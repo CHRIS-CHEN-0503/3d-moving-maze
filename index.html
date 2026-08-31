@@ -9,6 +9,7 @@
 <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🌀</text></svg>">
 <link rel="preload" as="image" href="./assets/首頁迷宮背景.webp" type="image/webp">
 <link rel="preload" as="image" href="./assets/遊戲視覺圖集.webp" type="image/webp">
+<link rel="preload" as="image" href="./assets/玩法說明圖集.webp" type="image/webp">
 <style>
 :root{
   --font:ui-rounded,'SF Pro Rounded','Microsoft JhengHei','PingFang TC','Comic Sans MS',system-ui,sans-serif;
@@ -381,6 +382,7 @@ button:focus-visible,input:focus-visible{outline:3px solid #fff;outline-offset:3
 .lb-tab{border:2px solid #ddd;background:#fafafa;border-radius:12px;padding:5px 10px;font-size:.85rem;cursor:pointer;}
 .lb-tab.sel{border-color:#7e57c2;background:#ede7f6;color:#4527a0;font-weight:bold;}
 .mp-mode-tabs{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));align-items:stretch;}
+.mp-mode-tabs[hidden]{display:none!important;}
 .mp-mode-btn{min-width:0;display:flex;flex-direction:column;align-items:center;gap:4px;padding:5px 3px;line-height:1.05;}
 .mp-mode-art{width:min(58px,100%);border-radius:10px;border:1px solid rgba(69,39,160,.24);box-shadow:0 3px 9px rgba(32,24,70,.2);}
 .mp-mode-copy{font-size:.72rem;font-weight:800;}
@@ -423,6 +425,96 @@ button:focus-visible,input:focus-visible{outline:3px solid #fff;outline-offset:3
   #startBtn{margin:2px auto 0;padding:5px;font-size:.86rem}.title-foot{margin-top:0}.mini-btn{padding:2px 6px;font-size:.62rem;margin:1px}.version-note{font-size:.56rem;margin-top:0}
   .result-art{width:104px}.win-card{padding:10px 14px}.win-card h2{font-size:1.45rem}.confetti{font-size:1.7rem}.win-stats{font-size:.92rem;margin:5px 0}.win-stats b{font-size:1.1rem}
 }
+
+/* ===== 首頁與分步進入流程 ===== */
+.title-card.entry-shell{display:block;max-width:940px;padding:18px 20px;overflow:hidden;}
+.entry-brand{position:relative;text-align:center;}
+.entry-brand h1{margin:0;}
+.entry-brand .sub{margin:2px 0 10px;}
+.flow-panel{display:none;animation:flowIn .2s ease;}
+.flow-panel.active{display:block;}
+@keyframes flowIn{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
+.home-intro{margin:4px auto 13px;max-width:620px;color:#f2f1ff;font-size:1rem;line-height:1.55;}
+.home-menu{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;max-width:720px;margin:0 auto;}
+.home-action{
+  min-height:92px;border:1px solid rgba(255,255,255,.2);border-radius:20px;padding:12px 15px;cursor:pointer;
+  display:grid;grid-template-columns:52px minmax(0,1fr);align-items:center;gap:12px;text-align:left;color:#fff;
+  background:linear-gradient(145deg,rgba(255,255,255,.14),rgba(255,255,255,.06));
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.1),0 8px 24px rgba(0,0,0,.22);transition:transform .12s,filter .12s,border-color .12s;
+}
+.home-action:hover,.home-action:focus-visible{transform:translateY(-2px);filter:brightness(1.1);border-color:rgba(255,255,255,.45);}
+.home-action .home-icon{font-size:2.25rem;text-align:center;filter:drop-shadow(0 4px 8px rgba(0,0,0,.35));}
+.home-action strong{display:block;font-size:1.12rem;color:#fff3c4;margin-bottom:2px;}
+.home-action small{display:block;color:#d7d6ec;font-size:.77rem;line-height:1.35;}
+.home-action.primary{background:linear-gradient(145deg,rgba(255,159,67,.42),rgba(200,80,32,.25));border-color:rgba(255,215,106,.48);}
+.home-action.multiplayer{background:linear-gradient(145deg,rgba(38,198,218,.38),rgba(27,92,130,.25));border-color:rgba(120,231,242,.5);}
+.home-action.history{background:linear-gradient(145deg,rgba(126,87,194,.38),rgba(63,43,112,.24));border-color:rgba(204,177,255,.42);}
+.home-action.help{grid-column:1/-1;}
+.home-utility{display:flex;justify-content:center;gap:8px;margin-top:10px;}
+.flow-head{display:grid;grid-template-columns:110px minmax(0,1fr) 110px;align-items:center;gap:8px;margin:2px 0 9px;}
+.flow-head h2{font-size:1.25rem;color:#fff3c4;margin:0;}
+.flow-back{border:1px solid rgba(255,255,255,.22);background:rgba(255,255,255,.1);color:#fff;border-radius:13px;padding:7px 10px;cursor:pointer;font-weight:800;text-align:left;}
+.flow-step{justify-self:end;color:#bdf9ff;font-size:.76rem;font-weight:800;letter-spacing:.04em;}
+.profile-stage{display:grid;grid-template-columns:minmax(0,1.35fr) minmax(260px,.65fr);gap:14px;align-items:center;}
+.profile-picker{text-align:left;}
+.profile-card{padding:8px 10px;border:1px solid rgba(255,255,255,.15);border-radius:18px;background:rgba(5,9,29,.3);}
+.profile-card #charPreviewWrap{margin:0;}
+.profile-name-label{display:block;margin:7px 0 4px;color:var(--gold);font-weight:800;font-size:.82rem;}
+.profile-card #playerName{width:100%;max-width:none;}
+.flow-error{min-height:17px;margin-top:3px;color:#ffb4a9;font-size:.75rem;font-weight:800;}
+.flow-actions{display:flex;justify-content:flex-end;gap:8px;margin-top:10px;}
+.flow-primary{border:0;border-radius:16px;padding:10px 22px;cursor:pointer;color:#fff;font-weight:900;font-size:1rem;background:linear-gradient(145deg,#ffd66b,#ff8f2f);box-shadow:0 4px 0 #c6531f;}
+.setup-stage{display:grid;grid-template-columns:minmax(0,1.18fr) minmax(300px,.82fr);gap:14px;text-align:left;}
+.setup-section{padding:7px 9px;border:1px solid rgba(255,255,255,.14);border-radius:17px;background:rgba(5,9,29,.3);}
+.setup-section .sec-label{margin:0 0 5px;}
+.setup-side{display:grid;gap:8px;align-content:start;}
+.setup-summary{display:flex;align-items:center;gap:7px;color:#deddf0;font-size:.76rem;}
+.setup-avatar{font-size:1.2rem;}
+.round-picker{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-top:6px;color:var(--gold);font-size:.78rem;font-weight:900;}
+.round-picker select{font-family:var(--font);min-width:92px;padding:5px 8px;border:2px solid rgba(120,231,242,.62);border-radius:11px;background:#101633;color:#fff;font-weight:900;}
+.setup-stage #spModeRow{grid-template-columns:repeat(2,minmax(0,1fr));gap:6px;}
+.setup-stage #viewRow{gap:5px;}
+.setup-stage .view-btn{padding:6px 9px;font-size:.8rem;}
+.setup-stage #startBtn{max-width:none;margin:0;padding:10px;font-size:1.05rem;}
+#mpChosenMode{margin:4px 0 6px;color:#7e57c2;font-size:1.05rem;font-weight:900;}
+.series-state{margin:5px 0;color:#ffd76a;font-size:.88rem;font-weight:900;}
+.series-summary{margin:7px auto;padding:7px 9px;border-radius:13px;background:rgba(120,231,242,.1);border:1px solid rgba(120,231,242,.25);font-size:.82rem;line-height:1.45;text-align:left;}
+.series-row{display:grid;grid-template-columns:28px minmax(0,1fr) 70px 86px;gap:5px;align-items:center;padding:3px 0;border-bottom:1px dashed rgba(255,255,255,.15);}
+.series-row:last-child{border-bottom:0;}.series-row strong{color:#fff3c4;}.series-row span:nth-last-child(-n+2){text-align:right;}
+.modal .series-summary{background:#f3f0ff;border-color:#d5c6ff;color:#4a4169;}.modal .series-row{border-color:#ddd4f4}.modal .series-row strong{color:#4527a0;}
+.help-visuals{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;margin:6px 0 12px;}
+.help-visual{overflow:hidden;border:2px solid #d9cef6;border-radius:13px;background:#111735;box-shadow:0 5px 14px rgba(45,42,74,.15);}
+.help-art{display:block;width:100%;aspect-ratio:1;background-image:url('./assets/玩法說明圖集.webp');background-size:300% 100%;background-repeat:no-repeat;}
+.help-art-controls{background-position:0 0}.help-art-pickups{background-position:50% 0}.help-art-exit{background-position:100% 0}
+.help-visual strong{display:block;padding:5px 3px;color:#4527a0;font-size:.78rem;text-align:center;line-height:1.2;}
+
+@media(orientation:landscape) and (max-height:520px){
+  #titleScreen{padding:5px;}
+  .title-card.entry-shell{max-width:970px;padding:7px 11px;border-radius:20px;}
+  .entry-brand h1{font-size:1.3rem;line-height:1.1;}
+  .entry-brand .sub{font-size:.67rem;margin:0 0 4px;}
+  .home-intro{font-size:.78rem;line-height:1.35;margin:2px auto 7px;}
+  .home-menu{gap:7px;max-width:720px;}
+  .home-action{min-height:68px;padding:7px 11px;border-radius:15px;grid-template-columns:38px minmax(0,1fr);gap:8px;}
+  .home-action .home-icon{font-size:1.65rem;}.home-action strong{font-size:.9rem;}.home-action small{font-size:.64rem;}
+  .home-utility{margin-top:5px}.home-utility .mini-btn{padding:4px 9px;font-size:.68rem;}
+  .flow-head{grid-template-columns:92px minmax(0,1fr) 92px;margin:0 0 4px;}.flow-head h2{font-size:1rem}.flow-back{padding:4px 7px;font-size:.7rem}.flow-step{font-size:.62rem}
+  .profile-stage{grid-template-columns:minmax(0,1.45fr) minmax(245px,.55fr);gap:8px;}
+  .profile-card{padding:5px 7px;border-radius:13px;}.profile-name-label{margin:3px 0 2px;font-size:.68rem}.flow-error{min-height:12px;font-size:.62rem}
+  .flow-actions{margin-top:4px}.flow-primary{padding:6px 16px;font-size:.78rem;border-radius:12px;}
+  .setup-stage{grid-template-columns:minmax(0,1.18fr) minmax(285px,.82fr);gap:8px;}.setup-section{padding:4px 6px;border-radius:12px}.setup-side{gap:4px}
+  .setup-summary{font-size:.62rem}.setup-avatar{font-size:.95rem}.setup-stage #spModeRow{gap:3px}.setup-stage #viewRow{gap:3px}
+  .round-picker{margin-top:3px;font-size:.62rem}.round-picker select{padding:2px 5px;font-size:.64rem;min-width:72px;}
+  .setup-stage .view-btn{padding:3px 5px;font-size:.64rem}.setup-stage #startBtn{padding:6px;font-size:.8rem}
+  #mpModal .m-card{max-height:96vh;padding:8px 12px;border-width:3px;border-radius:18px;}
+  #mpModal .m-card h3{font-size:1.05rem;margin:0 0 4px;}#mpChosenMode{font-size:.88rem;margin:2px 0;}
+  #mpModal .start-btn{padding:7px;font-size:.88rem;margin:5px auto!important;}#mpModal .m-close{padding:6px 18px;font-size:.8rem;margin-top:4px;}
+  .help-visuals{gap:5px;margin:3px 0 7px}.help-visual{border-radius:9px}.help-visual strong{padding:3px 2px;font-size:.62rem}
+}
+@media(max-width:620px){
+  .home-menu{grid-template-columns:1fr;}.profile-stage,.setup-stage{grid-template-columns:1fr;}.flow-head{grid-template-columns:90px minmax(0,1fr) 90px;}
+}
+@media(prefers-reduced-motion:reduce){.flow-panel{animation:none}.home-action{transition:none}}
 </style>
 </head>
 <body>
@@ -437,40 +529,80 @@ button:focus-visible,input:focus-visible{outline:3px solid #fff;outline-offset:3
     <span style="left:70%;animation-duration:16s;animation-delay:9s;">🍎</span>
     <span style="left:86%;animation-duration:20s;animation-delay:5s;">🗝️</span>
   </div>
-  <div class="title-card">
-    <h1>🌀 3D移動迷宮</h1>
-    <p class="sub">迷宮會變形！撿道具、找出口，比誰最快過關！</p>
-    <div class="sec-label char-label">1️⃣ 選擇你的角色</div>
-    <div class="char-row" id="charRow"></div>
-    <div id="charPreviewWrap">
-      <canvas id="charPreview" width="240" height="260"></canvas>
-      <div id="charDesc"></div>
-    </div>
-    <div class="sec-label level-label">2️⃣ 選擇關卡環境</div>
-    <div class="lvl-row" id="lvlRow"></div>
-    <div class="sec-label mode-label">3️⃣ 選擇玩法</div>
-    <div class="view-row" id="spModeRow">
-      <button class="view-btn mode-choice sel" data-m="classic"><span class="visual-atlas atlas-race title-mode-art" aria-hidden="true"></span><span class="mode-copy">🚩 經典闖關</span></button>
-      <button class="view-btn mode-choice" data-m="treasure"><span class="visual-atlas atlas-treasure title-mode-art" aria-hidden="true"></span><span class="mode-copy">💎 尋寶對戰</span></button>
-      <button class="view-btn mode-choice" data-m="tag"><span class="visual-atlas atlas-tag title-mode-art" aria-hidden="true"></span><span class="mode-copy">👹 鬼抓人</span></button>
-      <button class="view-btn mode-choice" data-m="shop"><span class="visual-atlas atlas-shop title-mode-art" aria-hidden="true"></span><span class="mode-copy">🛒 搶購模式</span></button>
-    </div>
-    <div class="sec-label view-label">4️⃣ 選擇初始視角</div>
-    <div class="view-row" id="viewRow">
-      <button class="view-btn sel" data-v="tp">🎥 第三人稱</button>
-      <button class="view-btn" data-v="fp">👀 第一人稱</button>
-      <button class="view-btn" data-v="top">🗺️ 俯視</button>
-    </div>
-    <div class="sec-label name-label">5️⃣ 角色名稱</div>
-    <input id="playerName" maxlength="10" placeholder="輸入名字">
-    <button class="start-btn" id="startBtn">🚩 開始冒險！</button>
-    <div class="title-foot">
-      <button class="mini-btn" id="mpBtn">👥 多人連線</button>
-      <button class="mini-btn" id="lbBtn">🏆 分數牆</button>
-      <button class="mini-btn" id="admBtn">⚙️ 遊戲設定</button>
-      <button class="mini-btn" id="helpBtn">❓ 玩法說明</button>
-    </div>
-    <div class="version-note">3D移動迷宮 v<span id="verLabel"></span></div>
+  <div class="title-card entry-shell">
+    <header class="entry-brand">
+      <h1>🌀 3D移動迷宮</h1>
+      <p class="sub">迷宮會變形！撿道具、找出口，比誰最快過關！</p>
+    </header>
+
+    <section class="flow-panel active" id="homePanel" aria-labelledby="homeTitle">
+      <p class="home-intro" id="homeTitle">準備好進入會移動的奇幻迷宮了嗎？先選擇今天想做的事。</p>
+      <div class="home-menu">
+        <button class="home-action primary" id="singleBtn"><span class="home-icon">🧭</span><span><strong>單人遊戲</strong><small>自己闖關，或和電腦挑戰尋寶、鬼抓人與搶購。</small></span></button>
+        <button class="home-action multiplayer" id="mpBtn"><span class="home-icon">👥</span><span><strong>多人遊戲</strong><small>先建立角色，再建立房間或輸入朋友的房號。</small></span></button>
+        <button class="home-action" id="admBtn"><span class="home-icon">⚙️</span><span><strong>遊戲設定</strong><small>調整迷宮大小、變形時間、音樂與視角。</small></span></button>
+        <button class="home-action history" id="lbBtn"><span class="home-icon">🏆</span><span><strong>勇者歷史</strong><small>查看各個迷宮的最快紀錄與歷代勇者。</small></span></button>
+        <button class="home-action help" id="helpBtn"><span class="home-icon">📖</span><span><strong>遊戲說明</strong><small>查看操作方法、道具、角色能力與各種玩法。</small></span></button>
+      </div>
+      <div class="version-note">3D移動迷宮 v<span id="verLabel"></span></div>
+    </section>
+
+    <section class="flow-panel" id="profilePanel" aria-labelledby="profileTitle">
+      <div class="flow-head"><button class="flow-back" id="profileBackBtn">← 回首頁</button><h2 id="profileTitle">建立你的角色</h2><span class="flow-step">步驟 1／2</span></div>
+      <div class="profile-stage">
+        <div class="profile-picker">
+          <div class="sec-label char-label">選擇人物</div>
+          <div class="char-row" id="charRow"></div>
+        </div>
+        <div class="profile-card">
+          <div id="charPreviewWrap">
+            <canvas id="charPreview" width="240" height="260"></canvas>
+            <div id="charDesc"></div>
+          </div>
+          <label class="profile-name-label" for="playerName">幫角色取一個名字</label>
+          <input id="playerName" maxlength="10" autocomplete="nickname" placeholder="輸入 1～10 個字">
+          <div class="flow-error" id="profileError" aria-live="polite"></div>
+        </div>
+      </div>
+      <div class="flow-actions"><button class="flow-primary" id="profileNextBtn">下一步：選擇關卡 →</button></div>
+    </section>
+
+    <section class="flow-panel" id="setupPanel" aria-labelledby="setupTitle">
+      <div class="flow-head"><button class="flow-back" id="setupBackBtn">← 回選角</button><h2 id="setupTitle">準備單人冒險</h2><span class="flow-step">步驟 2／2</span></div>
+      <div class="setup-stage">
+        <div class="setup-section">
+          <div class="sec-label level-label">選擇關卡環境</div>
+          <div class="lvl-row" id="lvlRow"></div>
+        </div>
+        <div class="setup-side">
+          <div class="setup-section">
+            <div class="setup-summary"><span class="setup-avatar" id="setupAvatar">👦</span><span id="setupPlayerSummary">小勇士準備出發</span></div>
+            <label class="round-picker" for="roundCount"><span>🔁 要玩幾輪</span><select id="roundCount" aria-label="遊戲輪數">
+              <option value="1">1 輪</option><option value="2">2 輪</option><option value="3" selected>3 輪</option><option value="4">4 輪</option><option value="5">5 輪</option>
+              <option value="6">6 輪</option><option value="7">7 輪</option><option value="8">8 輪</option><option value="9">9 輪</option><option value="10">10 輪</option>
+            </select></label>
+          </div>
+          <div class="setup-section">
+            <div class="sec-label mode-label">選擇玩法</div>
+            <div class="view-row" id="spModeRow">
+              <button class="view-btn mode-choice sel" data-m="classic"><span class="visual-atlas atlas-race title-mode-art" aria-hidden="true"></span><span class="mode-copy">🚩 經典闖關</span></button>
+              <button class="view-btn mode-choice" data-m="treasure"><span class="visual-atlas atlas-treasure title-mode-art" aria-hidden="true"></span><span class="mode-copy">💎 尋寶對戰</span></button>
+              <button class="view-btn mode-choice" data-m="tag"><span class="visual-atlas atlas-tag title-mode-art" aria-hidden="true"></span><span class="mode-copy">👹 鬼抓人</span></button>
+              <button class="view-btn mode-choice" data-m="shop"><span class="visual-atlas atlas-shop title-mode-art" aria-hidden="true"></span><span class="mode-copy">🛒 搶購模式</span></button>
+            </div>
+          </div>
+          <div class="setup-section">
+            <div class="sec-label view-label">選擇初始視角</div>
+            <div class="view-row" id="viewRow">
+              <button class="view-btn sel" data-v="tp">🎥 第三人稱</button>
+              <button class="view-btn" data-v="fp">👀 第一人稱</button>
+              <button class="view-btn" data-v="top">🗺️ 俯視</button>
+            </div>
+          </div>
+          <button class="start-btn" id="startBtn">🚩 開始單人冒險！</button>
+        </div>
+      </div>
+    </section>
   </div>
 </div>
 
@@ -486,6 +618,7 @@ button:focus-visible,input:focus-visible{outline:3px solid #fff;outline-offset:3
       <span id="cartWrap" style="display:none;">🛒 <b id="cartAmt">$0</b><span id="cartRank" style="font-size:.8rem;color:#8be9fd;margin-left:6px;"></span></span>
       <span>🌀 <span id="shiftCountdown">--</span></span>
       <span id="hudLvlName"></span>
+      <span id="hudRound">🔁 1/1</span>
     </div>
     <div id="minimapWrap">
       <canvas id="minimap" width="240" height="240"></canvas>
@@ -535,8 +668,10 @@ button:focus-visible,input:focus-visible{outline:3px solid #fff;outline-offset:3
       <div>獲得分數：<b id="winScore"></b> 分</div>
       <div id="winRank" style="font-size:.95rem;color:#7e57c2;margin-top:4px;"></div>
     </div>
+    <div class="series-state" id="winSeriesState"></div>
+    <div class="series-summary" id="winSeriesSummary"></div>
     <button class="start-btn" id="againBtn">🔁 再玩一次</button>
-    <button class="mini-btn" id="winLbBtn">🏆 看分數牆</button>
+    <button class="mini-btn" id="winLbBtn">🏆 看勇者歷史</button>
     <button class="mini-btn" id="winHomeBtn">🏠 回到選單</button>
   </div>
 </div>
@@ -544,16 +679,17 @@ button:focus-visible,input:focus-visible{outline:3px solid #fff;outline-offset:3
 <!-- ============ 多人連線 ============ -->
 <div class="modal" id="mpModal">
   <div class="m-card">
-    <h3>👥 多人連線（2～5 人）</h3>
+    <h3>👥 多人房間（2～5 人）</h3>
     <div id="mpSetup">
-      <div class="lb-tabs mp-mode-tabs">
+      <div class="lb-tabs mp-mode-tabs" hidden aria-hidden="true">
         <button class="lb-tab mp-mode-btn sel" id="mpModeRace"><span class="visual-atlas atlas-race mp-mode-art" aria-hidden="true"></span><span class="mp-mode-copy">🏁 比賽搶終點</span></button>
         <button class="lb-tab mp-mode-btn" id="mpModeTag"><span class="visual-atlas atlas-tag mp-mode-art" aria-hidden="true"></span><span class="mp-mode-copy">👹 鬼抓人</span></button>
         <button class="lb-tab mp-mode-btn" id="mpModeTre"><span class="visual-atlas atlas-treasure mp-mode-art" aria-hidden="true"></span><span class="mp-mode-copy">💎 尋寶</span></button>
         <button class="lb-tab mp-mode-btn" id="mpModeShop"><span class="visual-atlas atlas-shop mp-mode-art" aria-hidden="true"></span><span class="mp-mode-copy">🛒 搶購</span></button>
       </div>
+      <div id="mpChosenMode">🏁 已選擇：比賽搶終點</div>
       <div style="font-size:.85rem;color:#666;margin:6px 0;" id="mpModeDesc">大家從不同角落出發，看誰最快搶到中間的傳送門！</div>
-      <div style="font-size:.8rem;color:#999;margin-bottom:8px;">先在標題畫面選好角色和視角，遊戲中也能自由切換（視角已設計成公平的，看不到牆後面）。</div>
+      <div style="font-size:.8rem;color:#999;margin-bottom:8px;">人物、名稱、關卡與視角都已準備完成。遊戲中仍可自由切換開放的視角。</div>
       <div style="font-size:.85rem;color:#666;margin:8px 0 2px;">房間人數上限（最少 2 人、最多 5 人）</div>
       <div class="lb-tabs" id="mpSizeRow">
         <button class="lb-tab" data-n="2">2 人</button>
@@ -583,6 +719,9 @@ button:focus-visible,input:focus-visible{outline:3px solid #fff;outline-offset:3
   <div class="m-card">
     <h3 id="mpResultTitle">🏁 比賽結果</h3>
     <div id="mpResultBody" style="font-size:1.15rem;line-height:2;"></div>
+    <div class="series-state" id="mpSeriesState"></div>
+    <div class="series-summary" id="mpSeriesSummary"></div>
+    <button class="start-btn" id="mpNextRound" style="display:none;">➡️ 開始下一輪</button>
     <button class="m-close" id="mpResultHome">🏠 回到選單</button>
   </div>
 </div>
@@ -607,15 +746,17 @@ button:focus-visible,input:focus-visible{outline:3px solid #fff;outline-offset:3
       <div>這次撐了 <b id="failTime"></b></div>
       <div style="font-size:.95rem;color:#7e57c2;margin-top:6px;">💡 迷宮變形時會出現食物，記得撿來吃補充飽足感！</div>
     </div>
+    <div class="series-state" id="failSeriesState"></div>
+    <div class="series-summary" id="failSeriesSummary"></div>
     <button class="start-btn" id="failAgainBtn">🔁 再挑戰一次</button>
     <button class="mini-btn" id="failHomeBtn">🏠 回到選單</button>
   </div>
 </div>
 
-<!-- ============ 分數牆 ============ -->
+<!-- ============ 勇者歷史 ============ -->
 <div class="modal" id="lbModal">
   <div class="m-card">
-    <h3>🏆 分數牆</h3>
+    <h3>🏆 勇者歷史</h3>
     <div class="lb-tabs" id="lbTabs"></div>
     <div id="lbSyncState" style="font-size:.75rem;color:#999;margin-bottom:6px;"></div>
     <div style="overflow-x:auto;">
@@ -659,7 +800,7 @@ button:focus-visible,input:focus-visible{outline:3px solid #fff;outline-offset:3
       <input type="text" id="cfgBroker" placeholder="wss://broker.emqx.io:8084/mqtt">
     </div>
     <div class="adm-row" style="flex-direction:column;align-items:stretch;">
-      <label>☁️ 雲端分數牆 API 網址（選填）</label>
+      <label>☁️ 勇者歷史 API 網址（選填）</label>
       <input type="text" id="cfgApi" placeholder="https://script.google.com/...（留空＝只存在本機）">
     </div>
     <div class="adm-note">💡 填入 Google Apps Script 網址後，所有玩家的分數就能互相看見。做法請看資料夾內 README.md。</div>
@@ -671,6 +812,11 @@ button:focus-visible,input:focus-visible{outline:3px solid #fff;outline-offset:3
 <div class="modal" id="helpModal">
   <div class="m-card" style="text-align:left;font-size:.95rem;line-height:1.7;">
     <h3 style="text-align:center;">❓ 玩法說明</h3>
+    <div class="help-visuals" aria-label="玩法重點圖示">
+      <div class="help-visual"><span class="help-art help-art-controls" role="img" aria-label="左手搖桿移動，右手滑動旋轉視角"></span><strong>手機操作</strong></div>
+      <div class="help-visual"><span class="help-art help-art-pickups" role="img" aria-label="真正可拾取物有發光地面圈和垂直光柱"></span><strong>光圈＋光柱＝可拾取</strong></div>
+      <div class="help-visual"><span class="help-art help-art-exit" role="img" aria-label="金色發光傳送門是迷宮出口"></span><strong>金色傳送門＝出口</strong></div>
+    </div>
     <div>🕹️ <b>平板/手機</b>：左半邊拖曳搖桿移動；右半邊拖曳轉視角；俯視時雙指開合拉近拉遠。<b>一邊拖搖桿一邊按右下角的按鈕（攻擊／搶奪／結帳／鐵鍬…）都可以，不用停下來。</b></div>
     <div>⌨️ <b>電腦</b>：WASD / 方向鍵移動 · 滑鼠按住右半邊拖曳（或 Q / E）轉視角 · <b>空白鍵</b>用鐵鍬 · <b>F</b> 用風箏 · <b>X</b> 攻擊（尋寶／鬼抓人）或搶奪商品（搶購）· <b>B</b> 結帳（搶購）· <b>C</b> 隱身技能 · <b>G</b> 集合口哨 · <b>M</b> 開關大地圖 · <b>V</b> 切換視角 · 俯視時<b>滾輪</b>或 <b>＋/－</b> 拉近拉遠。</div>
     <div>🚩 目標：走到發光的<b>金色傳送門</b>就過關，越快分數越高！</div>
@@ -725,10 +871,10 @@ button:focus-visible,input:focus-visible{outline:3px solid #fff;outline-offset:3
    3D移動迷宮 — 給小朋友的變形迷宮冒險
    ===================================================== */
 const $=id=>document.getElementById(id);
-const GAME_VERSION='1.16.0';
+const GAME_VERSION='1.17.0';
 
 /* ---------- 設定（後台可調） ---------- */
-const DEFAULT_CFG={shiftMin:3,itemCount:6,foodCount:4,hungerMin:3,stunSec:3,pingSec:3,smellCells:3,mazeSize:13,musicOn:1,apiUrl:'',roomMax:3,goodsCount:16,shopMin:2.5,cartFull:400,views:{fp:1,tp:1,top:1},broker:'wss://broker.emqx.io:8084/mqtt'};
+const DEFAULT_CFG={shiftMin:3,itemCount:6,foodCount:4,hungerMin:3,stunSec:3,pingSec:3,smellCells:3,mazeSize:13,musicOn:1,apiUrl:'',roomMax:3,rounds:3,goodsCount:16,shopMin:2.5,cartFull:400,views:{fp:1,tp:1,top:1},broker:'wss://broker.emqx.io:8084/mqtt'};
 let CFG={...DEFAULT_CFG};
 try{const s=JSON.parse(localStorage.getItem('maze3d_cfg')||'{}');CFG={...DEFAULT_CFG,...s};}catch(e){}
 function saveCfg(){localStorage.setItem('maze3d_cfg',JSON.stringify(CFG));}
@@ -829,12 +975,13 @@ function jobPerk(key){ return isShop()?undefined:CH()[key]; } // 搶購模式大
 /* 把第 i 個商品放到某格（補貨也共用；房主決定位置後廣播，大家畫面一致） */
 function placeGood(i,gi,cx,cy){
   const old=G.goods[i];
-  if(old){ itemGroup.remove(old.sprite); itemGroup.remove(old.tag); }
+  if(old){ itemGroup.remove(old.sprite); itemGroup.remove(old.tag); itemGroup.remove(old.marker); }
   const g=GOODS[gi]||GOODS[0], p=cellToWorld(cx,cy);
   const sp=makeEmojiSprite(g.emoji,1.5); sp.position.set(p.x,1.0,p.z);
   const tag=makeTextSprite('$'+g.price); tag.position.set(p.x,1.85,p.z); tag.scale.set(1.5,0.38,1);
-  itemGroup.add(sp); itemGroup.add(tag);
-  G.goods[i]={g,gi,sprite:sp,tag,x:p.x,z:p.z,cx,cy,taken:false,backAt:0};
+  const marker=makePickupMarker(0xffd54f);marker.position.set(p.x,0,p.z);
+  itemGroup.add(sp); itemGroup.add(tag); itemGroup.add(marker);
+  G.goods[i]={g,gi,sprite:sp,tag,marker,x:p.x,z:p.z,cx,cy,taken:false,backAt:0};
 }
 function pickGood(rnd){
   const tot=GOODS.reduce((a,b)=>a+b.weight,0);
@@ -880,8 +1027,44 @@ const G={
  smellMarks:null, smellTarget:null, smellPath:null, smellPathAt:0,
  stunnedUntil:0, atkCoolUntil:0, spMode:'classic', coUntil:0, registers:[],
  visited:null, solutionPath:null, mapUntil:0, compassUntil:0, ghostUntil:0,
- muted:!CFG.musicOn,
+  muted:!CFG.musicOn,
 };
+
+/* ---------- 多輪賽事統計（1～10 輪） ---------- */
+const SERIES={kind:'single',total:1,current:0,stats:{}};
+function selectedRoundTotal(){return Math.max(1,Math.min(10,parseInt($('roundCount').value)||1));}
+function resetSeries(kind,total,players=[]){
+  SERIES.kind=kind; SERIES.total=Math.max(1,Math.min(10,parseInt(total)||1)); SERIES.current=0; SERIES.stats={};
+  players.forEach(p=>ensureSeriesPlayer({id:p.id,name:p.name,charIdx:p.charIdx}));
+}
+function ensureSeriesPlayer(result){
+  const id=result.id||'solo';
+  if(!SERIES.stats[id])SERIES.stats[id]={id,name:result.name||'玩家',charIdx:result.charIdx||0,wins:0,points:0};
+  return SERIES.stats[id];
+}
+function recordSeriesRound(results){
+  results.forEach(result=>{
+    const row=ensureSeriesPlayer(result);
+    row.wins+=result.win?1:0;
+    row.points+=Math.max(0,Math.round(result.points||0));
+  });
+  SERIES.current=Math.min(SERIES.total,SERIES.current+1);
+  return SERIES.current>=SERIES.total;
+}
+function rankedSeriesStats(){
+  return Object.values(SERIES.stats).sort((a,b)=>b.wins-a.wins||b.points-a.points||a.name.localeCompare(b.name,'zh-Hant'));
+}
+function seriesSummaryHtml(){
+  const medals=['🥇','🥈','🥉'];
+  return rankedSeriesStats().map((r,i)=>`<div class="series-row"><span>${medals[i]||'🎖️'}</span><strong>${CHARS[r.charIdx||0].emoji} ${escapeHtml(r.name)}</strong><span>${r.wins} 勝</span><span>${r.points} 分</span></div>`).join('');
+}
+function renderSingleSeriesResult(won){
+  const prefix=won?'win':'fail', final=SERIES.current>=SERIES.total;
+  $(prefix+'SeriesState').textContent=final?`🏆 ${SERIES.total} 輪全部完成｜最終統計`:`第 ${SERIES.current}／${SERIES.total} 輪完成`;
+  $(prefix+'SeriesSummary').innerHTML=seriesSummaryHtml();
+  const btn=$(won?'againBtn':'failAgainBtn');
+  btn.textContent=final?`🔁 再玩一組 ${SERIES.total} 輪`:`➡️ 開始第 ${SERIES.current+1} 輪`;
+}
 
 /* =====================================================
    音效引擎（WebAudio 電子音樂 + 特效音）
@@ -1326,6 +1509,22 @@ function makeEmojiSprite(emoji,size){
   const mat=new THREE.SpriteMaterial({map:spriteCache[emoji],transparent:true,depthWrite:false});
   const sp=new THREE.Sprite(mat); sp.scale.set(size,size,1); return sp;
 }
+/* 真正可拾取物共用的識別訊號：底圈＋向上光柱；裝飾物不使用 */
+function makePickupMarker(color,label){
+  if(!makePickupMarker.ringGeom)makePickupMarker.ringGeom=new THREE.TorusGeometry(0.72,0.08,8,24);
+  if(!makePickupMarker.beamGeom)makePickupMarker.beamGeom=new THREE.CylinderGeometry(0.08,0.32,1.8,8,1,true);
+  if(!makePickupMarker.materials)makePickupMarker.materials={};
+  if(!makePickupMarker.materials[color])makePickupMarker.materials[color]={
+    ring:new THREE.MeshBasicMaterial({color,transparent:true,opacity:.92}),
+    beam:new THREE.MeshBasicMaterial({color,transparent:true,opacity:.24,side:THREE.DoubleSide,depthWrite:false}),
+  };
+  const mats=makePickupMarker.materials[color],group=new THREE.Group();
+  const ring=new THREE.Mesh(makePickupMarker.ringGeom,mats.ring);ring.rotation.x=Math.PI/2;ring.position.y=.22;group.add(ring);
+  const beam=new THREE.Mesh(makePickupMarker.beamGeom,mats.beam);beam.position.y=1.05;group.add(beam);
+  if(label){const tag=makeTextSprite(label);tag.position.y=2.25;tag.scale.set(1.45,.36,1);group.add(tag);}
+  group.userData.phase=Math.random()*Math.PI*2;
+  return group;
+}
 </script>
 <script>
 'use strict';
@@ -1379,7 +1578,7 @@ function buildCharacter(cd){
 }
 
 /* =====================================================
-   五種環境（抬頭看得到東西，但物件數量刻意精簡）
+   六種環境（抬頭看得到東西，但物件數量刻意精簡）
    ===================================================== */
 function buildEnvironment(theme){
   if(envGroup){scene.remove(envGroup);envGroup=null;}
@@ -1432,11 +1631,10 @@ function buildEnvironment(theme){
       st.rotation.x=Math.PI; st.position.set((Math.random()-0.5)*span*1.1,7,(Math.random()-0.5)*span*1.1);
       envGroup.add(st);
     }
-    for(let i=0;i<7;i++){
+    for(let i=0;i<7;i++){ // 裝飾水晶固定在迷宮外圈，不與地上的可拾取物混淆
       const cr=new THREE.Mesh(new THREE.OctahedronGeometry(0.4),new THREE.MeshBasicMaterial({color:[0x40c4ff,0xb388ff,0x69f0ae][i%3]}));
-      cr.position.set((Math.random()-0.5)*span*1.2,0.4,(Math.random()-0.5)*span*1.2);
+      const a=i/7*Math.PI*2;cr.scale.set(2.2,3.4,2.2);cr.position.set(Math.cos(a)*R,1.35,Math.sin(a)*R);
       envGroup.add(cr);
-      envGroup.userData.anim.push(t=>{cr.rotation.y=t;cr.position.y=0.5+Math.sin(t*2+i)*0.12;});
     }
     for(let i=0;i<9;i++){
       const gem=makeEmojiSprite(['💎','✨','🔮'][i%3],1.6);
@@ -1521,9 +1719,9 @@ function buildEnvironment(theme){
       envGroup.userData.anim.push(t=>{blades.rotation.y=t*2.4+i;});
     }
     // 吊掛分區招牌
-    const signs=['🥦','🍖','🥛','🍞','🧃','🧻'];
+    const signs=['蔬果區','肉品區','乳品區','麵包區','飲料區','用品區'];
     for(let i=0;i<signs.length;i++){
-      const sg=makeEmojiSprite(signs[i],1.7);
+      const sg=makeTextSprite(signs[i]);sg.scale.set(2.4,.6,1);
       sg.position.set((i%3-1)*halfX*0.6,CH_-0.85,(Math.floor(i/3)-0.5)*halfZ*0.92);
       envGroup.add(sg);
     }
@@ -1591,10 +1789,10 @@ function buildEnvironment(theme){
   }
   else{ /* 🌫️ 迷霧沼澤：月亮 + 幽靈鬼火 + 枯樹 */
     const moon=makeEmojiSprite('🌕',9); moon.position.set(-span*0.4,30,-span*0.5); envGroup.add(moon);
-    for(let i=0;i<5;i++){
+    for(let i=0;i<5;i++){ // 鬼火維持高空飄動，避免看起來像地上道具
       const wisp=makeEmojiSprite('💠',1.6); const ph=i*1.3,rr=span*(0.2+i*0.08);
       envGroup.add(wisp);
-      envGroup.userData.anim.push(t=>{wisp.position.set(Math.cos(t*0.35+ph)*rr,2+Math.sin(t*1.1+ph)*1.1,Math.sin(t*0.35+ph)*rr);
+      envGroup.userData.anim.push(t=>{wisp.position.set(Math.cos(t*0.35+ph)*rr,5.2+Math.sin(t*1.1+ph)*.8,Math.sin(t*0.35+ph)*rr);
         wisp.material.opacity=0.5+Math.sin(t*2+ph)*0.35;});
     }
     for(let i=0;i<5;i++){
@@ -1644,11 +1842,9 @@ function spawnItems(){
     const type=pickItemType(spawnExcl), p=cellToWorld(cx,cy);
     if(type.id==='whistle')spawnExcl.add('whistle'); // 一輪只放一個
     const sp=makeEmojiSprite(type.emoji,1.5); sp.position.set(p.x,1.2,p.z);
-    const ring=new THREE.Mesh(new THREE.TorusGeometry(0.7,0.06,8,20),
-      new THREE.MeshBasicMaterial({color:0xffffff,transparent:true,opacity:0.55}));
-    ring.rotation.x=Math.PI/2; ring.position.set(p.x,0.25,p.z);
-    itemGroup.add(sp); itemGroup.add(ring);
-    G.items.push({type,sprite:sp,ring,x:p.x,z:p.z,taken:false});
+    const marker=makePickupMarker(0x78e7f2,'可拾取');marker.position.set(p.x,0,p.z);
+    itemGroup.add(sp); itemGroup.add(marker);
+    G.items.push({type,sprite:sp,marker,x:p.x,z:p.z,taken:false});
   }
   // 環境專屬道具（金色光圈，每輪 1 個）
   const envIt=isShop()?null:ENV_ITEMS[LEVELS[G.lvlIdx].id];
@@ -1660,11 +1856,9 @@ function spawnItems(){
       const key=cx+','+cy; if(used.has(key))continue; used.add(key);
       const p=cellToWorld(cx,cy);
       const sp=makeEmojiSprite(envIt.emoji,1.7); sp.position.set(p.x,1.3,p.z);
-      const ring=new THREE.Mesh(new THREE.TorusGeometry(0.8,0.07,8,20),
-        new THREE.MeshBasicMaterial({color:0xffd54f,transparent:true,opacity:0.8}));
-      ring.rotation.x=Math.PI/2; ring.position.set(p.x,0.25,p.z);
-      itemGroup.add(sp); itemGroup.add(ring);
-      G.items.push({type:envIt,sprite:sp,ring,x:p.x,z:p.z,taken:false});
+      const marker=makePickupMarker(0xffd54f,'關卡道具');marker.position.set(p.x,0,p.z);
+      itemGroup.add(sp); itemGroup.add(marker);
+      G.items.push({type:envIt,sprite:sp,marker,x:p.x,z:p.z,taken:false});
       placed=true;
     }
   }
@@ -1705,11 +1899,9 @@ function spawnItems(){
     const key=cx+','+cy; if(used.has(key))continue; used.add(key);
     const type=pickFoodType(), p=cellToWorld(cx,cy);
     const sp=makeEmojiSprite(type.emoji,1.4); sp.position.set(p.x,1.1,p.z);
-    const ring=new THREE.Mesh(new THREE.TorusGeometry(0.65,0.06,8,20),
-      new THREE.MeshBasicMaterial({color:0x8bc34a,transparent:true,opacity:0.6}));
-    ring.rotation.x=Math.PI/2; ring.position.set(p.x,0.25,p.z);
-    itemGroup.add(sp); itemGroup.add(ring);
-    G.foods.push({type,sprite:sp,ring,x:p.x,z:p.z,taken:false});
+    const marker=makePickupMarker(0x8bea68,'食物');marker.position.set(p.x,0,p.z);
+    itemGroup.add(sp); itemGroup.add(marker);
+    G.foods.push({type,sprite:sp,marker,x:p.x,z:p.z,taken:false});
   }
   scene.add(itemGroup);
 }
@@ -1738,6 +1930,8 @@ function loseGame(){
   G.running=false; G.frozen=true;
   AudioEng.stopMusic(); AudioEng.stopItemLoop(); AudioEng.sfxLose();
   $('failTime').textContent=fmtTime(G.elapsed);
+  recordSeriesRound([{id:'solo',name:getPlayerName(),charIdx:G.charIdx,win:false,points:0}]);
+  renderSingleSeriesResult(false);
   switchScreen('failScreen');
 }
 function showToast(msg,ms=1800){
@@ -2132,14 +2326,14 @@ function updatePlayer(dt,t){
   for(const [ii,it] of G.items.entries()){
     if(it.taken)continue;
     if((it.x-G.px)**2+(it.z-G.pz)**2<1.3){
-      it.taken=true; it.sprite.visible=false; it.ring.visible=false; applyItem(it);
+      it.taken=true; it.sprite.visible=false; it.marker.visible=false; applyItem(it);
       if(MP.on)mpSend({t:'take',kind:'item',i:ii,round:MP.round});
     }
   }
   for(const [fi,f] of G.foods.entries()){
     if(f.taken)continue;
     if((f.x-G.px)**2+(f.z-G.pz)**2<1.3){
-      f.taken=true; f.sprite.visible=false; f.ring.visible=false; applyFood(f);
+      f.taken=true; f.sprite.visible=false; f.marker.visible=false; applyFood(f);
       if(MP.on)mpSend({t:'take',kind:'food',i:fi,round:MP.round});
     }
   }
@@ -2148,7 +2342,7 @@ function updatePlayer(dt,t){
     for(const [gi,gd] of G.goods.entries()){
       if(gd.taken)continue;
       if((gd.x-G.px)**2+(gd.z-G.pz)**2<1.4){
-        gd.taken=true; gd.backAt=performance.now()+SHOP_RESTOCK_MS; gd.sprite.visible=false; gd.tag.visible=false;
+        gd.taken=true; gd.backAt=performance.now()+SHOP_RESTOCK_MS; gd.sprite.visible=false; gd.tag.visible=false; gd.marker.visible=false;
         cartAdd(MP.id,gd.gi);
         AudioEng.sfxCoin();
         showToast(gd.g.emoji+' '+gd.g.name+' +$'+gd.g.price,1200);
@@ -2940,6 +3134,8 @@ function winGame(){
   $('winLvl').textContent=LEVELS[G.lvlIdx].emoji+' '+LEVELS[G.lvlIdx].name;
   $('winTime').textContent=fmtTime(timeSec);
   $('winScore').textContent=score;
+  recordSeriesRound([{id:'solo',name:getPlayerName(),charIdx:G.charIdx,win:true,points:score}]);
+  renderSingleSeriesResult(true);
   const rec={name:getPlayerName(),char:CHARS[G.charIdx].emoji,level:LEVELS[G.lvlIdx].id,
     timeSec:Math.round(timeSec),score,date:new Date().toISOString().slice(0,10)};
   saveRecord(rec).then(rank=>{
@@ -2949,7 +3145,7 @@ function winGame(){
 }
 
 /* =====================================================
-   分數牆（本機儲存；後台可設定雲端 API 讓大家互相看見）
+   勇者歷史（本機儲存；後台可設定雲端 API 讓大家互相看見）
    ===================================================== */
 function getPlayerName(){
   return ($('playerName').value||'').trim()||'小勇士';
@@ -3002,7 +3198,7 @@ async function renderLeaderboard(){
   LEVELS.forEach(l=>mkTab(l.id,l.emoji+l.name));
   const body=$('lbBody'); body.innerHTML='<tr><td colspan="5">載入中…</td></tr>';
   let recs=await getAllRecords();
-  $('lbSyncState').textContent=G._remoteOk?'☁️ 雲端分數牆（大家都看得到）':'📱 目前只存在這台裝置（部署雲端分數牆的方法見 README）';
+  $('lbSyncState').textContent=G._remoteOk?'☁️ 雲端勇者歷史（大家都看得到）':'📱 目前只存在這台裝置（部署雲端勇者歷史的方法見 README）';
   if(lbFilter!=='all')recs=recs.filter(r=>r.level===lbFilter);
   recs.sort((a,b)=>a.timeSec-b.timeSec);
   recs=recs.slice(0,30);
@@ -3027,6 +3223,35 @@ function escapeHtml(s){return String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':
 function switchScreen(id){
   document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active'));
   $(id).classList.add('active');
+  if(id==='titleScreen')setFlowPanel('homePanel');
+}
+let entryMode='single';
+function setFlowPanel(id){
+  document.querySelectorAll('#titleScreen .flow-panel').forEach(p=>p.classList.toggle('active',p.id===id));
+  $('titleScreen').scrollTop=0;
+}
+function beginEntryFlow(mode){
+  entryMode=mode;
+  $('profileTitle').textContent=mode==='multi'?'建立多人角色':'建立單人角色';
+  $('profileError').textContent='';
+  requestLandscapeLock();
+  setFlowPanel('profilePanel');
+}
+function continueToSetup(){
+  const name=($('playerName').value||'').trim();
+  if(!name){
+    $('profileError').textContent='請先幫角色取一個名字';
+    $('playerName').focus();
+    return;
+  }
+  $('profileError').textContent='';
+  localStorage.setItem('maze3d_name',name);
+  $('setupTitle').textContent=entryMode==='multi'?'準備多人遊戲':'準備單人冒險';
+  document.querySelector('#spModeRow [data-m="classic"] .mode-copy').textContent=entryMode==='multi'?'🏁 比賽搶終點':'🚩 經典闖關';
+  $('startBtn').textContent=entryMode==='multi'?'👥 下一步：建立或加入房間':'🚩 開始單人冒險！';
+  $('setupAvatar').textContent=CHARS[G.charIdx].emoji;
+  $('setupPlayerSummary').textContent=name+'｜'+CHARS[G.charIdx].name+'・'+CHARS[G.charIdx].job;
+  setFlowPanel('setupPanel');
 }
 function buildTitleUI(){
   // 角色按鈕
@@ -3060,6 +3285,7 @@ function buildTitleUI(){
   });
   $('playerName').value=localStorage.getItem('maze3d_name')||'';
   $('playerName').addEventListener('input',()=>localStorage.setItem('maze3d_name',$('playerName').value));
+  $('roundCount').value=String(Math.max(1,Math.min(10,CFG.rounds||3)));
 }
 /* 角色 3D 預覽（旋轉展示台） */
 function initPreview(){
@@ -3158,8 +3384,7 @@ function startGame(){
     const tp=cellToWorld(tc.x,tc.y);
     G.treasureMesh=new THREE.Group();
     const gemSp=makeEmojiSprite('💎',2.0); gemSp.position.y=1.4; G.treasureMesh.add(gemSp);
-    const gRing=new THREE.Mesh(new THREE.TorusGeometry(0.9,0.09,8,22),new THREE.MeshBasicMaterial({color:0x40c4ff}));
-    gRing.rotation.x=Math.PI/2; gRing.position.y=0.25; G.treasureMesh.add(gRing);
+    G.treasureMesh.add(makePickupMarker(0x40c4ff,'寶藏'));
     G.treasureMesh.position.set(tp.x,0,tp.z);
     scene.add(G.treasureMesh);
     G.myGem=makeEmojiSprite('💎',1.2); G.myGem.position.y=2.7; G.myGem.visible=false;
@@ -3180,6 +3405,7 @@ function startGame(){
   if(!allowedViews().includes(G.view))G.view=allowedViews()[0];
   $('viewToggle').style.display=allowedViews().length<2?'none':'';
   $('hudLvlName').textContent=theme.emoji+' '+theme.name;
+  $('hudRound').textContent=`🔁 ${Math.min(SERIES.total,SERIES.current+1)}/${SERIES.total}`;
   updateShopHud();
   $('compassHud').style.display='none';
   switchScreen('gameScreen');
@@ -3244,9 +3470,9 @@ function loop(tms){
   }
   // 道具漂浮動畫
   const bob=Math.sin(t*3)*0.15;
-  for(const it of G.items)if(!it.taken){it.sprite.position.y=1.2+bob;it.ring.rotation.z=t;}
-  for(const f of G.foods)if(!f.taken){f.sprite.position.y=1.1-bob;f.ring.rotation.z=-t;}
-  if(G.goods)for(const gd of G.goods)if(!gd.taken){gd.sprite.position.y=1.0+bob*0.6;}
+  for(const it of G.items)if(!it.taken){it.sprite.position.y=1.2+bob;const s=1+Math.sin(t*3+it.marker.userData.phase)*.07;it.marker.scale.setScalar(s);}
+  for(const f of G.foods)if(!f.taken){f.sprite.position.y=1.1-bob;const s=1+Math.sin(t*3+f.marker.userData.phase)*.07;f.marker.scale.setScalar(s);}
+  if(G.goods)for(const gd of G.goods)if(!gd.taken){gd.sprite.position.y=1.0+bob*0.6;const s=1+Math.sin(t*3+gd.marker.userData.phase)*.07;gd.marker.scale.setScalar(s);}
   if(exitGroup){exitGroup.userData.ring.rotation.z=t*1.5;exitGroup.rotation.y=t*0.5;}
   if(G.treasureMesh&&G.treasureMesh.visible){G.treasureMesh.children[0].position.y=1.4+bob;G.treasureMesh.children[1].rotation.z=t;}
   if(envGroup){
@@ -3288,18 +3514,40 @@ function requestLandscapeLock(){
     if(p&&p.catch)p.catch(()=>{});
   }catch(e){}
 }
+function soloSeriesPlayer(){return{id:'solo',name:getPlayerName(),charIdx:G.charIdx};}
+function startSingleSeries(){
+  CFG.rounds=selectedRoundTotal();saveCfg();
+  resetSeries('single',CFG.rounds,[soloSeriesPlayer()]);
+  launchGame();
+}
+function continueSingleSeries(){
+  if(SERIES.current>=SERIES.total)resetSeries('single',SERIES.total,[soloSeriesPlayer()]);
+  launchGame();
+}
+function unfinishedSeries(){return SERIES.current>0&&SERIES.current<SERIES.total;}
+function confirmSeriesExit(){return !unfinishedSeries()||confirm(`還有 ${SERIES.total-SERIES.current} 輪尚未完成，確定要放棄目前統計並回到首頁嗎？`);}
 function wireUI(){
+  $('singleBtn').onclick=()=>beginEntryFlow('single');
+  $('profileBackBtn').onclick=()=>setFlowPanel('homePanel');
+  $('setupBackBtn').onclick=()=>setFlowPanel('profilePanel');
+  $('profileNextBtn').onclick=continueToSetup;
+  $('playerName').addEventListener('keydown',e=>{if(e.key==='Enter')continueToSetup();});
+  $('roundCount').addEventListener('change',()=>{CFG.rounds=selectedRoundTotal();saveCfg();});
   $('startBtn').onclick=()=>{
     AudioEng.init(); AudioEng.resume();
     requestLandscapeLock();
-    launchGame();
+    if(entryMode==='multi'){
+      openMultiplayerRoom();
+      return;
+    }
+    startSingleSeries();
   };
-  $('againBtn').onclick=()=>launchGame();
-  $('failAgainBtn').onclick=()=>launchGame();
-  $('failHomeBtn').onclick=()=>switchScreen('titleScreen');
-  $('winHomeBtn').onclick=()=>{switchScreen('titleScreen');};
+  $('againBtn').onclick=continueSingleSeries;
+  $('failAgainBtn').onclick=continueSingleSeries;
+  $('failHomeBtn').onclick=()=>{if(confirmSeriesExit())switchScreen('titleScreen');};
+  $('winHomeBtn').onclick=()=>{if(confirmSeriesExit())switchScreen('titleScreen');};
   $('quitBtn').onclick=()=>{
-    if(confirm('要離開這一局回到選單嗎？')){
+    if(confirm(`要離開這一局回到選單嗎？目前第 ${SERIES.current+1}／${SERIES.total} 輪的進度不會保留。`)){
       if(MP.on)mpLeave();
       G.running=false;AudioEng.stopMusic();AudioEng.stopItemLoop();switchScreen('titleScreen');
     }
@@ -3342,7 +3590,7 @@ function wireUI(){
   $('mapSizeBtn').onclick=e=>{e.stopPropagation();$('minimapWrap').classList.toggle('big');};
   $('bigMapClose').onclick=()=>$('bigMapOverlay').style.display='none';
   $('bigMapOverlay').onclick=e=>{if(e.target===$('bigMapOverlay'))$('bigMapOverlay').style.display='none';};
-  // 分數牆
+  // 勇者歷史
   $('lbBtn').onclick=()=>{$('lbModal').style.display='flex';renderLeaderboard();};
   $('winLbBtn').onclick=()=>{$('lbModal').style.display='flex';renderLeaderboard();};
   $('lbClose').onclick=()=>$('lbModal').style.display='none';
@@ -3396,6 +3644,7 @@ function launchGame(){
     mpHandle({t:'start',f:MP.id,seed:(Math.random()*2**31)|0,mode,lvl:G.lvlIdx,size:CFG.mazeSize,
       shiftMs:CFG.shiftMin*60000,hungerMin:CFG.hungerMin,roundMs:(mode==='shop'?(CFG.shopMin||2.5)*60000:150000),
       stunSec:CFG.stunSec,pingSec:CFG.pingSec,
+      seriesKind:'single',seriesRound:SERIES.current+1,seriesTotal:SERIES.total,
       order,players:MP.roster,itpw:mode==='tag'?randPower():null,
       it:mode==='tag'?order[Math.floor(Math.random()*order.length)]:null});
   }else{
@@ -3489,8 +3738,8 @@ function makeTextSprite(text){
 const MP={
   on:false, started:false, ended:false, endSent:false, host:false,
   room:'', id:'p'+Math.random().toString(36).slice(2,8),
-  mode:'race', pendingMode:'race', maxPlayers:3,
-  seed:0, round:0, size:13, shiftMs:180000, hungerMin:3, roundMs:150000,
+  mode:'race', pendingMode:'race', maxPlayers:3, plannedRounds:3,
+  seed:0, round:0, seriesRound:1, size:13, shiftMs:180000, hungerMin:3, roundMs:150000,
   order:[], roster:[], players:{}, outs:{},
   taggedId:null, tagImmuneUntil:0, raceEndAt:0, finishers:[],
   meFinished:false, meOut:false,
@@ -3499,8 +3748,32 @@ const MP={
   shopEndSent:false, robCoolUntil:0,
   net:null, posTimer:null, helloTimer:null,
 };
+const MP_ROUND_EVENTS=new Set(['pos','take','shift','reach','out','tag','hit','end','tres','prank','rob','costart','coend','codone','restock','shopend','wget','gather','inv','twin']);
 function mpTopic(){return 'ziwei-maze3d/'+MP.room;}
 function modeLabel(m){return m==='race'?'🏁 比賽搶終點':(m==='tag'?'👹 鬼抓人':(m==='shop'?'🛒 搶購大作戰':'💎 尋寶大作戰'));}
+const MP_MODE_DESCS={
+  race:'大家從不同角落出發，看誰最快搶到中間的傳送門！',
+  tag:'一個人當鬼追大家，被抓到就換你當鬼。時間到還是鬼的人就輸了！',
+  treasure:'搶寶藏💎帶到出口就贏！別人拿寶藏時可以用職業武器攻擊搶回來。',
+  shop:'在大賣場裡搶購！路徑上有商品，撿到最多金額的人獲勝。',
+};
+function selectMultiplayerMode(mode){
+  MP.pendingMode=mode;
+  const ids={race:'mpModeRace',tag:'mpModeTag',treasure:'mpModeTre',shop:'mpModeShop'};
+  Object.values(ids).forEach(id=>$(id).classList.toggle('sel',id===ids[mode]));
+  $('mpChosenMode').textContent=`已選擇：${modeLabel(mode)}｜${MP.plannedRounds||selectedRoundTotal()} 輪`;
+  $('mpModeDesc').textContent=MP_MODE_DESCS[mode];
+}
+function openMultiplayerRoom(){
+  AudioEng.init(); AudioEng.resume();
+  requestLandscapeLock();
+  CFG.rounds=selectedRoundTotal(); saveCfg();
+  MP.plannedRounds=CFG.rounds;
+  selectMultiplayerMode(G.spMode==='classic'?'race':G.spMode);
+  MP.maxPlayers=Math.max(2,Math.min(5,CFG.roomMax||3));
+  document.querySelectorAll('#mpSizeRow .lb-tab').forEach(x=>x.classList.toggle('sel',parseInt(x.dataset.n)===MP.maxPlayers));
+  $('mpModal').style.display='flex';
+}
 /* ===== 鬼抓人：職業能力（鬼抓人版）與鬼面具 ===== */
 const TAG_POWERS={
   speed:{mask:'👺',label:'⚡ 疾風（跑更快）'},
@@ -3543,6 +3816,7 @@ function makeBots(n,taken){
 }
 function mpSend(obj){
   if(!obj.f)obj.f=MP.id;
+  if(MP_ROUND_EVENTS.has(obj.t)&&obj.sr===undefined)obj.sr=MP.seriesRound;
   if(MP.net)MP.net.publish(mpTopic(),JSON.stringify(obj));
   else if(MP.on)mpHandle(JSON.parse(JSON.stringify(obj))); // 單機尋寶：本機迴路，重用多人邏輯
 }
@@ -3561,6 +3835,7 @@ function mpConnect(cb){
 /* ---- 訊息處理 ---- */
 function mpHandle(m){
   const now=performance.now();
+  if(MP_ROUND_EVENTS.has(m.t)&&Number(m.sr||1)!==MP.seriesRound)return; // 忽略上一輪延遲到達的封包
   switch(m.t){
     case 'hello':
       if(!MP.host||MP.started)break;
@@ -3568,7 +3843,7 @@ function mpHandle(m){
         if(MP.roster.length>=MP.maxPlayers){ mpSend({t:'full',to:m.f}); break; }
         MP.roster.push({id:m.f,name:m.name,charIdx:m.charIdx||0});
       }
-      mpSend({t:'lobby',players:MP.roster,mode:MP.mode,max:MP.maxPlayers});
+      mpSend({t:'lobby',players:MP.roster,mode:MP.mode,max:MP.maxPlayers,rounds:MP.plannedRounds});
       mpRenderLobby();
       break;
     case 'full':
@@ -3579,15 +3854,28 @@ function mpHandle(m){
     case 'lobby':
       if(MP.host||m.f===MP.id)break;
       MP.roster=m.players; MP.mode=m.mode; MP.maxPlayers=m.max||MP.maxPlayers;
+      MP.plannedRounds=Math.max(1,Math.min(10,parseInt(m.rounds)||1));
       clearInterval(MP.helloTimer); MP.helloTimer=null;
       $('mpSetup').style.display='none'; $('mpLobby').style.display='block';
       $('mpCode').textContent=MP.room;
-      $('mpModeShow').textContent=modeLabel(MP.mode);
+      $('mpModeShow').textContent=`${modeLabel(MP.mode)}｜${MP.plannedRounds} 輪`;
       $('mpStatus').textContent='等房主按開始…';
       mpRenderLobby();
       break;
     case 'start':
       if(MP.started)break;
+      {
+        const kind=m.seriesKind||(MP.net?'multi':'single');
+        const total=Math.max(1,Math.min(10,parseInt(m.seriesTotal)||1));
+        const round=Math.max(1,Math.min(total,parseInt(m.seriesRound)||1));
+        if(round===1||SERIES.kind!==kind)resetSeries(kind,total,m.players||[]);
+        else{
+          SERIES.total=total;
+          (m.players||[]).forEach(ensureSeriesPlayer);
+        }
+        MP.seriesRound=round;
+        MP.plannedRounds=total;
+      }
       MP.started=true; MP.ended=false; MP.endSent=false;
       MP.seed=m.seed; MP.mode=m.mode; MP.size=m.size; MP.shiftMs=m.shiftMs;
       MP.hungerMin=m.hungerMin; MP.roundMs=m.roundMs;
@@ -3603,6 +3891,7 @@ function mpHandle(m){
       MP.finishers=[]; MP.outs={}; MP.raceEndAt=0; MP.meFinished=false; MP.meOut=false;
       G.lvlIdx=m.lvl;
       $('mpModal').style.display='none';
+      $('mpResult').style.display='none';
       startGame();
       if(MP.bots)for(const b of MP.bots){ // 出發點跟真人一樣由 chooseStarts 指派
         const bi=Math.max(0,MP.order.indexOf(b.id))%(G.startCells?G.startCells.length:1);
@@ -3638,7 +3927,7 @@ function mpHandle(m){
       if(m.f===MP.id||m.round!==MP.round)break;
       if(m.kind==='good'){
         const gd=G.goods&&G.goods[m.i];
-        if(gd&&!gd.taken){gd.taken=true;gd.backAt=now+SHOP_RESTOCK_MS;gd.sprite.visible=false;gd.tag.visible=false;}
+        if(gd&&!gd.taken){gd.taken=true;gd.backAt=now+SHOP_RESTOCK_MS;gd.sprite.visible=false;gd.tag.visible=false;gd.marker.visible=false;}
         if(!fromMyBot(m.f)){                   // 房主端電腦撿到時已經算過，別再加一次
           const gi=(typeof m.gi==='number')?m.gi:Math.max(0,GOODS.findIndex(g=>g.price===m.v));
           cartAdd(m.f,gi);
@@ -3647,7 +3936,7 @@ function mpHandle(m){
         break;
       }
       const arr=m.kind==='item'?G.items:G.foods, it=arr&&arr[m.i];
-      if(it&&!it.taken){it.taken=true;it.sprite.visible=false;it.ring.visible=false;}
+      if(it&&!it.taken){it.taken=true;it.sprite.visible=false;it.marker.visible=false;}
       break;}
     case 'shift':
       if(!MP.started||MP.ended||G.shifting)break;
@@ -3789,7 +4078,7 @@ function mpHandle(m){
       AudioEng.stopMusic(); AudioEng.stopItemLoop();
       if(m.carts)MP.carts=m.carts;
       if(m.banked)MP.banked=m.banked;
-      const rows=MP.roster.map(r=>({name:r.name,id:r.id,v:shopTotal(r.id),b:MP.banked[r.id]||0})).sort((a,b)=>b.v-a.v);
+      const rows=MP.roster.map(r=>({name:r.name,id:r.id,charIdx:r.charIdx||0,v:shopTotal(r.id),b:MP.banked[r.id]||0})).sort((a,b)=>b.v-a.v||a.name.localeCompare(b.name,'zh-Hant'));
       const win=rows[0];
       if(win&&win.id===MP.id)AudioEng.sfxWin(); else AudioEng.sfxLose();
       const medals=['🥇','🥈','🥉'];
@@ -3800,7 +4089,7 @@ function mpHandle(m){
           +`${r.id===MP.id?'（你）':''}</div>`;
       });
       $('cartWrap').style.display='none';
-      showMPResults('🛒 搶購結果',html);
+      showMPResults('🛒 搶購結果',html,rows.map((r,i)=>({id:r.id,name:r.name,charIdx:r.charIdx,win:i===0,points:r.v})));
       break;}
     case 'wget': // 集合口哨全場唯一：記錄誰拿著
       MP.whistleHolder=m.f;
@@ -3828,14 +4117,14 @@ function mpHandle(m){
           html+=r.id===m.winner?`<div>🏆💎 ${escapeHtml(r.name)} — 把寶藏帶出迷宮！</div>`
                                :`<div>😿 ${escapeHtml(r.name)} — 差一點點</div>`;
         });
-        showMPResults('💎 尋寶結果',html);
+        showMPResults('💎 尋寶結果',html,MP.roster.map(r=>({id:r.id,name:r.name,charIdx:r.charIdx||0,win:r.id===m.winner,points:r.id===m.winner?1000:0})));
       }
       break;
     case 'bye':
       if(m.f===MP.id)break;
       if(!MP.started){
         MP.roster=MP.roster.filter(r=>r.id!==m.f);
-        if(MP.host)mpSend({t:'lobby',players:MP.roster,mode:MP.mode});
+        if(MP.host)mpSend({t:'lobby',players:MP.roster,mode:MP.mode,max:MP.maxPlayers,rounds:MP.plannedRounds});
         mpRenderLobby();
       }else{
         if(MP.whistleHolder===m.f)MP.whistleHolder=null; // 持有者離線→口哨釋放
@@ -4222,7 +4511,11 @@ function mpEndRace(){
     if(!MP.finishers.find(f=>f.id===r.id))
       html+=`<div>${MP.outs[r.id]?'😵':'⏳'} ${escapeHtml(r.name)} — 未完成</div>`;
   });
-  showMPResults('🏁 比賽結果',html);
+  const results=MP.roster.map(r=>{
+    const i=MP.finishers.findIndex(f=>f.id===r.id),f=i>=0?MP.finishers[i]:null;
+    return{id:r.id,name:r.name,charIdx:r.charIdx||0,win:i===0,points:f?Math.max(100,Math.round(6000-f.tm*15)):0};
+  });
+  showMPResults('🏁 比賽結果',html,results);
 }
 function mpTagEnd(loser){
   MP.ended=true; G.frozen=true; AudioEng.stopMusic(); AudioEng.stopItemLoop();
@@ -4232,11 +4525,19 @@ function mpTagEnd(loser){
     html+=r.id===loser?`<div>👹 ${escapeHtml(r.name)} — 時間到還是鬼，輸了！</div>`
                       :`<div>🏆 ${escapeHtml(r.name)} — 成功逃脫！</div>`;
   });
-  showMPResults('👹 鬼抓人結果',html);
+  showMPResults('👹 鬼抓人結果',html,MP.roster.map(r=>({id:r.id,name:r.name,charIdx:r.charIdx||0,win:r.id!==loser,points:r.id!==loser?1000:0})));
 }
-function showMPResults(title,html){
-  $('mpResultTitle').textContent=title;
+function showMPResults(title,html,results=[]){
+  const final=recordSeriesRound(results);
+  MP.started=false; G.running=false; G.frozen=true;
+  $('mpResultTitle').textContent=final?'🏆 最終結果｜'+title:title;
   $('mpResultBody').innerHTML=html;
+  $('mpSeriesState').textContent=final
+    ?`${SERIES.total} 輪全部完成｜先比勝場，再比總分`
+    :`第 ${SERIES.current}／${SERIES.total} 輪完成${SERIES.kind==='multi'&&!MP.host?'｜等待房主開始下一輪':''}`;
+  $('mpSeriesSummary').innerHTML=seriesSummaryHtml();
+  $('mpNextRound').textContent=`➡️ 開始第 ${SERIES.current+1} 輪`;
+  $('mpNextRound').style.display=!final&&(SERIES.kind==='single'||MP.host)?'block':'none';
   $('mpResult').style.display='flex';
 }
 
@@ -4264,6 +4565,7 @@ function mpLeave(){
   MP.treasure=null; MP.bots=null; MP.twinSent=false;
   MP.itPower=null; MP.hp={}; MP.itRegenAt=0; MP.whistleHolder=null; MP.carts={}; MP.cartList={};
   MP.banked={}; MP.coUntil={}; MP.shopEndSent=false; MP.robCoolUntil=0;
+  MP.seriesRound=1;
   $('cartWrap').style.display='none';
   G.invisUntil=0; G.skillCoolUntil=0; G.radarPings=null;
   G.smellMarks=null; G.smellTarget=null; G.smellPath=null; $('smellHud').style.display='none';
@@ -4277,16 +4579,38 @@ function mpLeave(){
   $('mpSetup').style.display='block'; $('mpLobby').style.display='none';
 }
 
+function confirmMultiplayerExit(){
+  if(!MP.on)return true;
+  if(MP.started||unfinishedSeries())return confirm(`目前第 ${Math.min(SERIES.total,SERIES.current+1)}／${SERIES.total} 輪尚未完成，確定要離開並放棄這組統計嗎？`);
+  return confirm('確定要離開目前的多人房間嗎？');
+}
+function sendMpRoundStart(players,seriesRound){
+  const order=players.map(r=>r.id),tagPool=players.map(r=>r.id);
+  mpSend({t:'start',seed:(Math.random()*2**31)|0,mode:MP.mode,lvl:G.lvlIdx,size:CFG.mazeSize,
+    shiftMs:CFG.shiftMin*60000,hungerMin:CFG.hungerMin,roundMs:(MP.mode==='shop'?(CFG.shopMin||2.5)*60000:150000),
+    stunSec:CFG.stunSec,pingSec:CFG.pingSec,seriesKind:'multi',seriesRound,seriesTotal:SERIES.total,
+    order,players,itpw:MP.mode==='tag'?randPower():null,
+    it:MP.mode==='tag'?tagPool[Math.floor(Math.random()*tagPool.length)]:null});
+}
+
 /* ---- 按鈕 ---- */
-$('mpBtn').onclick=()=>{
-  AudioEng.init(); AudioEng.resume();
-  requestLandscapeLock();
-  MP.maxPlayers=Math.max(2,Math.min(5,CFG.roomMax||3));
-  document.querySelectorAll('#mpSizeRow .lb-tab').forEach(x=>x.classList.toggle('sel',parseInt(x.dataset.n)===MP.maxPlayers));
-  $('mpModal').style.display='flex';
+$('mpBtn').onclick=()=>beginEntryFlow('multi');
+$('mpClose').onclick=()=>{if(confirmMultiplayerExit())mpLeave();};
+$('mpResultHome').onclick=()=>{
+  if(!confirmSeriesExit())return;
+  mpLeave(); G.running=false; switchScreen('titleScreen');
 };
-$('mpClose').onclick=()=>mpLeave();
-$('mpResultHome').onclick=()=>{ mpLeave(); G.running=false; switchScreen('titleScreen'); };
+$('mpNextRound').onclick=()=>{
+  if(SERIES.current>=SERIES.total)return;
+  if(SERIES.kind==='single'){
+    $('mpResult').style.display='none';
+    continueSingleSeries();
+    return;
+  }
+  if(!MP.host)return;
+  $('mpNextRound').style.display='none';
+  sendMpRoundStart([...MP.roster],SERIES.current+1);
+};
 document.querySelectorAll('#mpSizeRow .lb-tab').forEach(b=>{
   b.onclick=()=>{
     MP.maxPlayers=parseInt(b.dataset.n);
@@ -4294,22 +4618,17 @@ document.querySelectorAll('#mpSizeRow .lb-tab').forEach(b=>{
     document.querySelectorAll('#mpSizeRow .lb-tab').forEach(x=>x.classList.toggle('sel',x===b));
   };
 });
-$('mpModeRace').onclick=()=>{ $('mpModeShop').classList.remove('sel'); MP.pendingMode='race'; $('mpModeRace').classList.add('sel'); $('mpModeTag').classList.remove('sel'); $('mpModeTre').classList.remove('sel');
-  $('mpModeDesc').textContent='大家從不同角落出發，看誰最快搶到中間的傳送門！'; };
-$('mpModeTag').onclick=()=>{ $('mpModeShop').classList.remove('sel'); MP.pendingMode='tag'; $('mpModeTag').classList.add('sel'); $('mpModeRace').classList.remove('sel'); $('mpModeTre').classList.remove('sel');
-  $('mpModeDesc').textContent='一個人當鬼追大家，被抓到就換你當鬼。時間到還是鬼的人就輸了！（不用擔心肚子餓）'; };
-$('mpModeShop').onclick=()=>{ MP.pendingMode='shop';
-  ['mpModeShop','mpModeRace','mpModeTag','mpModeTre'].forEach(id=>$(id).classList.toggle('sel',id==='mpModeShop'));
-  $('mpModeDesc').textContent='在大賣場裡搶購！路徑上有商品，撿最多錢的人獲勝。沒有任何技能，只有加速藥水和調皮鬼'; };
-$('mpModeTre').onclick=()=>{ $('mpModeShop').classList.remove('sel'); MP.pendingMode='treasure'; $('mpModeTre').classList.add('sel'); $('mpModeRace').classList.remove('sel'); $('mpModeTag').classList.remove('sel');
-  $('mpModeDesc').textContent='搶寶藏💎帶到出口就贏！別人拿寶藏時可以用職業武器攻擊搶回來（大地圖人數不足會由電腦補位）'; };
+$('mpModeRace').onclick=()=>selectMultiplayerMode('race');
+$('mpModeTag').onclick=()=>selectMultiplayerMode('tag');
+$('mpModeShop').onclick=()=>selectMultiplayerMode('shop');
+$('mpModeTre').onclick=()=>selectMultiplayerMode('treasure');
 $('mpCreate').onclick=()=>{
   MP.on=true; MP.host=true; MP.mode=MP.pendingMode;
   MP.room=String(1000+Math.floor(Math.random()*9000));
   MP.roster=[{id:MP.id,name:getPlayerName(),charIdx:G.charIdx}];
   $('mpSetup').style.display='none'; $('mpLobby').style.display='block';
   $('mpCode').textContent=MP.room;
-  $('mpModeShow').textContent=modeLabel(MP.mode);
+  $('mpModeShow').textContent=`${modeLabel(MP.mode)}｜${MP.plannedRounds} 輪`;
   mpRenderLobby();
   mpConnect(()=>mpRenderLobby());
 };
@@ -4331,12 +4650,12 @@ $('mpStart').onclick=()=>{
   if((MP.mode==='treasure'||MP.mode==='shop')&&CFG.mazeSize>=15){ // 大地圖人數不足 → 電腦補位
     players=players.concat(makeBots(MP.maxPlayers-players.length,players));
   }
-  const order=players.map(r=>r.id);
-  mpSend({t:'start',seed:(Math.random()*2**31)|0,mode:MP.mode,lvl:G.lvlIdx,size:CFG.mazeSize,
-    shiftMs:CFG.shiftMin*60000,hungerMin:CFG.hungerMin,roundMs:(MP.mode==='shop'?(CFG.shopMin||2.5)*60000:150000),
-    stunSec:CFG.stunSec,pingSec:CFG.pingSec,
-    order,players,itpw:randPower(),it:MP.roster.map(r=>r.id)[Math.floor(Math.random()*MP.roster.length)]});
+  resetSeries('multi',selectedRoundTotal(),players);
+  sendMpRoundStart(players,1);
 };
+window.addEventListener('beforeunload',e=>{
+  if(G.running||MP.started){e.preventDefault();e.returnValue='';}
+});
 window.addEventListener('pagehide',()=>{ if(MP.on)try{mpSend({t:'bye'});}catch(e){} });
 </script>
 </body>

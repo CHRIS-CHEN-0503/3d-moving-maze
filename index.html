@@ -8,6 +8,7 @@
 <title>🌀 3D移動迷宮</title>
 <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🌀</text></svg>">
 <link rel="preload" as="image" href="./assets/首頁迷宮背景.webp" type="image/webp">
+<link rel="preload" as="image" href="./assets/遊戲視覺圖集.webp" type="image/webp">
 <style>
 :root{
   --font:ui-rounded,'SF Pro Rounded','Microsoft JhengHei','PingFang TC','Comic Sans MS',system-ui,sans-serif;
@@ -76,17 +77,32 @@ button{font-family:var(--font);}
 #charPreviewWrap{display:flex;gap:10px;align-items:center;justify-content:center;margin-top:8px;}
 #charPreview{width:120px;height:130px;border-radius:18px;background:linear-gradient(180deg,rgba(139,216,255,.86),rgba(139,236,183,.72));border:2px solid rgba(255,255,255,.48);box-shadow:inset 0 0 24px rgba(255,255,255,.22),0 8px 20px rgba(0,0,0,.3);}
 #charDesc{font-size:.9rem;color:#ecebfa;max-width:190px;text-align:left;}
+.visual-atlas{
+  display:block;aspect-ratio:1;background-image:url('./assets/遊戲視覺圖集.webp');background-repeat:no-repeat;
+  background-size:400% 300%;background-color:#141936;
+}
+.atlas-indoor{background-position:0 0}.atlas-field{background-position:33.333333% 0}.atlas-cave{background-position:66.666667% 0}.atlas-forest{background-position:100% 0}
+.atlas-mist{background-position:0 50%}.atlas-volcano{background-position:33.333333% 50%}.atlas-race{background-position:66.666667% 50%}.atlas-tag{background-position:100% 50%}
+.atlas-treasure{background-position:0 100%}.atlas-shop{background-position:33.333333% 100%}.atlas-win{background-position:66.666667% 100%}.atlas-fail{background-position:100% 100%}
 .lvl-row{display:grid;grid-template-columns:repeat(3,1fr);gap:6px;}
 @media(max-width:520px){.lvl-row{grid-template-columns:repeat(3,1fr);}}
 .lvl-btn{
-  border:2px solid rgba(255,255,255,.26);border-radius:16px;padding:8px 2px;cursor:pointer;font-size:.78rem;
-  color:#fff;text-shadow:1px 1px 2px rgba(0,0,0,.5);transition:transform .12s;
+  border:2px solid rgba(255,255,255,.26);border-radius:16px;padding:4px;cursor:pointer;font-size:.78rem;
+  color:#fff;text-shadow:1px 1px 2px rgba(0,0,0,.65);transition:transform .12s;display:grid;
+  grid-template-columns:52px minmax(0,1fr);gap:7px;align-items:center;text-align:left;overflow:hidden;
 }
-.lvl-btn .le{font-size:1.5rem;display:block;}
+.lvl-btn .level-art{width:52px;border-radius:11px;border:1px solid rgba(255,255,255,.5);box-shadow:0 3px 10px rgba(0,0,0,.35);}
+.lvl-btn .level-copy{min-width:0;font-weight:900;line-height:1.15;}
+.lvl-btn .le{font-size:.95rem;margin-right:2px;}
+.lvl-btn .level-name{display:block;}
 .lvl-btn.sel{border-color:var(--gold);transform:scale(1.05);box-shadow:0 0 0 2px rgba(255,215,106,.18),0 6px 18px rgba(0,0,0,.32);}
 .view-row{display:flex;gap:8px;justify-content:center;flex-wrap:wrap;}
 .view-btn{border:2px solid rgba(255,255,255,.2);border-radius:14px;background:rgba(255,255,255,.09);color:#f8f7ff;padding:8px 14px;cursor:pointer;font-size:.95rem;transition:transform .12s,background .12s,border-color .12s;}
 .view-btn.sel{border-color:var(--cyan);background:rgba(38,198,218,.22);color:#c9fbff;font-weight:bold;box-shadow:0 0 0 2px rgba(120,231,242,.12);}
+#spModeRow{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));}
+#spModeRow .mode-choice{min-width:0;padding:4px;display:grid;grid-template-columns:38px minmax(0,1fr);gap:5px;align-items:center;text-align:left;line-height:1.1;}
+#spModeRow .title-mode-art{width:38px;border-radius:9px;border:1px solid rgba(255,255,255,.45);box-shadow:0 2px 8px rgba(0,0,0,.3);}
+#spModeRow .mode-copy{font-size:.78rem;font-weight:800;}
 #playerName{
   font-family:var(--font);font-size:1.05rem;padding:10px 12px;border-radius:14px;border:2px solid rgba(255,255,255,.3);
   width:min(260px,70%);text-align:center;background:rgba(5,9,29,.5);color:#fff;outline:none;
@@ -142,7 +158,8 @@ button:focus-visible,input:focus-visible{outline:3px solid #fff;outline-offset:3
   #spModeRow{grid-area:mode-row}#viewRow{grid-area:view-row}#playerName{grid-area:player-name;justify-self:center}
   #startBtn{grid-area:start;margin:5px auto 1px;padding:9px;font-size:1.05rem}.title-foot{grid-area:foot;margin-top:1px}.version-note{grid-area:version;margin-top:1px}
   .sec-label{margin:4px 0 2px;font-size:.82rem}.char-btn{padding:3px 2px}.char-btn .ce{font-size:1.3rem}.char-btn .cj{font-size:.52rem}
-  #charPreview{width:86px;height:92px}.lvl-btn{padding:4px 2px}.lvl-btn .le{font-size:1.15rem}.view-btn{padding:5px 8px;font-size:.75rem}
+  #charPreview{width:86px;height:92px}.lvl-btn{padding:3px;grid-template-columns:42px minmax(0,1fr);gap:5px}.lvl-btn .level-art{width:42px}.lvl-btn .le{font-size:.78rem}.lvl-btn .level-name{font-size:.68rem}.view-btn{padding:5px 8px;font-size:.75rem}
+  #spModeRow .mode-choice{grid-template-columns:30px minmax(0,1fr);gap:3px;padding:3px}#spModeRow .title-mode-art{width:30px}#spModeRow .mode-copy{font-size:.64rem}
   #playerName{padding:6px 10px;font-size:.88rem}.mini-btn{padding:5px 9px;font-size:.75rem;margin:2px}
 }
 @media(prefers-reduced-motion:reduce){
@@ -330,17 +347,21 @@ button:focus-visible,input:focus-visible{outline:3px solid #fff;outline-offset:3
 
 /* ===== 過關畫面 ===== */
 #winScreen{
-  background:radial-gradient(circle at 50% 30%,#5b4aa0,#241c50 70%);
+  background:radial-gradient(circle at 50% 24%,#55419c,#17132f 72%);
   flex-direction:column;align-items:center;justify-content:center;padding:14px;overflow-y:auto;
 }
 .win-card{
-  background:#fff;border-radius:28px;border:6px solid #ffd54f;max-width:520px;width:100%;
-  padding:22px 18px;text-align:center;box-shadow:0 14px 36px rgba(0,0,0,.4);
+  background:linear-gradient(155deg,rgba(29,34,73,.97),rgba(10,14,38,.98));border-radius:28px;border:5px solid #ffd54f;max-width:520px;width:100%;
+  padding:16px 18px;text-align:center;box-shadow:0 18px 46px rgba(0,0,0,.55),inset 0 1px 0 rgba(255,255,255,.14);color:#f7f5ff;
 }
 .win-card h2{color:#ff9800;font-size:2rem;margin:4px 0;}
-.win-stats{font-size:1.15rem;margin:10px 0;color:#4527a0;}
-.win-stats b{font-size:1.5rem;color:#e65100;}
+.win-stats{font-size:1.15rem;margin:10px 0;color:#e9e5ff;}
+.win-stats b{font-size:1.5rem;color:#ffd76a;}
 .confetti{font-size:2.4rem;}
+.result-art{width:min(156px,38vw);margin:0 auto 5px;border-radius:22px;border:3px solid rgba(255,255,255,.8);box-shadow:0 10px 28px rgba(0,0,0,.5),0 0 28px rgba(120,231,242,.16);}
+#failScreen{overflow-y:auto;}
+#failScreen .win-card{border-color:#90a4ae;}
+#failScreen .result-art{box-shadow:0 10px 28px rgba(0,0,0,.55),0 0 30px rgba(239,83,80,.16);}
 
 /* ===== 分數牆 & 後台 modal ===== */
 .modal{
@@ -359,6 +380,10 @@ button:focus-visible,input:focus-visible{outline:3px solid #fff;outline-offset:3
 .lb-tabs{display:flex;gap:6px;justify-content:center;margin-bottom:8px;flex-wrap:wrap;}
 .lb-tab{border:2px solid #ddd;background:#fafafa;border-radius:12px;padding:5px 10px;font-size:.85rem;cursor:pointer;}
 .lb-tab.sel{border-color:#7e57c2;background:#ede7f6;color:#4527a0;font-weight:bold;}
+.mp-mode-tabs{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));align-items:stretch;}
+.mp-mode-btn{min-width:0;display:flex;flex-direction:column;align-items:center;gap:4px;padding:5px 3px;line-height:1.05;}
+.mp-mode-art{width:min(58px,100%);border-radius:10px;border:1px solid rgba(69,39,160,.24);box-shadow:0 3px 9px rgba(32,24,70,.2);}
+.mp-mode-copy{font-size:.72rem;font-weight:800;}
 .adm-row{display:flex;justify-content:space-between;align-items:center;margin:10px 0;text-align:left;gap:8px;}
 .adm-row label{font-size:.95rem;color:#444;flex:1;}
 .adm-row input[type=number],.adm-row select{
@@ -387,6 +412,17 @@ button:focus-visible,input:focus-visible{outline:3px solid #fff;outline-offset:3
 @keyframes rotateHint{0%,100%{transform:rotate(0)}50%{transform:rotate(90deg)}}
 @media(orientation:portrait) and (max-width:900px){#landscapeGate{display:flex;}}
 @media(prefers-reduced-motion:reduce){#landscapeGate .rotate-icon{animation:none;}}
+@media(orientation:landscape) and (max-height:470px){
+  #titleScreen{padding:4px}.title-card{padding:5px 10px;column-gap:12px;row-gap:0;border-radius:20px}
+  .title-card h1{font-size:1.25rem}.title-card .sub{font-size:.66rem;margin-bottom:0}.sec-label{font-size:.68rem;margin:1px 0}
+  .char-btn{padding:1px 2px;border-radius:11px;font-size:.64rem}.char-btn .ce{font-size:1rem}.char-btn .cj{font-size:.44rem}
+  #charPreviewWrap{gap:6px;margin-top:0}#charPreview{width:66px;height:70px;border-radius:13px}#charDesc{font-size:.7rem;max-width:175px}
+  .lvl-btn{grid-template-columns:34px minmax(0,1fr);gap:3px;padding:2px;border-radius:11px}.lvl-btn .level-art{width:34px;border-radius:8px}.lvl-btn .le{font-size:.65rem}.lvl-btn .level-name{font-size:.6rem}
+  #spModeRow .mode-choice{grid-template-columns:24px minmax(0,1fr);gap:2px;padding:2px;border-radius:10px}#spModeRow .title-mode-art{width:24px;border-radius:6px}#spModeRow .mode-copy{font-size:.57rem}
+  .view-btn{padding:3px 6px;font-size:.65rem;border-radius:10px}#playerName{padding:3px 8px;font-size:.74rem}
+  #startBtn{margin:2px auto 0;padding:5px;font-size:.86rem}.title-foot{margin-top:0}.mini-btn{padding:2px 6px;font-size:.62rem;margin:1px}.version-note{font-size:.56rem;margin-top:0}
+  .result-art{width:104px}.win-card{padding:10px 14px}.win-card h2{font-size:1.45rem}.confetti{font-size:1.7rem}.win-stats{font-size:.92rem;margin:5px 0}.win-stats b{font-size:1.1rem}
+}
 </style>
 </head>
 <body>
@@ -414,10 +450,10 @@ button:focus-visible,input:focus-visible{outline:3px solid #fff;outline-offset:3
     <div class="lvl-row" id="lvlRow"></div>
     <div class="sec-label mode-label">3️⃣ 選擇玩法</div>
     <div class="view-row" id="spModeRow">
-      <button class="view-btn sel" data-m="classic">🚩 經典闖關</button>
-      <button class="view-btn" data-m="treasure">💎 尋寶對戰</button>
-      <button class="view-btn" data-m="tag">👹 鬼抓人</button>
-      <button class="view-btn" data-m="shop">🛒 搶購模式</button>
+      <button class="view-btn mode-choice sel" data-m="classic"><span class="visual-atlas atlas-race title-mode-art" aria-hidden="true"></span><span class="mode-copy">🚩 經典闖關</span></button>
+      <button class="view-btn mode-choice" data-m="treasure"><span class="visual-atlas atlas-treasure title-mode-art" aria-hidden="true"></span><span class="mode-copy">💎 尋寶對戰</span></button>
+      <button class="view-btn mode-choice" data-m="tag"><span class="visual-atlas atlas-tag title-mode-art" aria-hidden="true"></span><span class="mode-copy">👹 鬼抓人</span></button>
+      <button class="view-btn mode-choice" data-m="shop"><span class="visual-atlas atlas-shop title-mode-art" aria-hidden="true"></span><span class="mode-copy">🛒 搶購模式</span></button>
     </div>
     <div class="sec-label view-label">4️⃣ 選擇初始視角</div>
     <div class="view-row" id="viewRow">
@@ -490,6 +526,7 @@ button:focus-visible,input:focus-visible{outline:3px solid #fff;outline-offset:3
 <!-- ============ 過關畫面 ============ -->
 <div id="winScreen" class="screen">
   <div class="win-card">
+    <div class="visual-atlas atlas-win result-art" role="img" aria-label="金色傳送門前的勝利慶祝畫面"></div>
     <div class="confetti">🎉🎊🏆🎊🎉</div>
     <h2>恭喜過關！</h2>
     <div class="win-stats">
@@ -509,11 +546,11 @@ button:focus-visible,input:focus-visible{outline:3px solid #fff;outline-offset:3
   <div class="m-card">
     <h3>👥 多人連線（2～5 人）</h3>
     <div id="mpSetup">
-      <div class="lb-tabs">
-        <button class="lb-tab sel" id="mpModeRace">🏁 比賽搶終點</button>
-        <button class="lb-tab" id="mpModeTag">👹 鬼抓人</button>
-        <button class="lb-tab" id="mpModeTre">💎 尋寶</button>
-        <button class="lb-tab" id="mpModeShop">🛒 搶購</button>
+      <div class="lb-tabs mp-mode-tabs">
+        <button class="lb-tab mp-mode-btn sel" id="mpModeRace"><span class="visual-atlas atlas-race mp-mode-art" aria-hidden="true"></span><span class="mp-mode-copy">🏁 比賽搶終點</span></button>
+        <button class="lb-tab mp-mode-btn" id="mpModeTag"><span class="visual-atlas atlas-tag mp-mode-art" aria-hidden="true"></span><span class="mp-mode-copy">👹 鬼抓人</span></button>
+        <button class="lb-tab mp-mode-btn" id="mpModeTre"><span class="visual-atlas atlas-treasure mp-mode-art" aria-hidden="true"></span><span class="mp-mode-copy">💎 尋寶</span></button>
+        <button class="lb-tab mp-mode-btn" id="mpModeShop"><span class="visual-atlas atlas-shop mp-mode-art" aria-hidden="true"></span><span class="mp-mode-copy">🛒 搶購</span></button>
       </div>
       <div style="font-size:.85rem;color:#666;margin:6px 0;" id="mpModeDesc">大家從不同角落出發，看誰最快搶到中間的傳送門！</div>
       <div style="font-size:.8rem;color:#999;margin-bottom:8px;">先在標題畫面選好角色和視角，遊戲中也能自由切換（視角已設計成公平的，看不到牆後面）。</div>
@@ -563,6 +600,7 @@ button:focus-visible,input:focus-visible{outline:3px solid #fff;outline-offset:3
 <!-- ============ 失敗畫面 ============ -->
 <div id="failScreen" class="screen" style="background:radial-gradient(circle at 50% 30%,#546e7a,#263238 70%);flex-direction:column;align-items:center;justify-content:center;padding:14px;">
   <div class="win-card" style="border-color:#90a4ae;">
+    <div class="visual-atlas atlas-fail result-art" role="img" aria-label="紅色傳送門前準備再次挑戰的迷宮畫面"></div>
     <div class="confetti">😵🍽️😵</div>
     <h2 style="color:#607d8b;">肚子太餓了…闖關失敗</h2>
     <div class="win-stats">
@@ -687,7 +725,7 @@ button:focus-visible,input:focus-visible{outline:3px solid #fff;outline-offset:3
    3D移動迷宮 — 給小朋友的變形迷宮冒險
    ===================================================== */
 const $=id=>document.getElementById(id);
-const GAME_VERSION='1.15.2';
+const GAME_VERSION='1.16.0';
 
 /* ---------- 設定（後台可調） ---------- */
 const DEFAULT_CFG={shiftMin:3,itemCount:6,foodCount:4,hungerMin:3,stunSec:3,pingSec:3,smellCells:3,mazeSize:13,musicOn:1,apiUrl:'',roomMax:3,goodsCount:16,shopMin:2.5,cartFull:400,views:{fp:1,tp:1,top:1},broker:'wss://broker.emqx.io:8084/mqtt'};
@@ -3005,7 +3043,7 @@ function buildTitleUI(){
   LEVELS.forEach((l,i)=>{
     const b=document.createElement('button');
     b.className='lvl-btn'+(i===G.lvlIdx?' sel':''); b.style.background=l.css;
-    b.innerHTML=`<span class="le">${l.emoji}</span>${l.name}`;
+    b.innerHTML=`<span class="visual-atlas atlas-${l.id} level-art" aria-hidden="true"></span><span class="level-copy"><span class="le">${l.emoji}</span><span class="level-name">${l.name}</span></span>`;
     b.onclick=()=>{G.lvlIdx=i;document.querySelectorAll('.lvl-btn').forEach((x,j)=>x.classList.toggle('sel',j===i));};
     lr.appendChild(b);
   });

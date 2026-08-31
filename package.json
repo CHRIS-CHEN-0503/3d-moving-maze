@@ -1,6 +1,6 @@
 {
   "name": "3d-moving-maze",
-  "version": "1.15.2",
+  "version": "1.16.0",
   "private": true,
   "description": "給孩子玩的 3D 變形迷宮瀏覽器遊戲",
   "scripts": {

@@ -117,6 +117,34 @@ button:focus-visible,input:focus-visible{outline:3px solid #fff;outline-offset:3
   .sec-label{font-size:.94rem;}
   .view-btn{padding:7px 10px;font-size:.86rem;}
 }
+@media(orientation:landscape) and (max-height:700px) and (min-width:600px){
+  #titleScreen{padding:8px;}
+  .title-card{
+    max-width:1040px;padding:10px 14px;margin:auto;
+    display:grid;grid-template-columns:minmax(0,1.08fr) minmax(0,.92fr);column-gap:18px;row-gap:3px;
+    grid-template-areas:
+      'title title'
+      'sub sub'
+      'char-label mode-label'
+      'char-row mode-row'
+      'char-preview view-label'
+      'char-preview view-row'
+      'level-label name-label'
+      'level-row player-name'
+      'level-row start'
+      'level-row foot'
+      'level-row version';
+  }
+  .title-card h1{grid-area:title;font-size:1.55rem;line-height:1.15;}
+  .title-card .sub{grid-area:sub;margin-bottom:2px;font-size:.78rem;}
+  .char-label{grid-area:char-label}.level-label{grid-area:level-label}.mode-label{grid-area:mode-label}.view-label{grid-area:view-label}.name-label{grid-area:name-label}
+  #charRow{grid-area:char-row}#charPreviewWrap{grid-area:char-preview;margin-top:2px}#lvlRow{grid-area:level-row;align-self:start}
+  #spModeRow{grid-area:mode-row}#viewRow{grid-area:view-row}#playerName{grid-area:player-name;justify-self:center}
+  #startBtn{grid-area:start;margin:5px auto 1px;padding:9px;font-size:1.05rem}.title-foot{grid-area:foot;margin-top:1px}.version-note{grid-area:version;margin-top:1px}
+  .sec-label{margin:4px 0 2px;font-size:.82rem}.char-btn{padding:3px 2px}.char-btn .ce{font-size:1.3rem}.char-btn .cj{font-size:.52rem}
+  #charPreview{width:86px;height:92px}.lvl-btn{padding:4px 2px}.lvl-btn .le{font-size:1.15rem}.view-btn{padding:5px 8px;font-size:.75rem}
+  #playerName{padding:6px 10px;font-size:.88rem}.mini-btn{padding:5px 9px;font-size:.75rem;margin:2px}
+}
 @media(prefers-reduced-motion:reduce){
   #titleScreen .deco span{animation:none;display:none;}
   .char-btn,.lvl-btn,.view-btn,.start-btn{transition:none;}
@@ -342,10 +370,23 @@ button:focus-visible,input:focus-visible{outline:3px solid #fff;outline-offset:3
 .adm-note{font-size:.78rem;color:#999;text-align:left;margin:2px 0 8px;}
 .m-close{border:none;background:#7e57c2;color:#fff;border-radius:16px;padding:10px 26px;font-size:1.05rem;font-weight:bold;cursor:pointer;margin-top:10px;}
 
-#orientTip{
-  position:fixed;inset:0;z-index:90;display:none;align-items:center;justify-content:center;text-align:center;
-  background:rgba(20,14,50,.95);color:#fff;font-size:1.2rem;padding:20px;
+#landscapeGate{
+  position:fixed;inset:0;z-index:100;display:none;align-items:center;justify-content:center;text-align:center;
+  background:
+    linear-gradient(180deg,rgba(6,10,28,.48),rgba(6,10,28,.82)),
+    url('./assets/首頁迷宮背景.webp') center/cover no-repeat;
+  color:#fff;padding:24px;
 }
+#landscapeGate .gate-card{
+  width:min(420px,100%);padding:24px 20px;border:1px solid rgba(255,255,255,.24);border-radius:26px;
+  background:rgba(13,18,48,.88);box-shadow:0 20px 60px rgba(0,0,0,.55);backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);
+}
+#landscapeGate .rotate-icon{display:block;font-size:4.2rem;line-height:1;animation:rotateHint 1.8s ease-in-out infinite;}
+#landscapeGate h2{margin:14px 0 6px;color:#fff3c4;font-size:1.55rem;}
+#landscapeGate p{margin:0;color:#d8d8ee;line-height:1.65;}
+@keyframes rotateHint{0%,100%{transform:rotate(0)}50%{transform:rotate(90deg)}}
+@media(orientation:portrait) and (max-width:900px){#landscapeGate{display:flex;}}
+@media(prefers-reduced-motion:reduce){#landscapeGate .rotate-icon{animation:none;}}
 </style>
 </head>
 <body>
@@ -363,28 +404,28 @@ button:focus-visible,input:focus-visible{outline:3px solid #fff;outline-offset:3
   <div class="title-card">
     <h1>🌀 3D移動迷宮</h1>
     <p class="sub">迷宮會變形！撿道具、找出口，比誰最快過關！</p>
-    <div class="sec-label">1️⃣ 選擇你的角色</div>
+    <div class="sec-label char-label">1️⃣ 選擇你的角色</div>
     <div class="char-row" id="charRow"></div>
     <div id="charPreviewWrap">
       <canvas id="charPreview" width="240" height="260"></canvas>
       <div id="charDesc"></div>
     </div>
-    <div class="sec-label">2️⃣ 選擇關卡環境</div>
+    <div class="sec-label level-label">2️⃣ 選擇關卡環境</div>
     <div class="lvl-row" id="lvlRow"></div>
-    <div class="sec-label">3️⃣ 選擇玩法</div>
+    <div class="sec-label mode-label">3️⃣ 選擇玩法</div>
     <div class="view-row" id="spModeRow">
       <button class="view-btn sel" data-m="classic">🚩 經典闖關</button>
       <button class="view-btn" data-m="treasure">💎 尋寶對戰</button>
       <button class="view-btn" data-m="tag">👹 鬼抓人</button>
       <button class="view-btn" data-m="shop">🛒 搶購模式</button>
     </div>
-    <div class="sec-label">4️⃣ 選擇初始視角</div>
+    <div class="sec-label view-label">4️⃣ 選擇初始視角</div>
     <div class="view-row" id="viewRow">
       <button class="view-btn sel" data-v="tp">🎥 第三人稱</button>
       <button class="view-btn" data-v="fp">👀 第一人稱</button>
       <button class="view-btn" data-v="top">🗺️ 俯視</button>
     </div>
-    <div class="sec-label">5️⃣ 角色名稱</div>
+    <div class="sec-label name-label">5️⃣ 角色名稱</div>
     <input id="playerName" maxlength="10" placeholder="輸入名字">
     <button class="start-btn" id="startBtn">🚩 開始冒險！</button>
     <div class="title-foot">
@@ -631,7 +672,13 @@ button:focus-visible,input:focus-visible{outline:3px solid #fff;outline-offset:3
   </div>
 </div>
 
-<div id="orientTip">📱 建議把平板/手機<b>橫著拿</b>會更好玩喔！<br><br><button class="m-close" id="orientOk">繼續</button></div>
+<div id="landscapeGate" role="dialog" aria-modal="true" aria-labelledby="landscapeTitle">
+  <div class="gate-card">
+    <span class="rotate-icon" aria-hidden="true">📱</span>
+    <h2 id="landscapeTitle">請將裝置橫向</h2>
+    <p>角色選擇與遊戲畫面都固定使用橫式。<br>若畫面沒有旋轉，請先關閉手機的直向鎖定。</p>
+  </div>
+</div>
 
 <script src="./lib/three.min.js"></script>
 <script>
@@ -640,7 +687,7 @@ button:focus-visible,input:focus-visible{outline:3px solid #fff;outline-offset:3
    3D移動迷宮 — 給小朋友的變形迷宮冒險
    ===================================================== */
 const $=id=>document.getElementById(id);
-const GAME_VERSION='1.15.1';
+const GAME_VERSION='1.15.2';
 
 /* ---------- 設定（後台可調） ---------- */
 const DEFAULT_CFG={shiftMin:3,itemCount:6,foodCount:4,hungerMin:3,stunSec:3,pingSec:3,smellCells:3,mazeSize:13,musicOn:1,apiUrl:'',roomMax:3,goodsCount:16,shopMin:2.5,cartFull:400,views:{fp:1,tp:1,top:1},broker:'wss://broker.emqx.io:8084/mqtt'};
@@ -3197,15 +3244,18 @@ function applyViewConfig(){
   }
 }
 function updateSoundBtn(){$('soundToggle').innerHTML=(G.muted?'🔇':'🔊')+'<span class="bl">音樂</span>';}
+function requestLandscapeLock(){
+  try{
+    const p=screen.orientation&&screen.orientation.lock&&screen.orientation.lock('landscape');
+    if(p&&p.catch)p.catch(()=>{});
+  }catch(e){}
+}
 function wireUI(){
   $('startBtn').onclick=()=>{
     AudioEng.init(); AudioEng.resume();
-    if(!localStorage.getItem('maze3d_orient')&&window.innerHeight>window.innerWidth&&'ontouchstart' in window){
-      $('orientTip').style.display='flex';
-      localStorage.setItem('maze3d_orient','1');
-    }else launchGame();
+    requestLandscapeLock();
+    launchGame();
   };
-  $('orientOk').onclick=()=>{$('orientTip').style.display='none';launchGame();};
   $('againBtn').onclick=()=>launchGame();
   $('failAgainBtn').onclick=()=>launchGame();
   $('failHomeBtn').onclick=()=>switchScreen('titleScreen');
@@ -4192,6 +4242,7 @@ function mpLeave(){
 /* ---- 按鈕 ---- */
 $('mpBtn').onclick=()=>{
   AudioEng.init(); AudioEng.resume();
+  requestLandscapeLock();
   MP.maxPlayers=Math.max(2,Math.min(5,CFG.roomMax||3));
   document.querySelectorAll('#mpSizeRow .lb-tab').forEach(x=>x.classList.toggle('sel',parseInt(x.dataset.n)===MP.maxPlayers));
   $('mpModal').style.display='flex';

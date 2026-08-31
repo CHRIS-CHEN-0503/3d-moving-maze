@@ -15,6 +15,7 @@ const requiredIds = [
   'admBtn',
   'lbBtn',
   'helpBtn',
+  'landscapeGate',
 ];
 
 for (const id of requiredIds) {
@@ -24,6 +25,8 @@ for (const id of requiredIds) {
 assert.match(html, /assets\/首頁迷宮背景\.webp/, '首頁沒有引用生成的迷宮背景');
 assert.match(html, /wss:\/\/broker\.emqx\.io:8084\/mqtt/, '多人 MQTT 預設網址被意外改動');
 assert.match(html, /class MiniMQTT/, '多人 MiniMQTT 實作遺失');
+assert.match(html, /screen\.orientation&&screen\.orientation\.lock&&screen\.orientation\.lock\('landscape'\)/, '橫式鎖定嘗試遺失');
+assert.doesNotMatch(html, /id=["']orientTip["']/, '舊的一次性轉向提示仍存在');
 assert.match(html, /function scoreApiUrl\(\)\{ return CFG\.apiUrl\|\|'\/api\/scores'; \}/, 'Cloudflare 分數 API 路徑被意外改動');
 
 const inlineScripts = [...html.matchAll(/<script(?![^>]*\bsrc=)[^>]*>([\s\S]*?)<\/script>/gi)]

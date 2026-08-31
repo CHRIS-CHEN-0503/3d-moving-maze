@@ -427,47 +427,71 @@ button:focus-visible,input:focus-visible{outline:3px solid #fff;outline-offset:3
 }
 
 /* ===== 首頁與分步進入流程 ===== */
-.title-card.entry-shell{display:block;max-width:940px;padding:18px 20px;overflow:hidden;}
+.title-card.entry-shell{
+  display:block;max-width:900px;padding:16px 18px;overflow:hidden;
+  transition:max-width .18s ease,padding .18s ease;
+}
+.entry-shell[data-panel="homePanel"]{max-width:780px;}
+.entry-shell[data-panel="profilePanel"]{max-width:830px;}
+.entry-shell:not([data-panel="homePanel"]) .entry-brand{display:none;}
 .entry-brand{position:relative;text-align:center;}
 .entry-brand h1{margin:0;}
-.entry-brand .sub{margin:2px 0 10px;}
+.entry-brand .sub{margin:2px 0 7px;}
 .flow-panel{display:none;animation:flowIn .2s ease;}
 .flow-panel.active{display:block;}
 @keyframes flowIn{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
-.home-intro{margin:4px auto 13px;max-width:620px;color:#f2f1ff;font-size:1rem;line-height:1.55;}
-.home-menu{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;max-width:720px;margin:0 auto;}
+.home-intro{margin:3px auto 10px;max-width:580px;color:#f2f1ff;font-size:.94rem;line-height:1.45;}
+.home-menu{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:8px;margin:0 auto;}
 .home-action{
-  min-height:92px;border:1px solid rgba(255,255,255,.2);border-radius:20px;padding:12px 15px;cursor:pointer;
-  display:grid;grid-template-columns:52px minmax(0,1fr);align-items:center;gap:12px;text-align:left;color:#fff;
+  grid-column:span 3;min-height:80px;border:1px solid rgba(255,255,255,.2);border-radius:18px;padding:10px 13px;cursor:pointer;
+  display:grid;grid-template-columns:46px minmax(0,1fr);align-items:center;gap:10px;text-align:left;color:#fff;
   background:linear-gradient(145deg,rgba(255,255,255,.14),rgba(255,255,255,.06));
   box-shadow:inset 0 1px 0 rgba(255,255,255,.1),0 8px 24px rgba(0,0,0,.22);transition:transform .12s,filter .12s,border-color .12s;
 }
 .home-action:hover,.home-action:focus-visible{transform:translateY(-2px);filter:brightness(1.1);border-color:rgba(255,255,255,.45);}
-.home-action .home-icon{font-size:2.25rem;text-align:center;filter:drop-shadow(0 4px 8px rgba(0,0,0,.35));}
-.home-action strong{display:block;font-size:1.12rem;color:#fff3c4;margin-bottom:2px;}
+.home-action .home-icon{font-size:2rem;text-align:center;filter:drop-shadow(0 4px 8px rgba(0,0,0,.35));}
+.home-action strong{display:block;font-size:1.04rem;color:#fff3c4;margin-bottom:2px;}
 .home-action small{display:block;color:#d7d6ec;font-size:.77rem;line-height:1.35;}
 .home-action.primary{background:linear-gradient(145deg,rgba(255,159,67,.42),rgba(200,80,32,.25));border-color:rgba(255,215,106,.48);}
 .home-action.multiplayer{background:linear-gradient(145deg,rgba(38,198,218,.38),rgba(27,92,130,.25));border-color:rgba(120,231,242,.5);}
 .home-action.history{background:linear-gradient(145deg,rgba(126,87,194,.38),rgba(63,43,112,.24));border-color:rgba(204,177,255,.42);}
-.home-action.help{grid-column:1/-1;}
+.home-action.utility{grid-column:span 2;min-height:68px;padding:8px 10px;grid-template-columns:36px minmax(0,1fr);gap:7px;border-radius:15px;}
+.home-action.utility .home-icon{font-size:1.55rem;}
+.home-action.utility strong{font-size:.9rem;}
+.home-action.utility small{font-size:.65rem;line-height:1.25;}
 .home-utility{display:flex;justify-content:center;gap:8px;margin-top:10px;}
-.flow-head{display:grid;grid-template-columns:110px minmax(0,1fr) 110px;align-items:center;gap:8px;margin:2px 0 9px;}
+.flow-head{display:grid;grid-template-columns:110px minmax(0,1fr) 110px;align-items:center;gap:8px;margin:0 0 9px;}
 .flow-head h2{font-size:1.25rem;color:#fff3c4;margin:0;}
 .flow-back{border:1px solid rgba(255,255,255,.22);background:rgba(255,255,255,.1);color:#fff;border-radius:13px;padding:7px 10px;cursor:pointer;font-weight:800;text-align:left;}
 .flow-step{justify-self:end;color:#bdf9ff;font-size:.76rem;font-weight:800;letter-spacing:.04em;}
-.profile-stage{display:grid;grid-template-columns:minmax(0,1.35fr) minmax(260px,.65fr);gap:14px;align-items:center;}
-.profile-picker{text-align:left;}
+.profile-stage{
+  display:grid;grid-template-columns:minmax(260px,.72fr) minmax(420px,1.28fr);
+  grid-template-areas:'profile-card profile-picker';gap:12px;align-items:start;
+}
+.profile-picker{grid-area:profile-picker;text-align:left;}
+.profile-picker .char-row{grid-template-columns:repeat(3,minmax(0,1fr));}
 .profile-card{padding:8px 10px;border:1px solid rgba(255,255,255,.15);border-radius:18px;background:rgba(5,9,29,.3);}
+.profile-card{grid-area:profile-card;}
 .profile-card #charPreviewWrap{margin:0;}
 .profile-name-label{display:block;margin:7px 0 4px;color:var(--gold);font-weight:800;font-size:.82rem;}
 .profile-card #playerName{width:100%;max-width:none;}
 .flow-error{min-height:17px;margin-top:3px;color:#ffb4a9;font-size:.75rem;font-weight:800;}
 .flow-actions{display:flex;justify-content:flex-end;gap:8px;margin-top:10px;}
 .flow-primary{border:0;border-radius:16px;padding:10px 22px;cursor:pointer;color:#fff;font-weight:900;font-size:1rem;background:linear-gradient(145deg,#ffd66b,#ff8f2f);box-shadow:0 4px 0 #c6531f;}
-.setup-stage{display:grid;grid-template-columns:minmax(0,1.18fr) minmax(300px,.82fr);gap:14px;text-align:left;}
+.setup-stage{display:grid;grid-template-columns:1fr;gap:9px;text-align:left;align-items:start;}
 .setup-section{padding:7px 9px;border:1px solid rgba(255,255,255,.14);border-radius:17px;background:rgba(5,9,29,.3);}
 .setup-section .sec-label{margin:0 0 5px;}
-.setup-side{display:grid;gap:8px;align-content:start;}
+.setup-stage .lvl-row{grid-template-columns:repeat(6,minmax(0,1fr));gap:5px;}
+.setup-stage .lvl-btn{grid-template-columns:42px minmax(0,1fr);gap:5px;}
+.setup-stage .lvl-btn .level-art{width:42px;}
+.setup-side{
+  display:grid;grid-template-columns:minmax(170px,.9fr) minmax(280px,1.4fr) minmax(210px,1fr);
+  grid-template-areas:'summary modes view' 'summary modes start';gap:7px;align-items:stretch;
+}
+.setup-summary-card{grid-area:summary;display:grid;align-content:center;}
+.setup-modes{grid-area:modes;}
+.setup-view{grid-area:view;}
+.setup-start{grid-area:start;align-self:stretch;}
 .setup-summary{display:flex;align-items:center;gap:7px;color:#deddf0;font-size:.76rem;}
 .setup-avatar{font-size:1.2rem;}
 .round-picker{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-top:6px;color:var(--gold);font-size:.78rem;font-weight:900;}
@@ -475,7 +499,7 @@ button:focus-visible,input:focus-visible{outline:3px solid #fff;outline-offset:3
 .setup-stage #spModeRow{grid-template-columns:repeat(2,minmax(0,1fr));gap:6px;}
 .setup-stage #viewRow{gap:5px;}
 .setup-stage .view-btn{padding:6px 9px;font-size:.8rem;}
-.setup-stage #startBtn{max-width:none;margin:0;padding:10px;font-size:1.05rem;}
+.setup-stage #startBtn{max-width:none;margin:0;padding:8px;font-size:.95rem;box-shadow:0 4px 0 #c6531f,0 7px 18px rgba(255,111,32,.25);}
 #mpChosenMode{margin:4px 0 6px;color:#7e57c2;font-size:1.05rem;font-weight:900;}
 .series-state{margin:5px 0;color:#ffd76a;font-size:.88rem;font-weight:900;}
 .series-summary{margin:7px auto;padding:7px 9px;border-radius:13px;background:rgba(120,231,242,.1);border:1px solid rgba(120,231,242,.25);font-size:.82rem;line-height:1.45;text-align:left;}
@@ -490,19 +514,25 @@ button:focus-visible,input:focus-visible{outline:3px solid #fff;outline-offset:3
 
 @media(orientation:landscape) and (max-height:520px){
   #titleScreen{padding:5px;}
-  .title-card.entry-shell{max-width:970px;padding:7px 11px;border-radius:20px;}
+  .title-card.entry-shell{padding:7px 11px;border-radius:20px;}
+  .entry-shell[data-panel="homePanel"]{max-width:760px;}
+  .entry-shell[data-panel="profilePanel"]{max-width:810px;}
+  .entry-shell[data-panel="setupPanel"]{max-width:824px;}
   .entry-brand h1{font-size:1.3rem;line-height:1.1;}
   .entry-brand .sub{font-size:.67rem;margin:0 0 4px;}
-  .home-intro{font-size:.78rem;line-height:1.35;margin:2px auto 7px;}
-  .home-menu{gap:7px;max-width:720px;}
-  .home-action{min-height:68px;padding:7px 11px;border-radius:15px;grid-template-columns:38px minmax(0,1fr);gap:8px;}
-  .home-action .home-icon{font-size:1.65rem;}.home-action strong{font-size:.9rem;}.home-action small{font-size:.64rem;}
+  .home-intro{font-size:.76rem;line-height:1.3;margin:1px auto 6px;}
+  .home-menu{gap:6px;}
+  .home-action{min-height:64px;padding:6px 9px;border-radius:14px;grid-template-columns:34px minmax(0,1fr);gap:7px;}
+  .home-action .home-icon{font-size:1.55rem;}.home-action strong{font-size:.86rem;}.home-action small{font-size:.61rem;}
+  .home-action.utility{min-height:54px;padding:5px 8px;grid-template-columns:27px minmax(0,1fr);gap:5px;border-radius:12px;}
+  .home-action.utility .home-icon{font-size:1.25rem}.home-action.utility strong{font-size:.76rem}.home-action.utility small{font-size:.56rem}
   .home-utility{margin-top:5px}.home-utility .mini-btn{padding:4px 9px;font-size:.68rem;}
   .flow-head{grid-template-columns:92px minmax(0,1fr) 92px;margin:0 0 4px;}.flow-head h2{font-size:1rem}.flow-back{padding:4px 7px;font-size:.7rem}.flow-step{font-size:.62rem}
-  .profile-stage{grid-template-columns:minmax(0,1.45fr) minmax(245px,.55fr);gap:8px;}
+  .profile-stage{grid-template-columns:minmax(245px,.7fr) minmax(390px,1.3fr);gap:8px;}
   .profile-card{padding:5px 7px;border-radius:13px;}.profile-name-label{margin:3px 0 2px;font-size:.68rem}.flow-error{min-height:12px;font-size:.62rem}
   .flow-actions{margin-top:4px}.flow-primary{padding:6px 16px;font-size:.78rem;border-radius:12px;}
-  .setup-stage{grid-template-columns:minmax(0,1.18fr) minmax(285px,.82fr);gap:8px;}.setup-section{padding:4px 6px;border-radius:12px}.setup-side{gap:4px}
+  .setup-stage{grid-template-columns:1fr;gap:5px;}.setup-section{padding:4px 6px;border-radius:12px}.setup-side{gap:4px;grid-template-columns:minmax(155px,.9fr) minmax(260px,1.45fr) minmax(190px,1fr)}
+  .setup-stage .lvl-row{gap:3px}.setup-stage .lvl-btn{grid-template-columns:34px minmax(0,1fr);gap:3px}.setup-stage .lvl-btn .level-art{width:34px}.setup-stage .lvl-btn .level-name{font-size:.6rem}
   .setup-summary{font-size:.62rem}.setup-avatar{font-size:.95rem}.setup-stage #spModeRow{gap:3px}.setup-stage #viewRow{gap:3px}
   .round-picker{margin-top:3px;font-size:.62rem}.round-picker select{padding:2px 5px;font-size:.64rem;min-width:72px;}
   .setup-stage .view-btn{padding:3px 5px;font-size:.64rem}.setup-stage #startBtn{padding:6px;font-size:.8rem}
@@ -511,8 +541,16 @@ button:focus-visible,input:focus-visible{outline:3px solid #fff;outline-offset:3
   #mpModal .start-btn{padding:7px;font-size:.88rem;margin:5px auto!important;}#mpModal .m-close{padding:6px 18px;font-size:.8rem;margin-top:4px;}
   .help-visuals{gap:5px;margin:3px 0 7px}.help-visual{border-radius:9px}.help-visual strong{padding:3px 2px;font-size:.62rem}
 }
+@media(max-width:720px){
+  .entry-shell[data-panel="homePanel"],.entry-shell[data-panel="profilePanel"],.entry-shell[data-panel="setupPanel"]{max-width:100%;}
+  .profile-stage{grid-template-columns:minmax(220px,.72fr) minmax(0,1.28fr);}
+  .setup-side{grid-template-columns:minmax(0,.9fr) minmax(0,1.25fr);grid-template-areas:'summary modes' 'view start';}
+  .setup-stage .lvl-btn{grid-template-columns:34px minmax(0,1fr);}.setup-stage .lvl-btn .level-art{width:34px;}
+}
 @media(max-width:620px){
-  .home-menu{grid-template-columns:1fr;}.profile-stage,.setup-stage{grid-template-columns:1fr;}.flow-head{grid-template-columns:90px minmax(0,1fr) 90px;}
+  .home-menu{grid-template-columns:1fr;}.home-action,.home-action.utility{grid-column:auto;}
+  .profile-stage{grid-template-columns:1fr;grid-template-areas:'profile-picker' 'profile-card';}.setup-stage{grid-template-columns:1fr;}.flow-head{grid-template-columns:90px minmax(0,1fr) 90px;}
+  .setup-stage .lvl-row{grid-template-columns:repeat(3,minmax(0,1fr));}.setup-side{grid-template-columns:1fr;grid-template-areas:'summary' 'modes' 'view' 'start';}
 }
 @media(prefers-reduced-motion:reduce){.flow-panel{animation:none}.home-action{transition:none}}
 </style>
@@ -529,7 +567,7 @@ button:focus-visible,input:focus-visible{outline:3px solid #fff;outline-offset:3
     <span style="left:70%;animation-duration:16s;animation-delay:9s;">🍎</span>
     <span style="left:86%;animation-duration:20s;animation-delay:5s;">🗝️</span>
   </div>
-  <div class="title-card entry-shell">
+  <div class="title-card entry-shell" data-panel="homePanel">
     <header class="entry-brand">
       <h1>🌀 3D移動迷宮</h1>
       <p class="sub">迷宮會變形！撿道具、找出口，比誰最快過關！</p>
@@ -540,9 +578,9 @@ button:focus-visible,input:focus-visible{outline:3px solid #fff;outline-offset:3
       <div class="home-menu">
         <button class="home-action primary" id="singleBtn"><span class="home-icon">🧭</span><span><strong>單人遊戲</strong><small>自己闖關，或和電腦挑戰尋寶、鬼抓人與搶購。</small></span></button>
         <button class="home-action multiplayer" id="mpBtn"><span class="home-icon">👥</span><span><strong>多人遊戲</strong><small>先建立角色，再建立房間或輸入朋友的房號。</small></span></button>
-        <button class="home-action" id="admBtn"><span class="home-icon">⚙️</span><span><strong>遊戲設定</strong><small>調整迷宮大小、變形時間、音樂與視角。</small></span></button>
-        <button class="home-action history" id="lbBtn"><span class="home-icon">🏆</span><span><strong>勇者歷史</strong><small>查看各個迷宮的最快紀錄與歷代勇者。</small></span></button>
-        <button class="home-action help" id="helpBtn"><span class="home-icon">📖</span><span><strong>遊戲說明</strong><small>查看操作方法、道具、角色能力與各種玩法。</small></span></button>
+        <button class="home-action utility" id="admBtn"><span class="home-icon">⚙️</span><span><strong>遊戲設定</strong><small>調整迷宮、音樂與視角。</small></span></button>
+        <button class="home-action utility history" id="lbBtn"><span class="home-icon">🏆</span><span><strong>勇者歷史</strong><small>查看最快紀錄與歷代勇者。</small></span></button>
+        <button class="home-action utility help" id="helpBtn"><span class="home-icon">📖</span><span><strong>遊戲說明</strong><small>查看操作、道具與各種玩法。</small></span></button>
       </div>
       <div class="version-note">3D移動迷宮 v<span id="verLabel"></span></div>
     </section>
@@ -570,19 +608,19 @@ button:focus-visible,input:focus-visible{outline:3px solid #fff;outline-offset:3
     <section class="flow-panel" id="setupPanel" aria-labelledby="setupTitle">
       <div class="flow-head"><button class="flow-back" id="setupBackBtn">← 回選角</button><h2 id="setupTitle">準備單人冒險</h2><span class="flow-step">步驟 2／2</span></div>
       <div class="setup-stage">
-        <div class="setup-section">
+        <div class="setup-section setup-levels">
           <div class="sec-label level-label">選擇關卡環境</div>
           <div class="lvl-row" id="lvlRow"></div>
         </div>
         <div class="setup-side">
-          <div class="setup-section">
+          <div class="setup-section setup-summary-card">
             <div class="setup-summary"><span class="setup-avatar" id="setupAvatar">👦</span><span id="setupPlayerSummary">小勇士準備出發</span></div>
             <label class="round-picker" for="roundCount"><span>🔁 要玩幾輪</span><select id="roundCount" aria-label="遊戲輪數">
               <option value="1">1 輪</option><option value="2">2 輪</option><option value="3" selected>3 輪</option><option value="4">4 輪</option><option value="5">5 輪</option>
               <option value="6">6 輪</option><option value="7">7 輪</option><option value="8">8 輪</option><option value="9">9 輪</option><option value="10">10 輪</option>
             </select></label>
           </div>
-          <div class="setup-section">
+          <div class="setup-section setup-modes">
             <div class="sec-label mode-label">選擇玩法</div>
             <div class="view-row" id="spModeRow">
               <button class="view-btn mode-choice sel" data-m="classic"><span class="visual-atlas atlas-race title-mode-art" aria-hidden="true"></span><span class="mode-copy">🚩 經典闖關</span></button>
@@ -591,7 +629,7 @@ button:focus-visible,input:focus-visible{outline:3px solid #fff;outline-offset:3
               <button class="view-btn mode-choice" data-m="shop"><span class="visual-atlas atlas-shop title-mode-art" aria-hidden="true"></span><span class="mode-copy">🛒 搶購模式</span></button>
             </div>
           </div>
-          <div class="setup-section">
+          <div class="setup-section setup-view">
             <div class="sec-label view-label">選擇初始視角</div>
             <div class="view-row" id="viewRow">
               <button class="view-btn sel" data-v="tp">🎥 第三人稱</button>
@@ -599,7 +637,7 @@ button:focus-visible,input:focus-visible{outline:3px solid #fff;outline-offset:3
               <button class="view-btn" data-v="top">🗺️ 俯視</button>
             </div>
           </div>
-          <button class="start-btn" id="startBtn">🚩 開始單人冒險！</button>
+          <button class="start-btn setup-start" id="startBtn">🚩 開始單人冒險！</button>
         </div>
       </div>
     </section>
@@ -871,7 +909,7 @@ button:focus-visible,input:focus-visible{outline:3px solid #fff;outline-offset:3
    3D移動迷宮 — 給小朋友的變形迷宮冒險
    ===================================================== */
 const $=id=>document.getElementById(id);
-const GAME_VERSION='1.17.0';
+const GAME_VERSION='1.17.1';
 
 /* ---------- 設定（後台可調） ---------- */
 const DEFAULT_CFG={shiftMin:3,itemCount:6,foodCount:4,hungerMin:3,stunSec:3,pingSec:3,smellCells:3,mazeSize:13,musicOn:1,apiUrl:'',roomMax:3,rounds:3,goodsCount:16,shopMin:2.5,cartFull:400,views:{fp:1,tp:1,top:1},broker:'wss://broker.emqx.io:8084/mqtt'};
@@ -3228,6 +3266,7 @@ function switchScreen(id){
 let entryMode='single';
 function setFlowPanel(id){
   document.querySelectorAll('#titleScreen .flow-panel').forEach(p=>p.classList.toggle('active',p.id===id));
+  document.querySelector('#titleScreen .entry-shell').dataset.panel=id;
   $('titleScreen').scrollTop=0;
 }
 function beginEntryFlow(mode){

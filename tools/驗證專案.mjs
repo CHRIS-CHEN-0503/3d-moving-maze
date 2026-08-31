@@ -34,6 +34,34 @@ for (const id of requiredIds) {
   assert.match(html, new RegExp(`id=["']${id}["']`), `缺少必要 UI：#${id}`);
 }
 
+const entryShellTag = html.match(/<[^>]+\bclass=["'][^"']*\bentry-shell\b[^"']*["'][^>]*>/)?.[0] ?? '';
+assert.match(entryShellTag, /\bdata-panel=["']homePanel["']/, '首頁容器缺少 data-panel="homePanel" 初始狀態');
+assert.match(
+  html,
+  /function\s+setFlowPanel\s*\([^)]*\)\s*\{[\s\S]{0,800}(?:\bshell|document\.querySelector\([^)]*\.entry-shell[^)]*\))\.dataset\.panel\s*=\s*id\b/,
+  'setFlowPanel 沒有同步更新 shell.dataset.panel',
+);
+
+const homeUtilityButtons = ['admBtn', 'lbBtn', 'helpBtn'];
+for (const id of homeUtilityButtons) {
+  const buttonTag = html.match(new RegExp(`<button\\b(?=[^>]*\\bid=["']${id}["'])[^>]*>`))?.[0] ?? '';
+  assert.match(buttonTag, /\bclass=["'][^"']*\butility\b[^"']*["']/, `首頁次要動作 #${id} 缺少 utility 類別`);
+}
+
+assert.match(
+  html,
+  /\.setup-side\s*\{[^}]*display\s*:\s*grid[^}]*grid-template(?:-columns|-areas)?\s*:/,
+  'setup-side 缺少緊湊 grid 配置',
+);
+const compactSetupClasses = ['setup-summary', 'setup-modes', 'setup-view', 'setup-start'];
+for (const className of compactSetupClasses) {
+  assert.match(
+    html,
+    new RegExp(`\\bclass=["'][^"']*\\b${className}\\b[^"']*["']`),
+    `關卡設定缺少緊湊配置類別：${className}`,
+  );
+}
+
 const requiredFlowFunctions = [
   'beginEntryFlow',
   'continueToSetup',
@@ -113,4 +141,4 @@ assert.equal(helpAtlasHeader.subarray(8, 12).toString('ascii'), 'WEBP', '玩法�
 await access(new URL('../lib/three.min.js', import.meta.url));
 await access(new URL('../functions/api/scores.js', import.meta.url));
 
-console.log(`專案靜態驗證通過：${requiredIds.length} 個必要 UI、${requiredFlowFunctions.length} 個首頁流程函式、${requiredSeriesFunctions.length} 個多輪統計函式、${inlineScripts.length} 段 inline JavaScript、${atlasClasses.length} 個視覺圖集區塊。`);
+console.log(`專案靜態驗證通過：${requiredIds.length} 個必要 UI、${homeUtilityButtons.length} 個首頁次要動作、${compactSetupClasses.length} 個緊湊設定區塊、${requiredFlowFunctions.length} 個首頁流程函式、${requiredSeriesFunctions.length} 個多輪統計函式、${inlineScripts.length} 段 inline JavaScript、${atlasClasses.length} 個視覺圖集區塊。`);

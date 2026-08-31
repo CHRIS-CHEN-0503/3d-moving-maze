@@ -62,6 +62,36 @@ for (const className of compactSetupClasses) {
   );
 }
 
+assert.match(html, /--action-rail-space\s*:/, '右側工具列缺少 --action-rail-space 安全距離');
+const actionRightOffsets = ['near', 'mid', 'far'];
+for (const offset of actionRightOffsets) {
+  assert.match(
+    html,
+    new RegExp(`--action-right-${offset}\\s*:[^;]*var\\(--action-rail-space\\)[^;]*;`),
+    `動作按鈕距離 --action-right-${offset} 沒有從安全欄推導`,
+  );
+}
+
+const actionButtonIds = ['shovelBtn', 'kiteBtn', 'atkBtn', 'robBtn', 'coBtn', 'skillBtn', 'whistleBtn'];
+for (const id of actionButtonIds) {
+  assert.match(
+    html,
+    new RegExp(`#${id}\\s*\\{[^}]*right\\s*:\\s*var\\(--action-right-(?:near|mid|far)\\)`),
+    `動作按鈕 #${id} 沒有使用右側安全距離`,
+  );
+}
+
+const narrowLandscapeStart = html.search(
+  /@media\s*(?=[^{]*orientation\s*:\s*landscape)(?=[^{]*max-width\s*:\s*700px)[^{]*\{/,
+);
+assert.notEqual(narrowLandscapeStart, -1, '缺少 max-width:700px 的窄橫式縮放規則');
+const narrowLandscapeCss = html.slice(narrowLandscapeStart, narrowLandscapeStart + 2400);
+assert.match(
+  narrowLandscapeCss,
+  /#(?:shovelBtn|kiteBtn|atkBtn|robBtn|coBtn|skillBtn|whistleBtn)[^{]*\{[^}]*(?:width|height)\s*:/,
+  '窄橫式規則沒有縮小動作按鈕',
+);
+
 const requiredFlowFunctions = [
   'beginEntryFlow',
   'continueToSetup',
@@ -141,4 +171,4 @@ assert.equal(helpAtlasHeader.subarray(8, 12).toString('ascii'), 'WEBP', '玩法�
 await access(new URL('../lib/three.min.js', import.meta.url));
 await access(new URL('../functions/api/scores.js', import.meta.url));
 
-console.log(`專案靜態驗證通過：${requiredIds.length} 個必要 UI、${homeUtilityButtons.length} 個首頁次要動作、${compactSetupClasses.length} 個緊湊設定區塊、${requiredFlowFunctions.length} 個首頁流程函式、${requiredSeriesFunctions.length} 個多輪統計函式、${inlineScripts.length} 段 inline JavaScript、${atlasClasses.length} 個視覺圖集區塊。`);
+console.log(`專案靜態驗證通過：${requiredIds.length} 個必要 UI、${homeUtilityButtons.length} 個首頁次要動作、${compactSetupClasses.length} 個緊湊設定區塊、${actionButtonIds.length} 個安全定位動作鈕、${requiredFlowFunctions.length} 個首頁流程函式、${requiredSeriesFunctions.length} 個多輪統計函式、${inlineScripts.length} 段 inline JavaScript、${atlasClasses.length} 個視覺圖集區塊。`);

@@ -1,0 +1,7 @@
+name = "3d-moving-maze"
+pages_build_output_dir = "."
+compatibility_date = "2026-08-31"
+
+[[kv_namespaces]]
+binding = "SCORES"
+id = "e04f26b9c49f469c81dae9c53bf02fc2"

@@ -1,0 +1,6 @@
+.DS_Store
+.agent-run/
+.wrangler/
+node_modules/
+test-results/
+screenshots/

@@ -5,11 +5,12 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
 <meta name="theme-color" content="#111735">
 <meta name="description" content="給孩子玩的 3D 變形迷宮冒險，支援單機、多人連線、手機、平板與電腦。">
-<title>🌀 3D移動迷宮</title>
-<link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🌀</text></svg>">
+<title>3D移動迷宮</title>
+<link rel="icon" type="image/webp" href="./assets/迷宮指南針圖示-v1.webp">
 <link rel="preload" as="image" href="./assets/首頁迷宮背景.webp" type="image/webp">
 <link rel="preload" as="image" href="./assets/遊戲視覺圖集.webp" type="image/webp">
 <link rel="preload" as="image" href="./assets/玩法說明圖集.webp" type="image/webp">
+<link rel="preload" as="image" href="./assets/遊戲專屬介面圖示集-v1.webp" type="image/webp">
 <style>
 :root{
   --font:ui-rounded,'SF Pro Rounded','Microsoft JhengHei','PingFang TC','Comic Sans MS',system-ui,sans-serif;
@@ -18,11 +19,16 @@
   --glass-line:rgba(255,255,255,.18);
   --gold:#ffd76a;
   --cyan:#78e7f2;
+  --panel:rgba(10,16,45,.88);
+  --panel-soft:rgba(255,255,255,.075);
+  --panel-line:rgba(255,255,255,.16);
+  --shadow-lg:0 22px 64px rgba(0,0,0,.48);
+  --focus-ring:0 0 0 3px rgba(120,231,242,.26);
 }
 *{box-sizing:border-box;-webkit-tap-highlight-color:transparent;user-select:none;-webkit-user-select:none;}
 html,body{margin:0;padding:0;height:100%;overflow:hidden;}
-body{font-family:var(--font);color:var(--ink);background:#1a1636;}
-button{font-family:var(--font);}
+body{font-family:var(--font);color:var(--ink);background:#1a1636;text-rendering:optimizeLegibility;}
+button{font-family:var(--font);letter-spacing:.01em;}
 
 /* ===== 畫面切換 ===== */
 .screen{position:fixed;inset:0;display:none;}
@@ -59,7 +65,7 @@ button{font-family:var(--font);}
 .title-card{
   position:relative;z-index:1;
   color:#f8f7ff;background:var(--glass);border-radius:30px;border:1px solid var(--glass-line);
-  box-shadow:0 24px 70px rgba(0,0,0,.55),inset 0 1px 0 rgba(255,255,255,.12);max-width:700px;width:100%;
+  box-shadow:var(--shadow-lg),inset 0 1px 0 rgba(255,255,255,.15);max-width:700px;width:100%;
   padding:20px 18px;text-align:center;margin:auto 0;
   backdrop-filter:blur(18px) saturate(1.25);-webkit-backdrop-filter:blur(18px) saturate(1.25);
 }
@@ -69,12 +75,16 @@ button{font-family:var(--font);}
 .char-row{display:grid;grid-template-columns:repeat(6,1fr);gap:6px;}
 @media(max-width:520px){.char-row{grid-template-columns:repeat(3,1fr);}}
 .char-btn{
-  border:2px solid rgba(255,255,255,.18);border-radius:16px;background:rgba(255,255,255,.09);padding:7px 2px;cursor:pointer;
+  border:1px solid rgba(255,255,255,.18);border-radius:16px;background:linear-gradient(160deg,rgba(255,255,255,.12),rgba(255,255,255,.055));padding:7px 4px;cursor:pointer;
   font-size:.8rem;color:#fff;transition:transform .12s,background .12s,border-color .12s;
 }
-.char-btn .ce{font-size:1.7rem;display:block;}
-.char-btn .cj{display:block;font-size:.62rem;color:#c9c7eb;font-weight:bold;}
-.char-btn.sel{border-color:var(--gold);background:rgba(255,193,7,.2);transform:scale(1.05);box-shadow:0 0 0 2px rgba(255,215,106,.16),0 6px 18px rgba(0,0,0,.3);}
+.char-btn .cj{display:block;font-size:.74rem;color:#f0efff;font-weight:900;line-height:1.15;}
+.role-color{
+  --role-color:#4fc3f7;display:block;width:34px;height:34px;margin:0 auto 4px;border-radius:50%;
+  background:radial-gradient(circle at 34% 28%,#fff 0 8%,color-mix(in srgb,var(--role-color),#fff 28%) 10% 28%,var(--role-color) 30% 64%,color-mix(in srgb,var(--role-color),#08122e 42%) 66% 100%);
+  border:2px solid rgba(255,255,255,.72);box-shadow:0 4px 12px rgba(0,0,0,.34),0 0 0 3px color-mix(in srgb,var(--role-color),transparent 74%);
+}
+.char-btn.sel{border-color:var(--gold);background:linear-gradient(155deg,rgba(255,193,7,.25),rgba(255,138,55,.12));transform:translateY(-2px);box-shadow:0 0 0 2px rgba(255,215,106,.16),0 8px 20px rgba(0,0,0,.34);}
 #charPreviewWrap{display:flex;gap:10px;align-items:center;justify-content:center;margin-top:8px;}
 #charPreview{width:120px;height:130px;border-radius:18px;background:linear-gradient(180deg,rgba(139,216,255,.86),rgba(139,236,183,.72));border:2px solid rgba(255,255,255,.48);box-shadow:inset 0 0 24px rgba(255,255,255,.22),0 8px 20px rgba(0,0,0,.3);}
 #charDesc{font-size:.9rem;color:#ecebfa;max-width:190px;text-align:left;}
@@ -85,6 +95,16 @@ button{font-family:var(--font);}
 .atlas-indoor{background-position:0 0}.atlas-field{background-position:33.333333% 0}.atlas-cave{background-position:66.666667% 0}.atlas-forest{background-position:100% 0}
 .atlas-mist{background-position:0 50%}.atlas-volcano{background-position:33.333333% 50%}.atlas-race{background-position:66.666667% 50%}.atlas-tag{background-position:100% 50%}
 .atlas-treasure{background-position:0 100%}.atlas-shop{background-position:33.333333% 100%}.atlas-win{background-position:66.666667% 100%}.atlas-fail{background-position:100% 100%}
+.ui-icon{
+  display:inline-block;width:1em;height:1em;flex:0 0 auto;vertical-align:-.16em;
+  background-image:url('./assets/遊戲專屬介面圖示集-v1.webp');background-repeat:no-repeat;background-size:600% 400%;
+  background-color:#071b43;border-radius:22%;filter:drop-shadow(0 3px 7px rgba(0,0,0,.28));
+}
+.icon-compass{background-position:0 0}.icon-duo{background-position:20% 0}.icon-settings{background-position:40% 0}.icon-history{background-position:60% 0}.icon-help{background-position:80% 0}.icon-camera{background-position:100% 0}
+.icon-sound{background-position:0 33.333333%}.icon-zoom-in{background-position:20% 33.333333%}.icon-zoom-out{background-position:40% 33.333333%}.icon-exit{background-position:60% 33.333333%}.icon-shovel{background-position:80% 33.333333%}.icon-kite{background-position:100% 33.333333%}
+.icon-whistle{background-position:0 66.666667%}.icon-attack{background-position:20% 66.666667%}.icon-grab{background-position:40% 66.666667%}.icon-checkout{background-position:60% 66.666667%}.icon-stealth{background-position:80% 66.666667%}.icon-medal{background-position:100% 66.666667%}
+.icon-timer{background-position:0 100%}.icon-food{background-position:20% 100%}.icon-shift{background-position:40% 100%}.icon-castle{background-position:60% 100%}.icon-repeat{background-position:80% 100%}.icon-score{background-position:100% 100%}
+.inline-ui-icon{width:1.35em;height:1.35em;margin-right:4px;vertical-align:-.32em;}
 .lvl-row{display:grid;grid-template-columns:repeat(3,1fr);gap:6px;}
 @media(max-width:520px){.lvl-row{grid-template-columns:repeat(3,1fr);}}
 .lvl-btn{
@@ -96,10 +116,10 @@ button{font-family:var(--font);}
 .lvl-btn .level-copy{min-width:0;font-weight:900;line-height:1.15;}
 .lvl-btn .le{font-size:.95rem;margin-right:2px;}
 .lvl-btn .level-name{display:block;}
-.lvl-btn.sel{border-color:var(--gold);transform:scale(1.05);box-shadow:0 0 0 2px rgba(255,215,106,.18),0 6px 18px rgba(0,0,0,.32);}
+.lvl-btn.sel{border-color:var(--gold);transform:translateY(-2px);box-shadow:0 0 0 2px rgba(255,215,106,.18),0 7px 18px rgba(0,0,0,.34);}
 .view-row{display:flex;gap:8px;justify-content:center;flex-wrap:wrap;}
 .view-btn{border:2px solid rgba(255,255,255,.2);border-radius:14px;background:rgba(255,255,255,.09);color:#f8f7ff;padding:8px 14px;cursor:pointer;font-size:.95rem;transition:transform .12s,background .12s,border-color .12s;}
-.view-btn.sel{border-color:var(--cyan);background:rgba(38,198,218,.22);color:#c9fbff;font-weight:bold;box-shadow:0 0 0 2px rgba(120,231,242,.12);}
+.view-btn.sel{border-color:var(--cyan);background:linear-gradient(145deg,rgba(38,198,218,.28),rgba(76,83,190,.18));color:#e5fdff;font-weight:900;box-shadow:var(--focus-ring);}
 #spModeRow{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));}
 #spModeRow .mode-choice{min-width:0;padding:4px;display:grid;grid-template-columns:38px minmax(0,1fr);gap:5px;align-items:center;text-align:left;line-height:1.1;}
 #spModeRow .title-mode-art{width:38px;border-radius:9px;border:1px solid rgba(255,255,255,.45);box-shadow:0 2px 8px rgba(0,0,0,.3);}
@@ -158,7 +178,7 @@ button:focus-visible,input:focus-visible{outline:3px solid #fff;outline-offset:3
   #charRow{grid-area:char-row}#charPreviewWrap{grid-area:char-preview;margin-top:2px}#lvlRow{grid-area:level-row;align-self:start}
   #spModeRow{grid-area:mode-row}#viewRow{grid-area:view-row}#playerName{grid-area:player-name;justify-self:center}
   #startBtn{grid-area:start;margin:5px auto 1px;padding:9px;font-size:1.05rem}.title-foot{grid-area:foot;margin-top:1px}.version-note{grid-area:version;margin-top:1px}
-  .sec-label{margin:4px 0 2px;font-size:.82rem}.char-btn{padding:3px 2px}.char-btn .ce{font-size:1.3rem}.char-btn .cj{font-size:.52rem}
+  .sec-label{margin:4px 0 2px;font-size:.9rem}.char-btn{padding:3px 2px}.char-btn .cj{font-size:.68rem}.char-btn .role-color{width:28px;height:28px;margin-bottom:2px}
   #charPreview{width:86px;height:92px}.lvl-btn{padding:3px;grid-template-columns:42px minmax(0,1fr);gap:5px}.lvl-btn .level-art{width:42px}.lvl-btn .le{font-size:.78rem}.lvl-btn .level-name{font-size:.68rem}.view-btn{padding:5px 8px;font-size:.75rem}
   #spModeRow .mode-choice{grid-template-columns:30px minmax(0,1fr);gap:3px;padding:3px}#spModeRow .title-mode-art{width:30px}#spModeRow .mode-copy{font-size:.64rem}
   #playerName{padding:6px 10px;font-size:.88rem}.mini-btn{padding:5px 9px;font-size:.75rem;margin:2px}
@@ -208,10 +228,12 @@ button:focus-visible,input:focus-visible{outline:3px solid #fff;outline-offset:3
 }
 .round-btn{
   width:52px;height:52px;border-radius:50%;border:3px solid rgba(255,255,255,.8);cursor:pointer;
-  background:rgba(30,24,70,.75);color:#fff;font-size:1.35rem;box-shadow:0 3px 8px rgba(0,0,0,.4);
+  position:relative;background:rgba(30,24,70,.75);color:#fff;font-size:1.35rem;box-shadow:0 3px 8px rgba(0,0,0,.4);
 }
 .round-btn:active{transform:scale(.92);}
-.round-btn .bl{display:block;font-size:.5rem;margin-top:-3px;}
+.round-btn .ui-icon{position:absolute;left:20%;top:8%;width:60%;height:60%;}
+.round-btn.muted .ui-icon{filter:grayscale(.8) brightness(.65);}
+.round-btn .bl{position:absolute;left:0;right:0;bottom:1px;display:block;font-size:.5rem;line-height:1.05;}
 #effectChips{
   position:absolute;top:calc(60px + env(safe-area-inset-top));left:calc(8px + env(safe-area-inset-left));display:flex;flex-direction:column;gap:6px;z-index:6;pointer-events:none;
 }
@@ -313,6 +335,13 @@ button:focus-visible,input:focus-visible{outline:3px solid #fff;outline-offset:3
   position:absolute;top:-6px;right:-6px;background:#ffd54f;color:#5d4037;border-radius:50%;
   width:26px;height:26px;font-size:.9rem;font-weight:bold;line-height:26px;
 }
+.game-action-btn{position:absolute;}
+.game-action-btn .action-icon{position:absolute;left:15%;top:15%;width:70%;height:70%;pointer-events:none;}
+.game-action-btn .cooldown{
+  position:absolute;inset:0;display:grid;place-items:center;border-radius:50%;color:#fff;font-size:1.45rem;font-weight:900;
+  text-shadow:0 2px 6px #000;background:transparent;pointer-events:none;
+}
+.game-action-btn.cooling .action-icon{filter:brightness(.42) saturate(.55);}
 @media(orientation:landscape) and (max-width:700px){
   #gameScreen{
     --action-rail-space:58px;
@@ -378,8 +407,11 @@ button:focus-visible,input:focus-visible{outline:3px solid #fff;outline-offset:3
 .win-card h2{color:#ff9800;font-size:2rem;margin:4px 0;}
 .win-stats{font-size:1.15rem;margin:10px 0;color:#e9e5ff;}
 .win-stats b{font-size:1.5rem;color:#ffd76a;}
-.confetti{font-size:2.4rem;}
 .result-art{width:min(156px,38vw);margin:0 auto 5px;border-radius:22px;border:3px solid rgba(255,255,255,.8);box-shadow:0 10px 28px rgba(0,0,0,.5),0 0 28px rgba(120,231,242,.16);}
+.button-with-icon{display:inline-flex;align-items:center;justify-content:center;gap:7px;}
+.button-with-icon .ui-icon{width:1.45em;height:1.45em;}
+.start-btn.button-with-icon{display:flex;}
+.score-medal{width:22px;height:22px;justify-self:center;}
 #failScreen{overflow-y:auto;}
 #failScreen .win-card{border-color:#90a4ae;}
 #failScreen .result-art{box-shadow:0 10px 28px rgba(0,0,0,.55),0 0 30px rgba(239,83,80,.16);}
@@ -437,13 +469,13 @@ button:focus-visible,input:focus-visible{outline:3px solid #fff;outline-offset:3
 @media(orientation:landscape) and (max-height:470px){
   #titleScreen{padding:4px}.title-card{padding:5px 10px;column-gap:12px;row-gap:0;border-radius:20px}
   .title-card h1{font-size:1.25rem}.title-card .sub{font-size:.66rem;margin-bottom:0}.sec-label{font-size:.68rem;margin:1px 0}
-  .char-btn{padding:1px 2px;border-radius:11px;font-size:.64rem}.char-btn .ce{font-size:1rem}.char-btn .cj{font-size:.44rem}
+  .char-btn{padding:2px;border-radius:11px}.char-btn .cj{font-size:.66rem}.char-btn .role-color{width:24px;height:24px;margin-bottom:2px}
   #charPreviewWrap{gap:6px;margin-top:0}#charPreview{width:66px;height:70px;border-radius:13px}#charDesc{font-size:.7rem;max-width:175px}
   .lvl-btn{grid-template-columns:34px minmax(0,1fr);gap:3px;padding:2px;border-radius:11px}.lvl-btn .level-art{width:34px;border-radius:8px}.lvl-btn .le{font-size:.65rem}.lvl-btn .level-name{font-size:.6rem}
   #spModeRow .mode-choice{grid-template-columns:24px minmax(0,1fr);gap:2px;padding:2px;border-radius:10px}#spModeRow .title-mode-art{width:24px;border-radius:6px}#spModeRow .mode-copy{font-size:.57rem}
   .view-btn{padding:3px 6px;font-size:.65rem;border-radius:10px}#playerName{padding:3px 8px;font-size:.74rem}
   #startBtn{margin:2px auto 0;padding:5px;font-size:.86rem}.title-foot{margin-top:0}.mini-btn{padding:2px 6px;font-size:.62rem;margin:1px}.version-note{font-size:.56rem;margin-top:0}
-  .result-art{width:104px}.win-card{padding:10px 14px}.win-card h2{font-size:1.45rem}.confetti{font-size:1.7rem}.win-stats{font-size:.92rem;margin:5px 0}.win-stats b{font-size:1.1rem}
+  .result-art{width:104px}.win-card{padding:10px 14px}.win-card h2{font-size:1.45rem}.win-stats{font-size:.92rem;margin:5px 0}.win-stats b{font-size:1.1rem}
 }
 
 /* ===== 首頁與分步進入流程 ===== */
@@ -465,18 +497,20 @@ button:focus-visible,input:focus-visible{outline:3px solid #fff;outline-offset:3
 .home-action{
   grid-column:span 3;min-height:80px;border:1px solid rgba(255,255,255,.2);border-radius:18px;padding:10px 13px;cursor:pointer;
   display:grid;grid-template-columns:46px minmax(0,1fr);align-items:center;gap:10px;text-align:left;color:#fff;
-  background:linear-gradient(145deg,rgba(255,255,255,.14),rgba(255,255,255,.06));
+  position:relative;isolation:isolate;overflow:hidden;background:linear-gradient(145deg,rgba(255,255,255,.14),rgba(255,255,255,.06));
   box-shadow:inset 0 1px 0 rgba(255,255,255,.1),0 8px 24px rgba(0,0,0,.22);transition:transform .12s,filter .12s,border-color .12s;
 }
+.home-action::after{content:'';position:absolute;z-index:-1;inset:0;background:linear-gradient(115deg,transparent 0 48%,rgba(255,255,255,.09) 55%,transparent 62%);transform:translateX(-120%);transition:transform .45s ease;}
+.home-action:hover::after,.home-action:focus-visible::after{transform:translateX(120%);}
 .home-action:hover,.home-action:focus-visible{transform:translateY(-2px);filter:brightness(1.1);border-color:rgba(255,255,255,.45);}
-.home-action .home-icon{font-size:2rem;text-align:center;filter:drop-shadow(0 4px 8px rgba(0,0,0,.35));}
+.home-action .home-icon{width:42px;height:42px;justify-self:center;}
 .home-action strong{display:block;font-size:1.04rem;color:#fff3c4;margin-bottom:2px;}
 .home-action small{display:block;color:#d7d6ec;font-size:.77rem;line-height:1.35;}
 .home-action.primary{background:linear-gradient(145deg,rgba(255,159,67,.42),rgba(200,80,32,.25));border-color:rgba(255,215,106,.48);}
 .home-action.multiplayer{background:linear-gradient(145deg,rgba(38,198,218,.38),rgba(27,92,130,.25));border-color:rgba(120,231,242,.5);}
 .home-action.history{background:linear-gradient(145deg,rgba(126,87,194,.38),rgba(63,43,112,.24));border-color:rgba(204,177,255,.42);}
 .home-action.utility{grid-column:span 2;min-height:68px;padding:8px 10px;grid-template-columns:36px minmax(0,1fr);gap:7px;border-radius:15px;}
-.home-action.utility .home-icon{font-size:1.55rem;}
+.home-action.utility .home-icon{width:32px;height:32px;}
 .home-action.utility strong{font-size:.9rem;}
 .home-action.utility small{font-size:.65rem;line-height:1.25;}
 .home-utility{display:flex;justify-content:center;gap:8px;margin-top:10px;}
@@ -490,7 +524,7 @@ button:focus-visible,input:focus-visible{outline:3px solid #fff;outline-offset:3
 }
 .profile-picker{grid-area:profile-picker;text-align:left;}
 .profile-picker .char-row{grid-template-columns:repeat(3,minmax(0,1fr));}
-.profile-card{padding:8px 10px;border:1px solid rgba(255,255,255,.15);border-radius:18px;background:rgba(5,9,29,.3);}
+.profile-card{padding:8px 10px;border:1px solid var(--panel-line);border-radius:18px;background:linear-gradient(160deg,rgba(19,31,72,.72),rgba(5,9,29,.5));box-shadow:inset 0 1px 0 rgba(255,255,255,.07);}
 .profile-card{grid-area:profile-card;}
 .profile-card #charPreviewWrap{margin:0;}
 .profile-name-label{display:block;margin:7px 0 4px;color:var(--gold);font-weight:800;font-size:.82rem;}
@@ -499,7 +533,7 @@ button:focus-visible,input:focus-visible{outline:3px solid #fff;outline-offset:3
 .flow-actions{display:flex;justify-content:flex-end;gap:8px;margin-top:10px;}
 .flow-primary{border:0;border-radius:16px;padding:10px 22px;cursor:pointer;color:#fff;font-weight:900;font-size:1rem;background:linear-gradient(145deg,#ffd66b,#ff8f2f);box-shadow:0 4px 0 #c6531f;}
 .setup-stage{display:grid;grid-template-columns:1fr;gap:9px;text-align:left;align-items:start;}
-.setup-section{padding:7px 9px;border:1px solid rgba(255,255,255,.14);border-radius:17px;background:rgba(5,9,29,.3);}
+.setup-section{padding:7px 9px;border:1px solid var(--panel-line);border-radius:17px;background:linear-gradient(160deg,rgba(19,31,72,.68),rgba(5,9,29,.46));box-shadow:inset 0 1px 0 rgba(255,255,255,.06);}
 .setup-section .sec-label{margin:0 0 5px;}
 .setup-stage .lvl-row{grid-template-columns:repeat(6,minmax(0,1fr));gap:5px;}
 .setup-stage .lvl-btn{grid-template-columns:42px minmax(0,1fr);gap:5px;}
@@ -513,7 +547,7 @@ button:focus-visible,input:focus-visible{outline:3px solid #fff;outline-offset:3
 .setup-view{grid-area:view;}
 .setup-start{grid-area:start;align-self:stretch;}
 .setup-summary{display:flex;align-items:center;gap:7px;color:#deddf0;font-size:.76rem;}
-.setup-avatar{font-size:1.2rem;}
+.setup-avatar{width:30px;height:30px;margin:0;}
 .round-picker{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-top:6px;color:var(--gold);font-size:.78rem;font-weight:900;}
 .round-picker select{font-family:var(--font);min-width:92px;padding:5px 8px;border:2px solid rgba(120,231,242,.62);border-radius:11px;background:#101633;color:#fff;font-weight:900;}
 .setup-stage #spModeRow{grid-template-columns:repeat(2,minmax(0,1fr));gap:6px;}
@@ -538,24 +572,25 @@ button:focus-visible,input:focus-visible{outline:3px solid #fff;outline-offset:3
   .entry-shell[data-panel="homePanel"]{max-width:760px;}
   .entry-shell[data-panel="profilePanel"]{max-width:810px;}
   .entry-shell[data-panel="setupPanel"]{max-width:824px;}
-  .entry-brand h1{font-size:1.3rem;line-height:1.1;}
-  .entry-brand .sub{font-size:.67rem;margin:0 0 4px;}
-  .home-intro{font-size:.76rem;line-height:1.3;margin:1px auto 6px;}
+  .entry-brand h1{font-size:1.45rem;line-height:1.1;}
+  .entry-brand .sub{font-size:.78rem;margin:0 0 4px;}
+  .home-intro{font-size:.86rem;line-height:1.3;margin:1px auto 6px;}
   .home-menu{gap:6px;}
   .home-action{min-height:64px;padding:6px 9px;border-radius:14px;grid-template-columns:34px minmax(0,1fr);gap:7px;}
-  .home-action .home-icon{font-size:1.55rem;}.home-action strong{font-size:.86rem;}.home-action small{font-size:.61rem;}
+  .home-action .home-icon{width:36px;height:36px;}.home-action strong{font-size:1.08rem;}.home-action small{font-size:.82rem;}
   .home-action.utility{min-height:54px;padding:5px 8px;grid-template-columns:27px minmax(0,1fr);gap:5px;border-radius:12px;}
-  .home-action.utility .home-icon{font-size:1.25rem}.home-action.utility strong{font-size:.76rem}.home-action.utility small{font-size:.56rem}
-  .home-utility{margin-top:5px}.home-utility .mini-btn{padding:4px 9px;font-size:.68rem;}
-  .flow-head{grid-template-columns:92px minmax(0,1fr) 92px;margin:0 0 4px;}.flow-head h2{font-size:1rem}.flow-back{padding:4px 7px;font-size:.7rem}.flow-step{font-size:.62rem}
+  .home-action.utility .home-icon{width:29px;height:29px}.home-action.utility strong{font-size:.98rem}.home-action.utility small{font-size:.78rem}
+  .home-utility{margin-top:5px}.home-utility .mini-btn{padding:4px 9px;font-size:.78rem;}
+  .flow-head{grid-template-columns:98px minmax(0,1fr) 98px;margin:0 0 4px;}.flow-head h2{font-size:1.12rem}.flow-back{padding:4px 7px;font-size:.82rem}.flow-step{font-size:.72rem}
   .profile-stage{grid-template-columns:minmax(245px,.7fr) minmax(390px,1.3fr);gap:8px;}
-  .profile-card{padding:5px 7px;border-radius:13px;}.profile-name-label{margin:3px 0 2px;font-size:.68rem}.flow-error{min-height:12px;font-size:.62rem}
-  .flow-actions{margin-top:4px}.flow-primary{padding:6px 16px;font-size:.78rem;border-radius:12px;}
-  .setup-stage{grid-template-columns:1fr;gap:5px;}.setup-section{padding:4px 6px;border-radius:12px}.setup-side{gap:4px;grid-template-columns:minmax(155px,.9fr) minmax(260px,1.45fr) minmax(190px,1fr)}
-  .setup-stage .lvl-row{gap:3px}.setup-stage .lvl-btn{grid-template-columns:34px minmax(0,1fr);gap:3px}.setup-stage .lvl-btn .level-art{width:34px}.setup-stage .lvl-btn .level-name{font-size:.6rem}
-  .setup-summary{font-size:.62rem}.setup-avatar{font-size:.95rem}.setup-stage #spModeRow{gap:3px}.setup-stage #viewRow{gap:3px}
-  .round-picker{margin-top:3px;font-size:.62rem}.round-picker select{padding:2px 5px;font-size:.64rem;min-width:72px;}
-  .setup-stage .view-btn{padding:3px 5px;font-size:.64rem}.setup-stage #startBtn{padding:6px;font-size:.8rem}
+  .char-btn{font-size:.82rem}.char-btn .cj{font-size:.84rem}.char-btn .role-color{width:28px;height:28px;margin-bottom:2px}#charDesc{font-size:.84rem}
+  .profile-card{padding:5px 7px;border-radius:13px;}.profile-name-label{margin:3px 0 2px;font-size:.78rem}.flow-error{min-height:12px;font-size:.72rem}
+  .flow-actions{margin-top:4px}.flow-primary{padding:6px 16px;font-size:.9rem;border-radius:12px;}
+  .setup-stage{grid-template-columns:1fr;gap:6px;}.setup-section{padding:5px 7px;border-radius:13px}.setup-side{gap:5px;grid-template-columns:minmax(155px,.9fr) minmax(260px,1.45fr) minmax(190px,1fr)}
+  .setup-stage .lvl-row{gap:4px}.setup-stage .lvl-btn{grid-template-columns:38px minmax(0,1fr);gap:4px}.setup-stage .lvl-btn .level-art{width:38px}.setup-stage .lvl-btn .level-name{font-size:.9rem}
+  .setup-summary{font-size:.86rem}.setup-avatar{font-size:1.05rem}.setup-stage #spModeRow{gap:4px}.setup-stage #viewRow{gap:4px}.setup-stage #spModeRow .mode-choice{grid-template-columns:30px minmax(0,1fr);padding:3px}.setup-stage #spModeRow .title-mode-art{width:30px}.setup-stage #spModeRow .mode-copy{font-size:.84rem}
+  .round-picker{margin-top:4px;font-size:.86rem}.round-picker select{padding:3px 6px;font-size:.86rem;min-width:74px;}
+  .setup-stage .view-btn{padding:4px 6px;font-size:.86rem}.setup-stage #startBtn{padding:7px;font-size:1.02rem}
   #mpModal .m-card{max-height:96vh;padding:8px 12px;border-width:3px;border-radius:18px;}
   #mpModal .m-card h3{font-size:1.05rem;margin:0 0 4px;}#mpChosenMode{font-size:.88rem;margin:2px 0;}
   #mpModal .start-btn{padding:7px;font-size:.88rem;margin:5px auto!important;}#mpModal .m-close{padding:6px 18px;font-size:.8rem;margin-top:4px;}
@@ -566,6 +601,10 @@ button:focus-visible,input:focus-visible{outline:3px solid #fff;outline-offset:3
   .profile-stage{grid-template-columns:minmax(220px,.72fr) minmax(0,1.28fr);}
   .setup-side{grid-template-columns:minmax(0,.9fr) minmax(0,1.25fr);grid-template-areas:'summary modes' 'view start';}
   .setup-stage .lvl-btn{grid-template-columns:34px minmax(0,1fr);}.setup-stage .lvl-btn .level-art{width:34px;}
+  .setup-view #viewRow{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));}
+  .setup-view .view-btn{min-width:0;width:100%;gap:2px;padding:4px 3px;white-space:nowrap;}
+  .setup-view .view-btn .ui-icon{width:1.18em;height:1.18em;}
+  .setup-stage #startBtn{align-self:center;min-height:52px;max-height:56px;}
 }
 @media(max-width:620px){
   .home-menu{grid-template-columns:1fr;}.home-action,.home-action.utility{grid-column:auto;}
@@ -580,27 +619,27 @@ button:focus-visible,input:focus-visible{outline:3px solid #fff;outline-offset:3
 <!-- ============ 標題畫面 ============ -->
 <div id="titleScreen" class="screen active">
   <div class="deco" aria-hidden="true">
-    <span style="left:6%;animation-duration:15s;">🌀</span>
-    <span style="left:20%;animation-duration:19s;animation-delay:3s;">⭐</span>
-    <span style="left:36%;animation-duration:17s;animation-delay:7s;">💎</span>
-    <span style="left:54%;animation-duration:21s;animation-delay:1s;">🧭</span>
-    <span style="left:70%;animation-duration:16s;animation-delay:9s;">🍎</span>
-    <span style="left:86%;animation-duration:20s;animation-delay:5s;">🗝️</span>
+    <span class="ui-icon icon-shift" style="left:6%;animation-duration:15s;"></span>
+    <span class="ui-icon icon-score" style="left:20%;animation-duration:19s;animation-delay:3s;"></span>
+    <span class="ui-icon icon-medal" style="left:36%;animation-duration:17s;animation-delay:7s;"></span>
+    <span class="ui-icon icon-compass" style="left:54%;animation-duration:21s;animation-delay:1s;"></span>
+    <span class="ui-icon icon-food" style="left:70%;animation-duration:16s;animation-delay:9s;"></span>
+    <span class="ui-icon icon-history" style="left:86%;animation-duration:20s;animation-delay:5s;"></span>
   </div>
   <div class="title-card entry-shell" data-panel="homePanel">
     <header class="entry-brand">
-      <h1>🌀 3D移動迷宮</h1>
+      <h1><span class="ui-icon icon-compass inline-ui-icon" aria-hidden="true"></span>3D移動迷宮</h1>
       <p class="sub">迷宮會變形！撿道具、找出口，比誰最快過關！</p>
     </header>
 
     <section class="flow-panel active" id="homePanel" aria-labelledby="homeTitle">
       <p class="home-intro" id="homeTitle">準備好進入會移動的奇幻迷宮了嗎？先選擇今天想做的事。</p>
       <div class="home-menu">
-        <button class="home-action primary" id="singleBtn"><span class="home-icon">🧭</span><span><strong>單人遊戲</strong><small>自己闖關，或和電腦挑戰尋寶、鬼抓人與搶購。</small></span></button>
-        <button class="home-action multiplayer" id="mpBtn"><span class="home-icon">👥</span><span><strong>多人遊戲</strong><small>先建立角色，再建立房間或輸入朋友的房號。</small></span></button>
-        <button class="home-action utility" id="admBtn"><span class="home-icon">⚙️</span><span><strong>遊戲設定</strong><small>調整迷宮、音樂與視角。</small></span></button>
-        <button class="home-action utility history" id="lbBtn"><span class="home-icon">🏆</span><span><strong>勇者歷史</strong><small>查看最快紀錄與歷代勇者。</small></span></button>
-        <button class="home-action utility help" id="helpBtn"><span class="home-icon">📖</span><span><strong>遊戲說明</strong><small>查看操作、道具與各種玩法。</small></span></button>
+        <button class="home-action primary" id="singleBtn"><span class="home-icon ui-icon icon-compass" aria-hidden="true"></span><span><strong>單人遊戲</strong><small>自己闖關，或和電腦挑戰尋寶、鬼抓人與搶購。</small></span></button>
+        <button class="home-action multiplayer" id="mpBtn"><span class="home-icon ui-icon icon-duo" aria-hidden="true"></span><span><strong>多人遊戲</strong><small>先建立角色，再建立房間或輸入朋友的房號。</small></span></button>
+        <button class="home-action utility" id="admBtn"><span class="home-icon ui-icon icon-settings" aria-hidden="true"></span><span><strong>遊戲設定</strong><small>調整迷宮、音樂與視角。</small></span></button>
+        <button class="home-action utility history" id="lbBtn"><span class="home-icon ui-icon icon-history" aria-hidden="true"></span><span><strong>勇者歷史</strong><small>查看最快紀錄與歷代勇者。</small></span></button>
+        <button class="home-action utility help" id="helpBtn"><span class="home-icon ui-icon icon-help" aria-hidden="true"></span><span><strong>遊戲說明</strong><small>查看操作、道具與各種玩法。</small></span></button>
       </div>
       <div class="version-note">3D移動迷宮 v<span id="verLabel"></span></div>
     </section>
@@ -634,8 +673,8 @@ button:focus-visible,input:focus-visible{outline:3px solid #fff;outline-offset:3
         </div>
         <div class="setup-side">
           <div class="setup-section setup-summary-card">
-            <div class="setup-summary"><span class="setup-avatar" id="setupAvatar">👦</span><span id="setupPlayerSummary">小勇士準備出發</span></div>
-            <label class="round-picker" for="roundCount"><span>🔁 要玩幾輪</span><select id="roundCount" aria-label="遊戲輪數">
+            <div class="setup-summary"><span class="setup-avatar role-color" id="setupAvatar" aria-hidden="true"></span><span id="setupPlayerSummary">小勇士準備出發</span></div>
+            <label class="round-picker" for="roundCount"><span><span class="ui-icon icon-repeat inline-ui-icon" aria-hidden="true"></span>要玩幾輪</span><select id="roundCount" aria-label="遊戲輪數">
               <option value="1">1 輪</option><option value="2">2 輪</option><option value="3" selected>3 輪</option><option value="4">4 輪</option><option value="5">5 輪</option>
               <option value="6">6 輪</option><option value="7">7 輪</option><option value="8">8 輪</option><option value="9">9 輪</option><option value="10">10 輪</option>
             </select></label>
@@ -643,21 +682,21 @@ button:focus-visible,input:focus-visible{outline:3px solid #fff;outline-offset:3
           <div class="setup-section setup-modes">
             <div class="sec-label mode-label">選擇玩法</div>
             <div class="view-row" id="spModeRow">
-              <button class="view-btn mode-choice sel" data-m="classic"><span class="visual-atlas atlas-race title-mode-art" aria-hidden="true"></span><span class="mode-copy">🚩 經典闖關</span></button>
-              <button class="view-btn mode-choice" data-m="treasure"><span class="visual-atlas atlas-treasure title-mode-art" aria-hidden="true"></span><span class="mode-copy">💎 尋寶對戰</span></button>
-              <button class="view-btn mode-choice" data-m="tag"><span class="visual-atlas atlas-tag title-mode-art" aria-hidden="true"></span><span class="mode-copy">👹 鬼抓人</span></button>
-              <button class="view-btn mode-choice" data-m="shop"><span class="visual-atlas atlas-shop title-mode-art" aria-hidden="true"></span><span class="mode-copy">🛒 搶購模式</span></button>
+              <button class="view-btn mode-choice sel" data-m="classic"><span class="visual-atlas atlas-race title-mode-art" aria-hidden="true"></span><span class="mode-copy">經典闖關</span></button>
+              <button class="view-btn mode-choice" data-m="treasure"><span class="visual-atlas atlas-treasure title-mode-art" aria-hidden="true"></span><span class="mode-copy">尋寶對戰</span></button>
+              <button class="view-btn mode-choice" data-m="tag"><span class="visual-atlas atlas-tag title-mode-art" aria-hidden="true"></span><span class="mode-copy">鬼抓人</span></button>
+              <button class="view-btn mode-choice" data-m="shop"><span class="visual-atlas atlas-shop title-mode-art" aria-hidden="true"></span><span class="mode-copy">搶購模式</span></button>
             </div>
           </div>
           <div class="setup-section setup-view">
             <div class="sec-label view-label">選擇初始視角</div>
             <div class="view-row" id="viewRow">
-              <button class="view-btn sel" data-v="tp">🎥 第三人稱</button>
-              <button class="view-btn" data-v="fp">👀 第一人稱</button>
-              <button class="view-btn" data-v="top">🗺️ 俯視</button>
+              <button class="view-btn button-with-icon sel" data-v="tp"><span class="ui-icon icon-camera" aria-hidden="true"></span>第三人稱</button>
+              <button class="view-btn button-with-icon" data-v="fp"><span class="ui-icon icon-compass" aria-hidden="true"></span>第一人稱</button>
+              <button class="view-btn button-with-icon" data-v="top"><span class="ui-icon icon-castle" aria-hidden="true"></span>俯視</button>
             </div>
           </div>
-          <button class="start-btn setup-start" id="startBtn">🚩 開始單人冒險！</button>
+          <button class="start-btn setup-start button-with-icon" id="startBtn"><span class="ui-icon icon-compass" aria-hidden="true"></span><span id="startBtnLabel">開始單人冒險！</span></button>
         </div>
       </div>
     </section>
@@ -670,13 +709,13 @@ button:focus-visible,input:focus-visible{outline:3px solid #fff;outline-offset:3
   <div id="topMask"></div>
   <div class="hud" id="hudTop">
     <div id="hudInfo">
-      <span>⏱ <b id="hudTime">0:00</b></span>
-      <span>🍗<span id="satietyWrap"><span id="satietyFill"></span></span><b id="satietyPct">100%</b></span>
+      <span><span class="ui-icon icon-timer inline-ui-icon" aria-hidden="true"></span><b id="hudTime">0:00</b></span>
+      <span><span class="ui-icon icon-food inline-ui-icon" aria-hidden="true"></span><span id="satietyWrap"><span id="satietyFill"></span></span><b id="satietyPct">100%</b></span>
       <span id="hpWrap" style="display:none;">體力 <b id="hpHearts">❤️</b></span>
       <span id="cartWrap" style="display:none;">🛒 <b id="cartAmt">$0</b><span id="cartRank" style="font-size:.8rem;color:#8be9fd;margin-left:6px;"></span></span>
-      <span>🌀 <span id="shiftCountdown">--</span></span>
-      <span id="hudLvlName"></span>
-      <span id="hudRound">🔁 1/1</span>
+      <span><span class="ui-icon icon-shift inline-ui-icon" aria-hidden="true"></span><span id="shiftCountdown">--</span></span>
+      <span><span class="ui-icon icon-castle inline-ui-icon" aria-hidden="true"></span><span id="hudLvlName"></span></span>
+      <span><span class="ui-icon icon-repeat inline-ui-icon" aria-hidden="true"></span><span id="hudRound">1/1</span></span>
     </div>
     <div id="minimapWrap">
       <canvas id="minimap" width="240" height="240"></canvas>
@@ -685,21 +724,21 @@ button:focus-visible,input:focus-visible{outline:3px solid #fff;outline-offset:3
   </div>
   <div id="effectChips"></div>
   <div id="hudRightBtns">
-    <button class="round-btn" id="viewToggle">🎥<span class="bl">視角</span></button>
-    <button class="round-btn" id="soundToggle">🔊<span class="bl">音樂</span></button>
-    <button class="round-btn" id="zoomInBtn" style="display:none;">➕<span class="bl">拉近</span></button>
-    <button class="round-btn" id="zoomOutBtn" style="display:none;">➖<span class="bl">拉遠</span></button>
-    <button class="round-btn" id="quitBtn">🏠<span class="bl">離開</span></button>
+    <button class="round-btn" id="viewToggle" aria-label="切換視角"><span class="ui-icon icon-camera" aria-hidden="true"></span><span class="bl">視角</span></button>
+    <button class="round-btn" id="soundToggle" aria-label="切換音樂"><span class="ui-icon icon-sound" aria-hidden="true"></span><span class="bl">音樂</span></button>
+    <button class="round-btn" id="zoomInBtn" aria-label="拉近" style="display:none;"><span class="ui-icon icon-zoom-in" aria-hidden="true"></span><span class="bl">拉近</span></button>
+    <button class="round-btn" id="zoomOutBtn" aria-label="拉遠" style="display:none;"><span class="ui-icon icon-zoom-out" aria-hidden="true"></span><span class="bl">拉遠</span></button>
+    <button class="round-btn" id="quitBtn" aria-label="離開遊戲"><span class="ui-icon icon-exit" aria-hidden="true"></span><span class="bl">離開</span></button>
   </div>
   <div id="compassHud"><div id="compassArrow">🔺</div></div>
   <div id="smellHud"><span id="smellArrow">🔺</span><span id="smellTxt">👃 聞到味道！</span></div>
-  <button id="shovelBtn">⛏️<span class="cnt" id="shovelCnt">1</span></button>
-  <button id="kiteBtn">🪁<span class="cnt" id="kiteCnt">1</span></button>
-  <button id="whistleBtn">📣<span class="cnt" id="whistleCnt">1</span></button>
-  <button id="atkBtn">🐾</button>
-  <button id="robBtn">🤏</button>
-  <button id="coBtn">💳<span class="cnt" id="coCnt"></span></button>
-  <button id="skillBtn">🫥</button>
+  <button class="game-action-btn" id="shovelBtn" aria-label="使用鐵鍬"><span class="ui-icon icon-shovel action-icon" aria-hidden="true"></span><span class="cnt" id="shovelCnt">1</span></button>
+  <button class="game-action-btn" id="kiteBtn" aria-label="使用風箏"><span class="ui-icon icon-kite action-icon" aria-hidden="true"></span><span class="cnt" id="kiteCnt">1</span></button>
+  <button class="game-action-btn" id="whistleBtn" aria-label="使用集合口哨"><span class="ui-icon icon-whistle action-icon" aria-hidden="true"></span><span class="cnt" id="whistleCnt">1</span></button>
+  <button class="game-action-btn" id="atkBtn" aria-label="攻擊"><span class="ui-icon icon-attack action-icon" aria-hidden="true"></span></button>
+  <button class="game-action-btn" id="robBtn" aria-label="搶奪"><span class="ui-icon icon-grab action-icon" aria-hidden="true"></span></button>
+  <button class="game-action-btn" id="coBtn" aria-label="結帳"><span class="ui-icon icon-checkout action-icon" aria-hidden="true"></span><span class="cnt" id="coCnt"></span></button>
+  <button class="game-action-btn" id="skillBtn" aria-label="使用技能"><span class="ui-icon icon-stealth action-icon" aria-hidden="true"></span><span class="cooldown" id="skillCooldown"></span></button>
   <div id="stunOverlay"></div>
   <div id="joyZone"><div id="joyBase"></div><div id="joyStick"></div></div>
   <div id="lookZone"></div>
@@ -718,7 +757,6 @@ button:focus-visible,input:focus-visible{outline:3px solid #fff;outline-offset:3
 <div id="winScreen" class="screen">
   <div class="win-card">
     <div class="visual-atlas atlas-win result-art" role="img" aria-label="金色傳送門前的勝利慶祝畫面"></div>
-    <div class="confetti">🎉🎊🏆🎊🎉</div>
     <h2>恭喜過關！</h2>
     <div class="win-stats">
       <div>關卡：<span id="winLvl"></span></div>
@@ -728,22 +766,22 @@ button:focus-visible,input:focus-visible{outline:3px solid #fff;outline-offset:3
     </div>
     <div class="series-state" id="winSeriesState"></div>
     <div class="series-summary" id="winSeriesSummary"></div>
-    <button class="start-btn" id="againBtn">🔁 再玩一次</button>
-    <button class="mini-btn" id="winLbBtn">🏆 看勇者歷史</button>
-    <button class="mini-btn" id="winHomeBtn">🏠 回到選單</button>
+    <button class="start-btn button-with-icon" id="againBtn"><span class="ui-icon icon-repeat" aria-hidden="true"></span><span id="againBtnLabel">再玩一次</span></button>
+    <button class="mini-btn button-with-icon" id="winLbBtn"><span class="ui-icon icon-history" aria-hidden="true"></span>看勇者歷史</button>
+    <button class="mini-btn button-with-icon" id="winHomeBtn"><span class="ui-icon icon-exit" aria-hidden="true"></span>回到選單</button>
   </div>
 </div>
 
 <!-- ============ 多人連線 ============ -->
 <div class="modal" id="mpModal">
   <div class="m-card">
-    <h3>👥 多人房間（2～5 人）</h3>
+    <h3><span class="ui-icon icon-duo inline-ui-icon" aria-hidden="true"></span>多人房間（2～5 人）</h3>
     <div id="mpSetup">
       <div class="lb-tabs mp-mode-tabs" hidden aria-hidden="true">
-        <button class="lb-tab mp-mode-btn sel" id="mpModeRace"><span class="visual-atlas atlas-race mp-mode-art" aria-hidden="true"></span><span class="mp-mode-copy">🏁 比賽搶終點</span></button>
-        <button class="lb-tab mp-mode-btn" id="mpModeTag"><span class="visual-atlas atlas-tag mp-mode-art" aria-hidden="true"></span><span class="mp-mode-copy">👹 鬼抓人</span></button>
-        <button class="lb-tab mp-mode-btn" id="mpModeTre"><span class="visual-atlas atlas-treasure mp-mode-art" aria-hidden="true"></span><span class="mp-mode-copy">💎 尋寶</span></button>
-        <button class="lb-tab mp-mode-btn" id="mpModeShop"><span class="visual-atlas atlas-shop mp-mode-art" aria-hidden="true"></span><span class="mp-mode-copy">🛒 搶購</span></button>
+        <button class="lb-tab mp-mode-btn sel" id="mpModeRace"><span class="visual-atlas atlas-race mp-mode-art" aria-hidden="true"></span><span class="mp-mode-copy">比賽搶終點</span></button>
+        <button class="lb-tab mp-mode-btn" id="mpModeTag"><span class="visual-atlas atlas-tag mp-mode-art" aria-hidden="true"></span><span class="mp-mode-copy">鬼抓人</span></button>
+        <button class="lb-tab mp-mode-btn" id="mpModeTre"><span class="visual-atlas atlas-treasure mp-mode-art" aria-hidden="true"></span><span class="mp-mode-copy">尋寶</span></button>
+        <button class="lb-tab mp-mode-btn" id="mpModeShop"><span class="visual-atlas atlas-shop mp-mode-art" aria-hidden="true"></span><span class="mp-mode-copy">搶購</span></button>
       </div>
       <div id="mpChosenMode">🏁 已選擇：比賽搶終點</div>
       <div style="font-size:.85rem;color:#666;margin:6px 0;" id="mpModeDesc">大家從不同角落出發，看誰最快搶到中間的傳送門！</div>
@@ -755,11 +793,11 @@ button:focus-visible,input:focus-visible{outline:3px solid #fff;outline-offset:3
         <button class="lb-tab" data-n="4">4 人</button>
         <button class="lb-tab" data-n="5">5 人</button>
       </div>
-      <button class="start-btn" id="mpCreate" style="margin:8px auto;">🏠 建立房間（我當房主）</button>
+      <button class="start-btn button-with-icon" id="mpCreate" style="margin:8px auto;"><span class="ui-icon icon-duo" aria-hidden="true"></span>建立房間（我當房主）</button>
       <div style="margin:8px 0;color:#666;">─ 或加入朋友的房間 ─</div>
       <input id="mpCodeInput" maxlength="4" inputmode="numeric" placeholder="輸入4位數房號"
         style="font-family:var(--font);font-size:1.3rem;padding:8px;border-radius:12px;border:3px solid #4dd0e1;width:160px;text-align:center;letter-spacing:6px;">
-      <button class="mini-btn" id="mpJoin" style="display:block;margin:8px auto;">🚪 加入房間</button>
+      <button class="mini-btn button-with-icon" id="mpJoin" style="display:flex;margin:8px auto;"><span class="ui-icon icon-exit" aria-hidden="true"></span>加入房間</button>
     </div>
     <div id="mpLobby" style="display:none;">
       <div style="font-size:1.05rem;color:#666;">房號（唸給朋友聽）</div>
@@ -767,7 +805,7 @@ button:focus-visible,input:focus-visible{outline:3px solid #fff;outline-offset:3
       <div id="mpModeShow" style="color:#7e57c2;font-weight:bold;margin:4px 0;"></div>
       <div id="mpPlayers" style="margin:10px 0;"></div>
       <div id="mpStatus" style="font-size:.85rem;color:#999;min-height:20px;"></div>
-      <button class="start-btn" id="mpStart" style="display:none;">🚩 大家到齊，開始！</button>
+      <button class="start-btn button-with-icon" id="mpStart" style="display:none;"><span class="ui-icon icon-compass" aria-hidden="true"></span>大家到齊，開始！</button>
     </div>
     <button class="m-close" id="mpClose" style="background:#90a4ae;">離開</button>
   </div>
@@ -775,12 +813,12 @@ button:focus-visible,input:focus-visible{outline:3px solid #fff;outline-offset:3
 
 <div class="modal" id="mpResult">
   <div class="m-card">
-    <h3 id="mpResultTitle">🏁 比賽結果</h3>
+    <h3><span class="ui-icon icon-medal inline-ui-icon" aria-hidden="true"></span><span id="mpResultTitle">比賽結果</span></h3>
     <div id="mpResultBody" style="font-size:1.15rem;line-height:2;"></div>
     <div class="series-state" id="mpSeriesState"></div>
     <div class="series-summary" id="mpSeriesSummary"></div>
-    <button class="start-btn" id="mpNextRound" style="display:none;">➡️ 開始下一輪</button>
-    <button class="m-close" id="mpResultHome">🏠 回到選單</button>
+    <button class="start-btn button-with-icon" id="mpNextRound" style="display:none;"><span class="ui-icon icon-repeat" aria-hidden="true"></span><span id="mpNextRoundLabel">開始下一輪</span></button>
+    <button class="m-close button-with-icon" id="mpResultHome"><span class="ui-icon icon-exit" aria-hidden="true"></span>回到選單</button>
   </div>
 </div>
 
@@ -798,23 +836,22 @@ button:focus-visible,input:focus-visible{outline:3px solid #fff;outline-offset:3
 <div id="failScreen" class="screen" style="background:radial-gradient(circle at 50% 30%,#546e7a,#263238 70%);flex-direction:column;align-items:center;justify-content:center;padding:14px;">
   <div class="win-card" style="border-color:#90a4ae;">
     <div class="visual-atlas atlas-fail result-art" role="img" aria-label="紅色傳送門前準備再次挑戰的迷宮畫面"></div>
-    <div class="confetti">😵🍽️😵</div>
     <h2 style="color:#607d8b;">肚子太餓了…闖關失敗</h2>
     <div class="win-stats">
       <div>這次撐了 <b id="failTime"></b></div>
-      <div style="font-size:.95rem;color:#7e57c2;margin-top:6px;">💡 迷宮變形時會出現食物，記得撿來吃補充飽足感！</div>
+      <div style="font-size:.95rem;color:#b6a6ef;margin-top:6px;">迷宮變形時會出現食物，記得撿來吃補充飽足感！</div>
     </div>
     <div class="series-state" id="failSeriesState"></div>
     <div class="series-summary" id="failSeriesSummary"></div>
-    <button class="start-btn" id="failAgainBtn">🔁 再挑戰一次</button>
-    <button class="mini-btn" id="failHomeBtn">🏠 回到選單</button>
+    <button class="start-btn button-with-icon" id="failAgainBtn"><span class="ui-icon icon-repeat" aria-hidden="true"></span><span id="failAgainBtnLabel">再挑戰一次</span></button>
+    <button class="mini-btn button-with-icon" id="failHomeBtn"><span class="ui-icon icon-exit" aria-hidden="true"></span>回到選單</button>
   </div>
 </div>
 
 <!-- ============ 勇者歷史 ============ -->
 <div class="modal" id="lbModal">
   <div class="m-card">
-    <h3>🏆 勇者歷史</h3>
+    <h3><span class="ui-icon icon-history inline-ui-icon" aria-hidden="true"></span>勇者歷史</h3>
     <div class="lb-tabs" id="lbTabs"></div>
     <div id="lbSyncState" style="font-size:.75rem;color:#999;margin-bottom:6px;"></div>
     <div style="overflow-x:auto;">
@@ -828,7 +865,7 @@ button:focus-visible,input:focus-visible{outline:3px solid #fff;outline-offset:3
 <!-- ============ 後台設定 ============ -->
 <div class="modal" id="admModal">
   <div class="m-card">
-    <h3>⚙️ 遊戲設定 <span id="admVer" style="font-size:.7rem;color:#aaa;font-weight:normal;"></span></h3>
+    <h3><span class="ui-icon icon-settings inline-ui-icon" aria-hidden="true"></span>遊戲設定 <span id="admVer" style="font-size:.7rem;color:#aaa;font-weight:normal;"></span></h3>
     <div class="adm-row"><label>🌀 迷宮每幾分鐘變換一次</label><input type="number" id="cfgShiftMin" min="0.5" max="10" step="0.5"></div>
     <div class="adm-row"><label>🎁 每次出現的道具數量</label><input type="number" id="cfgItems" min="3" max="12" step="1"></div>
     <div class="adm-row"><label>🍎 每次出現的食物數量</label><input type="number" id="cfgFood" min="2" max="10" step="1"></div>
@@ -862,14 +899,14 @@ button:focus-visible,input:focus-visible{outline:3px solid #fff;outline-offset:3
       <input type="text" id="cfgApi" placeholder="https://script.google.com/...（留空＝只存在本機）">
     </div>
     <div class="adm-note">💡 填入 Google Apps Script 網址後，所有玩家的分數就能互相看見。做法請看資料夾內 README.md。</div>
-    <button class="m-close" id="admSave">💾 儲存設定</button>
+    <button class="m-close button-with-icon" id="admSave"><span class="ui-icon icon-settings" aria-hidden="true"></span>儲存設定</button>
   </div>
 </div>
 
 <!-- ============ 玩法說明 ============ -->
 <div class="modal" id="helpModal">
   <div class="m-card" style="text-align:left;font-size:.95rem;line-height:1.7;">
-    <h3 style="text-align:center;">❓ 玩法說明</h3>
+    <h3 style="text-align:center;"><span class="ui-icon icon-help inline-ui-icon" aria-hidden="true"></span>玩法說明</h3>
     <div class="help-visuals" aria-label="玩法重點圖示">
       <div class="help-visual"><span class="help-art help-art-controls" role="img" aria-label="左手搖桿移動，右手滑動旋轉視角"></span><strong>手機操作</strong></div>
       <div class="help-visual"><span class="help-art help-art-pickups" role="img" aria-label="真正可拾取物有發光地面圈和垂直光柱"></span><strong>光圈＋光柱＝可拾取</strong></div>
@@ -916,7 +953,7 @@ button:focus-visible,input:focus-visible{outline:3px solid #fff;outline-offset:3
 
 <div id="landscapeGate" role="dialog" aria-modal="true" aria-labelledby="landscapeTitle">
   <div class="gate-card">
-    <span class="rotate-icon" aria-hidden="true">📱</span>
+    <span class="rotate-icon ui-icon icon-repeat" aria-hidden="true"></span>
     <h2 id="landscapeTitle">請將裝置橫向</h2>
     <p>角色選擇與遊戲畫面都固定使用橫式。<br>若畫面沒有旋轉，請先關閉手機的直向鎖定。</p>
   </div>
@@ -929,7 +966,7 @@ button:focus-visible,input:focus-visible{outline:3px solid #fff;outline-offset:3
    3D移動迷宮 — 給小朋友的變形迷宮冒險
    ===================================================== */
 const $=id=>document.getElementById(id);
-const GAME_VERSION='1.17.2';
+const GAME_VERSION='1.18.0';
 
 /* ---------- 設定（後台可調） ---------- */
 const DEFAULT_CFG={shiftMin:3,itemCount:6,foodCount:4,hungerMin:3,stunSec:3,pingSec:3,smellCells:3,mazeSize:13,musicOn:1,apiUrl:'',roomMax:3,rounds:3,goodsCount:16,shopMin:2.5,cartFull:400,views:{fp:1,tp:1,top:1},broker:'wss://broker.emqx.io:8084/mqtt'};
@@ -1113,15 +1150,14 @@ function rankedSeriesStats(){
   return Object.values(SERIES.stats).sort((a,b)=>b.wins-a.wins||b.points-a.points||a.name.localeCompare(b.name,'zh-Hant'));
 }
 function seriesSummaryHtml(){
-  const medals=['🥇','🥈','🥉'];
-  return rankedSeriesStats().map((r,i)=>`<div class="series-row"><span>${medals[i]||'🎖️'}</span><strong>${CHARS[r.charIdx||0].emoji} ${escapeHtml(r.name)}</strong><span>${r.wins} 勝</span><span>${r.points} 分</span></div>`).join('');
+  return rankedSeriesStats().map((r,i)=>`<div class="series-row"><span class="ui-icon ${i<3?'icon-medal':'icon-score'} score-medal" aria-hidden="true"></span><strong>${CHARS[r.charIdx||0].emoji} ${escapeHtml(r.name)}</strong><span>${r.wins} 勝</span><span>${r.points} 分</span></div>`).join('');
 }
 function renderSingleSeriesResult(won){
   const prefix=won?'win':'fail', final=SERIES.current>=SERIES.total;
-  $(prefix+'SeriesState').textContent=final?`🏆 ${SERIES.total} 輪全部完成｜最終統計`:`第 ${SERIES.current}／${SERIES.total} 輪完成`;
+  $(prefix+'SeriesState').textContent=final?`${SERIES.total} 輪全部完成｜最終統計`:`第 ${SERIES.current}／${SERIES.total} 輪完成`;
   $(prefix+'SeriesSummary').innerHTML=seriesSummaryHtml();
-  const btn=$(won?'againBtn':'failAgainBtn');
-  btn.textContent=final?`🔁 再玩一組 ${SERIES.total} 輪`:`➡️ 開始第 ${SERIES.current+1} 輪`;
+  const label=$(won?'againBtnLabel':'failAgainBtnLabel');
+  label.textContent=final?`再玩一組 ${SERIES.total} 輪`:`開始第 ${SERIES.current+1} 輪`;
 }
 
 /* =====================================================
@@ -2870,7 +2906,7 @@ function updateCheckoutBtn(){
   if(isCheckingOut(MP.id)){
     const left=Math.ceil((G.coUntil-performance.now())/1000);
     btn.style.display='block'; btn.classList.add('busy'); btn.classList.remove('ready');
-    btn.innerHTML='💳<span class="cnt">'+left+'</span>';
+    $('coCnt').textContent=left;
     return;
   }
   btn.classList.remove('busy');
@@ -2878,7 +2914,7 @@ function updateCheckoutBtn(){
   const can=near&&near.dist<CHECKOUT_RANGE&&(MP.carts[MP.id]||0)>0;
   btn.style.display=can?'block':'none';
   btn.classList.toggle('ready',!!can);
-  btn.innerHTML='💳<span class="cnt">$'+(MP.carts[MP.id]||0)+'</span>';
+  $('coCnt').textContent='$'+(MP.carts[MP.id]||0);
 }
 function startCheckout(){
   if(!isShop()||!MP.started||MP.ended||G.frozen)return;
@@ -3189,7 +3225,7 @@ function winGame(){
   AudioEng.stopMusic(); AudioEng.stopItemLoop(); AudioEng.sfxWin();
   const timeSec=G.elapsed;
   const score=calcScore(timeSec);
-  $('winLvl').textContent=LEVELS[G.lvlIdx].emoji+' '+LEVELS[G.lvlIdx].name;
+  $('winLvl').textContent=LEVELS[G.lvlIdx].name;
   $('winTime').textContent=fmtTime(timeSec);
   $('winScore').textContent=score;
   recordSeriesRound([{id:'solo',name:getPlayerName(),charIdx:G.charIdx,win:true,points:score}]);
@@ -3197,7 +3233,7 @@ function winGame(){
   const rec={name:getPlayerName(),char:CHARS[G.charIdx].emoji,level:LEVELS[G.lvlIdx].id,
     timeSec:Math.round(timeSec),score,date:new Date().toISOString().slice(0,10)};
   saveRecord(rec).then(rank=>{
-    $('winRank').textContent=rank?`🎖️ 你是「${LEVELS[G.lvlIdx].name}」第 ${rank} 名！`:'';
+    $('winRank').textContent=rank?`你是「${LEVELS[G.lvlIdx].name}」第 ${rank} 名！`:'';
   });
   switchScreen('winScreen');
 }
@@ -3306,10 +3342,11 @@ function continueToSetup(){
   $('profileError').textContent='';
   localStorage.setItem('maze3d_name',name);
   $('setupTitle').textContent=entryMode==='multi'?'準備多人遊戲':'準備單人冒險';
-  document.querySelector('#spModeRow [data-m="classic"] .mode-copy').textContent=entryMode==='multi'?'🏁 比賽搶終點':'🚩 經典闖關';
-  $('startBtn').textContent=entryMode==='multi'?'👥 下一步：建立或加入房間':'🚩 開始單人冒險！';
-  $('setupAvatar').textContent=CHARS[G.charIdx].emoji;
-  $('setupPlayerSummary').textContent=name+'｜'+CHARS[G.charIdx].name+'・'+CHARS[G.charIdx].job;
+  document.querySelector('#spModeRow [data-m="classic"] .mode-copy').textContent=entryMode==='multi'?'比賽搶終點':'經典闖關';
+  $('startBtnLabel').textContent=entryMode==='multi'?'下一步：建立或加入房間':'開始單人冒險！';
+  $('startBtn').querySelector('.ui-icon').className='ui-icon '+(entryMode==='multi'?'icon-duo':'icon-compass');
+  $('setupAvatar').style.setProperty('--role-color','#'+CHARS[G.charIdx].shirt.toString(16).padStart(6,'0'));
+  $('setupPlayerSummary').textContent=name+'｜'+CHARS[G.charIdx].job;
   setFlowPanel('setupPanel');
 }
 function buildTitleUI(){
@@ -3318,7 +3355,7 @@ function buildTitleUI(){
   CHARS.forEach((c,i)=>{
     const b=document.createElement('button');
     b.className='char-btn'+(i===G.charIdx?' sel':'');
-    b.innerHTML=`<span class="ce">${c.emoji}</span>${c.name}<span class="cj">${c.job}</span>`;
+    b.innerHTML=`<span class="role-color" style="--role-color:#${c.shirt.toString(16).padStart(6,'0')}" aria-hidden="true"></span><span class="cj">${c.job}</span>`;
     b.onclick=()=>{G.charIdx=i;document.querySelectorAll('.char-btn').forEach((x,j)=>x.classList.toggle('sel',j===i));updatePreview();};
     cr.appendChild(b);
   });
@@ -3327,7 +3364,7 @@ function buildTitleUI(){
   LEVELS.forEach((l,i)=>{
     const b=document.createElement('button');
     b.className='lvl-btn'+(i===G.lvlIdx?' sel':''); b.style.background=l.css;
-    b.innerHTML=`<span class="visual-atlas atlas-${l.id} level-art" aria-hidden="true"></span><span class="level-copy"><span class="le">${l.emoji}</span><span class="level-name">${l.name}</span></span>`;
+    b.innerHTML=`<span class="visual-atlas atlas-${l.id} level-art" aria-hidden="true"></span><span class="level-copy"><span class="level-name">${l.name}</span></span>`;
     b.onclick=()=>{G.lvlIdx=i;document.querySelectorAll('.lvl-btn').forEach((x,j)=>x.classList.toggle('sel',j===i));};
     lr.appendChild(b);
   });
@@ -3371,7 +3408,7 @@ function updatePreview(){
   previewChar=buildCharacter(CHARS[G.charIdx]);
   previewScene.add(previewChar);
   const c=CHARS[G.charIdx];
-  $('charDesc').innerHTML=`<b>${c.name}</b>｜${c.job}<br>${c.desc}<br><span style="color:#e65100;">✨ ${c.abilText}</span>`;
+  $('charDesc').innerHTML=`<b>${c.job}</b><br>${c.desc}<br><span style="color:#ffd76a;">能力：${c.abilText}</span>`;
 }
 
 /* =====================================================
@@ -3448,13 +3485,11 @@ function startGame(){
     scene.add(G.treasureMesh);
     G.myGem=makeEmojiSprite('💎',1.2); G.myGem.position.y=2.7; G.myGem.visible=false;
     playerGroup.add(G.myGem);
-    $('atkBtn').textContent=CH().weapon;
   }else{ MP.treasure=null; G.treasureMesh=null; G.myGem=null; }
   G.myMask=null;
   if(MP.on&&MP.mode==='tag'){
     G.myMask=makeEmojiSprite('👹',1.3); G.myMask.position.y=3.0; G.myMask.visible=false;
     playerGroup.add(G.myMask);
-    $('atkBtn').textContent=CH().weapon;
   }
   updateAtkBtn(); updateSkillBtn(); updateHpHud(); $('treasureBanner').style.display='none';
   G.mapUntil=0; G.compassUntil=0; G.ghostUntil=0; G.solutionPath=null;
@@ -3463,8 +3498,8 @@ function startGame(){
   spawnItems(); scheduleNextShift(); updateShovelBtn(); renderChips();
   if(!allowedViews().includes(G.view))G.view=allowedViews()[0];
   $('viewToggle').style.display=allowedViews().length<2?'none':'';
-  $('hudLvlName').textContent=theme.emoji+' '+theme.name;
-  $('hudRound').textContent=`🔁 ${Math.min(SERIES.total,SERIES.current+1)}/${SERIES.total}`;
+  $('hudLvlName').textContent=theme.name;
+  $('hudRound').textContent=`${Math.min(SERIES.total,SERIES.current+1)}/${SERIES.total}`;
   updateShopHud();
   $('compassHud').style.display='none';
   switchScreen('gameScreen');
@@ -3523,7 +3558,8 @@ function loop(tms){
     // 技能冷卻顯示
     if($('skillBtn').style.display==='block'){
       const left=Math.ceil((G.skillCoolUntil-performance.now())/1000);
-      $('skillBtn').textContent=left>0?left:'🫥';
+      $('skillCooldown').textContent=left>0?left:'';
+      $('skillBtn').classList.toggle('cooling',left>0);
       $('skillBtn').style.opacity=left>0?'0.5':'1';
     }
   }
@@ -3566,7 +3602,10 @@ function applyViewConfig(){
     document.querySelectorAll('#viewRow .view-btn').forEach(x=>x.classList.toggle('sel',x.dataset.v===G.view));
   }
 }
-function updateSoundBtn(){$('soundToggle').innerHTML=(G.muted?'🔇':'🔊')+'<span class="bl">音樂</span>';}
+function updateSoundBtn(){
+  $('soundToggle').classList.toggle('muted',G.muted);
+  $('soundToggle').setAttribute('aria-label',G.muted?'開啟音樂':'關閉音樂');
+}
 function requestLandscapeLock(){
   try{
     const p=screen.orientation&&screen.orientation.lock&&screen.orientation.lock('landscape');
@@ -3809,7 +3848,7 @@ const MP={
 };
 const MP_ROUND_EVENTS=new Set(['pos','take','shift','reach','out','tag','hit','end','tres','prank','rob','costart','coend','codone','restock','shopend','wget','gather','inv','twin']);
 function mpTopic(){return 'ziwei-maze3d/'+MP.room;}
-function modeLabel(m){return m==='race'?'🏁 比賽搶終點':(m==='tag'?'👹 鬼抓人':(m==='shop'?'🛒 搶購大作戰':'💎 尋寶大作戰'));}
+function modeLabel(m){return m==='race'?'比賽搶終點':(m==='tag'?'鬼抓人':(m==='shop'?'搶購大作戰':'尋寶大作戰'));}
 const MP_MODE_DESCS={
   race:'大家從不同角落出發，看誰最快搶到中間的傳送門！',
   tag:'一個人當鬼追大家，被抓到就換你當鬼。時間到還是鬼的人就輸了！',
@@ -4589,13 +4628,14 @@ function mpTagEnd(loser){
 function showMPResults(title,html,results=[]){
   const final=recordSeriesRound(results);
   MP.started=false; G.running=false; G.frozen=true;
-  $('mpResultTitle').textContent=final?'🏆 最終結果｜'+title:title;
+  const cleanTitle=title.replace(/^[🏁👹💎🛒🏆]\uFE0F?\s*/, '');
+  $('mpResultTitle').textContent=final?'最終結果｜'+cleanTitle:cleanTitle;
   $('mpResultBody').innerHTML=html;
   $('mpSeriesState').textContent=final
     ?`${SERIES.total} 輪全部完成｜先比勝場，再比總分`
     :`第 ${SERIES.current}／${SERIES.total} 輪完成${SERIES.kind==='multi'&&!MP.host?'｜等待房主開始下一輪':''}`;
   $('mpSeriesSummary').innerHTML=seriesSummaryHtml();
-  $('mpNextRound').textContent=`➡️ 開始第 ${SERIES.current+1} 輪`;
+  $('mpNextRoundLabel').textContent=`開始第 ${SERIES.current+1} 輪`;
   $('mpNextRound').style.display=!final&&(SERIES.kind==='single'||MP.host)?'block':'none';
   $('mpResult').style.display='flex';
 }

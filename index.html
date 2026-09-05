@@ -2249,7 +2249,7 @@ function grantShovelKit(quiet){
 function tickShovelRecharge(){
   if(!hasShovelKit()){ G.shovelRechargeAt=0; return; }
   const now=performance.now();
-  grantShovelKit(true); // 保險：有工具箱卻是空手（沒在倒數）就補一把
+  if(!G.shovelRechargeAt)grantShovelKit(true); // 只有未在倒數時才保險補發，避免剛使用就立即補回
   if(G.shovelRechargeAt&&now>=G.shovelRechargeAt){
     if(G.shovels<shovelCap()){
       G.shovels++; updateShovelBtn();

@@ -1,9 +1,9 @@
 {
   "name": "3d-moving-maze",
-  "version": "1.20.0",
+  "version": "1.21.0",
   "private": true,
   "description": "給孩子玩的 3D 變形迷宮瀏覽器遊戲",
   "scripts": {
-    "check": "node tools/驗證專案.mjs && node --check functions/api/scores.js && node --check story/story-core.js && node --check story/tower-audio.js && node --check story/tower-mode.js && node --test tests/*.test.mjs"
+    "check": "node tools/驗證專案.mjs && node --check functions/api/scores.js && node --check story/story-core.js && node --check story/tower-encounters.js && node --check story/tower-characters.js && node --check story/tower-audio.js && node --check story/tower-mode.js && node --test tests/*.test.mjs"
   }
 }

@@ -6,6 +6,7 @@ import vm from 'node:vm';
 
 const require = createRequire(import.meta.url);
 const core = require('../story/story-core.js');
+const encounters = require('../story/tower-encounters.js');
 const source = readFileSync(new URL('../story/tower-mode.js', import.meta.url), 'utf8');
 // This bridge exists only in tests. Production keeps its private state private.
 const bridge = `window.__warriorTest = {
@@ -16,7 +17,7 @@ const bridge = `window.__warriorTest = {
     G.exitCell={x:G.mazeW-1,y:G.mazeH-1}; buildWorld();
   },
   state() { return {run,monsters,traders,loot,warriorNpc,nearestWarrior,escort,paused}; },
-  clearScenery() { traders=[];loot=[];nearest=null;nearestWarrior=null; },
+  clearScenery() { traders=[];loot=[];nearest=null;nearestWarrior=null;explorer=chest=relic=nearbyEncounter=null; },
   approachWarrior() { nearestWarrior=warriorNpc;nearest=null;G.px=warriorNpc.x;G.pz=warriorNpc.z; },
   replaceMonsters(value) { monsters=value; },
   shifted() { wasShifting=true;G.shifting=false; },
@@ -49,15 +50,16 @@ function runtime(run) {
   class Mesh extends Object3D { constructor(geometry,material) { super();this.geometry=geometry;this.material=material; } }
   class Sprite extends Object3D { constructor(material) { super();this.material=material; } }
   class Geometry {}
+  const character=()=>{const model=new Object3D();model.userData.legL=new Object3D();model.userData.legR=new Object3D();return model;};
   const THREE={Group:Object3D,Mesh,Sprite,Color,Vector3:Vector,MeshLambertMaterial:Material,MeshBasicMaterial:Material,SpriteMaterial:Material,CanvasTexture:Geometry};
   for(const id of ['CylinderGeometry','BoxGeometry','OctahedronGeometry','ConeGeometry','SphereGeometry','TorusGeometry'])THREE[id]=Geometry;
   const G={running:true,frozen:false,shifting:false,satiety:100,px:0,pz:0,startTime:100,shovels:1,kites:0,whistles:0,shovelRechargeAt:0,skillCoolUntil:0,effects:{},cell:4,mazeW:7,mazeH:7,invisUntil:0,items:[],foods:[]};
   const context=vm.createContext({
-    window:{TowerCore:core},THREE,G,scene:new Object3D(),wallMesh:new Mesh(new Geometry(),new Material()),
+    window:{TowerCore:core,TowerEncounters:encounters,TowerCharacters:{buildMerchant:character,buildExplorer:character,buildChest:()=>new Object3D()}},THREE,G,scene:new Object3D(),wallMesh:new Mesh(new Geometry(),new Material()),
     document:{getElementById:node,activeElement:node('focus'),body:{classList:{add(){},remove(){},toggle(){}}},createElement:()=>({getContext:()=>({strokeText(){},fillText(){}})})},
     performance:{now:()=>now},localStorage:{getItem:key=>storage.get(key)??null,setItem:(key,value)=>storage.set(key,value)},
     keys:{},joy:{active:false,dx:0,dy:0},escapeHtml:value=>String(value),
-    CHARS:Array.from({length:6},(_,id)=>({id})),buildCharacter:()=>{const model=new Object3D();model.userData.legL=new Object3D();model.userData.legR=new Object3D();return model;},makeTextSprite:()=>new Object3D(),makePickupMarker:()=>new Object3D(),disposeSceneObject(){},
+    CHARS:Array.from({length:6},(_,id)=>({id})),buildCharacter:character,makeTextSprite:()=>new Object3D(),makePickupMarker:()=>new Object3D(),disposeSceneObject(){},
     mulberry32:seed=>()=>{seed|=0;seed=seed+0x6D2B79F5|0;let t=Math.imul(seed^seed>>>15,1|seed);t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296;},
     cellToWorld:(x,y)=>({x:x*4,z:y*4}),worldToCell:(x,z)=>({x:Math.max(0,Math.min(G.mazeW-1,Math.round(x/4))),y:Math.max(0,Math.min(G.mazeH-1,Math.round(z/4)))}),
     solveMaze:(x,y,ex=G.mazeW-1,ey=G.mazeH-1)=>[[x,y],[x,Math.min(y+1,G.mazeH-1)],[ex,ey]],
@@ -149,9 +151,64 @@ test('五分戰士立即解決三分怪物，剩餘二分續行且怪物不會�
   h.context.window.TowerMode.reachExit();assert.equal(h.api.state().run.floor,18);assert.equal(h.api.state().run.warrior.strength,2);
 });
 
-test('主角擊敗牽制中的怪物後結束契約，存檔不留下無效的對戰關聯',()=>{
+test('主角擊暈同分對手，護衛以減少後的分數擊殺並保留一分續行',()=>{
+  const h=runtime(hiredRun(3)),monster=positionThreat(h);h.api.replaceMonsters([monster]);h.api.updateWarrior(.05,h.now());
+  assert.equal(h.api.state().run.warrior.remaining,null);
+  const durability=h.api.state().run.equipment.weapon.durability;h.api.attack();
+  assert.equal(monster.alive,false);assert.equal(h.api.state().run.warrior.mode,'escort');
+  assert.equal(h.api.state().run.warrior.strength,1);assert.equal(h.api.state().run.warrior.targetId,null);
+  assert.equal(h.api.state().run.equipment.weapon.durability,durability-1);
+  assert.equal(h.api.state().run.monsterStuns[monster.id],undefined);
+  assert.equal(h.api.save(),true);assert.ok(h.api.readSave(),'解除牽制後保存可讀取的護行狀態');
+});
+
+test('武器只會擊暈；一分護衛無法因三分怪被擊暈就直接擊殺',()=>{
   const h=runtime(hiredRun()),monster=positionThreat(h);h.api.replaceMonsters([monster]);h.api.updateWarrior(.05,h.now());
-  monster.hp=1;h.api.attack();
-  assert.equal(monster.alive,false);assert.equal(h.api.state().run.warrior,null);
-  assert.equal(h.api.save(),true);assert.ok(h.api.readSave(),'持續抵抗與已擊敗狀態不能同時保留');
+  monster.hp=1;const durability=h.api.state().run.equipment.weapon.durability;h.api.attack();
+  assert.equal(monster.alive,true);assert.equal(monster.hp,1,'劇情武器不能扣怪物生命值');
+  assert.equal(h.api.state().run.monsterStuns[monster.id],10);
+  assert.equal(h.api.state().run.warrior.mode,'holding');assert.equal(h.api.state().run.warrior.remaining,60);
+  assert.equal(h.api.state().run.equipment.weapon.durability,durability-1);
+  assert.equal(h.api.save(),true);assert.ok(h.api.readSave());
+});
+
+test('怪物暈眩期間不能移動或攻擊，且主角空揮不消耗耐久',()=>{
+  const run=hiredRun();run.warrior=null;
+  const h=runtime(run),monster=positionThreat(h);h.api.replaceMonsters([monster]);
+  h.context.playerInWall=()=>true;
+  const durability=h.api.state().run.equipment.weapon.durability;
+  h.api.attack();assert.equal(h.api.state().run.equipment.weapon.durability,durability);
+  h.context.playerInWall=()=>false;h.tick(.8);h.api.attack();
+  const position={x:monster.model.position.x,z:monster.model.position.z};
+  monster.windup=.01;monster.path=[[2,0]];monster.pathLeft=2;
+  h.api.updateMonster(monster,.2,h.now());
+  assert.equal(h.api.state().run.hp,100);
+  assert.deepEqual({x:monster.model.position.x,z:monster.model.position.z},position);
+  assert.equal(monster.windup,0);assert.equal(monster.path.length,0);
+  assert.equal(monster.alive,true);
+  assert.equal(h.api.state().run.equipment.weapon.durability,durability-1);
+});
+
+test('暈眩造成的暫時同分在恢復後轉限時，已開始的倒數不會刷新',()=>{
+  let run=core.hitMonster(hiredRun(2),'monster-0',3).run;
+  const h=runtime(run),monster=positionThreat(h);h.api.replaceMonsters([monster]);h.api.updateWarrior(.05,h.now());
+  assert.equal(h.api.state().run.warrior.remaining,null);
+  h.api.updateMonster(monster,.05,h.now());
+  for(let second=0;second<10;second++)h.tick(1);
+  assert.equal(h.api.state().run.monsterStuns[monster.id],undefined);
+  assert.equal(h.api.state().run.warrior.remaining,120);
+  h.tick(20);assert.equal(h.api.state().run.warrior.remaining,100);
+  h.api.updateMonster(monster,.05,h.now());assert.equal(h.api.state().run.warrior.remaining,100);
+  h.api.save();assert.equal(h.api.readSave().warrior.remaining,100);
+});
+
+test('續讀時重評已恢復強度的怪物，不能留下永久牽制漏洞',()=>{
+  let run=core.hitMonster(hiredRun(2),'monster-0',3).run;
+  run=core.interceptMonster(run,'monster-0',2).run;
+  run=core.tickEffects(run,10).run;
+  assert.equal(run.warrior.remaining,null);
+  const h=runtime(run),monster=positionThreat(h);h.api.replaceMonsters([monster]);
+  h.api.updateMonster(monster,.05,h.now());
+  assert.equal(h.api.state().run.warrior.remaining,120);
+  assert.equal(monster.alive,true);
 });

@@ -968,7 +968,7 @@ button:focus-visible,input:focus-visible{outline:3px solid #fff;outline-offset:3
    3D移動迷宮 — 給小朋友的變形迷宮冒險
    ===================================================== */
 const $=id=>document.getElementById(id);
-const GAME_VERSION='1.20.0';
+const GAME_VERSION='1.21.0';
 
 /* ---------- 設定（後台可調） ---------- */
 const DEFAULT_CFG={shiftMin:3,itemCount:6,foodCount:4,hungerMin:3,stunSec:3,pingSec:3,smellCells:3,mazeSize:13,musicOn:1,apiUrl:'',roomMax:3,rounds:3,goodsCount:16,shopMin:2.5,cartFull:400,views:{fp:1,tp:1,top:1},broker:'wss://broker.emqx.io:8084/mqtt'};
@@ -1955,6 +1955,8 @@ function pickItemType(exclude){
   return pool[0];
 }
 function spawnItems(){
+  // 劇情的同層物資只生成一次；變形保留原位置、種類及已拾取狀態。
+  if(window.TowerMode&&TowerMode.active&&TowerMode.preserveFloorPickups&&TowerMode.preserveFloorPickups())return;
   if(itemGroup){disposeSceneObject(itemGroup);scene.remove(itemGroup);}
   itemGroup=new THREE.Group(); G.items=[];
   // 集合口哨全場只有一個：還有人拿著沒用掉，這輪就不再出現
@@ -1980,7 +1982,7 @@ function spawnItems(){
     G.items.push({type,sprite:sp,marker,x:p.x,z:p.z,taken:false});
   }
   // 環境專屬道具（金色光圈，每輪 1 個）
-  const envIt=isShop()?null:ENV_ITEMS[LEVELS[G.lvlIdx].id];
+  const envIt=isShop()||(window.TowerMode&&TowerMode.active)?null:ENV_ITEMS[LEVELS[G.lvlIdx].id];
   if(envIt){
     let placed=false; tries=0;
     while(!placed&&tries<300){
@@ -4845,6 +4847,8 @@ window.addEventListener('beforeunload',e=>{
 window.addEventListener('pagehide',()=>{ if(MP.on)try{mpSend({t:'bye'});}catch(e){} });
 </script>
 <script src="story/story-core.js"></script>
+<script src="story/tower-encounters.js"></script>
+<script src="story/tower-characters.js"></script>
 <script src="story/tower-audio.js"></script>
 <script src="story/tower-mode.js"></script>
 </body>

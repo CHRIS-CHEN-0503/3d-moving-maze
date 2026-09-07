@@ -1,9 +1,12 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
+import { createRequire } from 'node:module';
 import vm from 'node:vm';
 
+const THREE = createRequire(import.meta.url)('../lib/three.min.js');
 const html = await readFile(new URL('../index.html', import.meta.url), 'utf8');
+const towerSource = await readFile(new URL('../story/tower-mode.js', import.meta.url), 'utf8');
 const slice = (start, end) => {
   const from = html.indexOf(start);
   const to = html.indexOf(end, from);
@@ -230,6 +233,7 @@ test('劇情重建隱藏已拿的原版道具，拾取效果先套用再保存�
   const object = () => ({ visible: true, position: { set() {} } });
   const tower = {
     active: true,
+    preserveFloorPickups: () => false, // 初次建層／讀檔，不是同層變形。
     canCollectOriginal: id => !claimed.has(id),
     collectedOriginal: id => { assert.ok(applied.length > saved.length, '先套用道具再保存庫存'); claimed.add(id); saved.push(id); },
   };
@@ -261,6 +265,68 @@ test('劇情重建隱藏已拿的原版道具，拾取效果先套用再保存�
   tower.active = false;
   vm.runInContext('spawnItems()', context);
   assert.ok([...context.G.items, ...context.G.foods].every(pickup => !pickup.taken));
+});
+
+test('劇情同層變形完全保留原道具實例、類型、位置與拾取狀態；一般模式仍重生', () => {
+  let random = 17, rolls = 0, typeSerial = 0;
+  const released = [], scene = new THREE.Scene();
+  const environmentItem = { id: 'environment-relic', emoji: 'env' };
+  const tower = {
+    active: true,
+    itemConfig: () => ({ itemCount: 1, foodCount: 1 }),
+    canCollectOriginal: () => true,
+    reservedCells: () => [],
+  };
+  const context = vm.createContext({
+    window: { TowerMode: tower }, TowerMode: tower, active: true, floorStarted: false,
+    THREE, scene, itemGroup: null,
+    G: { mazeW: 7, mazeH: 7, px: 0, pz: 0, lvlIdx: 0, exitCell: { x: 6, y: 6 } },
+    MP: { on: false }, CFG: { itemCount: 2, foodCount: 2 }, LEVELS: [{ id: 'test' }], ENV_ITEMS: { test: environmentItem },
+    RNG: () => { rolls++; return ((random = random * 16807 % 2147483647) - 1) / 2147483646; },
+    cellToWorld: (x, y) => ({ x: x * 4, z: y * 4 }), worldToCell: (x, z) => ({ x: Math.round(x / 4), y: Math.round(z / 4) }),
+    makeEmojiSprite: () => new THREE.Sprite(new THREE.SpriteMaterial()), makePickupMarker: () => new THREE.Group(),
+    pickItemType: () => ({ id: 'speed-' + ++typeSerial }), pickFoodType: () => ({ id: 'ration-' + ++typeSerial }),
+    isShop: () => false, disposeSceneObject: object => released.push(object),
+  });
+  // 執行生產函式原文，只將它的兩個閉包狀態綁到測試環境；不新增正式除錯介面。
+  const preserve = towerSource.match(/function preserveFloorPickups\(\)\s*\{[^\n]+\}/)?.[0];
+  assert.ok(preserve, '必須測試真正的高塔拾取保留判斷');
+  vm.runInContext(preserve, context);
+  tower.preserveFloorPickups = context.preserveFloorPickups;
+  vm.runInContext(slice('function spawnItems()', 'function pickFoodType()'), context);
+  vm.runInContext('spawnItems()', context);
+  assert.equal(context.G.items.length, 1, '劇情使用少量配置，不能額外加入環境道具');
+  assert.equal(context.G.foods.length, 1);
+  assert.equal(context.G.items.some(item => item.type === environmentItem), false);
+  context.G.items[0].taken = true;
+  context.G.items[0].sprite.visible = context.G.items[0].marker.visible = false;
+  const items = context.G.items, foods = context.G.foods, group = context.itemGroup, children = group.children.slice();
+  const pickups = [...items, ...foods].map(item => ({ item, type: item.type, x: item.x, z: item.z, taken: item.taken, sprite: item.sprite, marker: item.marker, visible: item.sprite.visible }));
+  const beforeRolls = rolls;
+  context.floorStarted = true; context.G.shifting = true; context.G.px = 20;
+  for (let shift = 0; shift < 10; shift++) vm.runInContext('spawnItems()', context);
+  assert.equal(context.G.items, items); assert.equal(context.G.foods, foods); assert.equal(context.itemGroup, group);
+  assert.equal(group.parent, scene); assert.equal(scene.children.length, 1); assert.equal(scene.children[0], group);
+  assert.equal(rolls, beforeRolls, '變形不能重新抽取位置／類型'); assert.equal(released.length, 0);
+  assert.equal(group.children.length, children.length);
+  children.forEach((child, index) => assert.equal(group.children[index], child));
+  for (const before of pickups) {
+    assert.equal([...context.G.items, ...context.G.foods].includes(before.item), true);
+    for (const key of ['type', 'x', 'z', 'taken', 'sprite', 'marker']) assert.equal(before.item[key], before[key], `${key} 必須保留`);
+    assert.equal(before.item.sprite.visible, before.visible); assert.equal(before.item.marker.visible, before.visible);
+  }
+  tower.active = context.active = false;
+  vm.runInContext('spawnItems()', context);
+  assert.notEqual(context.G.items, items); assert.notEqual(context.G.foods, foods); assert.notEqual(context.itemGroup, group);
+  assert.equal(group.parent, null); assert.equal(released[0], group); assert.ok(rolls > beforeRolls);
+  assert.equal(context.G.items.length, 3, '一般模式仍使用原配置，包含一件環境道具'); assert.equal(context.G.foods.length, 2);
+  assert.ok(context.G.items.some(item => item.type === environmentItem));
+  assert.ok([...context.G.items, ...context.G.foods].every(item => !item.taken));
+  const normalGroup = context.itemGroup;
+  tower.active = context.active = true; context.floorStarted = false;
+  vm.runInContext('spawnItems()', context);
+  assert.notEqual(context.itemGroup, normalGroup, '新樓層的初次生成不受同層保留規則阻擋');
+  assert.equal(context.G.items.length, 1); assert.equal(context.G.foods.length, 1);
 });
 
 test('鏡頭更新保留高塔霧距，一般山洞仍套用原本探照燈效果', () => {

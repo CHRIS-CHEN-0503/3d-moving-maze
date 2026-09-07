@@ -9,6 +9,15 @@
   const STATE_VERSION = 1;
   const MAX_COINS = 999999;
   const MAX_STACK = 99;
+  const GEAR = Object.freeze({
+    helmet: Object.freeze({ kind: 'helmet', slot: 'helmet', name: '頭盔', defense: 2, stunSeconds: 0, buyPrice: 14 }),
+    armor: Object.freeze({ kind: 'armor', slot: 'armor', name: '盔甲', defense: 4, stunSeconds: 0, buyPrice: 22 }),
+    shield: Object.freeze({ kind: 'shield', slot: 'shield', name: '盾牌', defense: 3, stunSeconds: 0, buyPrice: 18 }),
+    bat: Object.freeze({ kind: 'bat', slot: 'weapon', name: '球棒', defense: 0, stunSeconds: 15, buyPrice: 16 }),
+    pan: Object.freeze({ kind: 'pan', slot: 'weapon', name: '平底鍋', defense: 0, stunSeconds: 20, buyPrice: 20 }),
+    staff: Object.freeze({ kind: 'staff', slot: 'weapon', name: '木杖', defense: 0, stunSeconds: 10, buyPrice: 12 }),
+  });
+  const EQUIPMENT_SLOTS = ['helmet', 'armor', 'shield', 'weapon'];
   const ITEMS = Object.freeze({
     heal: Object.freeze({ id: 'heal', name: '療癒藥', description: '恢復 35 點生命。', buyPrice: 14, sellPrice: 6, color: '#ff7889' }),
     ration: Object.freeze({ id: 'ration', name: '乾糧', description: '恢復 45 點飽食度。', buyPrice: 8, sellPrice: 3, color: '#efc073' }),
@@ -81,6 +90,8 @@
       effects: { shield: 0, freeze: 0, repel: 0, reveal: 0 },
       engine: { shovels: 1, kites: 0, whistles: 0, shovelCooldownMs: 0, skillCooldownMs: 0 },
       claimed: [], floorElapsed: 0, warrior: null, hiredWarriors: [], defeatedMonsters: [],
+      equipment: { helmet: null, armor: null, shield: null, weapon: createGear('staff', 99, seed, 'starter') },
+      gearBag: [], monsterStuns: {}, adventure: newAdventure(),
       revision: 0, seed, name: typeof opts.name === 'string' ? opts.name.trim().slice(0, 24) || '冒險者' : '冒險者',
       charIdx: Number.isInteger(opts.charIdx) && opts.charIdx >= 0 && opts.charIdx < 6 ? opts.charIdx : 0,
       status: 'playing', elapsed: 0, floorsCleared: 0,
@@ -93,6 +104,59 @@
 
   function validIds(ids, limit) {
     return Array.isArray(ids) && ids.length <= limit && ids.every((id) => typeof id === 'string' && id.length > 0 && id.length <= 80) && new Set(ids).size === ids.length;
+  }
+
+  function newAdventure() { return { version: 1, claimed: [], quest: null }; }
+
+  function validateAdventure(value, floor) {
+    if (value === undefined) return newAdventure();
+    const ids = (list, limit) => Array.isArray(list) && list.length <= limit && list.every(id => typeof id === 'string' && id.length > 0 && id.length <= 96) && new Set(list).size === list.length;
+    if (!value || value.version !== 1 || !ids(value.claimed, 128)) return null;
+    let quest = null;
+    if (value.quest !== null) {
+      const q = value.quest;
+      if (!q || !ids([q.id], 1) || !ids([q.target], 1) || q.floor !== floor || !['defeat', 'escort', 'relic', 'donate', 'survey', 'shift', 'stun'].includes(q.type) || !['active', 'ready', 'claimed'].includes(q.status) || !validNumber(q.goal, 1, 3, true) || !validNumber(q.progress, 0, q.goal, true) || !ids(q.events, 32)) return null;
+      if ((q.status === 'active' && q.progress >= q.goal) || (q.status !== 'active' && q.progress !== q.goal)) return null;
+      quest = { id: q.id, floor: q.floor, type: q.type, status: q.status, target: q.target, goal: q.goal, progress: q.progress, events: [...q.events] };
+    }
+    return { version: 1, claimed: [...value.claimed], quest };
+  }
+
+  function createGear(kind, floor, seed, sourceId, enhanced = false) {
+    floorConfig(floor);
+    if (!Object.hasOwn(GEAR, kind) || !validNumber(seed, 1, 0xffffffff, true) || typeof sourceId !== 'string' || !sourceId || sourceId.length > 96 || typeof enhanced !== 'boolean') throw new RangeError('無效的裝備來源。');
+    let hash = (seed ^ Math.imul(floor, 0x9e3779b9)) >>> 0;
+    for (const char of `${sourceId}:${kind}`) hash = Math.imul(hash ^ char.charCodeAt(0), 16777619) >>> 0;
+    const tier = floor >= 70 ? 1 : floor >= 40 ? 2 : 3;
+    const bonus = enhanced ? 1 + hash % tier : 0;
+    const maximum = [0, 13, 16, 20][tier];
+    const maxDurability = enhanced ? 10 + (hash >>> 8) % (maximum - 9) : 3 + (hash >>> 8) % 8;
+    const item = GEAR[kind];
+    return { id: `gear:${floor}:${seed}:${sourceId}:${kind}`, kind, slot: item.slot, name: item.name + (bonus ? ` +${bonus}` : ''), durability: maxDurability, maxDurability, defense: item.slot === 'weapon' ? 0 : item.defense + bonus, bonus };
+  }
+
+  function validateGear(value) {
+    if (!value || typeof value !== 'object' || !Object.hasOwn(GEAR, value.kind) || typeof value.id !== 'string' || !value.id || value.id.length > 160) return null;
+    const item = GEAR[value.kind];
+    if (value.slot !== item.slot || !validNumber(value.bonus, 0, 3, true) || !validNumber(value.maxDurability, value.bonus ? 10 : 3, value.bonus ? 20 : 10, true) || !validNumber(value.durability, 1, value.maxDurability, true)) return null;
+    const name = item.name + (value.bonus ? ` +${value.bonus}` : '');
+    const defense = item.slot === 'weapon' ? 0 : item.defense + value.bonus;
+    if (value.name !== name || value.defense !== defense) return null;
+    return { id: value.id, kind: value.kind, slot: item.slot, name, durability: value.durability, maxDurability: value.maxDurability, defense, bonus: value.bonus };
+  }
+
+  function gearPrice(gear) {
+    const item = validateGear(gear);
+    if (!item) throw new RangeError('無效的裝備報價。');
+    return GEAR[item.kind].buyPrice + item.maxDurability * 2 + item.bonus * 16;
+  }
+
+  function equipmentStats(run) {
+    const worn = Object.values(run.equipment || {}).filter(Boolean);
+    const defense = worn.reduce((sum, gear) => sum + gear.defense, 0);
+    const bonus = worn.reduce((sum, gear) => sum + gear.bonus, 0);
+    const weapon = run.equipment && run.equipment.weapon;
+    return { defense, bonus, stunSeconds: weapon ? GEAR[weapon.kind].stunSeconds + bonus * 10 : 0 };
   }
 
   function monsterStrength(kind, floor) {
@@ -174,12 +238,39 @@
       if (guard.mode === 'holding' && (!validIds([guard.targetId], 1) || defeatedMonsters.includes(guard.targetId) || !(guard.remaining === null || validNumber(guard.remaining, Number.MIN_VALUE, guard.strength * 60)))) return null;
       warrior = { offerId: guard.offerId, strength: guard.strength, mode: guard.mode, targetId: guard.targetId, remaining: guard.remaining };
     }
+    const legacyEquipment = run.equipment === undefined && run.gearBag === undefined;
+    const rawEquipment = legacyEquipment ? { helmet: null, armor: null, shield: null, weapon: createGear('staff', 99, run.seed, 'starter') } : run.equipment;
+    const rawBag = legacyEquipment ? [] : run.gearBag;
+    if (!rawEquipment || Array.isArray(rawEquipment) || Object.keys(rawEquipment).length !== 4 || !Array.isArray(rawBag) || rawBag.length > 24) return null;
+    const equipment = {}, gearBag = [], gearIds = new Set();
+    for (const slot of EQUIPMENT_SLOTS) {
+      if (!Object.hasOwn(rawEquipment, slot)) return null;
+      const gear = rawEquipment[slot] === null ? null : validateGear(rawEquipment[slot]);
+      if (rawEquipment[slot] !== null && (!gear || gear.slot !== slot || gearIds.has(gear.id))) return null;
+      equipment[slot] = gear;
+      if (gear) gearIds.add(gear.id);
+    }
+    for (const value of rawBag) {
+      const gear = validateGear(value);
+      if (!gear || gearIds.has(gear.id)) return null;
+      gearIds.add(gear.id); gearBag.push(gear);
+    }
+    const rawStuns = run.monsterStuns === undefined ? {} : run.monsterStuns;
+    if (!rawStuns || typeof rawStuns !== 'object' || Array.isArray(rawStuns) || Object.keys(rawStuns).length > 128) return null;
+    const monsterStuns = {};
+    for (const [id, seconds] of Object.entries(rawStuns)) {
+      if (!validIds([id], 1) || ['__proto__', 'constructor', 'prototype'].includes(id) || defeatedMonsters.includes(id) || !validNumber(seconds, Number.MIN_VALUE, 140)) return null;
+      monsterStuns[id] = seconds;
+    }
+    const adventure = validateAdventure(run.adventure, run.floor);
+    if (!adventure) return null;
     return {
       stateVersion: STATE_VERSION, mode: 'tower', floor: run.floor, hp: run.hp, hunger: run.hunger,
       coins: run.coins, bag, effects, revision: run.revision, seed: run.seed, name: run.name,
       charIdx: run.charIdx, status: run.status, elapsed: run.elapsed, floorsCleared: run.floorsCleared,
       engine, claimed: [...run.claimed], floorElapsed: run.floorElapsed,
       warrior, hiredWarriors: [...hiredWarriors], defeatedMonsters: [...defeatedMonsters],
+      equipment, gearBag, monsterStuns, adventure,
     };
   }
 
@@ -193,6 +284,103 @@
     if (!result.ok) return failure(run, result.message);
     next.revision += 1;
     return { ...result, run: next };
+  }
+
+  // These helpers mutate only a transaction's private, validated copy.
+  function receiveGear(next, value) {
+    const gear = validateGear(value);
+    if (!gear) return { ok: false, message: '無效的裝備。' };
+    if (next.gearBag.length >= 24) return { ok: false, message: '裝備行囊已滿，請先捨棄不需要的裝備。' };
+    if ([...next.gearBag, ...Object.values(next.equipment).filter(Boolean)].some(item => item.id === gear.id)) return { ok: false, message: '你已經擁有這件裝備。' };
+    next.gearBag.push(gear);
+    return { ok: true, message: `${gear.name}已放入裝備行囊，記得穿戴。`, effect: { gear } };
+  }
+
+  function grantGear(run, gear, expectedRevision) {
+    return transaction(run, expectedRevision, next => receiveGear(next, gear));
+  }
+
+  function equipGear(run, gearId, expectedRevision) {
+    return transaction(run, expectedRevision, next => {
+      const index = next.gearBag.findIndex(gear => gear.id === gearId);
+      if (index < 0) return { ok: false, message: '行囊裡沒有這件裝備。' };
+      const [gear] = next.gearBag.splice(index, 1);
+      const previous = next.equipment[gear.slot];
+      if (previous) next.gearBag.push(previous);
+      next.equipment[gear.slot] = gear;
+      return { ok: true, message: `已裝備${gear.name}。`, effect: { equipped: gear, previous } };
+    });
+  }
+
+  function discardGear(run, gearId, expectedRevision) {
+    return transaction(run, expectedRevision, next => {
+      const index = next.gearBag.findIndex(gear => gear.id === gearId);
+      let removed;
+      if (index >= 0) [removed] = next.gearBag.splice(index, 1);
+      else {
+        const slot = EQUIPMENT_SLOTS.find(key => next.equipment[key] && next.equipment[key].id === gearId);
+        if (!slot) return { ok: false, message: '找不到這件裝備。' };
+        removed = next.equipment[slot]; next.equipment[slot] = null;
+      }
+      return { ok: true, message: `已捨棄${removed.name}。`, effect: { discarded: removed } };
+    });
+  }
+
+  function buyGear(run, gear, cost, expectedRevision) {
+    return transaction(run, expectedRevision, next => {
+      const item = validateGear(gear);
+      if (!item || cost !== gearPrice(item)) return { ok: false, message: '裝備報價已變更，請重新確認。' };
+      if (next.coins < cost) return { ok: false, message: '銅幣不足。' };
+      const received = receiveGear(next, item);
+      if (!received.ok) return received;
+      next.coins -= cost;
+      return received;
+    });
+  }
+
+  function effectiveMonsterStrength(run, monsterId, baseStrength) {
+    if (!validNumber(baseStrength, 1, 5, true) || !validIds([monsterId], 1)) throw new RangeError('無效的怪物強度。');
+    return Math.max(0, baseStrength - (run.monsterStuns && run.monsterStuns[monsterId] > 0 ? 1 : 0));
+  }
+
+  function hitMonster(run, monsterId, baseStrength, expectedRevision) {
+    return transaction(run, expectedRevision, next => {
+      if (!validIds([monsterId], 1) || ['__proto__', 'constructor', 'prototype'].includes(monsterId) || !validNumber(baseStrength, 1, 5, true)) return { ok: false, message: '這次沒有擊中怪物。' };
+      if (next.defeatedMonsters.includes(monsterId)) return { ok: false, message: '這隻怪物已經被擊敗。' };
+      const weapon = next.equipment.weapon;
+      if (!weapon) return { ok: false, message: '請先裝備球棒、平底鍋或木杖。' };
+      if (!Object.hasOwn(next.monsterStuns, monsterId) && Object.keys(next.monsterStuns).length >= 128) return { ok: false, message: '目前樓層的戰鬥紀錄已滿。' };
+      const stunSeconds = equipmentStats(next).stunSeconds;
+      next.monsterStuns[monsterId] = Math.max(next.monsterStuns[monsterId] || 0, stunSeconds);
+      weapon.durability -= 1;
+      const broken = weapon.durability === 0 ? [weapon] : [];
+      if (broken.length) next.equipment.weapon = null;
+      return { ok: true, message: `怪物被擊暈 ${stunSeconds} 秒，暈眩期間強度降低 1 分。${broken.length ? `${weapon.name}已損壞。` : ''}`, effect: { monsterId, stunSeconds, effectiveStrength: baseStrength - 1, broken } };
+    });
+  }
+
+  function defeatWithWarrior(next, monsterId, strength) {
+    if (next.defeatedMonsters.length >= 128) return { ok: false, message: '目前樓層的戰鬥紀錄已滿。' };
+    const guard = next.warrior;
+    guard.strength -= strength; guard.mode = 'escort'; guard.targetId = null; guard.remaining = null;
+    next.defeatedMonsters.push(monsterId);
+    delete next.monsterStuns[monsterId];
+    return { ok: true, message: `戰士立即擊敗怪物，剩餘 ${guard.strength} 分戰力繼續護行。`, effect: { outcome: 'defeat', monsterId, seconds: 0, remainingStrength: guard.strength } };
+  }
+
+  function resolveHeldMonster(run, monsterId, baseStrength, expectedRevision) {
+    return transaction(run, expectedRevision, next => {
+      if (!validIds([monsterId], 1) || !validNumber(baseStrength, 1, 5, true)) return { ok: false, message: '無效的怪物資料。' };
+      const guard = next.warrior;
+      if (!guard || guard.mode !== 'holding' || guard.targetId !== monsterId) return { ok: false, message: '這隻怪物沒有正在與戰士交戰。' };
+      const strength = effectiveMonsterStrength(next, monsterId, baseStrength);
+      if (guard.strength > strength) return defeatWithWarrior(next, monsterId, strength);
+      if (guard.strength < strength && guard.remaining === null) {
+        guard.remaining = guard.strength * 60;
+        return { ok: true, message: `怪物恢復戰力，戰士還能抵禦 ${guard.remaining} 秒。`, effect: { outcome: 'hold', monsterId, seconds: guard.remaining, changed: true } };
+      }
+      return { ok: true, message: '戰士仍在牽制怪物。', effect: { outcome: 'hold', monsterId, seconds: guard.remaining } };
+    });
   }
 
   function hireWarrior(run, offerId, expectedRevision) {
@@ -216,16 +404,11 @@
 
   function interceptMonster(run, monsterId, strength, expectedRevision) {
     return transaction(run, expectedRevision, (next) => {
-      if (!validIds([monsterId], 1) || !validNumber(strength, 1, 5, true)) return { ok: false, message: '無效的怪物資料。' };
+      if (!validIds([monsterId], 1) || !validNumber(strength, 0, 5, true) || strength === 0 && !(next.monsterStuns[monsterId] > 0)) return { ok: false, message: '無效的怪物資料。' };
       if (!next.warrior || next.warrior.mode !== 'escort') return { ok: false, message: '沒有可迎戰的護行戰士。' };
       if (next.defeatedMonsters.includes(monsterId)) return { ok: false, message: '這隻怪物已經被擊敗。' };
       const guard = next.warrior;
-      if (guard.strength > strength) {
-        if (next.defeatedMonsters.length >= 128) return { ok: false, message: '目前樓層的戰鬥紀錄已滿。' };
-        guard.strength -= strength;
-        next.defeatedMonsters.push(monsterId);
-        return { ok: true, message: `戰士立即擊敗怪物，剩餘 ${guard.strength} 分戰力繼續護行。`, effect: { outcome: 'defeat', monsterId, seconds: 0, remainingStrength: guard.strength } };
-      }
+      if (guard.strength > strength) return defeatWithWarrior(next, monsterId, strength);
       guard.mode = 'holding'; guard.targetId = monsterId;
       guard.remaining = guard.strength === strength ? null : guard.strength * 60;
       return { ok: true, message: guard.remaining === null ? '戰士與怪物勢均力敵，將持續牽制，快趁現在前進！' : `戰士替你抵禦 ${guard.remaining} 秒，快趁現在前進！`, effect: { outcome: 'hold', monsterId, seconds: guard.remaining } };
@@ -307,23 +490,40 @@
     });
   }
 
-  function takeDamage(run, amount) {
-    return transaction(run, undefined, (next) => {
-      if (!validNumber(amount, 0, 10000)) return { ok: false, message: '無效的傷害數值。' };
-      const damage = amount === 0 ? 0 : (next.effects.shield > 0 ? Math.max(1, Math.round(amount * 0.35)) : amount);
-      next.hp = Math.max(0, next.hp - damage);
-      let revived = false;
-      if (next.hp === 0 && next.bag.feather > 0) {
-        next.bag.feather -= 1; next.hp = 50; next.effects.shield = Math.max(5, next.effects.shield); revived = true;
-      } else if (next.hp === 0) next.status = 'dead';
-      return { ok: true, message: revived ? '復甦羽化作光芒，讓你重新站起。' : next.status === 'dead' ? '旅程暫時停在這裡。' : '受到傷害。', effect: { damage, revived } };
-    });
+  function applyDamage(next, amount, source = 'monster') {
+    if (!validNumber(amount, 0, 10000) || !['monster', 'trap', 'hunger'].includes(source)) return { ok: false, message: '無效的傷害數值或來源。' };
+    const defense = source === 'hunger' ? 0 : equipmentStats(next).defense;
+    const reduced = Math.max(0, amount - defense);
+    const damage = source === 'hunger' ? amount : reduced === 0 ? 0 : next.effects.shield > 0 ? Math.max(1, Math.round(reduced * 0.35)) : reduced;
+    const broken = [];
+    if (amount > 0 && source !== 'hunger') {
+      for (const slot of ['helmet', 'armor', 'shield']) {
+        const gear = next.equipment[slot];
+        if (!gear) continue;
+        gear.durability -= 1;
+        if (gear.durability === 0) { broken.push(gear); next.equipment[slot] = null; }
+      }
+    }
+    next.hp = Math.max(0, next.hp - damage);
+    let revived = false;
+    if (next.hp === 0 && next.bag.feather > 0) {
+      next.bag.feather -= 1; next.hp = 50; next.effects.shield = Math.max(5, next.effects.shield); revived = true;
+    } else if (next.hp === 0) next.status = 'dead';
+    return { ok: true, message: revived ? '復甦羽化作光芒，讓你重新站起。' : next.status === 'dead' ? '旅程暫時停在這裡。' : damage === 0 ? '防具擋住了這次攻擊。' : '受到傷害。', effect: { damage, revived, defense, broken, source } };
+  }
+
+  function takeDamage(run, amount, source = 'monster') {
+    return transaction(run, undefined, next => applyDamage(next, amount, source));
   }
 
   function tickEffects(run, seconds) {
     return transaction(run, undefined, (next) => {
       if (!validNumber(seconds, 0, 60)) return { ok: false, message: '無效的時間間隔。' };
       for (const id of Object.keys(next.effects)) next.effects[id] = Math.max(0, next.effects[id] - seconds);
+      for (const id of Object.keys(next.monsterStuns)) {
+        next.monsterStuns[id] = Math.max(0, next.monsterStuns[id] - seconds);
+        if (next.monsterStuns[id] === 0) delete next.monsterStuns[id];
+      }
       next.elapsed += seconds;
       next.floorElapsed += seconds;
       if (next.warrior && next.warrior.mode === 'holding' && next.warrior.remaining !== null) {
@@ -344,6 +544,7 @@
       next.floorsCleared += 1;
       next.effects = { shield: 0, freeze: 0, repel: 0, reveal: 0 };
       next.claimed = []; next.floorElapsed = 0; next.defeatedMonsters = [];
+      next.monsterStuns = {}; next.adventure = newAdventure();
       if (next.warrior && next.warrior.mode === 'holding') next.warrior = null;
       if (next.floor === 1) {
         next.status = 'won';
@@ -354,5 +555,5 @@
     });
   }
 
-  return Object.freeze({ STATE_VERSION, ITEMS, MONSTERS, CHAPTERS, OPENING, ENDING, EXCHANGES, floorConfig, newRun, validateSave, buy, sell, exchange, useItem, collect, takeDamage, tickEffects, descend, monsterStrength, warriorOffer, hireWarrior, interceptMonster });
+  return Object.freeze({ STATE_VERSION, ITEMS, GEAR, MONSTERS, CHAPTERS, OPENING, ENDING, EXCHANGES, floorConfig, newRun, validateSave, buy, sell, exchange, useItem, collect, takeDamage, tickEffects, descend, monsterStrength, warriorOffer, hireWarrior, interceptMonster, createGear, validateGear, gearPrice, equipmentStats, receiveGear, grantGear, equipGear, discardGear, buyGear, effectiveMonsterStrength, hitMonster, resolveHeldMonster, transaction, applyDamage, newAdventure, validateAdventure });
 });

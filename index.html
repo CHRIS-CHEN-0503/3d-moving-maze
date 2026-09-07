@@ -613,6 +613,7 @@ button:focus-visible,input:focus-visible{outline:3px solid #fff;outline-offset:3
 }
 @media(prefers-reduced-motion:reduce){.flow-panel{animation:none}.home-action{transition:none}}
 </style>
+<link rel="stylesheet" href="assets/game-polish.css">
 </head>
 <body>
 
@@ -635,6 +636,7 @@ button:focus-visible,input:focus-visible{outline:3px solid #fff;outline-offset:3
     <section class="flow-panel active" id="homePanel" aria-labelledby="homeTitle">
       <p class="home-intro" id="homeTitle">準備好進入會移動的奇幻迷宮了嗎？先選擇今天想做的事。</p>
       <div class="home-menu">
+        <button class="home-action primary-story" id="storyEntryBtn"><span class="home-icon ui-icon icon-castle" aria-hidden="true"></span><span><strong>劇情模式・倒轉高塔</strong><small>被召喚至第 99 層。在變形迷宮中交易、求生，找到回家的路。</small></span></button>
         <button class="home-action primary" id="singleBtn"><span class="home-icon ui-icon icon-compass" aria-hidden="true"></span><span><strong>單人遊戲</strong><small>自己闖關，或和電腦挑戰尋寶、鬼抓人與搶購。</small></span></button>
         <button class="home-action multiplayer" id="mpBtn"><span class="home-icon ui-icon icon-duo" aria-hidden="true"></span><span><strong>多人遊戲</strong><small>先建立角色，再建立房間或輸入朋友的房號。</small></span></button>
         <button class="home-action utility" id="admBtn"><span class="home-icon ui-icon icon-settings" aria-hidden="true"></span><span><strong>遊戲設定</strong><small>調整迷宮、音樂與視角。</small></span></button>
@@ -966,7 +968,7 @@ button:focus-visible,input:focus-visible{outline:3px solid #fff;outline-offset:3
    3D移動迷宮 — 給小朋友的變形迷宮冒險
    ===================================================== */
 const $=id=>document.getElementById(id);
-const GAME_VERSION='1.18.0';
+const GAME_VERSION='1.19.0';
 
 /* ---------- 設定（後台可調） ---------- */
 const DEFAULT_CFG={shiftMin:3,itemCount:6,foodCount:4,hungerMin:3,stunSec:3,pingSec:3,smellCells:3,mazeSize:13,musicOn:1,apiUrl:'',roomMax:3,rounds:3,goodsCount:16,shopMin:2.5,cartFull:400,views:{fp:1,tp:1,top:1},broker:'wss://broker.emqx.io:8084/mqtt'};
@@ -1295,6 +1297,39 @@ let renderer,scene,camera,wallMesh,floorMesh,exitGroup,playerGroup,envGroup,item
 let previewRenderer,previewScene,previewCam,previewChar;
 const V3=THREE.Vector3;
 
+/* 重建關卡只釋放該場景持有的資源；道具圖集與標記仍由所有樓層共用。 */
+function disposeSceneObject(root){
+  if(!root)return;
+  const shared=new Set([...Object.values(_texCache),...Object.values(spriteCache)]);
+  shared.add(makePickupMarker.ringGeom); shared.add(makePickupMarker.beamGeom);
+  for(const mats of Object.values(makePickupMarker.materials||{}))for(const mat of Object.values(mats))shared.add(mat);
+  const disposed=new Set();
+  const release=resource=>{
+    if(!resource||shared.has(resource)||disposed.has(resource)||typeof resource.dispose!=='function')return;
+    disposed.add(resource); resource.dispose();
+  };
+  root.traverse(object=>{
+    // THREE.Sprite 的 geometry 是函式庫共用資源，不屬於單一場景。
+    if(!object.isSprite)release(object.geometry);
+    const materials=Array.isArray(object.material)?object.material:[object.material];
+    for(const material of materials){
+      if(!material||shared.has(material))continue;
+      for(const value of Object.values(material))if(value&&value.isTexture)release(value);
+      release(material);
+    }
+  });
+}
+
+let sceneEpoch=0,shiftRaf=0,shiftDelay=0,shiftAlarm=0,preWarnTimer=0;
+function cancelSceneTransition(){
+  sceneEpoch++;
+  cancelAnimationFrame(shiftRaf); clearTimeout(shiftDelay); clearTimeout(shiftAlarm); clearInterval(preWarnTimer);
+  shiftRaf=shiftDelay=shiftAlarm=preWarnTimer=0;
+  if(wallMesh)wallMesh.position.y=0;
+  G.shifting=false; G.preWarned=false;
+  $('shiftWarn').style.display='none'; $('preWarn').style.display='none';
+}
+
 let _vpW=0,_vpH=0;
 function viewportSize(){
   // 手機轉向時 innerWidth/innerHeight 常常是舊值，visualViewport 比較可靠
@@ -1313,7 +1348,8 @@ function fitRenderer(){
 function initRenderer(){
   const canvas=$('c3d');
   renderer=new THREE.WebGLRenderer({canvas,antialias:true});
-  renderer.setPixelRatio(Math.min(window.devicePixelRatio,2));
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio||1,matchMedia('(pointer:coarse)').matches?1.35:1.75));
+  renderer.outputColorSpace=THREE.SRGBColorSpace;
   camera=new THREE.PerspectiveCamera(70,1,0.1,300);
   fitRenderer();
   window.addEventListener('resize',fitRenderer);
@@ -1369,7 +1405,7 @@ function worldToCell(x,z){const c=G.cell;return{
    牆壁建置（InstancedMesh 一次畫完，行動裝置也順暢）
    ===================================================== */
 function buildWalls(theme){
-  if(wallMesh){scene.remove(wallMesh);wallMesh.geometry.dispose();wallMesh.material.dispose();}
+  if(wallMesh){disposeSceneObject(wallMesh);scene.remove(wallMesh);}
   G.wallBoxes=[];
   const W=G.mazeW,H=G.mazeH,c=G.cell,t=G.wallT,h=G.wallH;
   const mats=[]; // 收集每面牆的變換
@@ -1485,7 +1521,7 @@ function chooseStarts(n){
    地板 + 出口傳送門
    ===================================================== */
 function buildFloor(theme){
-  if(floorMesh){scene.remove(floorMesh);floorMesh.geometry.dispose();floorMesh.material.dispose();}
+  if(floorMesh){disposeSceneObject(floorMesh);scene.remove(floorMesh);}
   const size=Math.max(G.mazeW,G.mazeH)*G.cell*3;
   const geo=new THREE.PlaneGeometry(size,size,1,1);
   const baseKind=theme.floorTex==='lava'?'rock':(theme.floorTex||'tile');
@@ -1503,7 +1539,7 @@ function buildFloor(theme){
   scene.add(floorMesh);
 }
 function buildExit(){
-  if(exitGroup)scene.remove(exitGroup);
+  if(exitGroup){disposeSceneObject(exitGroup);scene.remove(exitGroup);}
   exitGroup=new THREE.Group();
   const p=cellToWorld(G.exitCell.x,G.exitCell.y);
   const ringGeo=new THREE.TorusGeometry(1.1,0.14,10,28);
@@ -1675,12 +1711,13 @@ function buildCharacter(cd){
    六種環境（抬頭看得到東西，但物件數量刻意精簡）
    ===================================================== */
 function buildEnvironment(theme){
-  if(envGroup){scene.remove(envGroup);envGroup=null;}
+  if(envGroup){disposeSceneObject(envGroup);scene.remove(envGroup);envGroup=null;}
   envGroup=new THREE.Group(); envGroup.userData.anim=[];
   scene.background=new THREE.Color(theme.sky);
   scene.fog=new THREE.Fog(theme.fog[0],theme.fog[1],theme.fog[2]);
   // 燈光
   const amb=new THREE.AmbientLight(theme.amb,theme.ambI); envGroup.add(amb);
+  envGroup.add(new THREE.HemisphereLight(0xd5edff,0x534348,0.28));
   const dir=new THREE.DirectionalLight(0xffffff,theme.dirI); dir.position.set(30,60,20); envGroup.add(dir);
   const span=Math.max(G.mazeW,G.mazeH)*G.cell;
   const R=span*0.62;
@@ -1918,7 +1955,7 @@ function pickItemType(exclude){
   return pool[0];
 }
 function spawnItems(){
-  if(itemGroup){scene.remove(itemGroup);}
+  if(itemGroup){disposeSceneObject(itemGroup);scene.remove(itemGroup);}
   itemGroup=new THREE.Group(); G.items=[];
   // 集合口哨全場只有一個：還有人拿著沒用掉，這輪就不再出現
   const spawnExcl=new Set();
@@ -1926,10 +1963,12 @@ function spawnItems(){
   const pc=worldToCell(G.px,G.pz);
   const used=MP.on?new Set([G.exitCell.x+','+G.exitCell.y])
                   :new Set([pc.x+','+pc.y, G.exitCell.x+','+G.exitCell.y]);
+  const pickupCfg=window.TowerMode&&TowerMode.active&&TowerMode.itemConfig?TowerMode.itemConfig():CFG;
+  if(window.TowerMode&&TowerMode.active&&TowerMode.reservedCells)for(const key of TowerMode.reservedCells())used.add(key);
   // 搶購：出發點不放商品，才不會有人一開場就白撿一件
   if(isShop()&&G.startCells)for(const c of G.startCells)used.add(c.x+','+c.y);
   let tries=0;
-  while(G.items.length<CFG.itemCount&&tries<300){
+  while(G.items.length<pickupCfg.itemCount&&tries<300){
     tries++;
     const cx=Math.floor(RNG()*G.mazeW), cy=Math.floor(RNG()*G.mazeH);
     const key=cx+','+cy; if(used.has(key))continue; used.add(key);
@@ -1986,7 +2025,7 @@ function spawnItems(){
   }
   // 食物（綠色光圈）
   G.foods=[]; tries=0;
-  const foodWant=isShop()?0:CFG.foodCount;
+  const foodWant=isShop()?0:pickupCfg.foodCount;
   while(G.foods.length<foodWant&&tries<300){
     tries++;
     const cx=Math.floor(RNG()*G.mazeW), cy=Math.floor(RNG()*G.mazeH);
@@ -1996,6 +2035,13 @@ function spawnItems(){
     const marker=makePickupMarker(0x8bea68,'食物');marker.position.set(p.x,0,p.z);
     itemGroup.add(sp); itemGroup.add(marker);
     G.foods.push({type,sprite:sp,marker,x:p.x,z:p.z,taken:false});
+  }
+  if(window.TowerMode&&TowerMode.active){
+    for(const [kind,list] of [['item',G.items],['food',G.foods]])for(const [index,pickup] of list.entries()){
+      if(!TowerMode.canCollectOriginal(kind+'-'+index)){
+        pickup.taken=true; pickup.sprite.visible=false; pickup.marker.visible=false;
+      }
+    }
   }
   scene.add(itemGroup);
 }
@@ -2020,6 +2066,7 @@ function applyFood(f){
   showToast(`${f.type.emoji} ${f.type.name}！飽足感 +${gain}%`);
 }
 function loseGame(){
+  if(window.TowerMode&&TowerMode.active){TowerMode.defeat();return;}
   if(!G.running)return;
   G.running=false; G.frozen=true;
   AudioEng.stopMusic(); AudioEng.stopItemLoop(); AudioEng.sfxLose();
@@ -2277,11 +2324,12 @@ function useShovel(){
 let particles=[];
 function burstParticles(x,z){
   const geo=new THREE.BoxGeometry(0.25,0.25,0.25);
+  const batch={geometry:geo,remaining:10};
   for(let i=0;i<10;i++){
     const m=new THREE.Mesh(geo,new THREE.MeshBasicMaterial({color:0xbcaaa4}));
     m.position.set(x,1.4,z);
     m.userData.v=new V3((Math.random()-0.5)*6,Math.random()*6+2,(Math.random()-0.5)*6);
-    scene.add(m); particles.push({m,life:1});
+    scene.add(m); particles.push({m,life:1,batch});
   }
 }
 function updateParticles(dt){
@@ -2289,7 +2337,11 @@ function updateParticles(dt){
     p.life-=dt; p.m.userData.v.y-=14*dt;
     p.m.position.addScaledVector(p.m.userData.v,dt);
     p.m.rotation.x+=dt*6; p.m.rotation.z+=dt*4;
-    if(p.life<=0||p.m.position.y<0){scene.remove(p.m);return false;}
+    if(p.life<=0||p.m.position.y<0){
+      scene.remove(p.m); p.m.material.dispose();
+      if(--p.batch.remaining===0)p.batch.geometry.dispose();
+      return false;
+    }
     return true;
   });
 }
@@ -2421,6 +2473,7 @@ function updatePlayer(dt,t){
     if(it.taken)continue;
     if((it.x-G.px)**2+(it.z-G.pz)**2<1.3){
       it.taken=true; it.sprite.visible=false; it.marker.visible=false; applyItem(it);
+      if(window.TowerMode&&TowerMode.active)TowerMode.collectedOriginal('item-'+ii);
       if(MP.on)mpSend({t:'take',kind:'item',i:ii,round:MP.round});
     }
   }
@@ -2428,6 +2481,7 @@ function updatePlayer(dt,t){
     if(f.taken)continue;
     if((f.x-G.px)**2+(f.z-G.pz)**2<1.3){
       f.taken=true; f.sprite.visible=false; f.marker.visible=false; applyFood(f);
+      if(window.TowerMode&&TowerMode.active)TowerMode.collectedOriginal('food-'+fi);
       if(MP.on)mpSend({t:'take',kind:'food',i:fi,round:MP.round});
     }
   }
@@ -2526,10 +2580,15 @@ function swingWeapon(){
   AudioEng.sfxHit();
   const sp=makeEmojiSprite(CH().weapon,1.6);
   sp.position.set(G.px+Math.sin(G.heading)*1.1,1.5,G.pz+Math.cos(G.heading)*1.1);
-  scene.add(sp);
+  const sourceScene=scene,epoch=sceneEpoch;
+  sourceScene.add(sp);
+  const release=()=>{if(sp.parent===sourceScene){disposeSceneObject(sp);sourceScene.remove(sp);}};
   let k=0;
-  const anim=()=>{k+=0.08;sp.material.opacity=1-k;sp.position.y=1.5+k*0.8;sp.material.rotation=k*2;
-    if(k<1)requestAnimationFrame(anim);else scene.remove(sp);};
+  const anim=()=>{
+    if(epoch!==sceneEpoch||!G.running){release();return;}
+    k+=0.08;sp.material.opacity=1-k;sp.position.y=1.5+k*0.8;sp.material.rotation=k*2;
+    if(k<1)requestAnimationFrame(anim);else release();
+  };
   anim();
 }
 function applyStun(id,ms){
@@ -2586,7 +2645,7 @@ function updateCamera(dt){
     envGroup.userData.torch.intensity=(boost?6:2.8)+Math.sin(performance.now()*0.01)*0.25;
     envGroup.userData.torch.distance=boost?70:30;
   }
-  if(scene&&scene.fog){ // 探照燈 / 驅霧號角：把霧推遠
+  if(scene&&scene.fog&&!(window.TowerMode&&TowerMode.active)){ // 劇情使用高塔自己的明亮霧距
     const th=isShop()?SHOP_THEME:LEVELS[G.lvlIdx], boost=performance.now()<G.visionUntil;
     scene.fog.near=boost?th.fog[1]*2+14:th.fog[1];
     scene.fog.far=boost?Math.max(130,th.fog[2]*2):th.fog[2];
@@ -3110,17 +3169,27 @@ function updateCompass(){
    迷宮變換（以玩家為中心重新生長，絕不困住玩家）
    ===================================================== */
 function scheduleNextShift(){
+  if(window.TowerMode&&TowerMode.active){TowerMode.scheduleShift();return;}
+  clearInterval(preWarnTimer); preWarnTimer=0; $('preWarn').style.display='none';
   G.nextShiftAt=performance.now()+(MP.on?MP.shiftMs:CFG.shiftMin*60*1000);
   G.preWarned=false;
 }
 function updateShiftTimer(){
-  if(!G.running||G.shifting)return;
+  if(window.TowerMode&&TowerMode.active){TowerMode.updateShift();return;}
+  if(!G.running||G.shifting||(G.frozen&&!MP.on))return;
   const left=(G.nextShiftAt-performance.now())/1000;
   $('shiftCountdown').textContent=left>60?Math.ceil(left/60)+'分':Math.ceil(Math.max(0,left))+'秒';
   if(left<=3.5&&!G.preWarned){
     G.preWarned=true; $('preWarn').style.display='block';
     let n=3; $('preWarnSec').textContent=n; AudioEng.sfxTick();
-    const iv=setInterval(()=>{n--; if(n<=0){clearInterval(iv);$('preWarn').style.display='none';} else {$('preWarnSec').textContent=n;AudioEng.sfxTick();}},1000);
+    const epoch=sceneEpoch;
+    const timerId=setInterval(()=>{
+      if(epoch!==sceneEpoch||!G.running){clearInterval(timerId);if(preWarnTimer===timerId)preWarnTimer=0;return;}
+      if(G.frozen&&!MP.on)return;
+      n--; if(n<=0){clearInterval(timerId);if(preWarnTimer===timerId)preWarnTimer=0;$('preWarn').style.display='none';}
+      else {$('preWarnSec').textContent=n;AudioEng.sfxTick();}
+    },1000);
+    preWarnTimer=timerId;
   }
   if(left<=0){
     if(MP.on){ // 多人：由房主廣播，所有人收到訊息才一起變形
@@ -3132,10 +3201,13 @@ function updateShiftTimer(){
   }
 }
 function doShift(){
+  if(!G.running||G.shifting||(G.frozen&&!MP.on))return;
+  const epoch=sceneEpoch,wasFrozen=G.frozen,stillCurrent=()=>epoch===sceneEpoch&&G.running;
+  clearInterval(preWarnTimer); preWarnTimer=0; $('preWarn').style.display='none';
   if(isShop())cancelCheckout('🌀 迷宮變換，結帳中斷了！收銀機也換位置囉');
   G.shifting=true; G.frozen=true;
   $('shiftWarn').style.display='flex';
-  AudioEng.sfxAlarm(); setTimeout(()=>AudioEng.sfxAlarm(),700);
+  AudioEng.sfxAlarm(); shiftAlarm=setTimeout(()=>{if(!stillCurrent())return;shiftAlarm=0;AudioEng.sfxAlarm();},700);
   // 玩家先吸到目前格子的正中央（避免變換後卡在牆裡）
   const pc=worldToCell(G.px,G.pz);
   const cp=cellToWorld(pc.x,pc.y);
@@ -3143,12 +3215,13 @@ function doShift(){
   // 牆壁沉下去 → 換迷宮 → 升上來
   const t0=performance.now(),down=900,up=900,hold=500;
   const animDown=()=>{
+    if(!stillCurrent())return;
     const k=Math.min(1,(performance.now()-t0)/down);
     wallMesh.position.y=-(G.wallH+0.35)*k;
     // 玩家滑向格子中央
     G.px+=(cp.x-G.px)*0.12; G.pz+=(cp.z-G.pz)*0.12;
     playerGroup.position.set(G.px,0,G.pz);
-    if(k<1)requestAnimationFrame(animDown);
+    if(k<1)shiftRaf=requestAnimationFrame(animDown);
     else{
       const gc=MP.on?{x:0,y:0}:pc;  // 多人：固定種子格，所有人的迷宮一模一樣（完美迷宮不會困住任何人）
       genMaze(gc.x,gc.y);           // ★ 單機：從玩家所在格子長出新迷宮
@@ -3156,16 +3229,19 @@ function doShift(){
       buildWalls(theme);
       wallMesh.position.y=-(G.wallH+0.35);
       spawnItems();
-      setTimeout(()=>{
+      shiftDelay=setTimeout(()=>{
+        if(!stillCurrent())return; shiftDelay=0;
         const t1=performance.now();
         const animUp=()=>{
+          if(!stillCurrent())return;
           const k2=Math.min(1,(performance.now()-t1)/up);
           wallMesh.position.y=-(G.wallH+0.35)*(1-k2);
-          if(k2<1)requestAnimationFrame(animUp);
+          if(k2<1)shiftRaf=requestAnimationFrame(animUp);
           else{
             wallMesh.position.y=0;
+            shiftRaf=0;
             $('shiftWarn').style.display='none';
-            G.shifting=false; G.frozen=false;
+            G.shifting=false; G.frozen=wasFrozen;
             scheduleNextShift();
             if(MP.host&&MP.bots)for(const b of MP.bots){ // 電腦也吸回走道正中央
               const c=worldToCell(b.x,b.z), wp=cellToWorld(c.x,c.y);
@@ -3220,6 +3296,7 @@ function calcScore(timeSec){
   return Math.max(100, Math.round(6000-timeSec*15) ) + G.starBonus;
 }
 function winGame(){
+  if(window.TowerMode&&TowerMode.active){TowerMode.reachExit();return;}
   if(!G.running)return;
   G.running=false; G.frozen=true;
   AudioEng.stopMusic(); AudioEng.stopItemLoop(); AudioEng.sfxWin();
@@ -3315,6 +3392,7 @@ function escapeHtml(s){return String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':
    畫面切換 & 標題畫面 UI
    ===================================================== */
 function switchScreen(id){
+  if(id!=='gameScreen')cancelSceneTransition();
   document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active'));
   $(id).classList.add('active');
   if(id==='titleScreen')setFlowPanel('homePanel');
@@ -3327,6 +3405,7 @@ function setFlowPanel(id){
 }
 function beginEntryFlow(mode){
   entryMode=mode;
+  $('profileNextBtn').textContent=mode==='story'?'進入第 99 層':'下一步：選擇關卡 →';
   $('profileTitle').textContent=mode==='multi'?'建立多人角色':'建立單人角色';
   $('profileError').textContent='';
   requestLandscapeLock();
@@ -3341,6 +3420,7 @@ function continueToSetup(){
   }
   $('profileError').textContent='';
   localStorage.setItem('maze3d_name',name);
+  if(entryMode==='story'){TowerMode.beginNew();return;}
   $('setupTitle').textContent=entryMode==='multi'?'準備多人遊戲':'準備單人冒險';
   document.querySelector('#spModeRow [data-m="classic"] .mode-copy').textContent=entryMode==='multi'?'比賽搶終點':'經典闖關';
   $('startBtnLabel').textContent=entryMode==='multi'?'下一步：建立或加入房間':'開始單人冒險！';
@@ -3417,12 +3497,15 @@ function updatePreview(){
 function startGame(){
   AudioEng.init(); AudioEng.resume();
   if(document.activeElement&&document.activeElement.blur)document.activeElement.blur();
-  setSeed(MP.on?MP.seed:null);
+  setSeed(MP.on?MP.seed:(window.TowerMode&&TowerMode.active?TowerMode.floorSeed():null));
   G.mazeW=G.mazeH=MP.on?MP.size:CFG.mazeSize;
   G.wallH=isShop()?1.25:3;            // 大賣場是矮貨架，看得到遠方
   G.shopTheme=isShop()?SHOP_THEME:null;
   const theme=isShop()?SHOP_THEME:LEVELS[G.lvlIdx];
-  if(!scene)scene=new THREE.Scene(); else while(scene.children.length)scene.remove(scene.children[0]);
+  cancelSceneTransition();
+  if(!scene)scene=new THREE.Scene();
+  else{disposeSceneObject(scene);while(scene.children.length)scene.remove(scene.children[0]);}
+  particles=[];
   wallMesh=null; floorMesh=null; exitGroup=null; envGroup=null; itemGroup=null;
   // 起點 & 出口（對角）
   genMaze(0,0);
@@ -3517,6 +3600,7 @@ function loop(tms){
   if(!renderer)return;
   const t=tms/1000, dt=Math.min(0.05,t-lastT||0.016); lastT=t;
   if(!$('gameScreen').classList.contains('active'))return;
+  if(window.TowerMode&&TowerMode.active&&TowerMode.paused){renderer.render(scene,camera);return;}
   if(G.running&&!G.shifting){
     G.elapsed=(performance.now()-G.startTime)/1000-G.timeOffset;
     $('hudTime').textContent=fmtTime(G.elapsed);
@@ -3540,6 +3624,7 @@ function loop(tms){
     if(G.coUntil&&performance.now()>=G.coUntil)finishCheckout();
   }
   updatePlayer(dt,t);
+  if(window.TowerMode&&TowerMode.active)TowerMode.tick(dt,tms);
   updateCamera(dt);
   updateParticles(dt);
   updateCompass();
@@ -3645,6 +3730,7 @@ function wireUI(){
   $('failHomeBtn').onclick=()=>{if(confirmSeriesExit())switchScreen('titleScreen');};
   $('winHomeBtn').onclick=()=>{if(confirmSeriesExit())switchScreen('titleScreen');};
   $('quitBtn').onclick=()=>{
+    if(window.TowerMode&&TowerMode.active){TowerMode.requestQuit();return;}
     if(confirm(`要離開這一局回到選單嗎？目前第 ${SERIES.current+1}／${SERIES.total} 輪的進度不會保留。`)){
       if(MP.on)mpLeave();
       G.running=false;AudioEng.stopMusic();AudioEng.stopItemLoop();switchScreen('titleScreen');
@@ -3658,6 +3744,7 @@ function wireUI(){
   });
   bindActionBtn($('soundToggle'),()=>{
     G.muted=!G.muted; updateSoundBtn();
+    if(window.TowerMode&&TowerMode.active){TowerMode.soundChanged();if(G.muted)AudioEng.stopItemLoop();return;}
     if(G.muted){AudioEng.stopMusic();AudioEng.stopItemLoop();}
     else if(G.running)AudioEng.startMusic(isShop()?SHOP_THEME.music:LEVELS[G.lvlIdx].music);
   });
@@ -4757,5 +4844,8 @@ window.addEventListener('beforeunload',e=>{
 });
 window.addEventListener('pagehide',()=>{ if(MP.on)try{mpSend({t:'bye'});}catch(e){} });
 </script>
+<script src="story/story-core.js"></script>
+<script src="story/tower-audio.js"></script>
+<script src="story/tower-mode.js"></script>
 </body>
 </html>

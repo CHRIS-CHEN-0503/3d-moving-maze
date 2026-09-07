@@ -2,10 +2,12 @@
 (function () {
   'use strict';
   const C = window.TowerCore;
+  const E = window.TowerEncounters, V = window.TowerCharacters;
   const SAVE = 'maze3d_tower_v1';
   let run = null, active = false, paused = false, pauseAt = 0, modalFocus = null;
   let world = null, loot = [], monsters = [], traders = [], nearest = null;
   let warriorNpc = null, nearestWarrior = null, escort = null;
+  let explorer = null, chest = null, relic = null, nearbyEncounter = null, lastSurveyCell = '', gearVisual = null, gearSignature = '', exitDeclined = false;
   let shiftLeft = 65, wasShifting = false, floorConfig = null, saveClock = 0, hudClock = 0;
   let attackLeft = 0, hurtLeft = 0, warning = false, floorStarted = false, saveFailed = false;
   let encounterHold = 0;
@@ -32,6 +34,7 @@
     hud.id = 'towerHud'; hud.setAttribute('aria-label', '高塔生存狀態');
     hud.innerHTML = '<span class="tower-stat"><small>倒轉高塔</small><b id="towerFloor">99 F</b></span><span class="tower-stat"><small>生命</small><b id="towerHealth">100 / 100</b><progress id="towerHp" class="tower-health" max="100" value="100" aria-label="生命值"></progress></span><span class="tower-stat"><small>銅幣</small><b id="towerCoins">0</b></span><span class="tower-stat"><small>章節</small><b id="towerChapter"></b></span><div id="towerGuardStatus" class="tower-guard-status" hidden></div>';
     el('gameScreen').appendChild(hud);
+    const gearStatus=document.createElement('div');gearStatus.id='towerGearStatus';gearStatus.className='tower-gear-status';hud.appendChild(gearStatus);
     const rail = document.createElement('nav'); rail.id = 'towerActionRail'; rail.setAttribute('aria-label', '劇情操作');
     rail.innerHTML = '<button class="tower-btn" id="towerBagBtn">背包 <small>B</small></button><button class="tower-btn" id="towerTalkBtn" disabled>附近無人 <small>R</small></button><button class="tower-btn" id="towerAttackBtn">揮擊 <small>X</small></button>';
     el('gameScreen').appendChild(rail);
@@ -116,14 +119,14 @@
     catch (_) { if (!saveFailed) { saveFailed = true; showToast('瀏覽器無法保存進度，請保持此分頁開啟。', 4000); } return false; }
   }
   function canCollectOriginal(id) { return !active || !run.claimed.includes(id); }
-  function itemConfig() { return {itemCount:5,foodCount:Math.max(4,Math.round(floorConfig.size/2))}; }
+  function itemConfig() { return E.floorLootCounts(floorConfig.size); }
+  function preserveFloorPickups() { return active && floorStarted; }
   function reservedCells() {
-    const entrance=solveMaze(0,0)[1]||[0,1];
-    return [entrance.join(','),...(floorStarted?[...traders,...loot,...(warriorNpc?[warriorNpc]:[])].map(item=>item.cx+','+item.cy):[])];
+    return floorStarted?[...traders,...loot,...[warriorNpc,explorer,chest,relic].filter(Boolean)].map(item=>item.cx+','+item.cy):[];
   }
   function collectedOriginal(id) {
     if (!active || !run || run.claimed.includes(id)) return;
-    run.claimed.push(id); save();
+    run.claimed.push(id); questEvent('collect',{id}); save();
   }
   function open() {
     const saved = readSave();
@@ -146,7 +149,7 @@
     closeDialog(); floorStarted = false;
     floorConfig = C.floorConfig(run.floor);
     const settings = { mazeSize: CFG.mazeSize, itemCount: CFG.itemCount, foodCount: CFG.foodCount };
-    CFG.mazeSize = floorConfig.size; CFG.itemCount = 5; CFG.foodCount = Math.max(4, Math.round(floorConfig.size / 2));
+    const counts = itemConfig(); CFG.mazeSize = floorConfig.size; CFG.itemCount = counts.itemCount; CFG.foodCount = counts.foodCount;
     G.lvlIdx = floorConfig.themeIndex;
     try { startGame(); } finally { Object.assign(CFG, settings); }
     G.hungerLethal = false; G.drainPerSec = 0.12; G.satiety = run.hunger;
@@ -158,12 +161,12 @@
     if (run.charIdx === 4 && !G.shovels && !G.shovelRechargeAt) G.shovelRechargeAt = performance.now() + shovelCdMs();
     updateShovelBtn(); updateKiteBtn(); updateWhistleBtn();
     el('hudLvlName').textContent = floorConfig.name; el('hudRound').textContent = '劇情';
-    buildTowerEnvironment(); buildWorld(); encounterHold = 0; soundChanged();
+    buildTowerEnvironment(); buildWorld(); gearVisual=null;gearSignature='';refreshGear();encounterHold = 0; soundChanged();
     floorStarted = true; saveClock = 0; attackLeft = 0; hurtLeft = 3; wasShifting = false;
     save(); updateHud();
     const narration = run.floor === 99 ? C.OPENING.text : floorConfig.narrative;
     if (intro || narration) dialog('第 ' + run.floor + ' 層 · ' + floorConfig.name, run.floor === 99 ? '我怎麼會在這裡？' : '向下的門，再次開啟', Array.isArray(narration) ? narration.join('\n\n') : (narration || '迷宮深處傳來金屬摩擦聲。找到下一扇門，繼續尋找召喚你的原因。'),
-      '<p class="tower-copy">本層 ' + floorConfig.size + ' × ' + floorConfig.size + '｜每 ' + floorConfig.shiftSeconds + ' 秒變形｜' + (floorConfig.monsterCount ? '留意怪物紅色警戒圈' : '安全探索，先儲備補給') + '</p><p class="tower-copy">左側拖曳移動 · 右側拖曳看四周 · 背包 B · 交易 R · 揮擊 X · 空白鍵鐵鍬</p>', action('踏入迷宮', 'close'));
+      '<p class="tower-copy">本層 ' + floorConfig.size + ' × ' + floorConfig.size + '｜物資 '+counts.total+' 件，不隨變形重生｜每 ' + floorConfig.shiftSeconds + ' 秒變形｜' + (floorConfig.monsterCount ? '武器只能擊暈，善用護衛合作' : '安全探索，先儲備補給') + '</p><p class="tower-copy">左側移動 · 右側看四周 · 背包／裝備 B · 互動 R · 擊暈 X · 空白鍵鐵鍬</p>', action('踏入迷宮', 'close'));
   }
   function buildTowerEnvironment() {
     if (envGroup) { disposeSceneObject(envGroup); scene.remove(envGroup); }
@@ -218,25 +221,19 @@
   }
   function buildWorld() {
     loot = []; monsters = []; traders = []; nearest = null; warriorNpc = nearestWarrior = escort = null;
+    explorer=chest=relic=nearbyEncounter=null;lastSurveyCell='';exitDeclined=false;
     world = new THREE.Group(); scene.add(world);
     const random = mulberry32(floorSeed() ^ 0x712da), used = new Set(['0,0', G.exitCell.x + ',' + G.exitCell.y]);
     const originalPickups = [...(G.items||[]), ...(G.foods||[])];
     for(const item of originalPickups){const c=worldToCell(item.x,item.z);used.add(c.x+','+c.y);}
-    const near = solveMaze(0, 0)[1] || [0, 1]; used.add(near.join(','));
-    // 營地與原版道具也分離，避免交易角色站在可拾取光圈中。
-    for(const item of originalPickups){const c=worldToCell(item.x,item.z);if(c.x===near[0]&&c.y===near[1]){const p=chooseCell(random,used);item.x=p.x;item.z=p.z;item.sprite.position.x=item.marker.position.x=p.x;item.sprite.position.z=item.marker.position.z=p.z;}}
-    const count = floorConfig.merchant ? 2 : 1;
-    for (let i = 0; i < count; i++) {
-      const point = i === 0 ? cellPoint(near[0], near[1]) : chooseCell(random, used);
-      const model = buildCharacter(CHARS[(run.floor + i + 1) % CHARS.length]); model.position.set(point.x, 0, point.z);
-      const name = i === 0 ? '行商・阿洛' : '探路者・伊芙';
-      const tag = makeTextSprite(name); tag.position.y = 2.5; tag.scale.set(1.8,.35,1); model.add(tag);
-      const mat = new THREE.MeshBasicMaterial({color: 0x63f0ca});
-      const flag = new THREE.Mesh(new THREE.ConeGeometry(.2,.5,4), mat); flag.position.y = 3.3; model.add(flag);
-      world.add(model); traders.push({ ...point, model, name, type: i });
+    for (const offer of E.merchantOffers(run.floor,run.seed)) {
+      const point = chooseCell(random, used);
+      const model = V.buildMerchant(offer.id,{THREE,CHARS,buildCharacter});model.position.set(point.x,0,point.z);
+      const name = offer.title+'・'+offer.name,tag=makeTextSprite(name);tag.position.y=2.6;tag.scale.set(2.7,.5,1);model.add(tag);
+      world.add(model);traders.push({...point,model,name,id:offer.id,offer});
     }
     const kinds = ['coin','heal','ration','shield','coin','hourglass','bell','map','ration','coin','feather'];
-    for (let i = 0; i < Math.min(14, floorConfig.size + 3); i++) {
+    for (let i = 0; i < itemConfig().storyCount; i++) {
       const point = chooseCell(random, used), kind = kinds[i % kinds.length], id = 's' + i;
       const model = new THREE.Group(); model.position.set(point.x,0,point.z);
       const icon = new THREE.Mesh(kind === 'coin' ? new THREE.CylinderGeometry(.34,.34,.14,10) : kind === 'ration' ? new THREE.BoxGeometry(.5,.4,.5) : new THREE.OctahedronGeometry(.42), new THREE.MeshLambertMaterial({color:color[kind],emissive:color[kind],emissiveIntensity:.16}));
@@ -248,10 +245,18 @@
       const strength = C.monsterStrength(kind, run.floor), id = 'monster-' + i;
       const point = chooseCell(random, used, Math.min(7, floorConfig.size - 1)), model = monsterModel(kind, strength);
       const alive = !run.defeatedMonsters.includes(id);
-      model.position.set(point.x, 0, point.z); model.visible = alive; world.add(model);
+      model.position.set(point.x, 0, point.z); model.visible = alive; model.userData.monsterId=id; world.add(model);
       monsters.push({ ...point, id, strength, kind, def, model, hp: def.hp || 60, alive, path: [], pathLeft: i * .15, windup: 0, cooldown: 2, phase: i });
     }
     buildWarriors(used);
+    const chestOffer=E.chestOffer(run.floor,run.seed);
+    if(chestOffer){const point=chooseCell(random,used),model=V.buildChest({THREE});model.position.set(point.x,0,point.z);model.visible=!run.adventure.claimed.includes(chestOffer.id);world.add(model);chest={...point,offer:chestOffer,model};}
+    const explorerOffer=E.explorerOffer(run);
+    if(explorerOffer){const point=chooseCell(random,used),model=V.buildExplorer({THREE,CHARS,buildCharacter});model.position.set(point.x,0,point.z);if(run.adventure.quest?.type==='escort'&&run.adventure.quest.status==='active')model.position.set(G.px,0,G.pz);const tag=makeTextSprite('探索者・伊芙');tag.position.y=2.6;model.add(tag);world.add(model);explorer={...point,offer:explorerOffer,model,path:[],pathLeft:0};}
+    // 尋物目標獨立於消耗物資，種子固定，讀檔或變形不會重抽。
+    const point=chooseCell(random,used),model=new THREE.Group();model.position.set(point.x,0,point.z);
+    const gem=new THREE.Mesh(new THREE.OctahedronGeometry(.36),new THREE.MeshLambertMaterial({color:0xe3ccff}));gem.position.y=.8;model.add(gem);model.add(makePickupMarker(0xc49dff,'任務遺物'));
+    model.visible=!!(run.adventure.quest&&run.adventure.quest.type==='relic'&&run.adventure.quest.status==='active');world.add(model);relic={...point,model};
   }
   function monsterModel(kind, strength) {
     const group = new THREE.Group(), type = ['clockmite','wisp','sentinel','hound'].indexOf(kind);
@@ -263,7 +268,7 @@
     if (type === 3) { body.scale.set(.8,.55,1.5); for (const x of [-.35,.35]) for (const z of [-.4,.4]) { const leg=new THREE.Mesh(new THREE.BoxGeometry(.2,.55,.2),mat);leg.position.set(x,.35,z);group.add(leg); } }
     for (const side of [-1,1]) { const eye = new THREE.Mesh(new THREE.BoxGeometry(.14,.16,.1),new THREE.MeshBasicMaterial({color:0xfff4c0}));eye.position.set(side*.22,1,.49);group.add(eye); }
     const ring = new THREE.Mesh(new THREE.TorusGeometry(.83,.05,5,20),new THREE.MeshBasicMaterial({color:0xff6767,transparent:true,opacity:.42})); ring.rotation.x=Math.PI/2;ring.position.y=.08;group.add(ring);group.userData.ring=ring;
-    const tag = strengthTag(C.MONSTERS[kind].name, strength);tag.position.y=2.35;group.add(tag);group.userData.body=body;
+    const tag = strengthTag(C.MONSTERS[kind].name, strength);tag.position.y=2.35;group.add(tag);group.userData.body=body;group.userData.tag=tag;
     return group;
   }
   function strengthTag(label, strength) {
@@ -289,11 +294,6 @@
     if (offer && !run.hiredWarriors.includes(offer.id)) {
       const random = mulberry32(floorSeed() ^ 0x651cea);
       const point = chooseCell(random,used);
-      // 初遇在入口附近但不與行商、道具重疊，之後由探索發現。
-      if (run.floor===99) {
-        const route=solveMaze(0,0).find(([x,y],i)=>i>1&&!used.has(x+','+y)&&!(x===G.exitCell.x&&y===G.exitCell.y));
-        if(route)Object.assign(point,cellPoint(route[0],route[1]));
-      }
       const model=buildWarriorModel(offer.strength,'可聘戰士');model.position.set(point.x,0,point.z);world.add(model);
       warriorNpc={...point,offer,model};
     }
@@ -331,7 +331,7 @@
     const safe=nearest||run.effects.repel>0||now<G.invisUntil;
     const target=!safe&&monsters.filter(m=>m.alive&&Math.hypot(G.px-m.model.position.x,G.pz-m.model.position.z)<3&&Math.hypot(p.x-m.model.position.x,p.z-m.model.position.z)<4.5&&hasClearPath(G.px,G.pz,m.model.position.x,m.model.position.z)&&hasClearPath(p.x,p.z,m.model.position.x,m.model.position.z)).sort((a,b)=>Math.hypot(p.x-a.model.position.x,p.z-a.model.position.z)-Math.hypot(p.x-b.model.position.x,p.z-b.model.position.z))[0];
     if(target) {
-      const result=C.interceptMonster(run,target.id,target.strength,run.revision);
+      const result=C.interceptMonster(run,target.id,C.effectiveMonsterStrength(run,target.id,target.strength),run.revision);
       if(result.ok) {
         run=result.run;target.windup=0;target.path=[];target.cooldown=2;
         if(result.effect.outcome==='defeat')defeatMonster(target,true);
@@ -375,12 +375,16 @@
     el('towerFloor').textContent = run.floor + ' F'; el('towerHealth').textContent = Math.ceil(run.hp) + ' / 100';
     el('towerHp').value = run.hp; el('towerCoins').textContent = run.coins;
     el('towerChapter').textContent = floorConfig.name;
-    el('towerTalkBtn').disabled = !nearest && !nearestWarrior; el('towerTalkBtn').textContent = nearestWarrior ? '聘請 R' : nearest ? '交易 R' : '附近無人';
+    el('towerTalkBtn').disabled = !nearest && !nearestWarrior && !nearbyEncounter; el('towerTalkBtn').textContent = nearbyEncounter ? (nearbyEncounter===chest?'開箱 R':'對話 R') : nearestWarrior ? '聘請 R' : nearest ? '交易 R' : '附近無人';
     el('towerGuardStatus').hidden = !run.warrior;
     el('towerGuardStatus').textContent = warriorStatus();
-    el('towerAttackBtn').disabled = attackLeft > 0; el('towerAttackBtn').textContent = attackLeft > 0 ? '揮擊 ' + attackLeft.toFixed(1) : '揮擊 X';
+    el('towerGearStatus').textContent=Object.entries(run.equipment).map(([slot,gear])=>({helmet:'盔',armor:'甲',shield:'盾',weapon:'武'}[slot])+' '+(gear?gear.durability:'—')).join(' · ');
+    el('towerAttackBtn').disabled = attackLeft > 0 || !run.equipment.weapon; el('towerAttackBtn').textContent = !run.equipment.weapon?'需裝備武器':attackLeft > 0 ? '擊暈 ' + attackLeft.toFixed(1) : '擊暈 X';
     const effects = Object.entries(run.effects).filter(([,v])=>v>0).map(([k,v])=>({shield:'護盾',freeze:'定牆',repel:'驅怪',reveal:'回聲地圖'}[k])+' '+Math.ceil(v)+'秒');
-    el('towerObjective').textContent = nearestWarrior ? '戰士 '+nearestWarrior.offer.strength+'/5 · '+costText(nearestWarrior.offer.cost)+' · 點「聘請」查看契約' : effects.length ? effects.join(' · ') : nearest ? nearest.name + '：靠近後可購買／交換補給' : '找到金色傳送門，前往' + (run.floor > 1 ? '第 ' + (run.floor - 1) + ' 層' : '塔外');
+    el('towerObjective').textContent = nearestWarrior ? '戰士 '+nearestWarrior.offer.strength+'/5 · '+costText(nearestWarrior.offer.cost)+' · 點「聘請」查看契約' : effects.length ? effects.join(' · ') : nearest ? nearest.name + '：靠近後可購買／出售補給' : '找到金色傳送門，前往' + (run.floor > 1 ? '第 ' + (run.floor - 1) + ' 層' : '塔外');
+    const q=run.adventure.quest;
+    if(nearbyEncounter)el('towerObjective').textContent=nearbyEncounter===chest?'封印寶箱 · 可能藏著強化裝備，也可能是陷阱':'探索者・伊芙 · 對話查看委託';
+    else if(q&&q.status!=='claimed'&&!nearest&&!nearestWarrior)el('towerObjective').textContent=(E.explorerOffer(run)?.title||'探索者委託')+' · '+q.progress+'/'+q.goal+(q.status==='ready'?' · 報酬待領':'');
     document.body.classList.toggle('tower-danger',run.hp<=25);
   }
   function tick(dt, now) {
@@ -390,6 +394,8 @@
       wallMesh.material.color.setHex(environmentSpec()[1]);
       monsters.forEach(m=>{ const c=worldToCell(m.model.position.x,m.model.position.z),p=cellToWorld(c.x,c.y);m.model.position.set(p.x,0,p.z);m.path=[];m.pathLeft=0;m.windup=0;m.cooldown=2; });
       restoreWarriorPosition();
+      if(explorer&&run.adventure.quest?.type==='escort'){explorer.model.position.set(G.px,0,G.pz);explorer.path=[];explorer.pathLeft=0;}
+      questEvent('shift',{id:'shift-'+Math.floor(run.floorElapsed*1000)});
       if (run.effects.reveal>0) { const p=worldToCell(G.px,G.pz); G.solutionPath=solveMaze(p.x,p.y); }
     }
     if (paused || !G.running || G.frozen || G.shifting || run.status !== 'playing') return;
@@ -398,7 +404,12 @@
     if(ticked.effect && ticked.effect.warriorReleased){dismissEscort();showToast('護衛已盡力撤退，怪物將恢復追擊！',3500);save();}
     if (run.effects.freeze<=0) shiftLeft -= dt;
     attackLeft=Math.max(0,attackLeft-dt);hurtLeft=Math.max(0,hurtLeft-dt);
-    if (G.satiety<=0 && hurtLeft<=0) damage(3);
+    if (G.satiety<=0 && hurtLeft<=0) damage(3,'hunger');
+    const portal=cellToWorld(G.exitCell.x,G.exitCell.y);if(Math.hypot(G.px-portal.x,G.pz-portal.z)>2.2)exitDeclined=false;
+    const pc=worldToCell(G.px,G.pz),cellKey=pc.x+','+pc.y;
+    if(cellKey!==lastSurveyCell){lastSurveyCell=cellKey;questEvent('survey',pc);}
+    updateExplorer(dt,now);
+    if(relic&&relic.model.visible&&Math.hypot(G.px-relic.x,G.pz-relic.z)<1.1&&hasClearPath(G.px,G.pz,relic.x,relic.z)){questEvent('relic',{id:run.adventure.quest.target});relic.model.visible=false;save();}
     for (const item of loot) {
       if (!item.model.visible) continue;
       item.icon.position.y=1+Math.sin(now*.003+item.cx)*.12;item.icon.rotation.y+=dt;
@@ -410,9 +421,13 @@
     nearest=traders.find(n=>Math.hypot(G.px-n.x,G.pz-n.z)<2.6&&hasClearPath(G.px,G.pz,n.x,n.z))||null;
     nearestWarrior=warriorNpc&&warriorNpc.model.visible&&Math.hypot(G.px-warriorNpc.x,G.pz-warriorNpc.z)<2.6&&hasClearPath(G.px,G.pz,warriorNpc.x,warriorNpc.z)?warriorNpc:null;
     if(nearestWarrior&&nearest&&Math.hypot(G.px-nearest.x,G.pz-nearest.z)<Math.hypot(G.px-nearestWarrior.x,G.pz-nearestWarrior.z))nearestWarrior=null;
+    const closeEntities=[chest,explorer].filter(n=>n&&n.model.visible&&Math.hypot(G.px-n.model.position.x,G.pz-n.model.position.z)<2.6&&hasClearPath(G.px,G.pz,n.model.position.x,n.model.position.z));
+    nearbyEncounter=closeEntities.sort((a,b)=>Math.hypot(G.px-a.model.position.x,G.pz-a.model.position.z)-Math.hypot(G.px-b.model.position.x,G.pz-b.model.position.z))[0]||null;
+    if(nearbyEncounter){const d=Math.hypot(G.px-nearbyEncounter.model.position.x,G.pz-nearbyEncounter.model.position.z);if([nearest,nearestWarrior].some(n=>n&&Math.hypot(G.px-n.x,G.pz-n.z)<d))nearbyEncounter=null;}
     updateWarrior(dt,now);
     for(const monster of monsters) updateMonster(monster,dt,now);
-    const threat=!nearest&&run.effects.repel<=0&&!(now<G.invisUntil)&&monsters.some(m=>m.alive&&!isHeld(m)&&Math.hypot(G.px-m.model.position.x,G.pz-m.model.position.z)<m.def.sight&&(m.path.length>0||m.windup>0));
+    const threat=!nearest&&run.effects.repel<=0&&!(now<G.invisUntil)&&monsters.some(m=>m.alive&&!isHeld(m)&&!(run.monsterStuns[m.id]>0)&&Math.hypot(G.px-m.model.position.x,G.pz-m.model.position.z)<m.def.sight&&(m.path.length>0||m.windup>0));
+    if(gearVisual?.userData.weapon)gearVisual.userData.weapon.rotation.x=attackLeft>0?-Math.sin((.8-attackLeft)/.8*Math.PI)*1.1:0;
     encounterHold=threat?4:Math.max(0,encounterHold-dt);
     if(window.TowerAudio)window.TowerAudio.setEncounter(encounterHold>0);
     if(run.effects.reveal>0){G.mapUntil=now+250; if(!G.solutionPath){const p=worldToCell(G.px,G.pz);G.solutionPath=solveMaze(p.x,p.y);}}
@@ -426,6 +441,13 @@
   }
   function updateMonster(m,dt,now) {
     if(!m.alive)return;
+    const stunned=(run.monsterStuns[m.id]||0)>0;
+    const questTarget=run.adventure?.quest?.status==='active'&&run.adventure.quest.target===m.id;
+    if(m.stunLabel!==stunned||m.questLabel!==questTarget){const old=m.model.userData.tag;if(old){m.model.remove(old);disposeSceneObject(old);const tag=strengthTag((questTarget?'委託目標・':'')+m.def.name+(stunned?'（暈）':''),C.effectiveMonsterStrength(run,m.id,m.strength));tag.position.y=2.35;m.model.add(tag);m.model.userData.tag=tag;}
+      if(m.stunLabel!==stunned&&!stunned&&isHeld(m)){const result=C.resolveHeldMonster(run,m.id,m.strength);if(result.ok&&result.effect.changed){run=result.run;save();updateHud();showToast('怪物恢復強度，護衛改為限時抵擋 '+result.effect.seconds+' 秒。');}}
+      m.stunLabel=stunned;m.questLabel=questTarget;
+    }
+    if(stunned){m.windup=0;m.path=[];m.cooldown=2;m.model.userData.ring.material.opacity=.25+.12*Math.sin(now*.01);return;}
     if(isHeld(m)){m.windup=0;m.path=[];m.cooldown=2;m.model.userData.ring.material.opacity=.65;return;}
     const p=m.model.position, distance=Math.hypot(G.px-p.x,G.pz-p.z);
     const safe=traders.some(n=>Math.hypot(G.px-n.x,G.pz-n.z)<2.6&&hasClearPath(G.px,G.pz,n.x,n.z));
@@ -451,20 +473,24 @@
     if(len>.001){const nx=p.x+dx/len*step,nz=p.z+dz/len*step;if(!playerInWall(nx,nz,.28)){p.x=nx;p.z=nz;}else{m.path=[];m.pathLeft=0;}m.model.rotation.y=Math.atan2(dx,dz);}
     if(len<.12)m.path.shift();
   }
-  function damage(amount) {
+  function damage(amount,source='monster') {
     if(hurtLeft>0||paused||run.status!=='playing')return;
-    const result=C.takeDamage(run,amount);if(!result.ok)return;run=result.run;hurtLeft=1.5;
-    showToast(result.effect&&result.effect.revived?'復甦羽亮起，你重新站了起來。':'受到 '+Math.round(amount)+' 點攻擊，留意紅圈預警');
+    const result=C.takeDamage(run,amount,source);if(!result.ok)return;run=result.run;hurtLeft=1.5;refreshGear();
+    showToast(result.effect&&result.effect.revived?'復甦羽亮起，你重新站了起來。':'受到 '+result.effect.damage+' 點傷害'+(result.effect.broken.length?' · 裝備已損壞':'，留意紅圈預警'));
     if(run.hp<=0||run.status==='dead')defeat();else save();updateHud();
   }
   function attack() {
     if(!active||paused||G.frozen||!G.running||attackLeft>0)return;
-    attackLeft=.8;swingWeapon();
-    const target=monsters.filter(m=>m.alive&&Math.hypot(G.px-m.model.position.x,G.pz-m.model.position.z)<2.8&&hasClearPath(G.px,G.pz,m.model.position.x,m.model.position.z)).sort((a,b)=>a.hp-b.hp)[0];
+    if(!run.equipment.weapon){showToast('請先在背包裝備球棒、平底鍋或木杖。');return;}
+    attackLeft=.8;
+    const target=monsters.filter(m=>m.alive&&Math.hypot(G.px-m.model.position.x,G.pz-m.model.position.z)<2.8&&hasClearPath(G.px,G.pz,m.model.position.x,m.model.position.z)).sort((a,b)=>Math.hypot(G.px-a.model.position.x,G.pz-a.model.position.z)-Math.hypot(G.px-b.model.position.x,G.pz-b.model.position.z))[0];
     if(!target){showToast('揮擊落空：靠近怪物後再攻擊');return;}
-    target.hp-=28;target.cooldown=1.2;target.windup=0;AudioEng.sfxPickup();
-    if(target.hp<=0)defeatMonster(target);
-    else showToast(target.def.name+' 剩餘生命 '+Math.ceil(target.hp));
+    const result=C.hitMonster(run,target.id,target.strength);if(!result.ok){showToast(result.message);return;}
+    run=result.run;target.cooldown=2;target.windup=0;AudioEng.sfxPickup();questEvent('stun',{monsterId:target.id});
+    const rescue=C.resolveHeldMonster(run,target.id,target.strength);
+    if(rescue.ok&&rescue.effect.outcome==='defeat'){run=rescue.run;defeatMonster(target,true);refreshWarriorLabel();}
+    else showToast(target.def.name+' 擊暈 '+result.effect.stunSeconds+' 秒 · 強度 −1'+(result.effect.broken.length?' · 武器已損壞':''));
+    refreshGear();save();updateHud();
   }
   function defeatMonster(target,byWarrior=false) {
     if(!target.alive)return;
@@ -474,6 +500,7 @@
     if(isHeld(target)){run.warrior=null;dismissEscort();}
     let reward=false;
     if(!run.claimed.includes(id)){const result=C.collect(run,'coin',12);if(result.ok){run=result.run;run.claimed.push(id);reward=true;}}
+    questEvent('defeat',{monsterId:id});
     showToast((byWarrior?'護衛瞬間擊敗 ':'擊退 ')+target.def.name+(byWarrior?'，剩餘強度 '+run.warrior.strength+'/5':'')+(reward?' · +12 銅幣':''));save();
   }
   function costText(cost) { return Object.entries(cost).map(([id,count])=>C.ITEMS[id].name+' × '+count).join(' ＋ '); }
@@ -482,7 +509,7 @@
     return !guard?'目前沒有護衛':guard.mode==='escort'?'護衛 '+guard.strength+'/5 · 隨行保護':'護衛 '+guard.strength+'/5 · '+(guard.remaining===null?'持續牽制':Math.ceil(guard.remaining)+' 秒牽制');
   }
   function warriorRules() {
-    return '<div class="tower-guard-rules"><p><b>戰士較強</b>立即擊敗怪物，扣除怪物分數後繼續護送。</p><p><b>雙方同分</b>留在原地持續牽制一隻怪物。</p><p><b>怪物較強</b>每 1 分抵擋 1 分鐘，之後戰士撤退。</p></div><p class="tower-copy">一次聘請一人。隨行護衛可跨樓層；交戰中的護衛會留在本層。主角仍可移動、攻擊與尋找出口，協助擊敗被牽制的怪物後，該次契約結束。</p>';
+    return '<div class="tower-guard-rules"><p><b>戰士較強</b>立即擊敗怪物，扣除怪物分數後繼續護送。</p><p><b>雙方同分</b>持續牽制；你可擊暈怪物，使其降 1 分，讓護衛取勝。</p><p><b>怪物較強</b>每 1 分抵擋 1 分鐘，之後戰士撤退。</p></div><p class="tower-copy">一次聘請一人。隨行護衛可跨樓層；交戰中的護衛留在本層。武器只擊暈，不直接殺死怪物。</p>';
   }
   function warriorDialog() {
     if(!active||G.shifting||!nearestWarrior||run.status!=='playing')return;
@@ -500,22 +527,88 @@
   }
   function transact(result) {
     if(!result.ok){showToast(result.message||'目前無法進行');return false;}
-    run=result.run;G.satiety=run.hunger;save();updateHud();return true;
+    run=result.run;G.satiety=run.hunger;refreshGear();save();updateHud();return true;
+  }
+  function refreshGear() {
+    if(!active||!run?.equipment||typeof playerGroup==='undefined'||!playerGroup||!V)return;
+    const signature=Object.values(run.equipment).map(g=>g?g.id:'-').join('|');
+    if(signature===gearSignature)return;
+    if(gearVisual){playerGroup.remove(gearVisual);disposeSceneObject(gearVisual);}
+    gearVisual=new THREE.Group();gearSignature=signature;
+    for(const gear of Object.values(run.equipment).filter(Boolean)){
+      const model=V.buildGear(gear.kind,{THREE}),mount=V.GEAR_MOUNTS[gear.kind];
+      model.position.set(...mount.position);if(mount.rotation)model.rotation.set(...mount.rotation);
+      gearVisual.add(model);if(gear.slot==='weapon')gearVisual.userData.weapon=model;
+    }
+    playerGroup.add(gearVisual);
+  }
+  function gearDescription(gear) {
+    return '耐久 '+gear.durability+'/'+gear.maxDurability+' · '+(gear.slot==='weapon'?'基礎擊暈 '+C.GEAR[gear.kind].stunSeconds+' 秒':'防禦 '+gear.defense)+(gear.bonus?' · 強化 +'+gear.bonus:'');
+  }
+  function gearCard(gear,equipped=false) {
+    return '<article class="tower-item tower-gear-card'+(gear.bonus?' rare':'')+'"><h3>'+text(gear.name)+(equipped?' <small>穿戴中</small>':'')+'</h3><p>'+text(gearDescription(gear))+'</p><meter min="0" max="'+gear.maxDurability+'" value="'+gear.durability+'" aria-label="耐久度"></meter>'+(!equipped?action('裝備','equip',gear.id):'')+action('捨棄','discard-ask',gear.id)+'</article>';
+  }
+  function questEvent(event,data) {
+    const q=run?.adventure?.quest;
+    if(!q||q.status!=='active'||q.type!==event)return false;
+    const result=E.questProgress(run,event,data);if(!result.ok)return false;
+    run=result.run;save();if(result.effect?.ready)showToast('委託完成！請找探索者領取報酬。',3000);return true;
+  }
+  function updateExplorer(dt,now) {
+    if(!explorer||run.adventure.quest?.type!=='escort'||run.adventure.quest.status!=='active')return;
+    const p=explorer.model.position;if(Math.hypot(G.px-p.x,G.pz-p.z)<1.6)return;
+    explorer.pathLeft-=dt;
+    if(explorer.pathLeft<=0){const a=worldToCell(p.x,p.z),b=worldToCell(G.px,G.pz);explorer.path=solveMaze(a.x,a.y,b.x,b.y).slice(1);explorer.pathLeft=.65;}
+    const waypoint=explorer.path.length?cellToWorld(...explorer.path[0]):{x:G.px,z:G.pz};
+    const dx=waypoint.x-p.x,dz=waypoint.z-p.z,length=Math.hypot(dx,dz),step=Math.min(length,5.5*dt);
+    if(length>.001){const x=p.x+dx/length*step,z=p.z+dz/length*step;if(!playerInWall(x,z,.28)){p.x=x;p.z=z;}else explorer.pathLeft=0;explorer.model.rotation.y=Math.atan2(dx,dz);}
+    if(length<.15)explorer.path.shift();
+    explorer.model.userData.legL.rotation.x=Math.sin(now*.008)*.3;explorer.model.userData.legR.rotation.x=-Math.sin(now*.008)*.3;
+  }
+  function nearExplorer() { return explorer&&Math.hypot(G.px-explorer.model.position.x,G.pz-explorer.model.position.z)<2.8&&hasClearPath(G.px,G.pz,explorer.model.position.x,explorer.model.position.z); }
+  function rewardDescription(reward) {
+    return [reward.coins?reward.coins+' 銅幣':'',...Object.entries(reward.items||{}).map(([id,n])=>C.ITEMS[id].name+' × '+n),reward.gear?reward.gear.name+'（'+gearDescription(reward.gear)+'）':''].filter(Boolean).join(' ＋ ');
+  }
+  function questDialog() {
+    if(!active||G.shifting||run.status!=='playing')return;
+    const offer=E.explorerOffer(run),q=run.adventure.quest;
+    if(!offer||(!q&&!nearExplorer())){dialog('探索者委託','目前沒有委託','探索者伊芙有 20% 機會出現在每一層；靠近她可查看委託。','',action('回到迷宮','close'));return;}
+    if(explorer)explorer.offer=offer;
+    const target=monsters.find(m=>m.id===offer.target);
+    const copy=offer.description+(target?' 目標：'+target.def.name+'（原始強度 '+target.strength+'/5）；接受後頭頂會標示「委託目標」。':'')+(q?' 進度 '+q.progress+' / '+q.goal:'');
+    let actions=action('繼續探索','close');
+    if(!q)actions+=action('接受委託','quest-accept',offer.id,!nearExplorer());
+    else if(q.status==='ready')actions+=action('領取報酬','quest-reward',null,!nearExplorer());
+    else if(q.status==='active'&&q.type==='donate')actions+=action('交付 '+q.goal+' 份'+C.ITEMS[q.target].name,'quest-donate',null,!nearExplorer()||run.bag[q.target]<q.goal);
+    dialog('探索者・伊芙',q?.status==='claimed'?'感謝你的幫助':offer.title,copy,'<section class="tower-guard-summary"><h3>完成報酬</h3><p>'+text(rewardDescription(offer.reward))+'</p></section><p class="tower-copy">離開本層、保存回首頁或重整挑戰會解除未結案委託；報酬必須向探索者領取。進出口前會再次確認。裝備放入行囊後請自行穿戴。</p>',actions);
+  }
+  function chestDialog() {
+    if(!chest||!chest.model.visible)return;
+    dialog('迷宮奇遇','開啟封印寶箱？','可能獲得強化裝備，也可能觸發陷阱。穿戴防具能減少陷阱傷害，但防具會消耗耐久。','<p class="tower-copy">每層有 20% 機會出現。內容已固定，開啟後不會因變形或讀檔重新出現。</p>',action('先不開啟','close')+action('打開寶箱','chest-open',chest.offer.id));
+  }
+  function openChest(id) {
+    if(!chest||!chest.model.visible||Math.hypot(G.px-chest.x,G.pz-chest.z)>=2.6||!hasClearPath(G.px,G.pz,chest.x,chest.z))return;
+    const result=E.openChest(run,id,run.revision);if(!transact(result))return;
+    chest.model.visible=false;nearbyEncounter=null;
+    if(run.status==='dead'){defeat();return;}
+    const copy=result.effect.outcome==='gear'?result.effect.gear.name+' · '+gearDescription(result.effect.gear)+'，已放入裝備行囊。':'陷阱造成 '+result.effect.damage+' 點傷害。'+(result.effect.revived?'復甦羽保護了你。':'防具已按命中消耗耐久。');
+    dialog('寶箱已開啟',result.effect.outcome==='gear'?'獲得強化裝備':'小心，是陷阱！',copy,'',action('查看裝備','bag')+action('繼續前進','close'));
   }
   function inventory() {
     if(!active||G.shifting||run.status!=='playing')return;
     syncEngine();
     const cards=Object.entries(C.ITEMS).filter(([id])=>id!=='coin').map(([id,item])=>'<article class="tower-item"><h3>'+text(item.name)+' <span>×'+(run.bag[id]||0)+'</span></h3><p>'+text(item.description||item.desc||'高塔冒險補給')+'</p>'+action(id==='feather'?'瀕死自動使用':'使用','use',id,!run.bag[id]||id==='feather')+'</article>').join('');
-    dialog('旅人背包 · 暫停中','補給與生存','生命 '+Math.ceil(run.hp)+' / 100 · 飽足 '+Math.ceil(run.hunger)+'% · 銅幣 '+run.coins,'<section class="tower-guard-summary"><h3>'+text(warriorStatus())+'</h3><p>戴鋼盔、持金色盾牌的是可交談的戰士，不是拾取道具。靠近後點「聘請」或按 R 查看報酬。</p></section><div class="tower-grid">'+cards+'</div>'+warriorRules(),action('回到迷宮','close')+action('保存並離開','quit'));
+    const stats=C.equipmentStats(run),worn=Object.values(run.equipment).filter(Boolean).map(g=>gearCard(g,true)).join(''),stored=run.gearBag.map(g=>gearCard(g)).join('');
+    dialog('旅人背包 · 暫停中','裝備與補給','生命 '+Math.ceil(run.hp)+' / 100 · 飽足 '+Math.ceil(run.hunger)+'% · 銅幣 '+run.coins,'<section class="tower-guard-summary"><h3>防禦 '+stats.defense+' · 強化 +'+stats.bonus+' · 擊暈 '+stats.stunSeconds+' 秒</h3><p>每次命中，三件已穿防具各減 1 耐久；武器命中減 1。每點已穿裝備強化增加 10 秒擊暈，耐久耗盡即損壞。</p></section><h3>穿戴中</h3><div class="tower-grid">'+(worn||'<p>尚未穿戴裝備。</p>')+'</div><h3 class="tower-section-title">裝備行囊 '+run.gearBag.length+'/24</h3><div class="tower-grid">'+(stored||'<p>商人與寶箱取得的裝備會放在這裡。</p>')+'</div><h3 class="tower-section-title">生存補給</h3><div class="tower-grid">'+cards+'</div><section class="tower-guard-summary"><h3>'+text(warriorStatus())+'</h3></section>'+warriorRules(),action('任務日誌','quest')+action('回到迷宮','close')+action('保存並離開','quit'));
   }
   function trade() {
+    if(nearbyEncounter){if(nearbyEncounter===chest)chestDialog();else questDialog();return;}
     if(nearestWarrior){warriorDialog();return;}
     if(!active||G.shifting||!nearest||run.status!=='playing')return;
     syncEngine();
-    const cards=Object.entries(C.ITEMS).filter(([id])=>id!=='coin').map(([id,item])=>'<article class="tower-item"><h3>'+text(item.name)+'</h3><p>'+text(item.description||item.desc||'高塔冒險補給')+' · 持有 '+(run.bag[id]||0)+'</p>'+action('買 '+(item.buyPrice||item.price)+' 幣','buy',id)+action('賣出','sell',id,!run.bag[id])+'</article>').join('');
-    const bundle=items=>Object.entries(items).map(([key,count])=>C.ITEMS[key].name+' × '+count).join(' ＋ ');
-    const trades=C.EXCHANGES.map(item=>'<article class="tower-item"><h3>'+text(item.name)+'</h3><p>'+text(bundle(item.give)+' → '+bundle(item.receive))+'</p>'+action('交換','exchange',item.id)+'</article>').join('');
-    dialog(nearest.name+' · 營地安全區','旅人補給站','「有人說塔在守護我們。可我只想知道，誰把我們帶進來？」剩餘銅幣 '+run.coins,'<div class="tower-grid">'+cards+'</div><div class="tower-actions">'+trades+'</div>',action('結束交易','close'));
+    const cards=nearest.offer.supplies.map(id=>{const item=C.ITEMS[id];return '<article class="tower-item"><h3>'+text(item.name)+'</h3><p>'+text(item.description)+' · 持有 '+run.bag[id]+'</p>'+action('買 '+item.buyPrice+' 幣','buy',id)+action('賣出','sell',id,!run.bag[id])+'</article>';}).join('');
+    const gear=nearest.offer.gear.map(({kind,gear,price})=>'<article class="tower-item tower-gear-card"><h3>'+text(gear.name)+'</h3><p>'+text(gearDescription(gear))+'</p>'+action(run.adventure.claimed.includes('stock:'+run.floor+':'+nearest.id+':'+kind)?'本層已售出':'購買 '+price+' 幣','buy-gear',kind,run.adventure.claimed.includes('stock:'+run.floor+':'+nearest.id+':'+kind)||run.coins<price)+'</article>').join('');
+    dialog(nearest.name+' · 行商營地','專門裝備與補給','每位商人固定專賣一種防具與一種武器。剩餘銅幣 '+run.coins,'<div class="tower-grid">'+gear+cards+'</div><p class="tower-copy">買到的裝備放入行囊，請在背包選擇「裝備」；每件本層限一件，讀檔不會補貨。</p>',action('整理裝備','bag')+action('結束交易','close'));
   }
   function useItem(id) {
     syncEngine();const before={...run.effects};
@@ -525,8 +618,15 @@
     if(id==='map'){const p=worldToCell(G.px,G.pz);G.solutionPath=solveMaze(p.x,p.y);G.mapUntil=performance.now()+run.effects.reveal*1000;}
     save();inventory();
   }
-  function reachExit() {
-    if(!active||paused||!G.running||run.status!=='playing')return;
+  function reachExit(confirmed=false) {
+    if(!active||paused||!G.running||run.status!=='playing'||(exitDeclined&&!confirmed))return;
+    let q=run.adventure.quest;
+    if(q&&q.status!=='claimed'&&!confirmed){
+      const portal=cellToWorld(G.exitCell.x,G.exitCell.y);
+      if(q.type==='escort'&&explorer)questEvent('escort',{atExit:hasClearPath(explorer.model.position.x,explorer.model.position.z,portal.x,portal.z),distance:Math.hypot(explorer.model.position.x-portal.x,explorer.model.position.z-portal.z)});
+      q=run.adventure.quest;exitDeclined=true;
+      dialog('出口確認',q.status==='ready'?'還有委託報酬尚未領取':'本層還有進行中的委託','下降後會解除本層委託，尚未領取的報酬也會失去。你可以先繼續探索。','<p class="tower-copy">'+text(E.explorerOffer(run)?.title||'探索者委託')+' · '+q.progress+'/'+q.goal+'</p>',action('留在本層','close')+(q.status==='ready'&&nearExplorer()?action('領取報酬並下降','exit-reward'):'')+action('放棄委託並下降','exit-confirm'));return;
+    }
     syncEngine();G.running=false;const result=C.descend(run);
     if(!result.ok){G.running=true;return;}run=result.run;floorStarted=false;const saved=save();
     if(run.status==='won'){dialog('塔外的第一道晨光','你找到了回家的路',C.ENDING.text,'<p class="tower-copy">99 層旅程完成。你保住的不只是自己的生命，還有其他旅人的希望。</p>',action('回到首頁','home'));return;}
@@ -535,15 +635,21 @@
   function defeat() {
     if(!active)return;
     G.running=false;run.status='dead';run.hp=0;save();
-    dialog('高塔仍在等待','這次旅程暫時停下','冒險者把你帶回本層入口。可以付出最多 12 枚銅幣重整行裝；已拾取的補給不會重複出現。', '',action('重整後再挑戰','retry')+action('回首頁','home'));
+    dialog('高塔仍在等待','這次旅程暫時停下','冒險者把你帶回本層入口。可以付出最多 12 枚銅幣重整行裝；已拾取的補給不會重複出現，未結案委託會解除。', '',action('重整後再挑戰','retry')+action('回首頁','home'));
   }
-  function pauseMenu() { dialog('旅程已暫停','隨時可以繼續','切回遊戲後按繼續，牆壁倒數與怪物都會等待你。','',action('繼續探索','close')+action('保存並回首頁','home')); }
+  function pauseMenu() { dialog('旅程已暫停','隨時可以繼續','切回遊戲後按繼續，牆壁倒數與怪物都會等待你。選擇保存回首頁會解除本層未結案委託。','',action('繼續探索','close')+action('保存並回首頁','home')); }
   function requestQuit() {
     if(G.shifting){showToast('請等牆壁移動完成再離開（約 2 秒）');return;}
-    dialog('離開確認','保存這段旅程？','將保存職業、樓層、背包與生命；下次從目前樓層入口繼續。','',action('繼續遊戲','close')+action('保存並回首頁','home'));
+    dialog('離開確認','保存這段旅程？','將保存職業、裝備、樓層、背包與生命；下次從目前樓層入口繼續。本層未結案委託會解除，未領取報酬會失去。','',action('繼續遊戲','close')+action('保存並回首頁','home'));
+  }
+  function cancelFloorQuest() {
+    if(!run.adventure.quest||run.adventure.quest.status==='claimed')return;
+    if(!run.adventure.claimed.includes('abandoned:'+run.floor))run.adventure.claimed.push('abandoned:'+run.floor);
+    run.adventure.quest=null;
   }
   function stop() {
-    if(!save()){dialog('尚未保存','目前無法保存旅程','瀏覽器儲存空間可能不足。請先繼續遊戲並保持此分頁開啟，避免遺失目前樓層。','',action('回到旅程','close'));return;}
+    const previous=C.validateAdventure(run.adventure,run.floor);cancelFloorQuest();
+    if(!save()){run.adventure=previous;dialog('尚未保存','目前無法保存旅程','瀏覽器儲存空間可能不足。請先繼續遊戲並保持此分頁開啟，避免遺失目前樓層。','',action('回到旅程','close'));return;}
     cancelSceneTransition();G.running=false;G.frozen=true;
     if(window.TowerAudio)window.TowerAudio.stop();
     active=false;floorStarted=false;paused=false;
@@ -559,12 +665,26 @@
     if(key==='descend'){loadFloor(false);return;}
     if(key==='home'){stop();return;}
     if(key==='quit'){requestQuit();return;}
-    if(key==='retry'){run.status='playing';run.hp=100;run.hunger=Math.max(65,run.hunger);run.coins=Math.max(0,run.coins-12);enter();return;}
+    if(key==='retry'){run.status='playing';run.hp=100;run.hunger=Math.max(65,run.hunger);run.coins=Math.max(0,run.coins-12);cancelFloorQuest();enter();return;}
+    if(key==='bag'){inventory();return;}
+    if(key==='equip'){if(transact(C.equipGear(run,id,run.revision)))inventory();return;}
+    if(key==='discard-ask'){const gear=[...run.gearBag,...Object.values(run.equipment)].find(g=>g&&g.id===id);if(gear)dialog('捨棄裝備確認','捨棄'+gear.name+'？','捨棄後不能取回，若這是最後一把武器，你會暫時無法擊暈怪物。','',action('保留裝備','bag')+action('確認捨棄','discard',id));return;}
+    if(key==='discard'){if(transact(C.discardGear(run,id,run.revision)))inventory();return;}
+    if(key==='quest'){questDialog();return;}
+    if(key==='quest-accept'){if(nearExplorer()&&transact(E.acceptQuest(run,id,run.revision))){if(relic)relic.model.visible=run.adventure.quest.type==='relic';closeDialog();showToast('委託已接受，背包可查看進度。');}return;}
+    if(key==='quest-donate'){if(nearExplorer()&&questEvent('donate',{}))questDialog();return;}
+    if(key==='quest-reward'){if(nearExplorer()&&transact(E.claimQuestReward(run,run.revision)))questDialog();return;}
+    if(key==='exit-reward'){if(!nearExplorer()||!transact(E.claimQuestReward(run,run.revision)))return;closeDialog();reachExit(true);return;}
+    if(key==='exit-confirm'){closeDialog();reachExit(true);return;}
+    if(key==='chest-open'){openChest(id);return;}
     if(key==='use'){useItem(id);return;}
     if(key==='hire'){hireWarrior(id);return;}
-    if(key==='buy'||key==='sell'){if(transact(C[key](run,id,1,run.revision)))trade();return;}
-    if(key==='exchange'){if(transact(C.exchange(run,id,run.revision)))trade();}
+    if(key==='buy'||key==='sell'||key==='buy-gear'){
+      if(!active||!G.running||!nearest||Math.hypot(G.px-nearest.x,G.pz-nearest.z)>=2.6||!hasClearPath(G.px,G.pz,nearest.x,nearest.z))return;
+      const result=key==='buy-gear'?E.buyMerchantGear(run,nearest.id,id,run.revision):E[key==='buy'?'buySupply':'sellSupply'](run,nearest.id,id,1,run.revision);
+      if(transact(result))trade();return;
+    }
   }
-  window.TowerMode = { get active(){return active;}, get paused(){return paused;}, open, beginNew, tick, floorSeed, scheduleShift, updateShift, reachExit, defeat, requestQuit, canCollectOriginal, collectedOriginal, itemConfig, reservedCells, soundChanged };
+  window.TowerMode = { get active(){return active;}, get paused(){return paused;}, open, beginNew, tick, floorSeed, scheduleShift, updateShift, reachExit, defeat, requestQuit, canCollectOriginal, collectedOriginal, itemConfig, reservedCells, preserveFloorPickups, soundChanged };
   install();
 })();

@@ -6,6 +6,7 @@ import vm from 'node:vm';
 
 const require = createRequire(import.meta.url);
 const core = require('../story/story-core.js');
+const encounters = require('../story/tower-encounters.js');
 const source = await readFile(new URL('../story/tower-mode.js', import.meta.url), 'utf8');
 // 注入只存在於測試的介面；正式程式沒有測試用全域或捷徑。
 const bridge = `window.__test = {
@@ -25,11 +26,11 @@ function runtime() {
     return nodes.get(id);
   };
   const context = vm.createContext({
-    window: { TowerCore: core }, escapeHtml: value => String(value),
+    window: { TowerCore: core, TowerEncounters: encounters }, escapeHtml: value => String(value),
     document: { getElementById: node, activeElement: node('focus'), body: { classList: { add() {}, remove() {}, toggle() {} } } },
     performance: { now: () => now },
     localStorage: { getItem: key => storage.get(key) ?? null, setItem: (key, value) => storage.set(key, value) },
-    G: { running: true, frozen: false, shifting: false, satiety: 100, px: 0, pz: 0, startTime: 100, shovels: 1, kites: 0, whistles: 0, shovelRechargeAt: 5000, skillCoolUntil: 0, effects: {}, mazeW: 7, mazeH: 7 },
+    G: { running: true, frozen: false, shifting: false, satiety: 100, px: 0, pz: 0, startTime: 100, shovels: 1, kites: 0, whistles: 0, shovelRechargeAt: 5000, skillCoolUntil: 0, effects: {}, mazeW: 7, mazeH: 7, exitCell: {x:6,y:6} },
     keys: { KeyW: true }, joy: { active: true, dx: 1, dy: 0 },
     showToast: message => messages.push(message), AudioEng: { sfxTick() {}, sfxPickup() {} },
     playerInWall: () => false, worldToCell: () => ({ x: 0, y: 0 }), cellToWorld: (x,y) => ({ x: x*4, z:y*4 }), solveMaze: () => [[0,0]],
@@ -41,6 +42,7 @@ function runtime() {
 
 test('背包對話真正暫停劇情與原道具時限，恢復時保留剩餘秒數', () => {
   const h = runtime();
+  h.testApi.state().run.monsterStuns['monster-0']=12;
   h.context.G.ghostUntil = 9000;
   h.context.G.effects.speed = { until: 10000 };
   h.testApi.dialog('背包', '暫停', '', '', '');
@@ -56,6 +58,9 @@ test('背包對話真正暫停劇情與原道具時限，恢復時保留剩餘�
   assert.equal(h.context.G.effects.speed.until, 30000);
   assert.equal(h.context.G.startTime, 20100);
   assert.equal(h.context.G.frozen, false);
+  assert.equal(h.testApi.state().run.monsterStuns['monster-0'],12);
+  h.api.tick(.5,21500);
+  assert.equal(h.testApi.state().run.monsterStuns['monster-0'],11.5);
 });
 
 test('存檔保存當前庫存與剩餘冷卻；破損或儲存額滿不冒充成功', () => {
@@ -77,7 +82,7 @@ test('存檔保存當前庫存與剩餘冷卻；破損或儲存額滿不冒充�
 test('怪物蓄力攻擊不能穿牆，命中後給予短暫保護避免多怪瞬間連殺', () => {
   const h = runtime();
   h.context.G.px = 1;
-  const monster = () => ({ alive: true, cooldown: 0, pathLeft: 1, windup: .1, phase: 0, kind: 'clockmite', def: core.MONSTERS.clockmite,
+  const monster = () => ({ id: 'monster-0', strength: 1, alive: true, cooldown: 0, pathLeft: 1, windup: .1, phase: 0, kind: 'clockmite', def: core.MONSTERS.clockmite,
     model: { position: { x: 0, z: 0 }, userData: { body: { position: {} }, ring: { material: {} } } } });
   h.context.playerInWall = () => true;
   h.testApi.updateMonster(monster(), .2, 1000);
@@ -87,6 +92,36 @@ test('怪物蓄力攻擊不能穿牆，命中後給予短暫保護避免多怪�
   assert.equal(h.testApi.state().run.hp, 92);
   h.testApi.updateMonster(monster(), .2, 1000);
   assert.equal(h.testApi.state().run.hp, 92);
+});
+
+test('實際怪物命中使三防具各耗一耐久，最後耐久仍保護這一擊', () => {
+  const h=runtime();
+  let run=h.testApi.state().run;
+  for(const kind of ['helmet','armor','shield']){
+    const gear=core.createGear(kind,99,run.seed,kind);gear.durability=1;
+    run=core.equipGear(core.grantGear(run,gear).run,gear.id).run;
+  }
+  h.testApi.setState({run});h.context.G.px=1;
+  const monster={id:'monster-0',strength:3,alive:true,cooldown:0,pathLeft:1,windup:.1,phase:0,kind:'sentinel',def:core.MONSTERS.sentinel,
+    model:{position:{x:0,z:0},userData:{body:{position:{}},ring:{material:{}}}}};
+  const weaponDurability=run.equipment.weapon.durability;
+  h.testApi.updateMonster(monster,.2,1000);
+  assert.equal(h.testApi.state().run.hp,94,'15傷害先抵扣三件防禦合計9');
+  for(const slot of ['helmet','armor','shield'])assert.equal(h.testApi.state().run.equipment[slot],null);
+  assert.equal(h.testApi.state().run.equipment.weapon.durability,weaponDurability);
+  assert.match(h.nodes.get('towerGearStatus').textContent,/盔 — · 甲 — · 盾 —/);
+  assert.equal(h.testApi.save(),true);assert.ok(h.testApi.readSave());
+});
+
+test('飢餓傷害正確經由例外來源，不消耗防具或受裝備護盾抵扣', () => {
+  const h=runtime();let run=h.testApi.state().run;
+  const armor=core.createGear('armor',99,run.seed,'armor');
+  run=core.equipGear(core.grantGear(run,armor).run,armor.id).run;
+  run.effects.shield=25;h.testApi.setState({run});h.context.G.satiety=0;
+  h.api.tick(.2,1200);
+  assert.equal(h.testApi.state().run.hp,97);
+  assert.equal(h.testApi.state().run.equipment.armor.durability,armor.durability);
+  assert.equal(h.testApi.state().run.hunger,0);
 });
 
 test('抵達第一層正確結束旅程，重複出口判定不重複獎勵', () => {

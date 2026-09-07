@@ -5,6 +5,7 @@
   const SAVE = 'maze3d_tower_v1';
   let run = null, active = false, paused = false, pauseAt = 0, modalFocus = null;
   let world = null, loot = [], monsters = [], traders = [], nearest = null;
+  let warriorNpc = null, nearestWarrior = null, escort = null;
   let shiftLeft = 65, wasShifting = false, floorConfig = null, saveClock = 0, hudClock = 0;
   let attackLeft = 0, hurtLeft = 0, warning = false, floorStarted = false, saveFailed = false;
   let encounterHold = 0;
@@ -29,7 +30,7 @@
   function install() {
     const hud = document.createElement('section');
     hud.id = 'towerHud'; hud.setAttribute('aria-label', '高塔生存狀態');
-    hud.innerHTML = '<span class="tower-stat"><small>倒轉高塔</small><b id="towerFloor">99 F</b></span><span class="tower-stat"><small>生命</small><b id="towerHealth">100 / 100</b><progress id="towerHp" class="tower-health" max="100" value="100" aria-label="生命值"></progress></span><span class="tower-stat"><small>銅幣</small><b id="towerCoins">0</b></span><span class="tower-stat"><small>章節</small><b id="towerChapter"></b></span>';
+    hud.innerHTML = '<span class="tower-stat"><small>倒轉高塔</small><b id="towerFloor">99 F</b></span><span class="tower-stat"><small>生命</small><b id="towerHealth">100 / 100</b><progress id="towerHp" class="tower-health" max="100" value="100" aria-label="生命值"></progress></span><span class="tower-stat"><small>銅幣</small><b id="towerCoins">0</b></span><span class="tower-stat"><small>章節</small><b id="towerChapter"></b></span><div id="towerGuardStatus" class="tower-guard-status" hidden></div>';
     el('gameScreen').appendChild(hud);
     const rail = document.createElement('nav'); rail.id = 'towerActionRail'; rail.setAttribute('aria-label', '劇情操作');
     rail.innerHTML = '<button class="tower-btn" id="towerBagBtn">背包 <small>B</small></button><button class="tower-btn" id="towerTalkBtn" disabled>附近無人 <small>R</small></button><button class="tower-btn" id="towerAttackBtn">揮擊 <small>X</small></button>';
@@ -118,7 +119,7 @@
   function itemConfig() { return {itemCount:5,foodCount:Math.max(4,Math.round(floorConfig.size/2))}; }
   function reservedCells() {
     const entrance=solveMaze(0,0)[1]||[0,1];
-    return [entrance.join(','),...(floorStarted?[...traders,...loot].map(item=>item.cx+','+item.cy):[])];
+    return [entrance.join(','),...(floorStarted?[...traders,...loot,...(warriorNpc?[warriorNpc]:[])].map(item=>item.cx+','+item.cy):[])];
   }
   function collectedOriginal(id) {
     if (!active || !run || run.claimed.includes(id)) return;
@@ -216,7 +217,7 @@
     return cellPoint(0, 0);
   }
   function buildWorld() {
-    loot = []; monsters = []; traders = []; nearest = null;
+    loot = []; monsters = []; traders = []; nearest = null; warriorNpc = nearestWarrior = escort = null;
     world = new THREE.Group(); scene.add(world);
     const random = mulberry32(floorSeed() ^ 0x712da), used = new Set(['0,0', G.exitCell.x + ',' + G.exitCell.y]);
     const originalPickups = [...(G.items||[]), ...(G.foods||[])];
@@ -244,12 +245,15 @@
     }
     for (let i = 0; i < floorConfig.monsterCount; i++) {
       const kind = floorConfig.monsterTypes[i % floorConfig.monsterTypes.length], def = C.MONSTERS[kind];
-      const point = chooseCell(random, used, Math.min(7, floorConfig.size - 1)), model = monsterModel(kind, i);
-      model.position.set(point.x, 0, point.z); world.add(model);
-      monsters.push({ ...point, kind, def, model, hp: def.hp || 60, alive: true, path: [], pathLeft: i * .15, windup: 0, cooldown: 2, phase: i });
+      const strength = C.monsterStrength(kind, run.floor), id = 'monster-' + i;
+      const point = chooseCell(random, used, Math.min(7, floorConfig.size - 1)), model = monsterModel(kind, strength);
+      const alive = !run.defeatedMonsters.includes(id);
+      model.position.set(point.x, 0, point.z); model.visible = alive; world.add(model);
+      monsters.push({ ...point, id, strength, kind, def, model, hp: def.hp || 60, alive, path: [], pathLeft: i * .15, windup: 0, cooldown: 2, phase: i });
     }
+    buildWarriors(used);
   }
-  function monsterModel(kind, index) {
+  function monsterModel(kind, strength) {
     const group = new THREE.Group(), type = ['clockmite','wisp','sentinel','hound'].indexOf(kind);
     const tint = C.MONSTERS[kind].color;
     const mat = new THREE.MeshLambertMaterial({color:tint});
@@ -259,8 +263,91 @@
     if (type === 3) { body.scale.set(.8,.55,1.5); for (const x of [-.35,.35]) for (const z of [-.4,.4]) { const leg=new THREE.Mesh(new THREE.BoxGeometry(.2,.55,.2),mat);leg.position.set(x,.35,z);group.add(leg); } }
     for (const side of [-1,1]) { const eye = new THREE.Mesh(new THREE.BoxGeometry(.14,.16,.1),new THREE.MeshBasicMaterial({color:0xfff4c0}));eye.position.set(side*.22,1,.49);group.add(eye); }
     const ring = new THREE.Mesh(new THREE.TorusGeometry(.83,.05,5,20),new THREE.MeshBasicMaterial({color:0xff6767,transparent:true,opacity:.42})); ring.rotation.x=Math.PI/2;ring.position.y=.08;group.add(ring);group.userData.ring=ring;
-    const tag = makeTextSprite(C.MONSTERS[kind].name);tag.position.y=2.35;tag.scale.set(1.8,.4,1);group.add(tag);group.userData.body=body;
+    const tag = strengthTag(C.MONSTERS[kind].name, strength);tag.position.y=2.35;group.add(tag);group.userData.body=body;
     return group;
+  }
+  function strengthTag(label, strength) {
+    const canvas = document.createElement('canvas'); canvas.width = 512; canvas.height = 80;
+    const ctx = canvas.getContext('2d'); ctx.font = 'bold 34px sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.strokeStyle = '#14202d'; ctx.lineWidth = 8; ctx.fillStyle = '#fff1c9';
+    const caption = label + ' · ' + strength + '/5'; ctx.strokeText(caption,256,40,490); ctx.fillText(caption,256,40,490);
+    const tag = new THREE.Sprite(new THREE.SpriteMaterial({map:new THREE.CanvasTexture(canvas),transparent:true,depthWrite:false}));
+    tag.scale.set(3.4,.53,1); return tag;
+  }
+  function buildWarriorModel(strength, label) {
+    const model = buildCharacter({...CHARS[0],shirt:0x658394,pants:0x303e50,hair:0x36313a});
+    const steel = new THREE.MeshLambertMaterial({color:0xc3d7e2}), gold = new THREE.MeshLambertMaterial({color:0xe1b968});
+    const shield = new THREE.Mesh(new THREE.CylinderGeometry(.4,.26,.13,5),gold);
+    shield.rotation.x = Math.PI/2; shield.position.set(-.52,1,.18); model.add(shield);
+    const blade = new THREE.Mesh(new THREE.BoxGeometry(.1,1,.08),steel); blade.position.set(.52,1.3,.24); model.add(blade);
+    const helmet = new THREE.Mesh(new THREE.BoxGeometry(.59,.17,.56),steel); helmet.position.y=1.86;model.add(helmet);
+    const tag = strengthTag(label,strength);tag.position.y=2.65;model.add(tag);
+    model.userData.guardTag=tag;model.userData.guardBlade=blade;return model;
+  }
+  function buildWarriors(used) {
+    const offer = C.warriorOffer(run.floor,run.seed);
+    if (offer && !run.hiredWarriors.includes(offer.id)) {
+      const random = mulberry32(floorSeed() ^ 0x651cea);
+      const point = chooseCell(random,used);
+      // 初遇在入口附近但不與行商、道具重疊，之後由探索發現。
+      if (run.floor===99) {
+        const route=solveMaze(0,0).find(([x,y],i)=>i>1&&!used.has(x+','+y)&&!(x===G.exitCell.x&&y===G.exitCell.y));
+        if(route)Object.assign(point,cellPoint(route[0],route[1]));
+      }
+      const model=buildWarriorModel(offer.strength,'可聘戰士');model.position.set(point.x,0,point.z);world.add(model);
+      warriorNpc={...point,offer,model};
+    }
+    if (run.warrior) {
+      const model=buildWarriorModel(run.warrior.strength,'護衛戰士');world.add(model);
+      escort={model,path:[],pathLeft:0};restoreWarriorPosition();
+    }
+  }
+  function isHeld(monster) { return !!(run.warrior && run.warrior.mode==='holding' && run.warrior.targetId===monster.id); }
+  function restoreWarriorPosition() {
+    if(!escort||!run.warrior)return;
+    const target=monsters.find(m=>m.alive&&isHeld(m));
+    const x=target?target.model.position.x:G.px,z=target?target.model.position.z:G.pz;
+    escort.model.position.set(x,0,z);escort.path=[];escort.pathLeft=0;
+  }
+  function refreshWarriorLabel() {
+    if(!escort||!run.warrior)return;
+    const model=escort.model,old=model.userData.guardTag;
+    model.remove(old);disposeSceneObject(old);
+    const tag=strengthTag(run.warrior.mode==='holding'?'牽制中':'護衛戰士',run.warrior.strength);
+    tag.position.y=2.65;model.add(tag);model.userData.guardTag=tag;
+  }
+  function dismissEscort() {
+    if(!escort)return;
+    world.remove(escort.model);disposeSceneObject(escort.model);escort=null;
+  }
+  function updateWarrior(dt,now) {
+    if(!escort||!run.warrior)return;
+    const guard=run.warrior,p=escort.model.position;
+    if(guard.mode==='holding') {
+      const target=monsters.find(m=>m.alive&&isHeld(m));
+      if(target){const q=target.model.position;const offset=playerInWall(q.x+.65,q.z,.28)?-.45:.65;p.set(q.x+offset,0,q.z);escort.model.rotation.y=-Math.PI/2;escort.model.userData.guardBlade.rotation.x=Math.sin(now*.008)*.35;}
+      return;
+    }
+    const safe=nearest||run.effects.repel>0||now<G.invisUntil;
+    const target=!safe&&monsters.filter(m=>m.alive&&Math.hypot(G.px-m.model.position.x,G.pz-m.model.position.z)<3&&Math.hypot(p.x-m.model.position.x,p.z-m.model.position.z)<4.5&&hasClearPath(G.px,G.pz,m.model.position.x,m.model.position.z)&&hasClearPath(p.x,p.z,m.model.position.x,m.model.position.z)).sort((a,b)=>Math.hypot(p.x-a.model.position.x,p.z-a.model.position.z)-Math.hypot(p.x-b.model.position.x,p.z-b.model.position.z))[0];
+    if(target) {
+      const result=C.interceptMonster(run,target.id,target.strength,run.revision);
+      if(result.ok) {
+        run=result.run;target.windup=0;target.path=[];target.cooldown=2;
+        if(result.effect.outcome==='defeat')defeatMonster(target,true);
+        else showToast('戰士已攔住 '+target.def.name+'：'+(result.effect.seconds===null?'持續牽制，你可繼續前進':Math.ceil(result.effect.seconds/60)+' 分鐘，趁現在前進！'),3500);
+        refreshWarriorLabel();save();updateHud();return;
+      }
+    }
+    // 至多一名護衛，每半秒尋路；與玩家共用牆壁碰撞，不新增物理引擎。
+    escort.pathLeft-=dt;
+    if(Math.hypot(G.px-p.x,G.pz-p.z)<1.2)return;
+    if(escort.pathLeft<=0){const a=worldToCell(p.x,p.z),b=worldToCell(G.px,G.pz);escort.path=solveMaze(a.x,a.y,b.x,b.y).slice(1);escort.pathLeft=.5;}
+    const waypoint=escort.path.length?cellToWorld(...escort.path[0]):{x:G.px,z:G.pz};
+    const dx=waypoint.x-p.x,dz=waypoint.z-p.z,len=Math.hypot(dx,dz),step=Math.min(len,5.8*dt);
+    if(len>.001){const x=p.x+dx/len*step,z=p.z+dz/len*step;if(!playerInWall(x,z,.28)){p.x=x;p.z=z;}else escort.pathLeft=0;escort.model.rotation.y=Math.atan2(dx,dz);}
+    if(len<.15)escort.path.shift();
+    escort.model.userData.legL.rotation.x=Math.sin(now*.009)*.35;escort.model.userData.legR.rotation.x=-Math.sin(now*.009)*.35;
   }
   function floorSeed() { return (run.seed ^ Math.imul(run.floor, 7919)) | 0; }
   function soundChanged() {
@@ -288,10 +375,12 @@
     el('towerFloor').textContent = run.floor + ' F'; el('towerHealth').textContent = Math.ceil(run.hp) + ' / 100';
     el('towerHp').value = run.hp; el('towerCoins').textContent = run.coins;
     el('towerChapter').textContent = floorConfig.name;
-    el('towerTalkBtn').disabled = !nearest; el('towerTalkBtn').textContent = nearest ? '交易 R' : '附近無人';
+    el('towerTalkBtn').disabled = !nearest && !nearestWarrior; el('towerTalkBtn').textContent = nearestWarrior ? '聘請 R' : nearest ? '交易 R' : '附近無人';
+    el('towerGuardStatus').hidden = !run.warrior;
+    el('towerGuardStatus').textContent = warriorStatus();
     el('towerAttackBtn').disabled = attackLeft > 0; el('towerAttackBtn').textContent = attackLeft > 0 ? '揮擊 ' + attackLeft.toFixed(1) : '揮擊 X';
     const effects = Object.entries(run.effects).filter(([,v])=>v>0).map(([k,v])=>({shield:'護盾',freeze:'定牆',repel:'驅怪',reveal:'回聲地圖'}[k])+' '+Math.ceil(v)+'秒');
-    el('towerObjective').textContent = effects.length ? effects.join(' · ') : nearest ? nearest.name + '：靠近後可購買／交換補給' : '找到金色傳送門，前往' + (run.floor > 1 ? '第 ' + (run.floor - 1) + ' 層' : '塔外');
+    el('towerObjective').textContent = nearestWarrior ? '戰士 '+nearestWarrior.offer.strength+'/5 · '+costText(nearestWarrior.offer.cost)+' · 點「聘請」查看契約' : effects.length ? effects.join(' · ') : nearest ? nearest.name + '：靠近後可購買／交換補給' : '找到金色傳送門，前往' + (run.floor > 1 ? '第 ' + (run.floor - 1) + ' 層' : '塔外');
     document.body.classList.toggle('tower-danger',run.hp<=25);
   }
   function tick(dt, now) {
@@ -300,11 +389,13 @@
       wasShifting = false;
       wallMesh.material.color.setHex(environmentSpec()[1]);
       monsters.forEach(m=>{ const c=worldToCell(m.model.position.x,m.model.position.z),p=cellToWorld(c.x,c.y);m.model.position.set(p.x,0,p.z);m.path=[];m.pathLeft=0;m.windup=0;m.cooldown=2; });
+      restoreWarriorPosition();
       if (run.effects.reveal>0) { const p=worldToCell(G.px,G.pz); G.solutionPath=solveMaze(p.x,p.y); }
     }
     if (paused || !G.running || G.frozen || G.shifting || run.status !== 'playing') return;
     run.hunger = G.satiety;
     const ticked = C.tickEffects(run, dt); run = ticked.run || ticked;
+    if(ticked.effect && ticked.effect.warriorReleased){dismissEscort();showToast('護衛已盡力撤退，怪物將恢復追擊！',3500);save();}
     if (run.effects.freeze<=0) shiftLeft -= dt;
     attackLeft=Math.max(0,attackLeft-dt);hurtLeft=Math.max(0,hurtLeft-dt);
     if (G.satiety<=0 && hurtLeft<=0) damage(3);
@@ -317,8 +408,11 @@
       }
     }
     nearest=traders.find(n=>Math.hypot(G.px-n.x,G.pz-n.z)<2.6&&hasClearPath(G.px,G.pz,n.x,n.z))||null;
+    nearestWarrior=warriorNpc&&warriorNpc.model.visible&&Math.hypot(G.px-warriorNpc.x,G.pz-warriorNpc.z)<2.6&&hasClearPath(G.px,G.pz,warriorNpc.x,warriorNpc.z)?warriorNpc:null;
+    if(nearestWarrior&&nearest&&Math.hypot(G.px-nearest.x,G.pz-nearest.z)<Math.hypot(G.px-nearestWarrior.x,G.pz-nearestWarrior.z))nearestWarrior=null;
+    updateWarrior(dt,now);
     for(const monster of monsters) updateMonster(monster,dt,now);
-    const threat=!nearest&&run.effects.repel<=0&&!(now<G.invisUntil)&&monsters.some(m=>m.alive&&Math.hypot(G.px-m.model.position.x,G.pz-m.model.position.z)<m.def.sight&&(m.path.length>0||m.windup>0));
+    const threat=!nearest&&run.effects.repel<=0&&!(now<G.invisUntil)&&monsters.some(m=>m.alive&&!isHeld(m)&&Math.hypot(G.px-m.model.position.x,G.pz-m.model.position.z)<m.def.sight&&(m.path.length>0||m.windup>0));
     encounterHold=threat?4:Math.max(0,encounterHold-dt);
     if(window.TowerAudio)window.TowerAudio.setEncounter(encounterHold>0);
     if(run.effects.reveal>0){G.mapUntil=now+250; if(!G.solutionPath){const p=worldToCell(G.px,G.pz);G.solutionPath=solveMaze(p.x,p.y);}}
@@ -332,6 +426,7 @@
   }
   function updateMonster(m,dt,now) {
     if(!m.alive)return;
+    if(isHeld(m)){m.windup=0;m.path=[];m.cooldown=2;m.model.userData.ring.material.opacity=.65;return;}
     const p=m.model.position, distance=Math.hypot(G.px-p.x,G.pz-p.z);
     const safe=traders.some(n=>Math.hypot(G.px-n.x,G.pz-n.z)<2.6&&hasClearPath(G.px,G.pz,n.x,n.z));
     const repelled=run.effects.repel>0||safe||now<G.invisUntil;
@@ -368,8 +463,40 @@
     const target=monsters.filter(m=>m.alive&&Math.hypot(G.px-m.model.position.x,G.pz-m.model.position.z)<2.8&&hasClearPath(G.px,G.pz,m.model.position.x,m.model.position.z)).sort((a,b)=>a.hp-b.hp)[0];
     if(!target){showToast('揮擊落空：靠近怪物後再攻擊');return;}
     target.hp-=28;target.cooldown=1.2;target.windup=0;AudioEng.sfxPickup();
-    if(target.hp<=0){target.alive=false;target.model.visible=false;const id='monster-'+target.phase;let reward=false;if(!run.claimed.includes(id)){const r=C.collect(run,'coin',12);if(r.ok){run=r.run;run.claimed.push(id);reward=true;}}showToast('擊退 '+target.def.name+(reward?'，獲得 12 枚銅幣':'（此守衛已領過獎勵）'));save();}
+    if(target.hp<=0)defeatMonster(target);
     else showToast(target.def.name+' 剩餘生命 '+Math.ceil(target.hp));
+  }
+  function defeatMonster(target,byWarrior=false) {
+    if(!target.alive)return;
+    target.alive=false;target.model.visible=false;
+    const id=target.id||'monster-'+target.phase;
+    if(!run.defeatedMonsters.includes(id))run.defeatedMonsters.push(id);
+    if(isHeld(target)){run.warrior=null;dismissEscort();}
+    let reward=false;
+    if(!run.claimed.includes(id)){const result=C.collect(run,'coin',12);if(result.ok){run=result.run;run.claimed.push(id);reward=true;}}
+    showToast((byWarrior?'護衛瞬間擊敗 ':'擊退 ')+target.def.name+(byWarrior?'，剩餘強度 '+run.warrior.strength+'/5':'')+(reward?' · +12 銅幣':''));save();
+  }
+  function costText(cost) { return Object.entries(cost).map(([id,count])=>C.ITEMS[id].name+' × '+count).join(' ＋ '); }
+  function warriorStatus() {
+    const guard=run&&run.warrior;
+    return !guard?'目前沒有護衛':guard.mode==='escort'?'護衛 '+guard.strength+'/5 · 隨行保護':'護衛 '+guard.strength+'/5 · '+(guard.remaining===null?'持續牽制':Math.ceil(guard.remaining)+' 秒牽制');
+  }
+  function warriorRules() {
+    return '<div class="tower-guard-rules"><p><b>戰士較強</b>立即擊敗怪物，扣除怪物分數後繼續護送。</p><p><b>雙方同分</b>留在原地持續牽制一隻怪物。</p><p><b>怪物較強</b>每 1 分抵擋 1 分鐘，之後戰士撤退。</p></div><p class="tower-copy">一次聘請一人。隨行護衛可跨樓層；交戰中的護衛會留在本層。主角仍可移動、攻擊與尋找出口，協助擊敗被牽制的怪物後，該次契約結束。</p>';
+  }
+  function warriorDialog() {
+    if(!active||G.shifting||!nearestWarrior||run.status!=='playing')return;
+    syncEngine();
+    const offer=nearestWarrior.offer,affordable=Object.entries(offer.cost).every(([id,count])=>(id==='coin'?run.coins:run.bag[id]||0)>=count);
+    const ranks='<div class="tower-ranks" aria-label="強度 '+offer.strength+' 分，最高 5 分">'+Array.from({length:5},(_,i)=>'<span class="'+(i<offer.strength?'filled':'')+'"></span>').join('')+'</div>';
+    dialog('旅途奇遇 · 護衛契約',offer.name,'「付出約定的報酬，我就替你擋住危險。你只管往下走。」','<section class="tower-guard-offer"><div><h3>戰士強度 '+offer.strength+' / 5</h3>'+ranks+'</div><div><h3>聘請報酬</h3><p>'+text(costText(offer.cost))+'</p></div></section>'+warriorRules()+'<p class="tower-copy">'+(run.warrior?'已有一名護衛，待目前契約結束後才能再聘請。':affordable?'只有按下「同意並聘請」才會扣除報酬。':'補給不足，可先向行商購買或探索收集。')+'</p>',action('暫不聘請','close')+action('同意並聘請','hire',offer.id,!!run.warrior||!affordable));
+  }
+  function hireWarrior(id) {
+    if(!active||!G.running||G.shifting||run.status!=='playing'||!warriorNpc||!warriorNpc.model.visible||warriorNpc.offer.id!==id||Math.hypot(G.px-warriorNpc.x,G.pz-warriorNpc.z)>=2.6||!hasClearPath(G.px,G.pz,warriorNpc.x,warriorNpc.z))return;
+    syncEngine();
+    if(!transact(C.hireWarrior(run,id,run.revision)))return;
+    const model=warriorNpc.model;escort={model,path:[],pathLeft:0};warriorNpc=null;nearestWarrior=null;
+    refreshWarriorLabel();closeDialog();updateHud();showToast('護衛開始同行：強度 '+run.warrior.strength+'/5。靠近危險時會自動攔截。',3500);
   }
   function transact(result) {
     if(!result.ok){showToast(result.message||'目前無法進行');return false;}
@@ -379,9 +506,10 @@
     if(!active||G.shifting||run.status!=='playing')return;
     syncEngine();
     const cards=Object.entries(C.ITEMS).filter(([id])=>id!=='coin').map(([id,item])=>'<article class="tower-item"><h3>'+text(item.name)+' <span>×'+(run.bag[id]||0)+'</span></h3><p>'+text(item.description||item.desc||'高塔冒險補給')+'</p>'+action(id==='feather'?'瀕死自動使用':'使用','use',id,!run.bag[id]||id==='feather')+'</article>').join('');
-    dialog('旅人背包 · 暫停中','補給與生存','生命 '+Math.ceil(run.hp)+' / 100 · 飽足 '+Math.ceil(run.hunger)+'% · 銅幣 '+run.coins,'<div class="tower-grid">'+cards+'</div>',action('回到迷宮','close')+action('保存並離開','quit'));
+    dialog('旅人背包 · 暫停中','補給與生存','生命 '+Math.ceil(run.hp)+' / 100 · 飽足 '+Math.ceil(run.hunger)+'% · 銅幣 '+run.coins,'<section class="tower-guard-summary"><h3>'+text(warriorStatus())+'</h3><p>戴鋼盔、持金色盾牌的是可交談的戰士，不是拾取道具。靠近後點「聘請」或按 R 查看報酬。</p></section><div class="tower-grid">'+cards+'</div>'+warriorRules(),action('回到迷宮','close')+action('保存並離開','quit'));
   }
   function trade() {
+    if(nearestWarrior){warriorDialog();return;}
     if(!active||G.shifting||!nearest||run.status!=='playing')return;
     syncEngine();
     const cards=Object.entries(C.ITEMS).filter(([id])=>id!=='coin').map(([id,item])=>'<article class="tower-item"><h3>'+text(item.name)+'</h3><p>'+text(item.description||item.desc||'高塔冒險補給')+' · 持有 '+(run.bag[id]||0)+'</p>'+action('買 '+(item.buyPrice||item.price)+' 幣','buy',id)+action('賣出','sell',id,!run.bag[id])+'</article>').join('');
@@ -433,6 +561,7 @@
     if(key==='quit'){requestQuit();return;}
     if(key==='retry'){run.status='playing';run.hp=100;run.hunger=Math.max(65,run.hunger);run.coins=Math.max(0,run.coins-12);enter();return;}
     if(key==='use'){useItem(id);return;}
+    if(key==='hire'){hireWarrior(id);return;}
     if(key==='buy'||key==='sell'){if(transact(C[key](run,id,1,run.revision)))trade();return;}
     if(key==='exchange'){if(transact(C.exchange(run,id,run.revision)))trade();}
   }

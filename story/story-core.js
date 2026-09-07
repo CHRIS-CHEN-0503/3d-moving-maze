@@ -21,10 +21,10 @@
   });
 
   const MONSTERS = Object.freeze({
-    clockmite: Object.freeze({ id: 'clockmite', name: '齒輪遊蟲', description: '緩慢巡邏的發條生物，靠近才會追逐；轉入岔路就能甩開。', speed: 1.25, damage: 8, sight: 7, color: 0xdba65f, shape: 'beetle' }),
-    sentinel: Object.freeze({ id: 'sentinel', name: '石甲守衛', description: '腳步沉重、接觸傷害高，留意它把守的通道。', speed: 1.6, damage: 15, sight: 8, color: 0x839cae, shape: 'golem' }),
-    wisp: Object.freeze({ id: 'wisp', name: '迷光幽靈', description: '在岔路間快速游移的幽光；驅怪鈴可以讓它遠離。', speed: 2.35, damage: 10, sight: 10, color: 0xa6a0ff, shape: 'wisp' }),
-    hound: Object.freeze({ id: 'hound', name: '燼火獵犬', description: '塔底的敏捷獵手，追蹤範圍大；善用護盾與變形的圍牆。', speed: 2.75, damage: 18, sight: 12, color: 0xff9868, shape: 'hound' }),
+    clockmite: Object.freeze({ id: 'clockmite', name: '齒輪遊蟲', strength: 1, description: '緩慢巡邏的發條生物，靠近才會追逐；轉入岔路就能甩開。', speed: 1.25, damage: 8, sight: 7, color: 0xdba65f, shape: 'beetle' }),
+    sentinel: Object.freeze({ id: 'sentinel', name: '石甲守衛', strength: 3, description: '腳步沉重、接觸傷害高，留意它把守的通道。', speed: 1.6, damage: 15, sight: 8, color: 0x839cae, shape: 'golem' }),
+    wisp: Object.freeze({ id: 'wisp', name: '迷光幽靈', strength: 2, description: '在岔路間快速游移的幽光；驅怪鈴可以讓它遠離。', speed: 2.35, damage: 10, sight: 10, color: 0xa6a0ff, shape: 'wisp' }),
+    hound: Object.freeze({ id: 'hound', name: '燼火獵犬', strength: 4, description: '塔底的敏捷獵手，追蹤範圍大；善用護盾與變形的圍牆。', speed: 2.75, damage: 18, sight: 12, color: 0xff9868, shape: 'hound' }),
   });
 
   const CHAPTERS = Object.freeze([
@@ -80,7 +80,7 @@
       bag: { heal: 2, ration: 2, shield: 0, hourglass: 0, bell: 0, map: 1, feather: 0 },
       effects: { shield: 0, freeze: 0, repel: 0, reveal: 0 },
       engine: { shovels: 1, kites: 0, whistles: 0, shovelCooldownMs: 0, skillCooldownMs: 0 },
-      claimed: [], floorElapsed: 0,
+      claimed: [], floorElapsed: 0, warrior: null, hiredWarriors: [], defeatedMonsters: [],
       revision: 0, seed, name: typeof opts.name === 'string' ? opts.name.trim().slice(0, 24) || '冒險者' : '冒險者',
       charIdx: Number.isInteger(opts.charIdx) && opts.charIdx >= 0 && opts.charIdx < 6 ? opts.charIdx : 0,
       status: 'playing', elapsed: 0, floorsCleared: 0,
@@ -89,6 +89,42 @@
 
   function validNumber(value, low, high, integer) {
     return typeof value === 'number' && Number.isFinite(value) && value >= low && value <= high && (!integer || Number.isInteger(value));
+  }
+
+  function validIds(ids, limit) {
+    return Array.isArray(ids) && ids.length <= limit && ids.every((id) => typeof id === 'string' && id.length > 0 && id.length <= 80) && new Set(ids).size === ids.length;
+  }
+
+  function monsterStrength(kind, floor) {
+    if (!Object.hasOwn(MONSTERS, kind)) throw new RangeError('找不到這種怪物。');
+    floorConfig(floor);
+    return Math.min(5, MONSTERS[kind].strength + (floor <= 19 ? 1 : 0));
+  }
+
+  function warriorOffer(floor, seed) {
+    floorConfig(floor);
+    if (!validNumber(seed, 1, 0xffffffff, true)) throw new RangeError('無效的旅程種子。');
+    let state = (seed ^ Math.imul(floor, 0x9e3779b9)) >>> 0;
+    const random = () => {
+      state = (state + 0x6d2b79f5) >>> 0;
+      let value = Math.imul(state ^ (state >>> 15), state | 1);
+      value ^= value + Math.imul(value ^ (value >>> 7), value | 61);
+      return ((value ^ (value >>> 14)) >>> 0) / 4294967296;
+    };
+    if (floor !== 99 && random() >= 0.3) return null;
+    const maximum = Math.min(5, 1 + Math.floor((99 - floor) / 20));
+    const strength = floor === 99 ? 1 : 1 + Math.floor(random() * maximum);
+    const costs = [
+      { coin: strength * 12 },
+      { coin: strength * 6, ration: strength },
+      { heal: Math.ceil(strength / 2), ration: strength },
+      { coin: strength * 8, map: 1 },
+    ];
+    return {
+      id: `warrior:${floor}:${seed}`, strength,
+      name: ['護路劍士', '巡塔衛士', '鋼盾戰士', '誓約騎士', '曙光劍聖'][strength - 1],
+      cost: floor === 99 ? { ration: 1 } : costs[Math.floor(random() * costs.length)],
+    };
   }
 
   function validateSave(value) {
@@ -125,11 +161,25 @@
     }
     if (!Array.isArray(run.claimed) || run.claimed.length > 128 || run.claimed.some((id) => typeof id !== 'string' || id.length < 1 || id.length > 80) || new Set(run.claimed).size !== run.claimed.length) return null;
     if (!validNumber(run.floorElapsed, 0, 315360000)) return null;
+    // Missing optional fields are v1 saves created before warrior contracts existed.
+    const hiredWarriors = run.hiredWarriors === undefined ? [] : run.hiredWarriors;
+    const defeatedMonsters = run.defeatedMonsters === undefined ? [] : run.defeatedMonsters;
+    if (!validIds(hiredWarriors, 99) || !validIds(defeatedMonsters, 128)) return null;
+    let warrior = null;
+    if (run.warrior !== undefined && run.warrior !== null) {
+      const guard = run.warrior;
+      if (typeof guard !== 'object' || Array.isArray(guard) || typeof guard.offerId !== 'string' || !hiredWarriors.includes(guard.offerId) || !validNumber(guard.strength, 1, 5, true)) return null;
+      if (!['escort', 'holding'].includes(guard.mode)) return null;
+      if (guard.mode === 'escort' && (guard.targetId !== null || guard.remaining !== null)) return null;
+      if (guard.mode === 'holding' && (!validIds([guard.targetId], 1) || defeatedMonsters.includes(guard.targetId) || !(guard.remaining === null || validNumber(guard.remaining, Number.MIN_VALUE, guard.strength * 60)))) return null;
+      warrior = { offerId: guard.offerId, strength: guard.strength, mode: guard.mode, targetId: guard.targetId, remaining: guard.remaining };
+    }
     return {
       stateVersion: STATE_VERSION, mode: 'tower', floor: run.floor, hp: run.hp, hunger: run.hunger,
       coins: run.coins, bag, effects, revision: run.revision, seed: run.seed, name: run.name,
       charIdx: run.charIdx, status: run.status, elapsed: run.elapsed, floorsCleared: run.floorsCleared,
       engine, claimed: [...run.claimed], floorElapsed: run.floorElapsed,
+      warrior, hiredWarriors: [...hiredWarriors], defeatedMonsters: [...defeatedMonsters],
     };
   }
 
@@ -143,6 +193,43 @@
     if (!result.ok) return failure(run, result.message);
     next.revision += 1;
     return { ...result, run: next };
+  }
+
+  function hireWarrior(run, offerId, expectedRevision) {
+    return transaction(run, expectedRevision, (next) => {
+      const offer = warriorOffer(next.floor, next.seed);
+      if (!offer || offer.id !== offerId) return { ok: false, message: '這位戰士不在目前樓層。' };
+      if (next.warrior) return { ok: false, message: '目前已有戰士護行或牽制怪物。' };
+      if (next.hiredWarriors.includes(offer.id)) return { ok: false, message: '這位戰士已履行過這趟旅程的委託。' };
+      if (next.hiredWarriors.length >= 99) return { ok: false, message: '這趟旅程的委託紀錄已滿。' };
+      for (const [id, count] of Object.entries(offer.cost)) {
+        if ((id === 'coin' ? next.coins : next.bag[id]) < count) return { ok: false, message: '委託所需的物資不足。' };
+      }
+      for (const [id, count] of Object.entries(offer.cost)) {
+        if (id === 'coin') next.coins -= count; else next.bag[id] -= count;
+      }
+      next.hiredWarriors.push(offer.id);
+      next.warrior = { offerId: offer.id, strength: offer.strength, mode: 'escort', targetId: null, remaining: null };
+      return { ok: true, message: `${offer.name}接受委託，將替你迎戰一隻靠近的怪物。`, effect: { hired: true, strength: offer.strength } };
+    });
+  }
+
+  function interceptMonster(run, monsterId, strength, expectedRevision) {
+    return transaction(run, expectedRevision, (next) => {
+      if (!validIds([monsterId], 1) || !validNumber(strength, 1, 5, true)) return { ok: false, message: '無效的怪物資料。' };
+      if (!next.warrior || next.warrior.mode !== 'escort') return { ok: false, message: '沒有可迎戰的護行戰士。' };
+      if (next.defeatedMonsters.includes(monsterId)) return { ok: false, message: '這隻怪物已經被擊敗。' };
+      const guard = next.warrior;
+      if (guard.strength > strength) {
+        if (next.defeatedMonsters.length >= 128) return { ok: false, message: '目前樓層的戰鬥紀錄已滿。' };
+        guard.strength -= strength;
+        next.defeatedMonsters.push(monsterId);
+        return { ok: true, message: `戰士立即擊敗怪物，剩餘 ${guard.strength} 分戰力繼續護行。`, effect: { outcome: 'defeat', monsterId, seconds: 0, remainingStrength: guard.strength } };
+      }
+      guard.mode = 'holding'; guard.targetId = monsterId;
+      guard.remaining = guard.strength === strength ? null : guard.strength * 60;
+      return { ok: true, message: guard.remaining === null ? '戰士與怪物勢均力敵，將持續牽制，快趁現在前進！' : `戰士替你抵禦 ${guard.remaining} 秒，快趁現在前進！`, effect: { outcome: 'hold', monsterId, seconds: guard.remaining } };
+    });
   }
 
   function buy(run, itemId, quantity = 1, expectedRevision) {
@@ -239,6 +326,14 @@
       for (const id of Object.keys(next.effects)) next.effects[id] = Math.max(0, next.effects[id] - seconds);
       next.elapsed += seconds;
       next.floorElapsed += seconds;
+      if (next.warrior && next.warrior.mode === 'holding' && next.warrior.remaining !== null) {
+        next.warrior.remaining = Math.max(0, next.warrior.remaining - seconds);
+        if (next.warrior.remaining === 0) {
+          const targetId = next.warrior.targetId;
+          next.warrior = null;
+          return { ok: true, message: '戰士已用盡力量撤離，怪物恢復行動。', effect: { warriorReleased: true, targetId } };
+        }
+      }
       return { ok: true, message: '' };
     });
   }
@@ -248,7 +343,8 @@
       next.coins = Math.min(MAX_COINS, next.coins + floorConfig(next.floor).rewardCoins);
       next.floorsCleared += 1;
       next.effects = { shield: 0, freeze: 0, repel: 0, reveal: 0 };
-      next.claimed = []; next.floorElapsed = 0;
+      next.claimed = []; next.floorElapsed = 0; next.defeatedMonsters = [];
+      if (next.warrior && next.warrior.mode === 'holding') next.warrior = null;
       if (next.floor === 1) {
         next.status = 'won';
         return { ok: true, message: ENDING.text, effect: { ending: true } };
@@ -258,5 +354,5 @@
     });
   }
 
-  return Object.freeze({ STATE_VERSION, ITEMS, MONSTERS, CHAPTERS, OPENING, ENDING, EXCHANGES, floorConfig, newRun, validateSave, buy, sell, exchange, useItem, collect, takeDamage, tickEffects, descend });
+  return Object.freeze({ STATE_VERSION, ITEMS, MONSTERS, CHAPTERS, OPENING, ENDING, EXCHANGES, floorConfig, newRun, validateSave, buy, sell, exchange, useItem, collect, takeDamage, tickEffects, descend, monsterStrength, warriorOffer, hireWarrior, interceptMonster });
 });

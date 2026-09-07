@@ -233,7 +233,7 @@
       const tag = makeTextSprite(name); tag.position.y = 2.5; tag.scale.set(1.8,.35,1); model.add(tag);
       const mat = new THREE.MeshBasicMaterial({color: 0x63f0ca});
       const flag = new THREE.Mesh(new THREE.ConeGeometry(.2,.5,4), mat); flag.position.y = 3.3; model.add(flag);
-      world.add(model); traders.push({ ...point, model, name, type: i });
+      world.add(model); traders.push({ ...point, model, name });
     }
     const kinds = ['coin','heal','ration','shield','coin','hourglass','bell','map','ration','coin','feather'];
     for (let i = 0; i < Math.min(14, floorConfig.size + 3); i++) {

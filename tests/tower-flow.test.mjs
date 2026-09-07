@@ -33,6 +33,7 @@ function harness(initialSave) {
     get innerHTML() { return this._html; }
     appendChild(child) { this.children.push(child); return child; }
     setAttribute(key, value) { this[key] = value; }
+    getContext() { return { strokeText() {}, fillText() {} }; }
     addEventListener(type, fn) { this.listeners.set(type, fn); }
     closest(selector) { return selector === 'button[data-tower]' && this.dataset.tower ? this : null; }
     querySelectorAll() { return (this.buttons || []).filter(button => !button.disabled); }
@@ -45,8 +46,9 @@ function harness(initialSave) {
   class Color { constructor(value) { this.value = value; } setHex(value) { this.value = value; } }
   class Material { constructor(options = {}) { Object.assign(this, options); this.color = new Color(options.color); } }
   class Mesh extends Object3D { constructor(geometry, material) { super(); this.geometry = geometry; this.material = material; } }
+  class Sprite extends Object3D { constructor(material) { super(); this.material = material; } }
   class Geometry {}
-  const THREE = { Group: Object3D, Mesh, Color, Fog: Geometry, HemisphereLight: Object3D, AmbientLight: Object3D, DirectionalLight: Object3D, MeshLambertMaterial: Material, MeshBasicMaterial: Material };
+  const THREE = { Group: Object3D, Mesh, Sprite, SpriteMaterial: Material, CanvasTexture: Geometry, Color, Fog: Geometry, HemisphereLight: Object3D, AmbientLight: Object3D, DirectionalLight: Object3D, MeshLambertMaterial: Material, MeshBasicMaterial: Material };
   for (const name of ['CylinderGeometry', 'BoxGeometry', 'OctahedronGeometry', 'ConeGeometry', 'SphereGeometry', 'TorusGeometry']) THREE[name] = Geometry;
   const G = { charIdx: 0, view: 'tp', spMode: 'classic', lvlIdx: 0, effects: {}, running: false, frozen: false, shifting: false, startTime: now, satiety: 100, shovels: 1, kites: 0, whistles: 0, shovelRechargeAt: 0, skillCoolUntil: 0, px: 0, pz: 0, cell: 3, mazeW: 7, mazeH: 7, exitCell: { x: 6, y: 6 } };
   const CFG = { mazeSize: 11, itemCount: 20, foodCount: 10 }, noop = () => {};
@@ -57,7 +59,7 @@ function harness(initialSave) {
     escapeHtml: value => String(value).replace(/[&<>"']/g, char => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[char]),
     bindActionBtn: (element, fn) => { element.onclick = fn; }, typingInField: () => false,
     getPlayerName: () => '測試冒險者', beginEntryFlow: mode => { context.entryFlow = mode; }, mpLeave: noop,
-    buildCharacter: () => new Object3D(), makeTextSprite: () => new Object3D(), makePickupMarker: () => new Object3D(), disposeSceneObject: noop,
+    buildCharacter: () => { const model=new Object3D(); model.userData.legL=new Object3D(); model.userData.legR=new Object3D(); return model; }, makeTextSprite: () => new Object3D(), makePickupMarker: () => new Object3D(), disposeSceneObject: noop,
     cellToWorld: (x, y) => ({ x: x * 3, z: y * 3 }), worldToCell: (x, z) => ({ x: Math.max(0, Math.round(x / 3)), y: Math.max(0, Math.round(z / 3)) }),
     solveMaze: (x, y, endX = G.exitCell.x, endY = G.exitCell.y) => [[x, y], [x, Math.min(y + 1, G.mazeH - 1)], [endX, endY]],
     mulberry32: seed => () => { seed |= 0; seed = seed + 0x6D2B79F5 | 0; let t = Math.imul(seed ^ seed >>> 15, 1 | seed); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; },

@@ -277,6 +277,11 @@ button, input, select { -webkit-font-smoothing: antialiased; }
 .tower-journal-entry h3 { margin: 5px 0 0; color: #e8d3a8; font-size: 18px; }
 .tower-journal-entry small { color: #bacad5; font-size: 13px; }
 .tower-journal-entry .tower-btn { min-width: 72px; flex: 0 0 auto; }
+.tower-story-echo { max-width: 660px; margin: 16px auto; padding: 14px 18px; border: 1px solid #669da2; border-left: 3px solid #a7d9d0; border-radius: 10px; background: #213b4380; }
+.tower-story-echo small { color: #b6e8dc; font-size: 14px; letter-spacing: .04em; }
+.tower-card .tower-story-echo p { color: #e2eee7; font-size: 17px; line-height: 1.85; }
+.tower-riddle-options { display: grid; gap: 10px; max-width: 660px; margin: 12px auto; }
+.tower-riddle-options .tower-btn { min-height: 46px; padding: 11px 16px; font-size: 16px; text-align: left; line-height: 1.6; }
 .tower-gear-card { border-color: #879baf !important; }
 .tower-gear-card.rare { border-color: #c8aa68 !important; background: linear-gradient(135deg, #403d42, #15263a) !important; }
 .tower-gear-card small { color: #83d5cb; font-size: 12px; white-space: nowrap; }

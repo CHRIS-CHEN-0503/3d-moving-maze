@@ -11,7 +11,7 @@ const fresh = () => core.newRun({ name: '尋路人', charIdx: 4, seed: 12345 });
 
 test('browser modules expose the same TowerCore contract after dependency loading', () => {
   const context = vm.createContext({});
-  for (const filename of ['story-core.js', 'tower-narrative.js', 'tower-dungeons.js']) {
+  for (const filename of ['story-core.js', 'tower-narrative.js', 'tower-side-stories.js', 'tower-dungeons.js']) {
     vm.runInContext(readFileSync(new URL('../story/' + filename, import.meta.url), 'utf8'), context);
   }
   assert.equal(context.TowerCore.floorConfig(99).size, 7);

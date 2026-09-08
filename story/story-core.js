@@ -563,6 +563,7 @@
         return { ok: true, message: ENDING.text, effect: { ending: true } };
       }
       next.floor -= 1;
+      next.expedition.version = dungeonRules().CATALOG_VERSION;
       return { ok: true, message: `抵達第 ${next.floor} 層。`, effect: { floor: next.floor } };
     });
   }

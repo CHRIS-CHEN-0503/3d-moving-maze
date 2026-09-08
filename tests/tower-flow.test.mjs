@@ -6,6 +6,7 @@ import vm from 'node:vm';
 
 const THREE = createRequire(import.meta.url)('../lib/three.min.js');
 const narrativeSource = readFileSync(new URL('../story/tower-narrative.js', import.meta.url), 'utf8');
+const sideStoriesSource = readFileSync(new URL('../story/tower-side-stories.js', import.meta.url), 'utf8');
 const dungeonsSource = readFileSync(new URL('../story/tower-dungeons.js', import.meta.url), 'utf8');
 const coreSource = readFileSync(new URL('../story/story-core.js', import.meta.url), 'utf8');
 const encountersSource = readFileSync(new URL('../story/tower-encounters.js', import.meta.url), 'utf8');
@@ -80,9 +81,10 @@ function harness(initialSave, runtimeBridge = '') {
     addEventListener: (type, fn) => windowEvents.set(type, fn),
   });
   context.window = context;
-  vm.runInContext(narrativeSource, context, { filename: 'tower-narrative.js' });
-  vm.runInContext(dungeonsSource, context, { filename: 'tower-dungeons.js' });
   vm.runInContext(coreSource, context, { filename: 'story-core.js' });
+  vm.runInContext(narrativeSource, context, { filename: 'tower-narrative.js' });
+  vm.runInContext(sideStoriesSource, context, { filename: 'tower-side-stories.js' });
+  vm.runInContext(dungeonsSource, context, { filename: 'tower-dungeons.js' });
   vm.runInContext(encountersSource, context, { filename: 'tower-encounters.js' });
   vm.runInContext(charactersSource, context, { filename: 'tower-characters.js' });
   const testedRuntime = runtimeBridge ? runtimeSource.replace(/  install\(\);(?=\s*\}\)\(\);\s*$)/, runtimeBridge + '\n  install();') : runtimeSource;

@@ -9,7 +9,7 @@ const THREE = require('../lib/three.min.js');
 const C = require('../story/story-core.js'), N = require('../story/tower-narrative.js');
 const E = require('../story/tower-encounters.js'), D = require('../story/tower-dungeons.js');
 const read = name => readFileSync(new URL('../story/' + name, import.meta.url), 'utf8');
-const sources = { coreSource: read('story-core.js'), narrativeSource: read('tower-narrative.js'), dungeonsSource: read('tower-dungeons.js'), encountersSource: read('tower-encounters.js'), charactersSource: read('tower-characters.js'), runtimeSource: read('tower-mode.js') };
+const sources = { coreSource: read('story-core.js'), narrativeSource: read('tower-narrative.js'), sideStoriesSource: read('tower-side-stories.js'), dungeonsSource: read('tower-dungeons.js'), encountersSource: read('tower-encounters.js'), charactersSource: read('tower-characters.js'), runtimeSource: read('tower-mode.js') };
 const flowSource = readFileSync(new URL('./tower-flow.test.mjs', import.meta.url), 'utf8');
 const factoryStart = flowSource.indexOf('function harness('), factoryEnd = flowSource.indexOf('\ntest(', factoryStart);
 assert.ok(factoryStart >= 0 && factoryEnd > factoryStart);
@@ -33,7 +33,11 @@ function harness(run) {
   return h;
 }
 function runAt(floor = 99, seed = 1) {
-  const run = C.newRun({ seed }); run.floor = floor; run.floorsCleared = 99 - floor; run.chronicle = N.newChronicle(floor); return run;
+  const run = C.newRun({ seed }); run.floor = floor; run.floorsCleared = 99 - floor; run.chronicle = N.newChronicle(floor);
+  // Keep the original three-rift fixtures as genuine version-one saves; the
+  // expanded catalog receives fresh version-two fixtures in side-runtime.
+  run.expedition = { version: 1, discovered: false, history: [], active: null };
+  return run;
 }
 function findRun(predicate, floor = 99) {
   for (let seed = 1; seed <= 5000; seed++) { const run = runAt(floor, seed); if (predicate(run)) return run; }
@@ -153,7 +157,7 @@ test('沒有主線／副本欄位的舊存檔可續玩，保留職業裝備並�
   const h = harness(old); h.start();
   assert.equal(h.context.G.charIdx, 4); assert.equal(h.context.G.satiety, 43); assert.equal(h.save().floor, 80);
   assert.deepEqual(h.save().equipment, old.equipment); assert.deepEqual(h.save().claimed, old.claimed);
-  assert.deepEqual(h.save().expedition, D.newExpedition());
+  assert.deepEqual(h.save().expedition, { version: 1, discovered: false, history: [], active: null });
   assert.ok(h.save().chronicle.clues.includes('clue:summoning'), 'Legacy descent through the previous chapter must remain valid');
   assert.ok(!h.save().chronicle.clues.includes('clue:garden')); assert.ok(h.state().mainClue?.model.visible);
   assert.equal(N.canDescend(h.state().run), false); assert.ok(C.validateSave(h.save()));

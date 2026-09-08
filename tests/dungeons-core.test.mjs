@@ -10,9 +10,10 @@ const D = require('../story/tower-dungeons.js');
 
 function fixture(kind, enhanced, floor = 95) {
   for (let seed = 1; seed < 10000; seed += 1) {
-    const candidate = D.offer({ floor, seed });
+    const candidate = D.offer({ floor, seed, expedition: D.newExpedition(1) });
     if (candidate && (!kind || candidate.kind === kind) && (enhanced === undefined || !!candidate.reward.gear === enhanced)) {
       const run = C.newRun({ seed }); run.floor = floor; run.floorsCleared = 99 - floor;
+      run.expedition = D.newExpedition(1);
       return { run, offer: candidate };
     }
   }
@@ -35,13 +36,13 @@ function solved(kind, enhanced, floor) {
   return { run, offer };
 }
 
-test('browser loading core then narrative then dungeons has no eager dependency cycle', () => {
+test('browser loading core then narrative, side stories and dungeons has no eager dependency cycle', () => {
   const context = vm.createContext({});
-  for (const file of ['story-core.js', 'tower-narrative.js', 'tower-dungeons.js']) {
+  for (const file of ['story-core.js', 'tower-narrative.js', 'tower-side-stories.js', 'tower-dungeons.js']) {
     vm.runInContext(readFileSync(new URL('../story/' + file, import.meta.url), 'utf8'), context);
   }
   const run = context.TowerCore.newRun({ seed: 1 });
-  assert.equal(run.expedition.version, 1);
+  assert.equal(run.expedition.version, 2);
   assert.equal(run.chronicle.version, 1);
   assert.equal(context.TowerCore.validateSave(run).floor, 99);
 });
@@ -51,7 +52,7 @@ test('rift offers start at floor 95 with independent deterministic 28% occurrenc
   const kinds = new Set();
   for (let seed = 1; seed <= 100; seed += 1) {
     for (let floor = 99; floor >= 1; floor -= 1) {
-      const run = { floor, seed }, offer = D.offer(run);
+      const run = { floor, seed, expedition: D.newExpedition(1) }, offer = D.offer(run);
       if (floor > 95) { assert.equal(offer, null); continue; }
       assert.deepEqual(D.offer(run), offer);
       if (!offer) continue;
@@ -148,6 +149,7 @@ test('dungeon clocks cap at the time limit, survive reload, and do not silently 
 test('dungeons freeze the main-floor guard and monster stun timers without freezing general effects', () => {
   const { run: original, offer } = fixture('archive');
   let run = C.newRun({ seed: original.seed });
+  run.expedition = D.newExpedition(1);
   run = C.hireWarrior(run, C.warriorOffer(99, run.seed).id).run;
   run = C.interceptMonster(run, 'monster-0', 3).run;
   run = C.hitMonster(run, 'monster-0', 3).run;
@@ -273,7 +275,7 @@ test('legacy save migration initializes expedition without disturbing existing i
   delete run.expedition; delete run.chronicle;
   const saved = C.validateSave(JSON.stringify(run));
   assert.ok(saved);
-  assert.deepEqual(saved.expedition, D.newExpedition());
+  assert.deepEqual(saved.expedition, D.newExpedition(1));
   assert.equal(saved.coins, 70);
   assert.deepEqual(saved.bag, run.bag);
   assert.equal(saved.chronicle.version, 1);

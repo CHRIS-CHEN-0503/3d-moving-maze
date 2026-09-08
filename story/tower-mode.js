@@ -792,9 +792,9 @@
     if(N&&run.floor===N.chapterForFloor(run.floor).low){const scene=N.scenesForFloor(run.floor).find(entry=>!run.chronicle.read.includes(entry.id));if(scene){exitDeclined=true;readStory(scene.id,false,0,true);return;}}
     if(N&&run.floor===1&&!run.chronicle.ending){exitDeclined=true;dialog('主線終章 · 由你決定','把這座塔帶往哪裡？','三條路都不必犧牲任何人。這一次，高塔會等待你的回答。','<div class="tower-grid">'+N.ENDINGS.map(ending=>'<article class="tower-item"><h3>'+text(ending.title)+'</h3><p>'+text(ending.description)+'</p>'+action('選擇這條歸途','ending',ending.id)+'</article>').join('')+'</div>',action('再想一想','close'));return;}
     syncEngine();const result=C.descend(run);
-    if(!transact(result))return;G.running=false;floorStarted=false;const saved=true;
+    if(!transact(result))return;G.running=false;floorStarted=false;
     if(run.status==='won'){const ending=N&&N.ENDINGS.find(e=>e.id===run.chronicle.ending);dialog('塔外的第一道晨光',ending?ending.title:'你找到了回家的路',ending?'九十九層的旅程，終於有了你的答案。':C.ENDING.text,ending?prose(ending.paragraphs):'<p class="tower-copy">99 層旅程完成。你保住的不只是自己的生命，還有其他旅人的希望。</p>',action('回到首頁','home'));return;}
-    dialog('本層探索完成','門後，是第 '+run.floor+' 層','下一層的迷宮更接近高塔心臟。補給與職業工具會隨你繼續旅程。','<p class="tower-copy">生命 '+Math.ceil(run.hp)+' · 銅幣 '+run.coins+' · '+(saved?'已自動保存':'儲存失敗，請勿關閉分頁')+'</p>',action('繼續下降','descend')+action('保存並回首頁','home'));
+    dialog('本層探索完成','門後，是第 '+run.floor+' 層','下一層的迷宮更接近高塔心臟。補給與職業工具會隨你繼續旅程。','<p class="tower-copy">生命 '+Math.ceil(run.hp)+' · 銅幣 '+run.coins+' · 已自動保存</p>',action('繼續下降','descend')+action('保存並回首頁','home'));
   }
   function defeat() {
     if(!active)return;

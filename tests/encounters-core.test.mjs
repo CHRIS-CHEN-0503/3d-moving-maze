@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createRequire } from 'node:module';
+import { createHash } from 'node:crypto';
 const require = createRequire(import.meta.url);
 const C = require('../story/story-core.js');
 const E = require('../story/tower-encounters.js');
@@ -63,6 +64,75 @@ test('寶箱與探險者各自約二成出現，種子固定且互相獨立',()=
     if(explorer)explorers++;if(chest&&explorer)both++;
   }
   assert.ok(chests>300&&chests<500);assert.ok(explorers>300&&explorers<500);assert.ok(both>40&&both<130);assert.ok(traps/chests>.25&&traps/chests<.45);
+});
+
+test('五位探索者有固定身分與個性台詞，回傳資料不會污染角色目錄',()=>{
+  const names={eve:'伊芙',rowan:'洛恩',mira:'米菈',oren:'奧倫',sena:'星奈'},seen=new Set();
+  assert.deepEqual(Object.keys(E.EXPLORERS),Object.keys(names));
+  assert.ok(Object.isFrozen(E.EXPLORERS));
+  assert.equal(new Set(Object.values(E.EXPLORERS).map(entry=>entry.greeting)).size,5);
+  for(let seed=1;seed<=300;seed++){
+    const identity=E.explorerIdentity(60,seed);seen.add(identity.id);
+    assert.deepEqual(Object.keys(identity).sort(),['greeting','id','name','title']);
+    assert.equal(identity.name,names[identity.id]);assert.equal(identity.title,'探索者');assert.ok(identity.greeting.length>=12);
+    assert.ok(Object.isFrozen(E.EXPLORERS[identity.id]));assert.deepEqual(identity,E.explorerIdentity(60,seed));
+    assert.notStrictEqual(identity,E.explorerIdentity(60,seed));
+    const expected=clone(identity);identity.name='被改掉的名字';identity.greeting='外部改動';
+    assert.deepEqual(E.explorerIdentity(60,seed),expected);
+  }
+  assert.deepEqual([...seen].sort(),Object.keys(names).sort());
+  assert.ok(Array.from({length:99},(_,i)=>E.explorerIdentity(i+1,25).id).some(id=>id!==E.explorerIdentity(99,25).id));
+});
+
+test('探索者身分沿用樓層與種子，存讀檔、庫存改變及委託進度皆不換人',()=>{
+  for(const id of Object.keys(E.EXPLORERS)){
+    let run=findRun(r=>E.explorerOffer(r)?.explorer.id===id),identity=E.explorerIdentity(run.floor,run.seed);
+    const before=clone(run);assert.deepEqual(E.explorerOffer(run).explorer,identity);assert.deepEqual(run,before);
+    run.bag.heal=run.bag.ration=run.bag.map=0;run.equipment.weapon=null;
+    assert.deepEqual(E.explorerOffer(run).explorer,identity);
+    const accepted=E.acceptQuest(run,E.explorerOffer(run).id);assert.equal(accepted.ok,true);run=accepted.run;
+    assert.deepEqual(Object.keys(run.adventure.quest).sort(),['events','floor','goal','id','progress','status','target','type']);
+    const saved=C.validateSave(JSON.stringify(run));assert.ok(saved);
+    assert.deepEqual(E.explorerOffer(saved).explorer,identity);
+    assert.deepEqual(E.explorerOffer(completeSimple(saved)).explorer,identity);
+    const legacy=clone(saved);delete legacy.adventure;
+    const restored=C.validateSave(legacy);assert.ok(restored);assert.deepEqual(E.explorerOffer(restored).explorer,identity);
+  }
+});
+
+test('五位探索者都能給出七種委託，不把任務綁定角色',()=>{
+  const seen=Object.fromEntries(Object.keys(E.EXPLORERS).map(id=>[id,new Set()]));
+  for(let seed=1;seed<=10000&&!Object.values(seen).every(types=>types.size===7);seed++){
+    const run=runAt(60,seed);run.hiredWarriors=['fixture'];run.warrior={offerId:'fixture',strength:5,mode:'escort',targetId:null,remaining:null};
+    const offer=E.explorerOffer(run);if(offer)seen[offer.explorer.id].add(offer.type);
+  }
+  for(const [id,types] of Object.entries(seen))assert.deepEqual([...types].sort(),[...E.QUEST_TYPES].sort(),id);
+});
+
+test('加入身分前後出現率與原任務抽選完全相同，不消耗原本的隨機序列',()=>{
+  // Verified using the pre-identity HEAD core and encounter sources in an isolated VM, with legal strength 5.
+  const fixtures=[
+    {floor:99,count:405,sha256:'439a2dfdc2f04c1b2933e14e3be6a13f45b4168f2fc935922567bdba2d801eb4'},
+    {floor:60,count:390,sha256:'48fec897071b2fc87a0764774d08d1071feb669205ceac6051158e5551177a2b'},
+    {floor:1,count:368,sha256:'0a4992b06602bc467c057f63564bdc1ac6496b1742d8635e64d2114c6afe76cc'},
+  ];
+  for(const fixture of fixtures){
+    const rows=[];let count=0;
+    for(let seed=1;seed<=2000;seed++){
+      const run=runAt(fixture.floor,seed);
+      if(fixture.floor!==99){run.hiredWarriors=['fixture'];run.warrior={offerId:'fixture',strength:5,mode:'escort',targetId:null,remaining:null};}
+      E.explorerIdentity(run.floor,run.seed);E.explorerIdentity(run.floor,run.seed);
+      const offer=E.explorerOffer(run);if(offer)count++;
+      rows.push([seed,offer?[offer.type,offer.target,offer.goal]:null]);
+    }
+    assert.equal(count,fixture.count);assert.equal(createHash('sha256').update(JSON.stringify(rows)).digest('hex'),fixture.sha256);
+  }
+});
+
+test('探索者身分拒絕無效樓層或種子，邊界輸入仍可穩定產生',()=>{
+  for(const floor of [undefined,null,'60',0,100,-1,1.5,NaN,Infinity])assert.throws(()=>E.explorerIdentity(floor,1),RangeError);
+  for(const seed of [undefined,null,'1',0,-1,0x100000000,1.5,NaN,Infinity])assert.throws(()=>E.explorerIdentity(60,seed),RangeError);
+  for(const floor of [1,99])for(const seed of [1,0xffffffff])assert.deepEqual(E.explorerIdentity(floor,seed),E.explorerIdentity(floor,seed));
 });
 
 test('陷阱與強化寶物只能開一次，重試或讀檔不能重抽',()=>{

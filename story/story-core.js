@@ -9,6 +9,9 @@
   const STATE_VERSION = 1;
   const MAX_COINS = 999999;
   const MAX_STACK = 99;
+  // Late lookup keeps the browser's core → narrative → dungeons loading order safe.
+  const narrativeRules = () => typeof module === 'object' && module.exports ? require('./tower-narrative.js') : globalThis.TowerNarrative;
+  const dungeonRules = () => typeof module === 'object' && module.exports ? require('./tower-dungeons.js') : globalThis.TowerDungeons;
   const GEAR = Object.freeze({
     helmet: Object.freeze({ kind: 'helmet', slot: 'helmet', name: '頭盔', defense: 2, stunSeconds: 0, buyPrice: 14 }),
     armor: Object.freeze({ kind: 'armor', slot: 'armor', name: '盔甲', defense: 4, stunSeconds: 0, buyPrice: 22 }),
@@ -92,6 +95,7 @@
       claimed: [], floorElapsed: 0, warrior: null, hiredWarriors: [], defeatedMonsters: [],
       equipment: { helmet: null, armor: null, shield: null, weapon: createGear('staff', 99, seed, 'starter') },
       gearBag: [], monsterStuns: {}, adventure: newAdventure(),
+      chronicle: narrativeRules().newChronicle(99), expedition: dungeonRules().newExpedition(),
       revision: 0, seed, name: typeof opts.name === 'string' ? opts.name.trim().slice(0, 24) || '冒險者' : '冒險者',
       charIdx: Number.isInteger(opts.charIdx) && opts.charIdx >= 0 && opts.charIdx < 6 ? opts.charIdx : 0,
       status: 'playing', elapsed: 0, floorsCleared: 0,
@@ -264,6 +268,9 @@
     }
     const adventure = validateAdventure(run.adventure, run.floor);
     if (!adventure) return null;
+    const chronicle = narrativeRules().validateChronicle(run.chronicle, run.floor);
+    const expedition = dungeonRules().validateExpedition(run.expedition, run.floor, run.seed);
+    if (!chronicle || !expedition) return null;
     return {
       stateVersion: STATE_VERSION, mode: 'tower', floor: run.floor, hp: run.hp, hunger: run.hunger,
       coins: run.coins, bag, effects, revision: run.revision, seed: run.seed, name: run.name,
@@ -271,6 +278,7 @@
       engine, claimed: [...run.claimed], floorElapsed: run.floorElapsed,
       warrior, hiredWarriors: [...hiredWarriors], defeatedMonsters: [...defeatedMonsters],
       equipment, gearBag, monsterStuns, adventure,
+      chronicle, expedition,
     };
   }
 
@@ -520,13 +528,13 @@
     return transaction(run, undefined, (next) => {
       if (!validNumber(seconds, 0, 60)) return { ok: false, message: '無效的時間間隔。' };
       for (const id of Object.keys(next.effects)) next.effects[id] = Math.max(0, next.effects[id] - seconds);
-      for (const id of Object.keys(next.monsterStuns)) {
-        next.monsterStuns[id] = Math.max(0, next.monsterStuns[id] - seconds);
-        if (next.monsterStuns[id] === 0) delete next.monsterStuns[id];
-      }
+      if (!next.expedition.active) for (const id of Object.keys(next.monsterStuns)) {
+          next.monsterStuns[id] = Math.max(0, next.monsterStuns[id] - seconds);
+          if (next.monsterStuns[id] === 0) delete next.monsterStuns[id];
+        }
       next.elapsed += seconds;
       next.floorElapsed += seconds;
-      if (next.warrior && next.warrior.mode === 'holding' && next.warrior.remaining !== null) {
+      if (!next.expedition.active && next.warrior && next.warrior.mode === 'holding' && next.warrior.remaining !== null) {
         next.warrior.remaining = Math.max(0, next.warrior.remaining - seconds);
         if (next.warrior.remaining === 0) {
           const targetId = next.warrior.targetId;
@@ -540,11 +548,15 @@
 
   function descend(run, expectedRevision) {
     return transaction(run, expectedRevision, (next) => {
+      if (next.expedition.active) return { ok: false, message: '請先離開裂隙副本，再繼續往下探索。' };
+      if (!narrativeRules().canDescend(next)) return { ok: false, message: '章末之門尚未開啟，請先找到本章主線印記。' };
+      if (next.floor === 1 && next.chronicle.ending === null) return { ok: false, message: '請先在塔心選擇高塔的未來，再踏出歸途之門。' };
       next.coins = Math.min(MAX_COINS, next.coins + floorConfig(next.floor).rewardCoins);
       next.floorsCleared += 1;
       next.effects = { shield: 0, freeze: 0, repel: 0, reveal: 0 };
       next.claimed = []; next.floorElapsed = 0; next.defeatedMonsters = [];
       next.monsterStuns = {}; next.adventure = newAdventure();
+      next.expedition.discovered = false;
       if (next.warrior && next.warrior.mode === 'holding') next.warrior = null;
       if (next.floor === 1) {
         next.status = 'won';

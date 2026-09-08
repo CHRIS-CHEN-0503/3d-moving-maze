@@ -5,6 +5,8 @@ import { createRequire } from 'node:module';
 import vm from 'node:vm';
 
 const THREE = createRequire(import.meta.url)('../lib/three.min.js');
+const narrativeSource = readFileSync(new URL('../story/tower-narrative.js', import.meta.url), 'utf8');
+const dungeonsSource = readFileSync(new URL('../story/tower-dungeons.js', import.meta.url), 'utf8');
 const coreSource = readFileSync(new URL('../story/story-core.js', import.meta.url), 'utf8');
 const encountersSource = readFileSync(new URL('../story/tower-encounters.js', import.meta.url), 'utf8');
 const charactersSource = readFileSync(new URL('../story/tower-characters.js', import.meta.url), 'utf8');
@@ -12,8 +14,9 @@ const runtimeSource = readFileSync(new URL('../story/tower-mode.js', import.meta
 const SAVE_KEY = 'maze3d_tower_v1';
 
 // Only the DOM and original game-engine boundary are stubbed. The real core,
-// runtime, events, storage and dialog rendering execute without source rewriting.
-function harness(initialSave) {
+// runtime, events, storage and dialog rendering execute unmodified by default.
+// Other runtime suites can explicitly request a test-only closure bridge.
+function harness(initialSave, runtimeBridge = '') {
   const elements = new Map(), windowEvents = new Map(), storage = new Map(), toasts = [];
   let now = 10000;
   if (initialSave !== undefined) storage.set(SAVE_KEY, typeof initialSave === 'string' ? initialSave : JSON.stringify(initialSave));
@@ -60,7 +63,7 @@ function harness(initialSave) {
     escapeHtml: value => String(value).replace(/[&<>"']/g, char => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[char]),
     bindActionBtn: (element, fn) => { element.onclick = fn; }, typingInField: () => false,
     getPlayerName: () => '測試冒險者', beginEntryFlow: mode => { context.entryFlow = mode; }, mpLeave: noop,
-    buildCharacter, makeTextSprite: () => new THREE.Group(), makePickupMarker: () => new THREE.Group(), disposeSceneObject: noop,
+    buildCharacter, makeTextSprite: label => { const group = new THREE.Group(); group.userData.label = label; return group; }, makePickupMarker: () => new THREE.Group(), disposeSceneObject: noop,
     cellToWorld: (x, y) => ({ x: x * G.cell, z: y * G.cell }), worldToCell: (x, z) => ({ x: Math.max(0, Math.round(x / G.cell)), y: Math.max(0, Math.round(z / G.cell)) }),
     solveMaze: (x, y, endX = G.exitCell.x, endY = G.exitCell.y) => [[x, y], [x, Math.min(y + 1, G.mazeH - 1)], [endX, endY]],
     mulberry32: seed => () => { seed |= 0; seed = seed + 0x6D2B79F5 | 0; let t = Math.imul(seed ^ seed >>> 15, 1 | seed); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; },
@@ -69,6 +72,7 @@ function harness(initialSave) {
     playerInWall: () => false, doShift: () => { G.shifting = true; }, swingWeapon: noop, cancelSceneTransition: noop, switchScreen: screen => { context.screen = screen; },
     startGame: () => {
       context.lastStartSettings = { ...CFG };
+      (context.startSettingsHistory ||= []).push(context.lastStartSettings);
       context.scene.clear(); context.envGroup = null; context.playerGroup = buildCharacter(); context.scene.add(context.playerGroup);
       G.items = []; G.foods = []; G.mazeW = G.mazeH = CFG.mazeSize; G.exitCell = { x: G.mazeW - 1, y: G.mazeH - 1 };
       G.running = true; G.frozen = G.shifting = false; G.px = G.pz = 0; G.startTime = now; context.TowerMode.scheduleShift();
@@ -76,10 +80,14 @@ function harness(initialSave) {
     addEventListener: (type, fn) => windowEvents.set(type, fn),
   });
   context.window = context;
+  vm.runInContext(narrativeSource, context, { filename: 'tower-narrative.js' });
+  vm.runInContext(dungeonsSource, context, { filename: 'tower-dungeons.js' });
   vm.runInContext(coreSource, context, { filename: 'story-core.js' });
   vm.runInContext(encountersSource, context, { filename: 'tower-encounters.js' });
   vm.runInContext(charactersSource, context, { filename: 'tower-characters.js' });
-  vm.runInContext(runtimeSource, context, { filename: 'tower-mode.js' });
+  const testedRuntime = runtimeBridge ? runtimeSource.replace(/  install\(\);(?=\s*\}\)\(\);\s*$)/, runtimeBridge + '\n  install();') : runtimeSource;
+  assert.ok(!runtimeBridge || testedRuntime !== runtimeSource, 'The test-only bridge must be injected inside the runtime closure');
+  vm.runInContext(testedRuntime, context, { filename: 'tower-mode.js' });
   const get = id => elements.get(id);
   function click(action, item) {
     const button = get('towerDialog').buttons.find(candidate => candidate.dataset.tower === action && (item === undefined || candidate.dataset.item === item));
@@ -89,7 +97,7 @@ function harness(initialSave) {
   }
   function save() { const stored = storage.get(SAVE_KEY); return stored ? JSON.parse(stored) : null; }
   function tick(seconds) { now += seconds * 1000; context.TowerMode.tick(seconds, now); }
-  return { context, get, click, save, tick, storage, toasts, emit: type => windowEvents.get(type)?.() };
+  return { context, get, click, save, tick, storage, toasts, emit: (type, event = {}) => windowEvents.get(type)?.(event) };
 }
 
 test('story menu routes new players through the existing character creation flow', () => {
@@ -107,7 +115,7 @@ test('beginNew creates a valid save and renders opening prose rather than an obj
   h.context.TowerMode.beginNew();
   assert.equal(h.context.TowerMode.active, true); assert.equal(h.context.TowerMode.paused, true);
   assert.equal(h.save().floor, 99); assert.ok(h.context.TowerCore.validateSave(h.save()));
-  assert.match(h.get('towerDialog').innerHTML, /你在陌生的石台醒來/);
+  assert.ok(h.get('towerDialog').innerHTML.includes(h.context.escapeHtml(h.context.TowerNarrative.scenesForFloor(99)[0].paragraphs[0])));
   assert.doesNotMatch(h.get('towerDialog').innerHTML, /\[object Object\]/);
   assert.equal(h.context.CFG.mazeSize, 11, 'Temporary story settings must restore normal-mode configuration');
   assert.equal(h.context.TowerMode.preserveFloorPickups(), true, 'The live runtime must protect pickups after the floor has started');
@@ -180,16 +188,20 @@ test('malformed and incompatible saves never offer a broken continue action', ()
   }
 });
 
-test('repeated stair contact descends once, and floor 1 produces the core ending', () => {
-  const original = harness().context.TowerCore.newRun({ seed: 765 }); original.floor = 2; original.floorsCleared = 97;
+test('repeated stair contact descends once, and floor 1 produces the chosen story ending', () => {
+  const catalog = harness().context;
+  const original = catalog.TowerCore.newRun({ seed: 765 }); original.floor = 2; original.floorsCleared = 97;
+  original.chronicle = catalog.TowerNarrative.newChronicle(2); original.chronicle.clues.push('clue:heart');
   const h = harness(original); h.context.TowerMode.open(); h.click('continue'); h.click('close'); h.context.TowerMode.reachExit();
   assert.equal(h.save().floor, 1); assert.equal(h.save().floorsCleared, 98);
   assert.equal(h.context.TowerMode.preserveFloorPickups(), false, 'The next floor must be allowed to create its initial pickups');
   const before = h.save(); h.context.TowerMode.reachExit(); h.context.TowerMode.reachExit();
   assert.deepEqual(h.save(), before, 'Repeated collision callbacks must not advance more than one floor');
   h.click('descend'); if (h.context.TowerMode.paused) h.click('close'); h.context.TowerMode.reachExit();
+  assert.equal(h.save().floor, 1); h.click('story-next'); h.click('story-next'); h.click('story-finish');
+  const ending = h.context.TowerNarrative.ENDINGS[0]; h.click('ending', ending.id);
   assert.equal(h.save().status, 'won'); assert.equal(h.save().floorsCleared, 99); assert.ok(h.context.TowerCore.validateSave(h.save()));
-  assert.match(h.get('towerDialog').innerHTML, /你把旅人留下的記憶放入塔心/); assert.doesNotMatch(h.get('towerDialog').innerHTML, /\[object Object\]|data-tower="descend"/);
+  assert.ok(h.get('towerDialog').innerHTML.includes(h.context.escapeHtml(ending.paragraphs[0]))); assert.doesNotMatch(h.get('towerDialog').innerHTML, /\[object Object\]|data-tower="descend"/);
   h.click('home'); assert.equal(h.context.TowerMode.active, false); assert.equal(h.context.screen, 'titleScreen');
   assert.equal(h.context.TowerMode.preserveFloorPickups(), false);
 });

@@ -7,6 +7,7 @@ import vm from 'node:vm';
 const require = createRequire(import.meta.url);
 const core = require('../story/story-core.js');
 const encounters = require('../story/tower-encounters.js');
+const narrative = require('../story/tower-narrative.js');
 const source = await readFile(new URL('../story/tower-mode.js', import.meta.url), 'utf8');
 // 注入只存在於測試的介面；正式程式沒有測試用全域或捷徑。
 const bridge = `window.__test = {
@@ -124,15 +125,21 @@ test('飢餓傷害正確經由例外來源，不消耗防具或受裝備護盾�
   assert.equal(h.testApi.state().run.hunger,0);
 });
 
-test('抵達第一層正確結束旅程，重複出口判定不重複獎勵', () => {
+test('帶著歸途星印完成終章選擇後正確結束旅程，重複出口判定不重複獎勵', () => {
   const h = runtime();
-  const run = core.newRun({ seed: 123 });
+  let run = core.newRun({ seed: 123 });
   run.floor = 1; run.floorsCleared = 98;
+  run.chronicle = narrative.newChronicle(1);
+  const clue = narrative.collectClue(run); assert.equal(clue.ok, true);
+  const chapterEnd = narrative.readScene(clue.run, 'scene:1'); assert.equal(chapterEnd.ok, true);
+  const ending = narrative.chooseEnding(chapterEnd.run, 'release'); assert.equal(ending.ok, true);
+  run = ending.run;
   h.testApi.setState({ run });
   h.api.reachExit();
   const completed = h.testApi.state().run;
   assert.equal(completed.status, 'won');
   assert.equal(completed.floorsCleared, 99);
+  assert.equal(completed.chronicle.ending, 'release');
   assert.match(h.nodes.get('towerDialog').innerHTML, /歸途|回家/);
   assert.doesNotMatch(h.nodes.get('towerDialog').innerHTML, /\[object Object\]|第 0 層|繼續下降/);
   const coins = completed.coins;

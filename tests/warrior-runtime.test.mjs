@@ -7,6 +7,7 @@ import vm from 'node:vm';
 const require = createRequire(import.meta.url);
 const core = require('../story/story-core.js');
 const encounters = require('../story/tower-encounters.js');
+const narrative = require('../story/tower-narrative.js');
 const source = readFileSync(new URL('../story/tower-mode.js', import.meta.url), 'utf8');
 // This bridge exists only in tests. Production keeps its private state private.
 const bridge = `window.__warriorTest = {
@@ -133,7 +134,13 @@ test('牽制倒數在背包與迷宮變形期間停止，保存後仍保留剩�
 });
 
 test('同分持續抵抗但下降後留在原層，不把牽制狀態帶到下一層',()=>{
-  const h=runtime(hiredRun(3)),monster=positionThreat(h);h.api.replaceMonsters([monster]);h.api.updateWarrior(.05,h.now());
+  let run=hiredRun(3);
+  run.chronicle=narrative.newChronicle(run.floor);
+  const clue=narrative.collectClue(run);assert.equal(clue.ok,true);
+  const chapterEnd=narrative.readScene(clue.run,'scene:60');assert.equal(chapterEnd.ok,true);
+  run=chapterEnd.run;
+  assert.ok(run.chronicle.clues.includes('clue:echo'));
+  const h=runtime(run),monster=positionThreat(h);h.api.replaceMonsters([monster]);h.api.updateWarrior(.05,h.now());
   assert.equal(h.api.state().run.warrior.remaining,null);
   for(let second=0;second<65;second++)h.tick(1);
   assert.equal(h.api.isHeld(monster),true);assert.equal(h.api.state().run.hp,100);

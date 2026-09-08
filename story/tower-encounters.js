@@ -10,6 +10,13 @@
     jinHe: Object.freeze({ id: 'jinHe', name: '錦禾', title: '裁甲師', equipmentKinds: Object.freeze(['armor', 'pan']), supplies: Object.freeze(['ration', 'feather']) }),
     lanZhou: Object.freeze({ id: 'lanZhou', name: '嵐舟', title: '盾匠', equipmentKinds: Object.freeze(['shield', 'staff']), supplies: Object.freeze(['map', 'bell', 'hourglass']) }),
   });
+  const EXPLORERS = Object.freeze({
+    eve: Object.freeze({ id: 'eve', name: '伊芙', title: '探索者', greeting: '我的地圖又被高塔改寫了。沒關係，我們一起把路找回來。' }),
+    rowan: Object.freeze({ id: 'rowan', name: '洛恩', title: '探索者', greeting: '繩索、睡墊都帶齊了！路再難走，歇一口氣就能繼續。' }),
+    mira: Object.freeze({ id: 'mira', name: '米菈', title: '探索者', greeting: '小心別碰翻我的藥瓶。這座塔的苔蘚，說不定藏著救命的線索。' }),
+    oren: Object.freeze({ id: 'oren', name: '奧倫', title: '探索者', greeting: '石壁上的古文還沒讀完，牆就搬走啦。年輕人，陪我找找下一句？' }),
+    sena: Object.freeze({ id: 'sena', name: '星奈', title: '探索者', greeting: '從塔頂看過的流星，我一顆都記得。希望下一次，能站在塔外仰望。' }),
+  });
   const GEAR_KINDS = ['helmet', 'armor', 'shield', 'bat', 'pan', 'staff'];
   const QUEST_TYPES = ['defeat', 'escort', 'relic', 'donate', 'survey', 'shift', 'stun'];
   const DONATIONS = ['heal', 'ration', 'map'];
@@ -21,6 +28,11 @@
     if (!integer(floor, 1, 99) || !integer(seed, 1, 0xffffffff)) throw new RangeError('無效的樓層或旅程種子。');
     let state = (seed ^ Math.imul(floor, 7919) ^ salt) >>> 0;
     return () => { state = (state + 0x6d2b79f5) >>> 0; let n = Math.imul(state ^ state >>> 15, state | 1); n ^= n + Math.imul(n ^ n >>> 7, n | 61); return ((n ^ n >>> 14) >>> 0) / 4294967296; };
+  }
+  function explorerIdentity(floor, seed) {
+    // Identity has its own stream: do not consume the encounter or quest draws.
+    const random = randomFor(floor, seed, 0x683f47), ids = Object.keys(EXPLORERS);
+    return { ...EXPLORERS[ids[Math.floor(random() * ids.length)]] };
   }
   function newAdventure() { return { version: 1, claimed: [], quest: null }; }
   function validateAdventure(value, floor) {
@@ -130,7 +142,7 @@
       relic: ['遺失的記憶', '幫我找回散落在迷宮中的記憶碎片。'], donate: ['旅人的急需', `請交付 ${q.goal} 份${C.ITEMS[q.target]?.name || '補給'}，讓我能繼續走下去。`],
       survey: ['繪製迷宮', '走訪三個不同的迷宮格，替我記下道路。'], shift: ['觀察高塔心跳', '陪我安全經歷一次迷宮變形。'], stun: ['爭取逃脫時間', '用武器擊暈指定怪物一次，替旅人爭取空檔。'],
     };
-    return { ...q, title: types[q.type][0], description: types[q.type][1], reward: questReward(run.floor, run.seed) };
+    return { ...q, title: types[q.type][0], description: types[q.type][1], reward: questReward(run.floor, run.seed), explorer: explorerIdentity(run.floor, run.seed) };
   }
   function explorerOffer(run) {
     const C = core(), random = randomFor(run.floor, run.seed, 0x5b31e);
@@ -214,5 +226,5 @@
       return { ok: true, message: '已放棄本層委託，尚未領取的報酬不會保留。' };
     });
   }
-  return Object.freeze({ MERCHANTS, QUEST_TYPES, newAdventure, validateAdventure, floorLootCounts, merchantOffers, buySupply, sellSupply, buyMerchantGear, chestOffer, openChest, questReward, explorerOffer, acceptQuest, questProgress, claimQuestReward, abandonQuest });
+  return Object.freeze({ MERCHANTS, EXPLORERS, QUEST_TYPES, newAdventure, validateAdventure, floorLootCounts, merchantOffers, buySupply, sellSupply, buyMerchantGear, chestOffer, openChest, questReward, explorerIdentity, explorerOffer, acceptQuest, questProgress, claimQuestReward, abandonQuest });
 });

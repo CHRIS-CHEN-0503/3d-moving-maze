@@ -246,7 +246,7 @@
       const point = chooseCell(random, used, Math.min(7, floorConfig.size - 1)), model = monsterModel(kind, strength);
       const alive = !run.defeatedMonsters.includes(id);
       model.position.set(point.x, 0, point.z); model.visible = alive; model.userData.monsterId=id; world.add(model);
-      monsters.push({ ...point, id, strength, kind, def, model, hp: def.hp || 60, alive, path: [], pathLeft: i * .15, windup: 0, cooldown: 2, phase: i });
+      monsters.push({ ...point, id, strength, kind, def, model, alive, path: [], pathLeft: i * .15, windup: 0, cooldown: 2, phase: i });
     }
     buildWarriors(used);
     const chestOffer=E.chestOffer(run.floor,run.seed);

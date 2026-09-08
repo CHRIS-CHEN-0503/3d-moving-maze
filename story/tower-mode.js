@@ -3,6 +3,7 @@
   'use strict';
   const C = window.TowerCore;
   const E = window.TowerEncounters, V = window.TowerCharacters;
+  const N = window.TowerNarrative, D = window.TowerDungeons;
   const SAVE = 'maze3d_tower_v1';
   let run = null, active = false, paused = false, pauseAt = 0, modalFocus = null;
   let world = null, loot = [], monsters = [], traders = [], nearest = null;
@@ -11,6 +12,7 @@
   let shiftLeft = 65, wasShifting = false, floorConfig = null, saveClock = 0, hudClock = 0;
   let attackLeft = 0, hurtLeft = 0, warning = false, floorStarted = false, saveFailed = false;
   let encounterHold = 0;
+  let mainClue = null, rift = null, dungeonObjects = [], nearbyJourney = null, exploredCells = new Set(), reader = null;
   const color = { heal: 0xff719a, ration: 0xe7b86c, shield: 0x5edfff, hourglass: 0xcda5ff, bell: 0xffd677, map: 0x85e9ac, feather: 0xeaf6ff, coin: 0xffd76a };
   // 十區使用獨立色盤與建築輪廓；只有當層載入，不預載九十九個場景。
   const ENVIRONMENTS = [
@@ -25,7 +27,14 @@
     [0x906968,0xc19a83,0xb19b8c,0xffa35f,'fire'],
     [0x637c9b,0xadb6d7,0xb3bbc7,0xffe1a0,'heart'],
   ];
-  function environmentSpec() { return ENVIRONMENTS[Math.max(0, Math.min(9, floorConfig.chapter - 1))]; }
+  function inDungeon() { return !!run?.expedition?.active; }
+  function dungeonOffer() { return D && inDungeon() ? D.offer(run) : null; }
+  function explorerIdentity() { return explorer?.offer?.explorer || E.explorerIdentity?.(run.floor,run.seed) || {id:'eve',name:'伊芙',title:'探索者',greeting:''}; }
+  function explorerName() { const person=explorerIdentity();return person.title+'・'+person.name; }
+  function environmentSpec() {
+    if(inDungeon())return {archive:[0x718291,0xaea38f,0x9b9387,0xf1d29e,'books'],bells:[0x617b94,0x92aaba,0x8c99a8,0x91e5e7,'crystal'],lantern:[0x77748b,0xb8a58e,0x9a9295,0xffc878,'fire']}[run.expedition.active.kind];
+    return ENVIRONMENTS[Math.max(0, Math.min(9, floorConfig.chapter - 1))];
+  }
   const text = escapeHtml;
   const el = id => document.getElementById(id);
 
@@ -67,6 +76,7 @@
       if (event.code === 'KeyB') inventory();
       if (event.code === 'KeyR') trade();
       if (event.code === 'KeyX') attack();
+      if (event.code === 'KeyJ') journal();
     });
     document.addEventListener('visibilitychange', () => {
       if (document.hidden && active && !paused && !G.shifting && run.status === 'playing') pauseMenu();
@@ -89,6 +99,7 @@
     const closeButton=(!active||(run.status==='playing'&&G.running&&floorStarted))?'<button class="tower-close" data-tower="close" aria-label="關閉對話並返回">返回</button>':'';
     el('towerDialog').innerHTML = closeButton+'<div class="tower-kicker">' + text(kicker) + '</div><h2 class="tower-heading" id="towerDialogTitle">' + text(title) + '</h2><p class="tower-copy">' + text(copy) + '</p>' + (body || '') + '<div class="tower-actions">' + actions + '</div>';
     el('towerDialog').focus();
+    el('towerDialog').scrollTop=0;
   }
   function closeDialog() {
     el('towerOverlay').hidden = true;
@@ -119,19 +130,19 @@
     catch (_) { if (!saveFailed) { saveFailed = true; showToast('瀏覽器無法保存進度，請保持此分頁開啟。', 4000); } return false; }
   }
   function canCollectOriginal(id) { return !active || !run.claimed.includes(id); }
-  function itemConfig() { return E.floorLootCounts(floorConfig.size); }
+  function itemConfig() { return inDungeon()?{itemCount:0,foodCount:0,storyCount:0,total:0}:E.floorLootCounts(floorConfig.size); }
   function preserveFloorPickups() { return active && floorStarted; }
   function reservedCells() {
-    return floorStarted?[...traders,...loot,...[warriorNpc,explorer,chest,relic].filter(Boolean)].map(item=>item.cx+','+item.cy):[];
+    return floorStarted?[...traders,...loot,...dungeonObjects,...[warriorNpc,explorer,chest,relic,mainClue,rift].filter(Boolean)].map(item=>item.cx+','+item.cy):[];
   }
   function collectedOriginal(id) {
-    if (!active || !run || run.claimed.includes(id)) return;
+    if (!active || !run || inDungeon() || run.claimed.includes(id)) return;
     run.claimed.push(id); questEvent('collect',{id}); save();
   }
   function open() {
     const saved = readSave();
     dialog('全新單人長篇冒險', '倒轉高塔・第 99 層', '你在陌生的召喚陣中醒來。塔頂只有一扇向下的門。每下一層，空間更大，牆壁的心跳也更快。與同樣受困的冒險者交易，帶著補給活著走到第一層。', '<div class="tower-story-cover" role="img" aria-label="被召喚到雲上高塔的冒險者"></div><p class="tower-copy">單人故事 · 沿用原本職業與操作 · 每層自動保存（繼續時回到該層入口）</p>',
-      (saved && saved.status !== 'won' ? action('繼續：第 ' + saved.floor + ' 層', 'continue') : '') + action(saved ? '重新開始故事' : '建立主角', 'new') + action('回首頁', 'close'));
+      (saved && saved.status !== 'won' ? action('繼續：第 ' + saved.floor + ' 層', 'continue') : saved&&N?action('回顧已完成故事','story-archive'):'') + action(saved ? '重新開始故事' : '建立主角', 'new') + action('回首頁', 'close'));
   }
   function beginNew() {
     run = C.newRun({ name: getPlayerName(), charIdx: G.charIdx, seed: (Math.random() * 0x7fffffff) | 0 });
@@ -146,8 +157,10 @@
     loadFloor(true);
   }
   function loadFloor(intro) {
-    closeDialog(); floorStarted = false;
+    closeDialog(); floorStarted = false; reader=null;
     floorConfig = C.floorConfig(run.floor);
+    const instance=dungeonOffer();
+    if(instance)floorConfig={...floorConfig,size:instance.size,name:instance.title,shiftSeconds:instance.shiftSeconds,monsterCount:0,narrative:'',environmentId:{archive:'library',bells:'echo',lantern:'furnace'}[instance.kind]};
     const settings = { mazeSize: CFG.mazeSize, itemCount: CFG.itemCount, foodCount: CFG.foodCount };
     const counts = itemConfig(); CFG.mazeSize = floorConfig.size; CFG.itemCount = counts.itemCount; CFG.foodCount = counts.foodCount;
     G.lvlIdx = floorConfig.themeIndex;
@@ -160,13 +173,137 @@
     }
     if (run.charIdx === 4 && !G.shovels && !G.shovelRechargeAt) G.shovelRechargeAt = performance.now() + shovelCdMs();
     updateShovelBtn(); updateKiteBtn(); updateWhistleBtn();
-    el('hudLvlName').textContent = floorConfig.name; el('hudRound').textContent = '劇情';
+    el('hudLvlName').textContent = floorConfig.name; el('hudRound').textContent = instance?'副本':'劇情';
     buildTowerEnvironment(); buildWorld(); gearVisual=null;gearSignature='';refreshGear();encounterHold = 0; soundChanged();
     floorStarted = true; saveClock = 0; attackLeft = 0; hurtLeft = 3; wasShifting = false;
     save(); updateHud();
+    if(instance){dungeonBriefing();return;}
+    if(N){
+      const chapter=N.chapterForFloor(run.floor),scene=run.floor===chapter.high&&N.scenesForFloor(run.floor).find(entry=>!run.chronicle.read.includes(entry.id));
+      if(scene){readStory(scene.id,true);return;}
+      if(intro)dialog('倒轉高塔 · 主線續章',floorConfig.name,N.objective(run),'<p class="tower-copy">每章中段尋找主線印記，章末出口需要印記。背包的故事日誌可重讀已抵達的章節。</p>'+floorFacts(),action('踏入迷宮','close')+action('故事日誌','journal'));
+      return;
+    }
     const narration = run.floor === 99 ? C.OPENING.text : floorConfig.narrative;
     if (intro || narration) dialog('第 ' + run.floor + ' 層 · ' + floorConfig.name, run.floor === 99 ? '我怎麼會在這裡？' : '向下的門，再次開啟', Array.isArray(narration) ? narration.join('\n\n') : (narration || '迷宮深處傳來金屬摩擦聲。找到下一扇門，繼續尋找召喚你的原因。'),
       '<p class="tower-copy">本層 ' + floorConfig.size + ' × ' + floorConfig.size + '｜物資 '+counts.total+' 件，不隨變形重生｜每 ' + floorConfig.shiftSeconds + ' 秒變形｜' + (floorConfig.monsterCount ? '武器只能擊暈，善用護衛合作' : '安全探索，先儲備補給') + '</p><p class="tower-copy">左側移動 · 右側看四周 · 背包／裝備 B · 互動 R · 擊暈 X · 空白鍵鐵鍬</p>', action('踏入迷宮', 'close'));
+  }
+  function floorFacts() {
+    const counts=itemConfig();
+    return '<p class="tower-copy">本層 '+floorConfig.size+' × '+floorConfig.size+' · 物資 '+counts.total+' 件 · 每 '+floorConfig.shiftSeconds+' 秒變形</p><p class="tower-copy">左側移動 · 右側看四周 · 背包 B · 互動 R · 故事日誌 J</p>';
+  }
+  function prose(paragraphs) { return '<div class="tower-prose">'+paragraphs.map(p=>'<p>'+text(p)+'</p>').join('')+'</div>'; }
+  function readStory(id,enter=false,page=0,exit=false) {
+    if(!N||!run)return;
+    const entry=N.availableScenes(run).find(s=>s.id===id);if(!entry)return;
+    page=Math.max(0,Math.min(entry.paragraphs.length-1,page));reader={id,page,enter,exit};
+    dialog('倒轉高塔 · 第 '+entry.floor+' 層 · '+(page+1)+' / '+entry.paragraphs.length,entry.title,'',prose([entry.paragraphs[page]]),
+      (page?action('上一頁','story-prev'):'')+(page<entry.paragraphs.length-1?action('下一頁','story-next'):action(exit?'收進日誌，走向門後':enter?'收進日誌，繼續探索':'收進日誌','story-finish'))+action(exit?'暫留本層':'稍後在日誌閱讀','close'));
+  }
+  function journal() {
+    if(!N||!run||G.shifting)return;
+    const unlocked=N.availableScenes(run),chapter=N.chapterForFloor(run.floor);
+    const entries=unlocked.slice().reverse().map(s=>'<article class="tower-journal-entry"><div><small>第 '+s.floor+' 層 · '+(run.chronicle.read.includes(s.id)?'已讀':'未讀')+'</small><h3>'+text(s.title)+'</h3></div>'+action('閱讀','story-read',s.id)+'</article>').join('');
+    const clues=N.CHAPTERS.filter(c=>run.chronicle.clues.includes(c.clueId));
+    const history=(run.expedition?.history||[]).slice(-5).reverse().map(h=>'第 '+h.floor+' 層 · '+({archive:'無聲信庫',bells:'逆時鐘室',lantern:'餘燼渡廊'}[h.kind])+' · '+({completed:'已完成',abandoned:'已退出',expired:'時間耗盡'}[h.outcome])).join('／');
+    dialog('旅人的手記 · '+run.chronicle.read.length+' / 30 幕',chapter.title,N.objective(run),'<section class="tower-guard-summary"><h3>歸途印記 '+clues.length+' / 10</h3><p>'+text(clues.map(c=>c.clueName).join('、')||'第一枚線索仍在塔中等待。')+'</p></section>'+entries+(history?'<p class="tower-copy">裂隙紀錄：'+text(history)+'</p>':''),action(active?'回到迷宮':'回首頁','close')+(run.chronicle.ending?action('閱讀我的結局','ending-read'):'')+(active?(inDungeon()?action('副本目標','dungeon-brief'):action('探索者委託','quest')):''));
+  }
+  function journeyMarker(label,tint,shape='clue') {
+    const model=new THREE.Group(),material=new THREE.MeshLambertMaterial({color:tint,emissive:tint,emissiveIntensity:.22});
+    const mesh=new THREE.Mesh(shape==='rift'?new THREE.TorusGeometry(.82,.12,6,22):new THREE.OctahedronGeometry(.44),material);mesh.position.y=1.15;model.add(mesh);
+    const base=new THREE.Mesh(new THREE.CylinderGeometry(.55,.68,.18,8),new THREE.MeshLambertMaterial({color:0x415564}));base.position.y=.1;model.add(base);
+    model.add(makePickupMarker(tint,label));model.userData.role=shape;model.userData.icon=mesh;return model;
+  }
+  function buildJourneyWorld(random,used) {
+    if(N){const chapter=N.chapterForFloor(run.floor);if(run.floor<=chapter.mid&&!run.chronicle.clues.includes(chapter.clueId)){const point=chooseCell(random,used),model=journeyMarker('主線・'+chapter.clueName,0xffdf83);model.position.set(point.x,0,point.z);world.add(model);mainClue={...point,model};}}
+    const offer=D&&D.offer(run);
+    if(offer){const point=chooseCell(random,used),model=journeyMarker('裂隙・'+offer.title,0x7fe2db,'rift');model.position.set(point.x,0,point.z);model.visible=run.expedition.discovered;world.add(model);rift={...point,model,offer};}
+  }
+  function nearEntity(item,distance=2.6) { return !!(item&&item.model.visible&&Math.hypot(G.px-item.model.position.x,G.pz-item.model.position.z)<distance&&hasClearPath(G.px,G.pz,item.model.position.x,item.model.position.z)); }
+  function updateJourneyNearby() {
+    nearbyJourney=[mainClue,rift,...dungeonObjects].filter(item=>nearEntity(item)).sort((a,b)=>Math.hypot(G.px-a.x,G.pz-a.z)-Math.hypot(G.px-b.x,G.pz-b.z))[0]||null;
+    if(nearbyJourney&&[nearest,nearestWarrior,nearbyEncounter].some(item=>item&&Math.hypot(G.px-item.model.position.x,G.pz-item.model.position.z)<Math.hypot(G.px-nearbyJourney.x,G.pz-nearbyJourney.z)))nearbyJourney=null;
+  }
+  function mainClueDialog() {
+    if(!N||inDungeon()||!nearEntity(mainClue))return;
+    const chapter=N.chapterForFloor(run.floor);
+    if(!transact(N.collectClue(run)))return;
+    mainClue.model.visible=false;nearbyJourney=null;
+    const scene=N.scenesForFloor(chapter.mid).find(entry=>!run.chronicle.read.includes(entry.id));
+    if(scene){readStory(scene.id,true);return;}
+    dialog('主線更新 · 歸途印記',chapter.clueName,N.objective(run),prose(chapter.clueText),action('繼續前進','close')+action('故事日誌','journal'));
+  }
+  function dungeonOrder(offer) { return offer.order.map(i=>['晨光','正午','星夜'][i]).join(' → '); }
+  function dungeonBriefing() {
+    const offer=dungeonOffer();if(!offer)return;
+    dialog('裂隙副本 · '+run.floor+' 層之外',offer.title,offer.description,'<section class="tower-guard-summary"><h3>'+text(offer.objective)+'</h3><p>'+(offer.kind==='bells'?'符印順序：'+text(dungeonOrder(offer))+'。敲錯會觸發陷阱並重設順序。':'找齊三個標記後抵達出口。')+'</p></section><p class="tower-copy">剩餘 '+Math.ceil(Math.max(0,offer.timeLimit-run.expedition.active.elapsed))+' 秒；暫停與變形時不計時。沒有普通物資，也不推進原層委託。裝備和補給照常消耗，護衛留在原層等候。中途退出不領獎。</p>',action('開始探索','close')+action('退出副本','dungeon-leave'));
+  }
+  function riftDialog() {
+    if(inDungeon()||!nearEntity(rift))return;
+    const offer=rift.offer;
+    dialog('隨機奇遇 · 裂隙副本',offer.title,offer.description,'<section class="tower-guard-summary"><h3>'+text(offer.objective)+'</h3><p>獨立 '+offer.size+' × '+offer.size+' 小迷宮 · '+offer.timeLimit+' 秒 · 每 '+offer.shiftSeconds+' 秒變形</p></section><p class="tower-copy">完成可獲銅幣與補給或強化裝備。任務與護衛留在原層；結束回到入口所在格。原層迷宮重新排列，但已拾取物不重生。每層裂隙只能挑戰一次。</p>',action('暫不進入','close')+action('進入副本','dungeon-enter',offer.id));
+  }
+  function enterDungeon(id) {
+    if(!D||inDungeon()||G.shifting||!nearEntity(rift))return;
+    syncEngine();const cell=worldToCell(G.px,G.pz),result=D.enter(run,id,{x:cell.x,y:cell.y,shiftLeft:Math.max(0,shiftLeft)},run.revision);
+    if(!transact(result))return;loadFloor(false);
+  }
+  function buildDungeonWorld(random,used) {
+    const offer=dungeonOffer();
+    for(let index=0;index<3;index++){
+      const point=chooseCell(random,used),label=offer.kind==='archive'?'失落信件 '+(index+1):offer.kind==='bells'?['晨光符印','正午符印','星夜符印'][index]:'渡廊燈 '+(index+1);
+      const model=new THREE.Group(),mat=new THREE.MeshLambertMaterial({color:0xd1b075,emissive:0x846633,emissiveIntensity:.15});
+      const icon=new THREE.Mesh(offer.kind==='archive'?new THREE.BoxGeometry(.72,.12,.48):offer.kind==='bells'?new THREE.CylinderGeometry(.35,.52,.65,8):new THREE.OctahedronGeometry(.38),mat);icon.position.y=1;model.add(icon);
+      const pedestal=new THREE.Mesh(new THREE.BoxGeometry(.65,.65,.65),new THREE.MeshLambertMaterial({color:0x556475}));pedestal.position.y=.32;model.add(pedestal);model.add(makePickupMarker(0xa6dfd9,label));
+      model.position.set(point.x,0,point.z);model.userData.role='dungeon-object';model.userData.index=index;world.add(model);dungeonObjects.push({...point,index,label,model,icon});
+    }
+    refreshDungeonObjects();
+  }
+  function refreshDungeonObjects() {
+    if(!inDungeon())return;
+    for(const item of dungeonObjects){const done=run.expedition.active.progress.includes(item.index);item.icon.material.color.setHex(done?0x79dfac:0xe1bd83);item.icon.material.emissiveIntensity=done?.55:.15;}
+  }
+  function dungeonObjectDialog(index) {
+    const item=dungeonObjects.find(o=>o.index===index);if(!inDungeon()||!nearEntity(item))return;
+    const offer=dungeonOffer(),done=run.expedition.active.progress.includes(index);
+    const fragments={archive:['「給仍在門邊等我的你：我已平安抵達。奇怪的是，塔裡的鐘聲一直沒有停。」信末的日期，被另一層墨水蓋住了。','「如果路又變了，請記住我們畫在門框的記號。不是每一封沒有回覆的信，都代表收信人忘記了你。」紙角繫著一小段紅線。','最後一封沒有地址，只寫著：「回家的時候，把這封信帶給還以為自己被遺忘的人。」你發現信紙的水印，和召喚台的紋路相同。'],lantern:['燈座上刻著：「第一盞留給先到的人。願你知道，這條路曾經有人走過。」','第二座燈裡剩著半截燈芯。旁邊的筆跡說：「我先走一段，替你看清下一個轉角。」','最後一座燈背後寫著：「如果你已經找到出口，請把光留給後來的人。」你聽見牆後傳來一聲很輕的道謝。']};
+    dialog(offer.title,item.label,done?'這處記號已經完成。':offer.kind==='bells'?'牆面的詩句提示了先後順序：'+dungeonOrder(offer):'讓這段被遺忘的記憶重新亮起。',fragments[offer.kind]?prose([fragments[offer.kind][index]]):'',action('返回迷宮','close')+(!done?action(offer.kind==='archive'?'收回信件':offer.kind==='bells'?'敲響符印':'點亮燈火','dungeon-interact',String(index)):''));
+  }
+  function interactDungeon(index) {
+    const item=dungeonObjects.find(o=>o.index===index);if(!inDungeon()||!nearEntity(item))return;
+    syncEngine();const result=D.interact(run,index,run.revision);if(!transact(result))return;
+    refreshDungeonObjects();closeDialog();
+    if(run.status==='dead'){defeat();return;}
+    showToast(result.message||'記憶已經亮起。',3000);
+    if(run.expedition.active.progress.length===3)showToast('副本目標完成！趕在時間內找到出口領取報酬。',3500);
+  }
+  function tickDungeon(dt,now) {
+    const result=D.tick(run,dt);if(!result.ok)return;run=result.run;
+    if(result.effect?.expired){finishDungeon('expired');return;}
+    nearbyEncounter=nearest=nearestWarrior=null;updateJourneyNearby();
+    for(const item of dungeonObjects)item.icon.rotation.y+=dt*.35;
+    if(run.effects.reveal>0)G.mapUntil=now+250;
+    hudClock+=dt;if(hudClock>.15){hudClock=0;updateHud();}
+    saveClock+=dt;if(saveClock>3){saveClock=0;save();}
+  }
+  function leaveDungeonDialog() {
+    if(!inDungeon())return;
+    dialog('退出副本確認','放下這段未完成的記憶？','退出後回到原層，不會領取獎勵，也不能在同一層重開這個副本。','',action('繼續挑戰','close')+action('確認退出副本','dungeon-abandon'));
+  }
+  function finishDungeon(outcome) {
+    if(!inDungeon())return;
+    syncEngine();const title=dungeonOffer().title,result=D.finish(run,outcome,run.revision);
+    if(!result.ok){dialog('副本尚未結算','請先整理背包',result.message,'',action('整理背包','bag')+action('放棄報酬並退出','dungeon-leave'));return;}
+    if(!transact(result)){dialog('副本尚未保存','請重試保存結算','這次結算尚未生效，報酬不會重複領取。副本倒數已暫停，請保持分頁開啟。','',action('重試保存','dungeon-settle',outcome));return;}
+    floorStarted=false;loadFloor(false);
+    const cell=result.effect.returnCell,p=cellToWorld(cell.x,cell.y);G.px=p.x;G.pz=p.z;playerGroup.position.set(p.x,0,p.z);shiftLeft=result.effect.returnShift;exitDeclined=true;restoreWarriorPosition();
+    if(explorer&&run.adventure.quest?.type==='escort')explorer.model.position.set(p.x,0,p.z);
+    save();updateHud();
+    dialog('回到第 '+run.floor+' 層',outcome==='completed'?title+' · 記憶歸還':outcome==='expired'?'裂隙的時間已盡':'你離開了裂隙',outcome==='completed'?'副本報酬：'+rewardDescription(result.effect.reward):'這次沒有帶出報酬。你的旅程仍能繼續，消耗的裝備與補給不會重置。','<p class="tower-copy">原層任務與主線保留；已拾取物、商店庫存與已擊敗怪物不重生。</p>',action('繼續旅程','close')+action('整理裝備','bag'));
+  }
+  function mapMarkers() {
+    if(!active)return [];
+    return [mainClue,rift,...dungeonObjects].filter(o=>o&&o.model.visible).map(o=>({cx:o.cx,cy:o.cy,label:o===mainClue?'印':o===rift?'裂':String(o.index+1),color:o===mainClue?'#ffe295':o===rift?'#8ee5df':run.expedition.active.progress.includes(o.index)?'#83e7ae':'#edc789'}));
   }
   function buildTowerEnvironment() {
     if (envGroup) { disposeSceneObject(envGroup); scene.remove(envGroup); }
@@ -223,7 +360,9 @@
     loot = []; monsters = []; traders = []; nearest = null; warriorNpc = nearestWarrior = escort = null;
     explorer=chest=relic=nearbyEncounter=null;lastSurveyCell='';exitDeclined=false;
     world = new THREE.Group(); scene.add(world);
+    mainClue=rift=nearbyJourney=null;dungeonObjects=[];exploredCells=new Set();
     const random = mulberry32(floorSeed() ^ 0x712da), used = new Set(['0,0', G.exitCell.x + ',' + G.exitCell.y]);
+    if(inDungeon()){buildDungeonWorld(random,used);return;}
     const originalPickups = [...(G.items||[]), ...(G.foods||[])];
     for(const item of originalPickups){const c=worldToCell(item.x,item.z);used.add(c.x+','+c.y);}
     for (const offer of E.merchantOffers(run.floor,run.seed)) {
@@ -246,17 +385,18 @@
       const point = chooseCell(random, used, Math.min(7, floorConfig.size - 1)), model = monsterModel(kind, strength);
       const alive = !run.defeatedMonsters.includes(id);
       model.position.set(point.x, 0, point.z); model.visible = alive; model.userData.monsterId=id; world.add(model);
-      monsters.push({ ...point, id, strength, kind, def, model, hp: def.hp || 60, alive, path: [], pathLeft: i * .15, windup: 0, cooldown: 2, phase: i });
+      monsters.push({ ...point, id, strength, kind, def, model, alive, path: [], pathLeft: i * .15, windup: 0, cooldown: 2, phase: i });
     }
     buildWarriors(used);
     const chestOffer=E.chestOffer(run.floor,run.seed);
     if(chestOffer){const point=chooseCell(random,used),model=V.buildChest({THREE});model.position.set(point.x,0,point.z);model.visible=!run.adventure.claimed.includes(chestOffer.id);world.add(model);chest={...point,offer:chestOffer,model};}
     const explorerOffer=E.explorerOffer(run);
-    if(explorerOffer){const point=chooseCell(random,used),model=V.buildExplorer({THREE,CHARS,buildCharacter});model.position.set(point.x,0,point.z);if(run.adventure.quest?.type==='escort'&&run.adventure.quest.status==='active')model.position.set(G.px,0,G.pz);const tag=makeTextSprite('探索者・伊芙');tag.position.y=2.6;model.add(tag);world.add(model);explorer={...point,offer:explorerOffer,model,path:[],pathLeft:0};}
+    if(explorerOffer){const identity=explorerOffer.explorer||{id:'eve',name:'伊芙',title:'探索者'},point=chooseCell(random,used),model=V.buildExplorer(identity.id,{THREE,CHARS,buildCharacter});model.position.set(point.x,0,point.z);if(run.adventure.quest?.type==='escort'&&run.adventure.quest.status==='active')model.position.set(G.px,0,G.pz);const tag=makeTextSprite(identity.title+'・'+identity.name);tag.position.y=2.6;model.add(tag);world.add(model);explorer={...point,offer:explorerOffer,model,path:[],pathLeft:0};}
     // 尋物目標獨立於消耗物資，種子固定，讀檔或變形不會重抽。
     const point=chooseCell(random,used),model=new THREE.Group();model.position.set(point.x,0,point.z);
     const gem=new THREE.Mesh(new THREE.OctahedronGeometry(.36),new THREE.MeshLambertMaterial({color:0xe3ccff}));gem.position.y=.8;model.add(gem);model.add(makePickupMarker(0xc49dff,'任務遺物'));
     model.visible=!!(run.adventure.quest&&run.adventure.quest.type==='relic'&&run.adventure.quest.status==='active');world.add(model);relic={...point,model};
+    buildJourneyWorld(random,used);
   }
   function monsterModel(kind, strength) {
     const group = new THREE.Group(), type = ['clockmite','wisp','sentinel','hound'].indexOf(kind);
@@ -349,7 +489,7 @@
     if(len<.15)escort.path.shift();
     escort.model.userData.legL.rotation.x=Math.sin(now*.009)*.35;escort.model.userData.legR.rotation.x=-Math.sin(now*.009)*.35;
   }
-  function floorSeed() { return (run.seed ^ Math.imul(run.floor, 7919)) | 0; }
+  function floorSeed() { return (run.seed ^ Math.imul(run.floor, 7919) ^ (inDungeon()?0x7316dea:0)) | 0; }
   function soundChanged() {
     if(!active||!window.TowerAudio)return;
     AudioEng.stopMusic(); AudioEng.resume();
@@ -359,7 +499,7 @@
     window.TowerAudio.setEncounter(encounterHold>0);
     window.TowerAudio.setPaused(paused);
   }
-  function scheduleShift() { shiftLeft = C.floorConfig(run.floor).shiftSeconds; warning = false; G.preWarned = false; }
+  function scheduleShift() { shiftLeft = dungeonOffer()?.shiftSeconds || C.floorConfig(run.floor).shiftSeconds; warning = false; G.preWarned = false; }
   function updateShift() {
     if (!active) return;
     el('shiftCountdown').textContent = Math.ceil(Math.max(0, shiftLeft)) + '秒';
@@ -383,8 +523,11 @@
     const effects = Object.entries(run.effects).filter(([,v])=>v>0).map(([k,v])=>({shield:'護盾',freeze:'定牆',repel:'驅怪',reveal:'回聲地圖'}[k])+' '+Math.ceil(v)+'秒');
     el('towerObjective').textContent = nearestWarrior ? '戰士 '+nearestWarrior.offer.strength+'/5 · '+costText(nearestWarrior.offer.cost)+' · 點「聘請」查看契約' : effects.length ? effects.join(' · ') : nearest ? nearest.name + '：靠近後可購買／出售補給' : '找到金色傳送門，前往' + (run.floor > 1 ? '第 ' + (run.floor - 1) + ' 層' : '塔外');
     const q=run.adventure.quest;
-    if(nearbyEncounter)el('towerObjective').textContent=nearbyEncounter===chest?'封印寶箱 · 可能藏著強化裝備，也可能是陷阱':'探索者・伊芙 · 對話查看委託';
+    if(nearbyEncounter)el('towerObjective').textContent=nearbyEncounter===chest?'封印寶箱 · 可能藏著強化裝備，也可能是陷阱':explorerName()+' · 對話查看委託';
     else if(q&&q.status!=='claimed'&&!nearest&&!nearestWarrior)el('towerObjective').textContent=(E.explorerOffer(run)?.title||'探索者委託')+' · '+q.progress+'/'+q.goal+(q.status==='ready'?' · 報酬待領':'');
+    else if(N&&!nearest&&!nearestWarrior)el('towerObjective').textContent=N.objective(run);
+    if(inDungeon()){const offer=dungeonOffer(),state=run.expedition.active;el('towerFloor').textContent='裂隙 · '+run.floor+' F';el('towerObjective').textContent=offer.title+' · '+state.progress.length+'/3 · 剩 '+Math.ceil(Math.max(0,offer.timeLimit-state.elapsed))+' 秒'+(offer.kind==='bells'?' · '+dungeonOrder(offer):'');el('towerAttackBtn').disabled=true;el('towerAttackBtn').textContent='探索試煉';}
+    if(nearbyJourney){el('towerTalkBtn').disabled=false;el('towerTalkBtn').textContent=nearbyJourney===rift?'裂隙 R':nearbyJourney===mainClue?'印記 R':'調查 R';el('towerObjective').textContent=nearbyJourney===rift?'裂隙副本 · 自願進入，結束回到原層':nearbyJourney===mainClue?'主線印記 · '+N.chapterForFloor(run.floor).clueName:el('towerObjective').textContent;}
     document.body.classList.toggle('tower-danger',run.hp<=25);
   }
   function tick(dt, now) {
@@ -395,7 +538,7 @@
       monsters.forEach(m=>{ const c=worldToCell(m.model.position.x,m.model.position.z),p=cellToWorld(c.x,c.y);m.model.position.set(p.x,0,p.z);m.path=[];m.pathLeft=0;m.windup=0;m.cooldown=2; });
       restoreWarriorPosition();
       if(explorer&&run.adventure.quest?.type==='escort'){explorer.model.position.set(G.px,0,G.pz);explorer.path=[];explorer.pathLeft=0;}
-      questEvent('shift',{id:'shift-'+Math.floor(run.floorElapsed*1000)});
+      if(!inDungeon())questEvent('shift',{id:'shift-'+Math.floor(run.floorElapsed*1000)});
       if (run.effects.reveal>0) { const p=worldToCell(G.px,G.pz); G.solutionPath=solveMaze(p.x,p.y); }
     }
     if (paused || !G.running || G.frozen || G.shifting || run.status !== 'playing') return;
@@ -405,9 +548,12 @@
     if (run.effects.freeze<=0) shiftLeft -= dt;
     attackLeft=Math.max(0,attackLeft-dt);hurtLeft=Math.max(0,hurtLeft-dt);
     if (G.satiety<=0 && hurtLeft<=0) damage(3,'hunger');
+    if(run.status!=='playing')return;
     const portal=cellToWorld(G.exitCell.x,G.exitCell.y);if(Math.hypot(G.px-portal.x,G.pz-portal.z)>2.2)exitDeclined=false;
+    if(inDungeon()){tickDungeon(dt,now);return;}
     const pc=worldToCell(G.px,G.pz),cellKey=pc.x+','+pc.y;
-    if(cellKey!==lastSurveyCell){lastSurveyCell=cellKey;questEvent('survey',pc);}
+    if(cellKey!==lastSurveyCell){lastSurveyCell=cellKey;questEvent('survey',pc);exploredCells.add(cellKey);}
+    if(rift&&!rift.model.visible&&exploredCells.size>=3){const result=D.discover(run);if(result.ok){run=result.run;rift.model.visible=true;save();showToast('牆縫裡出現了異色裂隙，小地圖「裂」標記可找到入口。',4000);}}
     updateExplorer(dt,now);
     if(relic&&relic.model.visible&&Math.hypot(G.px-relic.x,G.pz-relic.z)<1.1&&hasClearPath(G.px,G.pz,relic.x,relic.z)){questEvent('relic',{id:run.adventure.quest.target});relic.model.visible=false;save();}
     for (const item of loot) {
@@ -424,6 +570,7 @@
     const closeEntities=[chest,explorer].filter(n=>n&&n.model.visible&&Math.hypot(G.px-n.model.position.x,G.pz-n.model.position.z)<2.6&&hasClearPath(G.px,G.pz,n.model.position.x,n.model.position.z));
     nearbyEncounter=closeEntities.sort((a,b)=>Math.hypot(G.px-a.model.position.x,G.pz-a.model.position.z)-Math.hypot(G.px-b.model.position.x,G.pz-b.model.position.z))[0]||null;
     if(nearbyEncounter){const d=Math.hypot(G.px-nearbyEncounter.model.position.x,G.pz-nearbyEncounter.model.position.z);if([nearest,nearestWarrior].some(n=>n&&Math.hypot(G.px-n.x,G.pz-n.z)<d))nearbyEncounter=null;}
+    updateJourneyNearby();
     updateWarrior(dt,now);
     for(const monster of monsters) updateMonster(monster,dt,now);
     const threat=!nearest&&run.effects.repel<=0&&!(now<G.invisUntil)&&monsters.some(m=>m.alive&&!isHeld(m)&&!(run.monsterStuns[m.id]>0)&&Math.hypot(G.px-m.model.position.x,G.pz-m.model.position.z)<m.def.sight&&(m.path.length>0||m.windup>0));
@@ -480,7 +627,7 @@
     if(run.hp<=0||run.status==='dead')defeat();else save();updateHud();
   }
   function attack() {
-    if(!active||paused||G.frozen||!G.running||attackLeft>0)return;
+    if(!active||paused||G.frozen||!G.running||inDungeon()||attackLeft>0)return;
     if(!run.equipment.weapon){showToast('請先在背包裝備球棒、平底鍋或木杖。');return;}
     attackLeft=.8;
     const target=monsters.filter(m=>m.alive&&Math.hypot(G.px-m.model.position.x,G.pz-m.model.position.z)<2.8&&hasClearPath(G.px,G.pz,m.model.position.x,m.model.position.z)).sort((a,b)=>Math.hypot(G.px-a.model.position.x,G.pz-a.model.position.z)-Math.hypot(G.px-b.model.position.x,G.pz-b.model.position.z))[0];
@@ -527,7 +674,10 @@
   }
   function transact(result) {
     if(!result.ok){showToast(result.message||'目前無法進行');return false;}
-    run=result.run;G.satiety=run.hunger;refreshGear();save();updateHud();return true;
+    const previous=run,previousHunger=G.satiety;
+    run=result.run;G.satiety=run.hunger;
+    if(!save()){run=previous;G.satiety=previousHunger;showToast('未能保存，這次操作尚未生效。請保持分頁開啟並重試。',4000);return false;}
+    refreshGear();updateHud();return true;
   }
   function refreshGear() {
     if(!active||!run?.equipment||typeof playerGroup==='undefined'||!playerGroup||!V)return;
@@ -549,6 +699,7 @@
     return '<article class="tower-item tower-gear-card'+(gear.bonus?' rare':'')+'"><h3>'+text(gear.name)+(equipped?' <small>穿戴中</small>':'')+'</h3><p>'+text(gearDescription(gear))+'</p><meter min="0" max="'+gear.maxDurability+'" value="'+gear.durability+'" aria-label="耐久度"></meter>'+(!equipped?action('裝備','equip',gear.id):'')+action('捨棄','discard-ask',gear.id)+'</article>';
   }
   function questEvent(event,data) {
+    if(inDungeon())return false;
     const q=run?.adventure?.quest;
     if(!q||q.status!=='active'||q.type!==event)return false;
     const result=E.questProgress(run,event,data);if(!result.ok)return false;
@@ -572,7 +723,7 @@
   function questDialog() {
     if(!active||G.shifting||run.status!=='playing')return;
     const offer=E.explorerOffer(run),q=run.adventure.quest;
-    if(!offer||(!q&&!nearExplorer())){dialog('探索者委託','目前沒有委託','探索者伊芙有 20% 機會出現在每一層；靠近她可查看委託。','',action('回到迷宮','close'));return;}
+    if(!offer||(!q&&!nearExplorer())){dialog('探索者委託','目前沒有委託','每層有 20% 機會遇見五位探索者之一；他們的委託都隨機抽選。靠近本人可查看委託。','',action('回到迷宮','close'));return;}
     if(explorer)explorer.offer=offer;
     const target=monsters.find(m=>m.id===offer.target);
     const copy=offer.description+(target?' 目標：'+target.def.name+'（原始強度 '+target.strength+'/5）；接受後頭頂會標示「委託目標」。':'')+(q?' 進度 '+q.progress+' / '+q.goal:'');
@@ -580,7 +731,7 @@
     if(!q)actions+=action('接受委託','quest-accept',offer.id,!nearExplorer());
     else if(q.status==='ready')actions+=action('領取報酬','quest-reward',null,!nearExplorer());
     else if(q.status==='active'&&q.type==='donate')actions+=action('交付 '+q.goal+' 份'+C.ITEMS[q.target].name,'quest-donate',null,!nearExplorer()||run.bag[q.target]<q.goal);
-    dialog('探索者・伊芙',q?.status==='claimed'?'感謝你的幫助':offer.title,copy,'<section class="tower-guard-summary"><h3>完成報酬</h3><p>'+text(rewardDescription(offer.reward))+'</p></section><p class="tower-copy">離開本層、保存回首頁或重整挑戰會解除未結案委託；報酬必須向探索者領取。進出口前會再次確認。裝備放入行囊後請自行穿戴。</p>',actions);
+    dialog(explorerName(),q?.status==='claimed'?'感謝你的幫助':offer.title,copy,(!q?'<p class="tower-copy">'+text(explorerIdentity().greeting||'')+'</p>':'')+'<section class="tower-guard-summary"><h3>完成報酬</h3><p>'+text(rewardDescription(offer.reward))+'</p></section><p class="tower-copy">離開本層、保存回首頁或重整挑戰會解除未結案委託；報酬必須向探索者領取。進出口前會再次確認。裝備放入行囊後請自行穿戴。</p>',actions);
   }
   function chestDialog() {
     if(!chest||!chest.model.visible)return;
@@ -599,9 +750,11 @@
     syncEngine();
     const cards=Object.entries(C.ITEMS).filter(([id])=>id!=='coin').map(([id,item])=>'<article class="tower-item"><h3>'+text(item.name)+' <span>×'+(run.bag[id]||0)+'</span></h3><p>'+text(item.description||item.desc||'高塔冒險補給')+'</p>'+action(id==='feather'?'瀕死自動使用':'使用','use',id,!run.bag[id]||id==='feather')+'</article>').join('');
     const stats=C.equipmentStats(run),worn=Object.values(run.equipment).filter(Boolean).map(g=>gearCard(g,true)).join(''),stored=run.gearBag.map(g=>gearCard(g)).join('');
-    dialog('旅人背包 · 暫停中','裝備與補給','生命 '+Math.ceil(run.hp)+' / 100 · 飽足 '+Math.ceil(run.hunger)+'% · 銅幣 '+run.coins,'<section class="tower-guard-summary"><h3>防禦 '+stats.defense+' · 強化 +'+stats.bonus+' · 擊暈 '+stats.stunSeconds+' 秒</h3><p>每次命中，三件已穿防具各減 1 耐久；武器命中減 1。每點已穿裝備強化增加 10 秒擊暈，耐久耗盡即損壞。</p></section><h3>穿戴中</h3><div class="tower-grid">'+(worn||'<p>尚未穿戴裝備。</p>')+'</div><h3 class="tower-section-title">裝備行囊 '+run.gearBag.length+'/24</h3><div class="tower-grid">'+(stored||'<p>商人與寶箱取得的裝備會放在這裡。</p>')+'</div><h3 class="tower-section-title">生存補給</h3><div class="tower-grid">'+cards+'</div><section class="tower-guard-summary"><h3>'+text(warriorStatus())+'</h3></section>'+warriorRules(),action('任務日誌','quest')+action('回到迷宮','close')+action('保存並離開','quit'));
+    dialog('旅人背包 · 暫停中','裝備與補給','生命 '+Math.ceil(run.hp)+' / 100 · 飽足 '+Math.ceil(run.hunger)+'% · 銅幣 '+run.coins,'<section class="tower-guard-summary"><h3>防禦 '+stats.defense+' · 強化 +'+stats.bonus+' · 擊暈 '+stats.stunSeconds+' 秒</h3><p>每次命中，三件已穿防具各減 1 耐久；武器命中減 1。每點已穿裝備強化增加 10 秒擊暈，耐久耗盡即損壞。</p></section><h3>穿戴中</h3><div class="tower-grid">'+(worn||'<p>尚未穿戴裝備。</p>')+'</div><h3 class="tower-section-title">裝備行囊 '+run.gearBag.length+'/24</h3><div class="tower-grid">'+(stored||'<p>商人與寶箱取得的裝備會放在這裡。</p>')+'</div><h3 class="tower-section-title">生存補給</h3><div class="tower-grid">'+cards+'</div><section class="tower-guard-summary"><h3>'+text(warriorStatus())+'</h3></section>'+warriorRules(),(N?action('故事日誌','journal'):'')+action('任務日誌','quest')+(inDungeon()?action('副本目標','dungeon-brief'):'')+action('回到迷宮','close')+action('保存並離開','quit'));
   }
   function trade() {
+    if(!active||G.shifting||run.status!=='playing')return;
+    if(nearbyJourney){if(nearbyJourney===mainClue)mainClueDialog();else if(nearbyJourney===rift)riftDialog();else dungeonObjectDialog(nearbyJourney.index);return;}
     if(nearbyEncounter){if(nearbyEncounter===chest)chestDialog();else questDialog();return;}
     if(nearestWarrior){warriorDialog();return;}
     if(!active||G.shifting||!nearest||run.status!=='playing')return;
@@ -620,6 +773,15 @@
   }
   function reachExit(confirmed=false) {
     if(!active||paused||!G.running||run.status!=='playing'||(exitDeclined&&!confirmed))return;
+    if(inDungeon()){
+      exitDeclined=true;
+      if(run.expedition.active.progress.length===3){finishDungeon('completed');return;}
+      dialog('副本出口','還有記憶沒有帶回','目前已完成 '+run.expedition.active.progress.length+' / 3；完成後再回來領取報酬。','',action('繼續尋找','close')+action('退出副本','dungeon-leave'));return;
+    }
+    if(N&&!N.canDescend(run)){
+      exitDeclined=true;const chapter=N.chapterForFloor(run.floor);
+      dialog('主線尚未完成','門上缺少一枚印記','找到「'+chapter.clueName+'」才能打開下一章的門。小地圖金色「印」標記指向線索，靠近後按「印記 R」。','',action('返回尋找','close')+action('故事日誌','journal'));return;
+    }
     let q=run.adventure.quest;
     if(q&&q.status!=='claimed'&&!confirmed){
       const portal=cellToWorld(G.exitCell.x,G.exitCell.y);
@@ -627,20 +789,24 @@
       q=run.adventure.quest;exitDeclined=true;
       dialog('出口確認',q.status==='ready'?'還有委託報酬尚未領取':'本層還有進行中的委託','下降後會解除本層委託，尚未領取的報酬也會失去。你可以先繼續探索。','<p class="tower-copy">'+text(E.explorerOffer(run)?.title||'探索者委託')+' · '+q.progress+'/'+q.goal+'</p>',action('留在本層','close')+(q.status==='ready'&&nearExplorer()?action('領取報酬並下降','exit-reward'):'')+action('放棄委託並下降','exit-confirm'));return;
     }
-    syncEngine();G.running=false;const result=C.descend(run);
-    if(!result.ok){G.running=true;return;}run=result.run;floorStarted=false;const saved=save();
-    if(run.status==='won'){dialog('塔外的第一道晨光','你找到了回家的路',C.ENDING.text,'<p class="tower-copy">99 層旅程完成。你保住的不只是自己的生命，還有其他旅人的希望。</p>',action('回到首頁','home'));return;}
+    if(N&&run.floor===N.chapterForFloor(run.floor).low){const scene=N.scenesForFloor(run.floor).find(entry=>!run.chronicle.read.includes(entry.id));if(scene){exitDeclined=true;readStory(scene.id,false,0,true);return;}}
+    if(N&&run.floor===1&&!run.chronicle.ending){exitDeclined=true;dialog('主線終章 · 由你決定','把這座塔帶往哪裡？','三條路都不必犧牲任何人。這一次，高塔會等待你的回答。','<div class="tower-grid">'+N.ENDINGS.map(ending=>'<article class="tower-item"><h3>'+text(ending.title)+'</h3><p>'+text(ending.description)+'</p>'+action('選擇這條歸途','ending',ending.id)+'</article>').join('')+'</div>',action('再想一想','close'));return;}
+    syncEngine();const result=C.descend(run);
+    if(!transact(result))return;G.running=false;floorStarted=false;const saved=true;
+    if(run.status==='won'){const ending=N&&N.ENDINGS.find(e=>e.id===run.chronicle.ending);dialog('塔外的第一道晨光',ending?ending.title:'你找到了回家的路',ending?'九十九層的旅程，終於有了你的答案。':C.ENDING.text,ending?prose(ending.paragraphs):'<p class="tower-copy">99 層旅程完成。你保住的不只是自己的生命，還有其他旅人的希望。</p>',action('回到首頁','home'));return;}
     dialog('本層探索完成','門後，是第 '+run.floor+' 層','下一層的迷宮更接近高塔心臟。補給與職業工具會隨你繼續旅程。','<p class="tower-copy">生命 '+Math.ceil(run.hp)+' · 銅幣 '+run.coins+' · '+(saved?'已自動保存':'儲存失敗，請勿關閉分頁')+'</p>',action('繼續下降','descend')+action('保存並回首頁','home'));
   }
   function defeat() {
     if(!active)return;
-    G.running=false;run.status='dead';run.hp=0;save();
+    G.running=false;run.status='dead';run.hp=0;
+    if(inDungeon()){const result=D.finish(run,'abandoned',run.revision);if(result.ok)run=result.run;}
+    save();
     dialog('高塔仍在等待','這次旅程暫時停下','冒險者把你帶回本層入口。可以付出最多 12 枚銅幣重整行裝；已拾取的補給不會重複出現，未結案委託會解除。', '',action('重整後再挑戰','retry')+action('回首頁','home'));
   }
   function pauseMenu() { dialog('旅程已暫停','隨時可以繼續','切回遊戲後按繼續，牆壁倒數與怪物都會等待你。選擇保存回首頁會解除本層未結案委託。','',action('繼續探索','close')+action('保存並回首頁','home')); }
   function requestQuit() {
     if(G.shifting){showToast('請等牆壁移動完成再離開（約 2 秒）');return;}
-    dialog('離開確認','保存這段旅程？','將保存職業、裝備、樓層、背包與生命；下次從目前樓層入口繼續。本層未結案委託會解除，未領取報酬會失去。','',action('繼續遊戲','close')+action('保存並回首頁','home'));
+    dialog('離開確認','保存這段旅程？','將保存職業、裝備、主線與背包。'+(inDungeon()?'副本進度與剩餘時間保留，下次從副本入口繼續。':'下次從目前樓層入口繼續。')+'本層探索者未結案委託會解除，未領取報酬會失去。','',action('繼續遊戲','close')+action('保存並回首頁','home'));
   }
   function cancelFloorQuest() {
     if(!run.adventure.quest||run.adventure.quest.status==='claimed')return;
@@ -667,6 +833,20 @@
     if(key==='quit'){requestQuit();return;}
     if(key==='retry'){run.status='playing';run.hp=100;run.hunger=Math.max(65,run.hunger);run.coins=Math.max(0,run.coins-12);cancelFloorQuest();enter();return;}
     if(key==='bag'){inventory();return;}
+    if(key==='journal'){journal();return;}
+    if(key==='story-archive'){const saved=readSave();if(N&&saved?.status==='won'){run=saved;journal();}return;}
+    if(key==='ending-read'){const ending=N&&N.ENDINGS.find(e=>e.id===run?.chronicle.ending);if(ending)dialog('已完成的歸途',ending.title,'',prose(ending.paragraphs),action('回故事日誌','journal'));return;}
+    if(key==='story-read'){readStory(id);return;}
+    if(key==='story-next'&&reader){readStory(reader.id,reader.enter,reader.page+1,reader.exit);return;}
+    if(key==='story-prev'&&reader){readStory(reader.id,reader.enter,reader.page-1,reader.exit);return;}
+    if(key==='story-finish'&&reader){const entry=reader;if(run.chronicle.read.includes(entry.id)||transact(N.readScene(run,entry.id))){reader=null;if(entry.exit){closeDialog();reachExit(true);}else if(entry.enter)closeDialog();else journal();}return;}
+    if(key==='ending'){if(N&&transact(N.chooseEnding(run,id))){closeDialog();reachExit(true);}return;}
+    if(key==='dungeon-enter'){enterDungeon(id);return;}
+    if(key==='dungeon-brief'){dungeonBriefing();return;}
+    if(key==='dungeon-interact'){interactDungeon(Number(id));return;}
+    if(key==='dungeon-leave'){leaveDungeonDialog();return;}
+    if(key==='dungeon-abandon'){finishDungeon('abandoned');return;}
+    if(key==='dungeon-settle'){finishDungeon(id);return;}
     if(key==='equip'){if(transact(C.equipGear(run,id,run.revision)))inventory();return;}
     if(key==='discard-ask'){const gear=[...run.gearBag,...Object.values(run.equipment)].find(g=>g&&g.id===id);if(gear)dialog('捨棄裝備確認','捨棄'+gear.name+'？','捨棄後不能取回，若這是最後一把武器，你會暫時無法擊暈怪物。','',action('保留裝備','bag')+action('確認捨棄','discard',id));return;}
     if(key==='discard'){if(transact(C.discardGear(run,id,run.revision)))inventory();return;}
@@ -685,6 +865,6 @@
       if(transact(result))trade();return;
     }
   }
-  window.TowerMode = { get active(){return active;}, get paused(){return paused;}, open, beginNew, tick, floorSeed, scheduleShift, updateShift, reachExit, defeat, requestQuit, canCollectOriginal, collectedOriginal, itemConfig, reservedCells, preserveFloorPickups, soundChanged };
+  window.TowerMode = { get active(){return active;}, get paused(){return paused;}, open, beginNew, tick, floorSeed, scheduleShift, updateShift, reachExit, defeat, requestQuit, canCollectOriginal, collectedOriginal, itemConfig, reservedCells, preserveFloorPickups, soundChanged, mapMarkers };
   install();
 })();

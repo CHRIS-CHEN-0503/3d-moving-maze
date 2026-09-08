@@ -6,11 +6,14 @@ import vm from 'node:vm';
 
 const require = createRequire(import.meta.url);
 const core = require('../story/story-core.js');
+const narrative = require('../story/tower-narrative.js');
 const fresh = () => core.newRun({ name: '尋路人', charIdx: 4, seed: 12345 });
 
-test('browser script exposes the same standalone TowerCore contract', () => {
+test('browser modules expose the same TowerCore contract after dependency loading', () => {
   const context = vm.createContext({});
-  vm.runInContext(readFileSync(new URL('../story/story-core.js', import.meta.url), 'utf8'), context);
+  for (const filename of ['story-core.js', 'tower-narrative.js', 'tower-dungeons.js']) {
+    vm.runInContext(readFileSync(new URL('../story/' + filename, import.meta.url), 'utf8'), context);
+  }
   assert.equal(context.TowerCore.floorConfig(99).size, 7);
   assert.equal(context.TowerCore.newRun({ seed: 1 }).stateVersion, 1);
 });
@@ -172,6 +175,16 @@ test('a complete 99-floor journey saves at each boundary and reaches the ending 
   let run = fresh();
   for (let floor = 99; floor >= 1; floor -= 1) {
     assert.equal(run.floor, floor);
+    if (floor === narrative.chapterForFloor(floor).mid) {
+      const clue = narrative.collectClue(run);
+      assert.equal(clue.ok, true);
+      run = clue.run;
+    }
+    if (floor === 1) {
+      const ending = narrative.chooseEnding(run, 'release');
+      assert.equal(ending.ok, true);
+      run = ending.run;
+    }
     const result = core.descend(run, run.revision);
     assert.equal(result.ok, true);
     assert.ok(core.validateSave(result.run));
@@ -184,6 +197,38 @@ test('a complete 99-floor journey saves at each boundary and reaches the ending 
   assert.equal(core.collect(run, 'coin', 10).ok, false);
   assert.match(core.OPENING.text, /第九十九層/);
   assert.ok(core.CHAPTERS.every((chapter) => core.floorConfig(chapter.high).narrative));
+});
+
+test('core chapter gates reject direct descent without clues and require a chosen ending at floor one', () => {
+  for (const chapter of narrative.CHAPTERS) {
+    const run = fresh();run.floor = chapter.low;run.floorsCleared = 99 - chapter.low;
+    const before = JSON.stringify(run);
+    assert.equal(narrative.canDescend(run), false);
+    const blocked = core.descend(run, run.revision);
+    assert.equal(blocked.ok, false);
+    assert.equal(blocked.run, run);
+    assert.equal(JSON.stringify(run), before, 'Rejected gates must not award coins or clear floor state');
+    const withClue = narrative.collectClue(run).run;
+    assert.equal(narrative.canDescend(withClue), true);
+    if (chapter.low === 1) {
+      assert.equal(core.descend(withClue).ok, false, 'The final clue alone must not select an ending for the player');
+      const chosen = narrative.chooseEnding(withClue, 'keeper').run;
+      const finished = core.descend(chosen);
+      assert.equal(finished.ok, true);
+      assert.equal(finished.run.status, 'won');
+      assert.equal(finished.run.chronicle.ending, 'keeper');
+    } else assert.equal(core.descend(withClue).ok, true);
+  }
+});
+
+test('previously completed legacy saves remain readable without inventing an ending choice', () => {
+  const old = fresh();old.floor = 1;old.floorsCleared = 99;old.status = 'won';
+  delete old.chronicle;delete old.expedition;
+  const restored = core.validateSave(JSON.stringify(old));
+  assert.ok(restored);
+  assert.equal(restored.status, 'won');
+  assert.equal(restored.chronicle.ending, null);
+  assert.equal(core.descend(restored).ok, false);
 });
 
 test('engine inventory, cooldowns and claimed pickups persist and only floor-local claims reset', () => {

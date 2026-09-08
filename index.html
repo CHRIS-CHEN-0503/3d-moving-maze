@@ -968,7 +968,7 @@ button:focus-visible,input:focus-visible{outline:3px solid #fff;outline-offset:3
    3D移動迷宮 — 給小朋友的變形迷宮冒險
    ===================================================== */
 const $=id=>document.getElementById(id);
-const GAME_VERSION='1.21.0';
+const GAME_VERSION='1.22.0';
 
 /* ---------- 設定（後台可調） ---------- */
 const DEFAULT_CFG={shiftMin:3,itemCount:6,foodCount:4,hungerMin:3,stunSec:3,pingSec:3,smellCells:3,mazeSize:13,musicOn:1,apiUrl:'',roomMax:3,rounds:3,goodsCount:16,shopMin:2.5,cartFull:400,views:{fp:1,tp:1,top:1},broker:'wss://broker.emqx.io:8084/mqtt'};
@@ -2784,6 +2784,16 @@ function drawMap(cv,big){
   };
   // 出口（搶購模式沒有出口就不畫）
   if(!isShop())mark('🚩',G.exitCell.x,G.exitCell.y);
+  if(window.TowerMode&&TowerMode.active&&TowerMode.mapMarkers){
+    ctx.save();
+    for(const m of TowerMode.mapMarkers()){
+      const px=gx(m.cx)+cw/2,py=gy(m.cy)+ch/2,r=big?13:7;
+      ctx.beginPath();ctx.arc(px,py,r,0,Math.PI*2);ctx.fillStyle='#152638';ctx.fill();
+      ctx.strokeStyle=m.color;ctx.lineWidth=1.5;ctx.stroke();ctx.fillStyle=m.color;
+      ctx.font='bold '+(big?17:10)+'px sans-serif';ctx.textAlign='center';ctx.textBaseline='middle';ctx.fillText(m.label,px,py);
+    }
+    ctx.restore();
+  }
   // 🛒 搶購模式：收銀機 + 商品位置
   if(isShop()){
     for(const r of (G.registers||[]))mark('💳',r.cx,r.cy);
@@ -4847,6 +4857,8 @@ window.addEventListener('beforeunload',e=>{
 window.addEventListener('pagehide',()=>{ if(MP.on)try{mpSend({t:'bye'});}catch(e){} });
 </script>
 <script src="story/story-core.js"></script>
+<script src="story/tower-narrative.js"></script>
+<script src="story/tower-dungeons.js"></script>
 <script src="story/tower-encounters.js"></script>
 <script src="story/tower-characters.js"></script>
 <script src="story/tower-audio.js"></script>

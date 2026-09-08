@@ -271,6 +271,12 @@ button, input, select { -webkit-font-smoothing: antialiased; }
 .tower-guard-status[hidden] { display: none; }
 .tower-gear-status { font-size: 12px; color: #bad2de; padding-top: 4px; font-variant-numeric: tabular-nums; }
 .tower-section-title { margin-top: 22px !important; padding-top: 16px; border-top: 1px solid #415369; }
+.tower-prose { max-width: 660px; margin: 14px auto 18px; padding: 8px 20px; border-left: 2px solid #ac956a; background: linear-gradient(110deg, #26344380, transparent); }
+.tower-card .tower-prose p { margin: 12px 0; font-family: "Noto Serif TC", "Songti TC", serif; font-size: clamp(18px, 2.3vw, 22px); line-height: 1.85; letter-spacing: .055em; color: #eee5d3; }
+.tower-journal-entry { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 14px 0; border-bottom: 1px solid #455469; }
+.tower-journal-entry h3 { margin: 5px 0 0; color: #e8d3a8; font-size: 18px; }
+.tower-journal-entry small { color: #bacad5; font-size: 13px; }
+.tower-journal-entry .tower-btn { min-width: 72px; flex: 0 0 auto; }
 .tower-gear-card { border-color: #879baf !important; }
 .tower-gear-card.rare { border-color: #c8aa68 !important; background: linear-gradient(135deg, #403d42, #15263a) !important; }
 .tower-gear-card small { color: #83d5cb; font-size: 12px; white-space: nowrap; }

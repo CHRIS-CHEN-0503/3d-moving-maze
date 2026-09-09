@@ -37,6 +37,10 @@
     if(inDungeon())return sideStory(run.expedition.active.kind)?.palette||{archive:[0x718291,0xaea38f,0x9b9387,0xf1d29e,'books'],bells:[0x617b94,0x92aaba,0x8c99a8,0x91e5e7,'crystal'],lantern:[0x77748b,0xb8a58e,0x9a9295,0xffc878,'fire']}[run.expedition.active.kind];
     return ENVIRONMENTS[Math.max(0, Math.min(9, floorConfig.chapter - 1))];
   }
+  function atmosphereStyle() {
+    const [,wall,ground,accent,style]=environmentSpec();
+    return {style,palette:{wall,ground,accent},seed:floorSeed()};
+  }
   const text = escapeHtml;
   const el = id => document.getElementById(id);
 
@@ -602,6 +606,10 @@
     if(ticked.effect && ticked.effect.warriorReleased){dismissEscort();showToast('護衛已盡力撤退，怪物將恢復追擊！',3500);save();}
     if (run.effects.freeze<=0) shiftLeft -= dt;
     attackLeft=Math.max(0,attackLeft-dt);hurtLeft=Math.max(0,hurtLeft-dt);
+    if(gearVisual?.userData.weapon){
+      if(window.CharacterMotion)window.CharacterMotion.worldWeaponPose(gearVisual.userData.weapon,playerGroup,1-attackLeft/.8);
+      else gearVisual.userData.weapon.rotation.x=.25+Math.sin((.8-attackLeft)/.8*Math.PI)*1.35;
+    }
     if (G.satiety<=0 && hurtLeft<=0) damage(3,'hunger');
     if(run.status!=='playing')return;
     const portal=cellToWorld(G.exitCell.x,G.exitCell.y);if(Math.hypot(G.px-portal.x,G.pz-portal.z)>2.2)exitDeclined=false;
@@ -629,7 +637,6 @@
     updateWarrior(dt,now);
     for(const monster of monsters) updateMonster(monster,dt,now);
     const threat=!nearest&&run.effects.repel<=0&&!(now<G.invisUntil)&&monsters.some(m=>m.alive&&!isHeld(m)&&!(run.monsterStuns[m.id]>0)&&Math.hypot(G.px-m.model.position.x,G.pz-m.model.position.z)<m.def.sight&&(m.path.length>0||m.windup>0));
-    if(gearVisual?.userData.weapon)gearVisual.userData.weapon.rotation.x=attackLeft>0?-Math.sin((.8-attackLeft)/.8*Math.PI)*1.1:0;
     encounterHold=threat?4:Math.max(0,encounterHold-dt);
     if(window.TowerAudio)window.TowerAudio.setEncounter(encounterHold>0);
     if(run.effects.reveal>0){G.mapUntil=now+250; if(!G.solutionPath){const p=worldToCell(G.px,G.pz);G.solutionPath=solveMaze(p.x,p.y);}}
@@ -685,6 +692,7 @@
     if(!active||paused||G.frozen||!G.running||inDungeon()||attackLeft>0)return;
     if(!run.equipment.weapon){showToast('請先在背包裝備球棒、平底鍋或木杖。');return;}
     attackLeft=.8;
+    if(window.CharacterMotion)window.CharacterMotion.beginAction(playerGroup,'attack',.8);
     const target=monsters.filter(m=>m.alive&&Math.hypot(G.px-m.model.position.x,G.pz-m.model.position.z)<2.8&&hasClearPath(G.px,G.pz,m.model.position.x,m.model.position.z)).sort((a,b)=>Math.hypot(G.px-a.model.position.x,G.pz-a.model.position.z)-Math.hypot(G.px-b.model.position.x,G.pz-b.model.position.z))[0];
     if(!target){showToast('揮擊落空：靠近怪物後再攻擊');return;}
     const result=C.hitMonster(run,target.id,target.strength);if(!result.ok){showToast(result.message);return;}
@@ -738,12 +746,14 @@
     if(!active||!run?.equipment||typeof playerGroup==='undefined'||!playerGroup||!V)return;
     const signature=Object.values(run.equipment).map(g=>g?g.id:'-').join('|');
     if(signature===gearSignature)return;
-    if(gearVisual){playerGroup.remove(gearVisual);disposeSceneObject(gearVisual);}
+    if(gearVisual){const oldWeapon=gearVisual.userData.weapon;if(oldWeapon?.parent===scene){scene.remove(oldWeapon);disposeSceneObject(oldWeapon);}playerGroup.remove(gearVisual);disposeSceneObject(gearVisual);}
     gearVisual=new THREE.Group();gearSignature=signature;
     for(const gear of Object.values(run.equipment).filter(Boolean)){
       const model=V.buildGear(gear.kind,{THREE}),mount=V.GEAR_MOUNTS[gear.kind];
       model.position.set(...mount.position);if(mount.rotation)model.rotation.set(...mount.rotation);
-      gearVisual.add(model);if(gear.slot==='weapon')gearVisual.userData.weapon=model;
+      if(gear.slot==='weapon'&&window.CharacterMotion){scene.add(model);window.CharacterMotion.worldWeaponPose(model,playerGroup,1-attackLeft/.8);}
+      else gearVisual.add(model);
+      if(gear.slot==='weapon')gearVisual.userData.weapon=model;
     }
     playerGroup.add(gearVisual);
   }
@@ -927,6 +937,6 @@
       if(transact(result))trade();return;
     }
   }
-  window.TowerMode = { get active(){return active;}, get paused(){return paused;}, open, beginNew, tick, floorSeed, scheduleShift, updateShift, reachExit, defeat, requestQuit, canCollectOriginal, collectedOriginal, itemConfig, reservedCells, preserveFloorPickups, soundChanged, mapMarkers };
+  window.TowerMode = { get active(){return active;}, get paused(){return paused;}, open, beginNew, tick, floorSeed, atmosphereStyle, scheduleShift, updateShift, reachExit, defeat, requestQuit, canCollectOriginal, collectedOriginal, itemConfig, reservedCells, preserveFloorPickups, soundChanged, mapMarkers };
   install();
 })();

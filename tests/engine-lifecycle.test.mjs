@@ -200,29 +200,40 @@ test('粒子逐顆消失時釋放材質，共用幾何等最後一顆消失才�
   assert.equal(context.particles.length, 0);
 });
 
-test('武器揮擊結束釋放資源，換層後的舊動畫不碰新場景', () => {
-  const frames = [];
-  let released = 0;
-  const sprite = { parent: null, material: {}, position: { y: 1, set() {} } };
-  const scene = { add(object) { object.parent = this; }, remove(object) { object.parent = null; } };
+test('揮擊模型同層重用、換層完整釋放，沒有舊動畫跨場景回呼', () => {
+  const motion = createRequire(import.meta.url)('../assets/character-motion.js'), scene = new THREE.Scene();
   const context = vm.createContext({
-    sceneEpoch: 1, scene, G: { running: true, px: 0, pz: 0, heading: 0 }, AudioEng: { sfxHit() {} },
-    CH: () => ({ weapon: 'sword' }), makeEmojiSprite: () => sprite,
-    disposeSceneObject: () => released++, requestAnimationFrame: fn => frames.push(fn),
+    THREE, window: { CharacterMotion: motion }, CharacterMotion: motion, scene,
+    G: { running: true, charIdx: 4 }, AudioEng: { sfxHit() {} }, _texCache: {}, spriteCache: {}, makePickupMarker: {},
+    requestAnimationFrame() { throw new Error('揮擊不得另建動畫回呼'); },
   });
+  const characterStart = html.indexOf('function buildCharacter(cd)'), characterEnd = html.indexOf('\n}', characterStart) + 2;
+  vm.runInContext(html.slice(characterStart, characterEnd), context);
+  context.playerGroup = context.buildCharacter({ type: 'boy', skin: 0xd9ad87, hair: 0x444444, shirt: 0x446655, pants: 0x333333 });
+  scene.add(context.playerGroup);
+  vm.runInContext(slice('function disposeSceneObject(root)', 'let sceneEpoch='), context);
   vm.runInContext(slice('function swingWeapon()', 'function applyStun('), context);
-  vm.runInContext('swingWeapon()', context);
-  while (frames.length) frames.shift()();
-  assert.equal(released, 1);
-  assert.equal(sprite.parent, null);
-  vm.runInContext('swingWeapon()', context);
-  const opacity = sprite.material.opacity;
-  context.sceneEpoch++;
-  context.scene = { remove() { throw new Error('不應移除新場景物件'); } };
-  frames.shift()();
-  assert.equal(sprite.material.opacity, opacity);
-  assert.equal(released, 2);
-  assert.equal(sprite.parent, null);
+  context.swingWeapon();
+  const oldPlayer = context.playerGroup, weapon = oldPlayer.userData.motion.weapon, resources = new Map();
+  scene.traverse(object => {
+    for (const resource of [object.geometry, object.material]) if (resource && !resources.has(resource)) {
+      resources.set(resource, 0); resource.addEventListener('dispose', () => resources.set(resource, resources.get(resource) + 1));
+    }
+  });
+  for (let i = 0; i < 40; i++) motion.update(oldPlayer, .016, i * .016, 0);
+  assert.equal(weapon.visible, false); assert.equal(weapon.parent, scene);
+  context.swingWeapon(); assert.equal(oldPlayer.userData.motion.weapon, weapon);
+  assert.ok([...resources.values()].every(count => count === 0), '同層的快取武器不反覆釋放／配置');
+  context.disposeSceneObject(scene); scene.clear();
+  assert.ok([...resources.values()].every(count => count === 1), '場景擁有的每份幾何／材質恰好釋放一次');
+  assert.equal(weapon.parent, null);
+  context.scene = new THREE.Scene();
+  context.playerGroup = context.buildCharacter({ type: 'boy', skin: 0xd9ad87, hair: 0x444444, shirt: 0x446655, pants: 0x333333 });
+  context.scene.add(context.playerGroup); context.swingWeapon();
+  const nextWeapon = context.playerGroup.userData.motion.weapon;
+  assert.notEqual(nextWeapon, weapon); assert.equal(nextWeapon.parent, context.scene);
+  for (let i = 0; i < 40; i++) motion.update(context.playerGroup, .016, i * .016, 0);
+  assert.equal(weapon.parent, null); assert.ok([...resources.values()].every(count => count === 1));
 });
 
 test('劇情重建隱藏已拿的原版道具，拾取效果先套用再保存；一般模式不受影響', () => {

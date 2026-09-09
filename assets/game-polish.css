@@ -22,6 +22,47 @@ button:focus-visible, input:focus-visible, select:focus-visible {
 }
 button, input, select { -webkit-font-smoothing: antialiased; }
 
+/* Game-native title screen. Reuses our original artwork; no extra render loop. */
+#splashScreen {
+  isolation: isolate;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  overflow: auto;
+  color: #fff1cf;
+  background: #101b2b;
+  padding: max(24px, env(safe-area-inset-top)) max(24px, env(safe-area-inset-right)) max(60px, env(safe-area-inset-bottom)) max(24px, env(safe-area-inset-left));
+}
+#splashScreen::before {
+  content: ''; position: absolute; inset: 0; z-index: -2;
+  background: url('./首頁迷宮背景.webp') center / cover no-repeat;
+}
+#splashScreen::after {
+  content: ''; position: absolute; inset: 0; z-index: -1; pointer-events: none;
+  background: linear-gradient(180deg, rgba(5, 11, 22, .05), rgba(5, 11, 22, .14) 24%, rgba(5, 11, 22, .54) 80%, #07101e), radial-gradient(ellipse at 50% 59%, #08132238, transparent 66%);
+}
+.splash-content { margin-top: min(14vh, 130px); text-align: center; width: min(680px, 100%); }
+.splash-eyebrow { margin: 0 0 8px; font-size: 14px; letter-spacing: .42em; color: #e8d8b0; text-shadow: 0 2px 6px #051322; }
+#splashTitle { margin: 0; font-size: clamp(46px, 7.6vw, 94px); font-weight: 850; letter-spacing: .07em; line-height: 1.12; color: #ffe9ab; text-shadow: 0 3px 0 #58422d, 0 7px 25px #020b17, 0 0 55px #c8914238; }
+#splashTitle > span { display: block; font-size: .38em; letter-spacing: .19em; line-height: 1.1; margin-bottom: 4px; color: #cce6e6; text-shadow: 0 3px 12px #020b17; }
+.splash-caption { margin: 20px 0 27px; font-size: clamp(16px, 2vw, 20px); letter-spacing: .12em; line-height: 1.6; color: #e0ebee; text-shadow: 0 2px 6px #020b17; }
+.splash-start { display: inline-flex; align-items: center; justify-content: center; gap: 35px; min-height: 60px; min-width: 256px; padding: 14px 30px; border: 1px solid #ffefb9; border-radius: 8px; background: linear-gradient(120deg, #ffe3a4, #d7a65b); color: #29251f; font-size: 22px; font-weight: 800; letter-spacing: .1em; box-shadow: 0 4px 0 #73542b, 0 12px 42px #010b20b3; cursor: pointer; transition: transform .18s ease, filter .18s ease; }
+.splash-start:hover { filter: brightness(1.08); transform: translateY(-2px); }
+.splash-start:active { transform: translateY(2px); box-shadow: 0 1px 0 #73542b, 0 6px 22px #010b20b3; }
+.splash-start:focus-visible { outline: 3px solid #e9ffff; outline-offset: 7px; }
+.splash-footer { position: absolute; bottom: max(17px, env(safe-area-inset-bottom)); left: max(24px, env(safe-area-inset-left)); right: max(24px, env(safe-area-inset-right)); margin: 0; display: flex; justify-content: space-between; gap: 18px; font-size: 13px; letter-spacing: .04em; line-height: 1.5; color: #a9c0cd; }
+.splash-footer > span { white-space: nowrap; }
+@media (orientation: landscape) and (max-height: 540px) {
+  #splashScreen { padding-top: max(12px, env(safe-area-inset-top)); padding-bottom: 38px; }
+  .splash-content { margin-top: 35px; }
+  #splashTitle { font-size: clamp(42px, 8vw, 68px); }
+  .splash-eyebrow { font-size: 13px; margin-bottom: 5px; }
+  .splash-caption { margin: 13px 0 18px; font-size: 16px; }
+  .splash-start { min-height: 50px; padding: 10px 26px; font-size: 20px; }
+  .splash-footer { bottom: max(10px, env(safe-area-inset-bottom)); font-size: 12px; }
+}
+@media (prefers-reduced-motion: reduce) { .splash-start { transition: none; } }
+
 /* A restrained frame lets the existing original maze artwork remain visible. */
 #titleScreen {
   padding: max(16px, env(safe-area-inset-top)) max(20px, env(safe-area-inset-right))

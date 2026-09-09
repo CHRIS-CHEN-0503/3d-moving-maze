@@ -152,6 +152,36 @@ test('手機觸控走低批次預算，劇情使用當層專屬色盤而非一�
   assert.equal(color.getHex(), expected.wall[0].color);
 });
 
+for (const style of [
+  { style: 'spire', palette: { wall: 0x9aafbd, ground: 0xa3a9ae, accent: 0x9beded }, seed: 99 },
+  { style: 'garden', palette: { wall: 0xaab993, ground: 0x9dab7f, accent: 0x75c996 }, seed: 89 },
+]) {
+  test(`劇情 ${style.style} 初次與移牆重建立即使用該層牆色，不等待下一次劇情更新`, () => {
+    const h = harness({ towerStyle: style });
+    for (let rebuild = 0; rebuild < 3; rebuild++) {
+      h.run('buildWalls(theme)');
+      assert.equal(h.context.wallMesh.material.color.getHex(), style.palette.wall);
+      assert.equal(h.context.wallMesh.material.map, h.texture, '只修牆底色，保留原牆貼圖');
+    }
+  });
+}
+
+test('一般模式與大賣場的初次和移牆重建仍優先使用原 wall3d，缺少時採 wall', () => {
+  for (const level of [
+    { ...theme, wall3d: 0xb0785a, wall: 0x887766 },
+    { ...theme, wall3d: undefined, wall: 0x776655 },
+    { id: 'shop', wall3d: 0xfdfdfd, wall: 0xffffff, floor: 0xf5f5f5, wallTex: 'brick' },
+  ]) {
+    const h = harness(); h.context.theme = level;
+    // 高塔物件會一直存在於正式頁面，但非劇情模式絕不能套用高塔色盤。
+    h.context.TowerMode = { active: false, atmosphereStyle() { throw new Error('非劇情模式不應讀高塔色盤'); } };
+    for (let rebuild = 0; rebuild < 2; rebuild++) {
+      h.run('buildWalls(theme)');
+      assert.equal(h.context.wallMesh.material.color.getHex(), level.wall3d || level.wall);
+    }
+  }
+});
+
 test('高塔公開目前章節與副本的裝飾風格，主樓層與副本種子保持隔離', () => {
   const from = tower.indexOf('  const ENVIRONMENTS = ['), to = tower.indexOf('  const text = escapeHtml;', from);
   assert.ok(from > 0 && to > from);

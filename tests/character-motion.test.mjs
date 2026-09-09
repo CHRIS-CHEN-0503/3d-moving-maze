@@ -89,6 +89,20 @@ test('第一人稱抓取手只有抓取時顯示，第三人稱沿用角色的�
   assert.ok(meshBudget(state.grabHand).meshes<=2);
 });
 
+test('第一人稱揮擊抬離畫面下緣，不改武器水平位置、方向或第三人稱姿態',()=>{
+  const model=figure(),weapon=characters.buildGear('staff',{THREE});
+  const camera=new THREE.PerspectiveCamera(70,844/390,.1,300);
+  camera.position.set(0,1.6,0);camera.lookAt(0,1.6,1);camera.updateMatrixWorld(true);
+  motion.worldWeaponPose(weapon,model,.5);const original=weapon.position.clone(),rotation=weapon.quaternion.clone();
+  motion.worldWeaponPose(weapon,model,.5,true);weapon.updateMatrixWorld(true);
+  assert.equal(weapon.position.x,original.x);assert.equal(weapon.position.z,original.z);
+  assert.ok(Math.abs(weapon.position.y-original.y-.32)<1e-9);assert.ok(weapon.quaternion.equals(rotation));
+  const tip=weapon.localToWorld(new THREE.Vector3(0,.7,0)).project(camera);
+  assert.ok(tip.y>-.7&&tip.y<.3,'武器尖端需留在畫面內，而非藏在下緣');
+  assert.ok(Math.abs(tip.x)<.8);
+  motion.worldWeaponPose(weapon,model,.5,false);assert.ok(weapon.position.equals(original));
+});
+
 test('六職業揮擊武器有不同幾何，最多四個網格及低於二百個三角形',()=>{
   const fingerprints=new Set();
   for(let index=0;index<6;index++){
@@ -136,7 +150,7 @@ test('預覽只在選角頁繪製，換角色釋放前一個模型的資源',()=
 
 test('劇情武器只持有一份模型；更新耐久時重用，卸下與換裝確實釋放',()=>{
   const model=figure(),scene=new THREE.Scene(),gear={id:'staff-1',slot:'weapon',kind:'staff',durability:5};scene.add(model);
-  const context=vm.createContext({THREE,window:{CharacterMotion:motion},V:characters,scene,playerGroup:model,gearVisual:null,gearSignature:'',attackLeft:0,active:true,run:{equipment:{weapon:gear}},_texCache:{},spriteCache:{},makePickupMarker:{}});
+  const context=vm.createContext({THREE,window:{CharacterMotion:motion},V:characters,scene,G:{view:'tp'},playerGroup:model,gearVisual:null,gearSignature:'',attackLeft:0,active:true,run:{equipment:{weapon:gear}},_texCache:{},spriteCache:{},makePickupMarker:{}});
   vm.runInContext(functionSource('disposeSceneObject'),context);
   const start=tower.indexOf('  function refreshGear()'),end=tower.indexOf('\n  }',start)+4;
   vm.runInContext(tower.slice(start,end),context);context.refreshGear();

@@ -32,10 +32,12 @@
     weapon.position.set(.48 - .18 * reach, .9 + .04 * reach, .18 + .25 * reach);
     weapon.rotation.set(.25 + 1.35 * reach, -.16 * reach, -.2 + .38 * reach);
   }
-  function worldWeaponPose(weapon, model, progress) {
+  function worldWeaponPose(weapon, model, progress, firstPerson = false) {
     if (!weapon || !model) return;
     weaponPose(weapon, progress);
     weapon.position.applyQuaternion(model.quaternion).add(model.position);
+    // 第一人稱只抬高畫面中的武器；不移動角色或改變前向判定。
+    if (firstPerson) weapon.position.y += .32;
     weapon.quaternion.premultiply(model.quaternion);
   }
 
@@ -73,7 +75,7 @@
     }
     if (state.weapon) {
       state.weapon.visible = state.action === 'attack';
-      if (state.weaponWorld) worldWeaponPose(state.weapon, model, state.progress);
+      if (state.weaponWorld) worldWeaponPose(state.weapon, model, state.progress, firstPerson);
       else weaponPose(state.weapon, state.progress);
     }
     if (state.grabHand) {

@@ -1458,7 +1458,8 @@ function buildWalls(theme){
   add(oX,0,t,H*c+t,{boundary:true}); add(oX+W*c,0,t,H*c+t,{boundary:true});
 
   const geo=new THREE.BoxGeometry(1,h,1);
-  const mat=new THREE.MeshLambertMaterial({color:theme.wall3d||theme.wall,map:makeTex(theme.wallTex||'brick')});
+  const tower=window.TowerMode&&TowerMode.active?TowerMode.atmosphereStyle():null;
+  const mat=new THREE.MeshLambertMaterial({color:tower?tower.palette.wall:theme.wall3d||theme.wall,map:makeTex(theme.wallTex||'brick')});
   wallMesh=new THREE.InstancedMesh(geo,mat,mats.length);
   const m=new THREE.Matrix4(),s=new V3(),p=new V3(),q=new THREE.Quaternion();
   mats.forEach((w,i)=>{

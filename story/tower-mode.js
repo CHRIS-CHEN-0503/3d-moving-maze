@@ -607,7 +607,7 @@
     if (run.effects.freeze<=0) shiftLeft -= dt;
     attackLeft=Math.max(0,attackLeft-dt);hurtLeft=Math.max(0,hurtLeft-dt);
     if(gearVisual?.userData.weapon){
-      if(window.CharacterMotion)window.CharacterMotion.worldWeaponPose(gearVisual.userData.weapon,playerGroup,1-attackLeft/.8);
+      if(window.CharacterMotion)window.CharacterMotion.worldWeaponPose(gearVisual.userData.weapon,playerGroup,1-attackLeft/.8,G.view==='fp');
       else gearVisual.userData.weapon.rotation.x=.25+Math.sin((.8-attackLeft)/.8*Math.PI)*1.35;
     }
     if (G.satiety<=0 && hurtLeft<=0) damage(3,'hunger');
@@ -751,7 +751,7 @@
     for(const gear of Object.values(run.equipment).filter(Boolean)){
       const model=V.buildGear(gear.kind,{THREE}),mount=V.GEAR_MOUNTS[gear.kind];
       model.position.set(...mount.position);if(mount.rotation)model.rotation.set(...mount.rotation);
-      if(gear.slot==='weapon'&&window.CharacterMotion){scene.add(model);window.CharacterMotion.worldWeaponPose(model,playerGroup,1-attackLeft/.8);}
+      if(gear.slot==='weapon'&&window.CharacterMotion){scene.add(model);window.CharacterMotion.worldWeaponPose(model,playerGroup,1-attackLeft/.8,G.view==='fp');}
       else gearVisual.add(model);
       if(gear.slot==='weapon')gearVisual.userData.weapon=model;
     }

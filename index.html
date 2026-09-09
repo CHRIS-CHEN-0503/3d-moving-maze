@@ -2406,7 +2406,6 @@ function frontClear(maxD){
 function collideMove(nx,nz){
   const r=0.42;
   const ghost=performance.now()<G.ghostUntil;
-  const half=G.cell*0.5;
   const bx=(G.mazeW/2)*G.cell-r-0.36, bz=(G.mazeH/2)*G.cell-r-0.36;
   if(ghost){ // 穿牆但不能出迷宮
     G.px=Math.max(-bx,Math.min(bx,nx)); G.pz=Math.max(-bz,Math.min(bz,nz)); return;

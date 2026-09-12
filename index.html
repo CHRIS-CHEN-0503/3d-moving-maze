@@ -981,7 +981,7 @@ button:focus-visible,input:focus-visible{outline:3px solid #fff;outline-offset:3
    3D移動迷宮 — 給小朋友的變形迷宮冒險
    ===================================================== */
 const $=id=>document.getElementById(id);
-const GAME_VERSION='1.24.0';
+const GAME_VERSION='1.24.1';
 
 /* ---------- 設定（後台可調） ---------- */
 const DEFAULT_CFG={shiftMin:3,itemCount:6,foodCount:4,hungerMin:3,stunSec:3,pingSec:3,smellCells:3,mazeSize:13,musicOn:1,apiUrl:'',roomMax:3,rounds:3,goodsCount:16,shopMin:2.5,cartFull:400,views:{fp:1,tp:1,top:1},broker:'wss://broker.emqx.io:8084/mqtt'};
@@ -1047,7 +1047,7 @@ const ITEM_TYPES=[
 /* ---------- 🛒 搶購模式：大賣場主題與商品 ---------- */
 const SHOP_THEME={id:'shop',name:'大賣場',emoji:'🛒',
   sky:0xdff0fb,fog:[0xeef3f8,90,400],floor:0xf5f5f5,wall:0xbcd6e6,wall3d:0xfdfdfd,
-  amb:0xffffff,ambI:1.0,dirI:.45,music:1,wallTex:'shelf',floorTex:'tile'};
+  amb:0xffffff,ambI:1.0,dirI:.45,music:6,wallTex:'shelf',floorTex:'tile'};
 const GOODS=[
  {emoji:'🍬',name:'糖果',   price:10, weight:22, color:0xff8a80},
  {emoji:'🍞',name:'麵包',   price:20, weight:20, color:0xffcc80},
@@ -1180,7 +1180,7 @@ function renderSingleSeriesResult(won){
    ===================================================== */
 const AudioEng={
  ctx:null, master:null, musicGain:null, fxGain:null, itemGain:null,
- seqTimer:null, step:0, playing:false, songIdx:0, itemLoopTimer:null,
+ seqTimer:null, step:0, playing:false, songIdx:0, musicRequest:0, itemLoopTimer:null,
  init(){
    if(this.ctx) return;
    const AC=window.AudioContext||window.webkitAudioContext; if(!AC) return;
@@ -1208,7 +1208,7 @@ const AudioEng={
    const g=this.ctx.createGain(); g.gain.value=vol;
    src.connect(f); f.connect(g); g.connect(this.fxGain); src.start(t);
  },
- /* --- 背景電子音樂：五個關卡五種完全不同的曲風 --- */
+ /* --- 七種一般版場景各有完整原創配樂；下列電子音保留為載入失敗時的備援。 --- */
  SONGS:[
   // 0 🏰 神祕城堡：鐘樓圓舞曲（三拍感、鐘聲疊音、A小調）
   {bpm:104,leadType:'triangle',bassType:'sine',leadVol:.18,bassVol:.15,leadLen:1.4,
@@ -1234,12 +1234,27 @@ const AudioEng={
   {bpm:124,leadType:'sawtooth',bassType:'square',leadVol:.12,bassVol:.13,leadLen:.9,
    arp:[262,262,311,262,349,311,262,233,262,262,311,349,392,349,311,233],
    bassSeq:[65.4,65.4,58.3,49],bassEvery:2,kickEvery:4,hatEvery:2,hatOff:1},
+  // 6 🛒 搶購賣場：輕快發條節奏（完整配樂載入失敗時使用）
+  {bpm:126,leadType:'triangle',bassType:'square',leadVol:.15,bassVol:.1,leadLen:.75,
+   arp:[392,494,587,659,587,494,440,523,659,784,659,523,440,494,587,659],
+   bassSeq:[98,123.5,110,131],bassEvery:2,kickEvery:4,hatEvery:2,hatOff:1},
  ],
  startMusic(songIdx){
-   this.stopMusic(); if(!this.ctx) return;
+   this.stopMusic(); if(!this.ctx||G.muted) return;
    this.songIdx=songIdx; this.step=0; this.playing=true;
-   const g=this.SONGS[songIdx], stepDur=60/g.bpm/2;
-   this.seqTimer=setInterval(()=>{
+   const request=++this.musicRequest;
+   if(window.ClassicAudio&&ClassicAudio.configure({context:this.ctx,output:this.musicGain})){
+     ClassicAudio.play(songIdx).then(ok=>{
+       if(!ok&&request===this.musicRequest&&this.playing&&!G.muted)this.startSynthMusic(songIdx);
+     });
+     return;
+   }
+   this.startSynthMusic(songIdx);
+ },
+ startSynthMusic(songIdx){
+   const g=this.SONGS[songIdx]; if(!g)return;
+   const stepDur=60/g.bpm/2;
+   const playStep=()=>{
      if(G.muted||!this.playing) return;
      const s=this.step;
      // 主旋律（0＝休止符）
@@ -1261,7 +1276,9 @@ const AudioEng={
      if(g.hatEvery&&s%g.hatEvery===(g.hatOff||0))this.noiseHat(stepDur*0.3);
      if(g.drip&&Math.random()<0.05)this.tone(1400+Math.random()*600,0.5,'sine',this.musicGain,0.07,-500); // 水滴
      this.step++;
-   },stepDur*1000);
+   };
+   playStep();
+   this.seqTimer=setInterval(playStep,stepDur*1000);
  },
  noiseHat(dur){
    if(!this.ctx||G.muted) return;
@@ -1272,7 +1289,7 @@ const AudioEng={
    const g=this.ctx.createGain(); g.gain.value=0.12;
    src.connect(f); f.connect(g); g.connect(this.musicGain); src.start(t);
  },
- stopMusic(){ this.playing=false; if(this.seqTimer){clearInterval(this.seqTimer);this.seqTimer=null;} },
+ stopMusic(){ this.playing=false; this.musicRequest=(this.musicRequest||0)+1; if(this.seqTimer){clearInterval(this.seqTimer);this.seqTimer=null;} if(window.ClassicAudio)ClassicAudio.stop(); },
  /* --- 道具「使用中」的循環音樂 --- */
  startItemLoop(){
    if(this.itemLoopTimer) return;
@@ -3628,7 +3645,7 @@ function startGame(){
   updateShopHud();
   $('compassHud').style.display='none';
   switchScreen('gameScreen');
-  if(!G.muted)AudioEng.startMusic(isShop()?1:theme.music);
+  if(!G.muted&&!(window.TowerMode&&TowerMode.active))AudioEng.startMusic(theme.music);
   updateSoundBtn();
   if(MP.on)mpAfterStart();
 }
@@ -4888,6 +4905,7 @@ window.addEventListener('beforeunload',e=>{
 });
 window.addEventListener('pagehide',()=>{ if(MP.on)try{mpSend({t:'bye'});}catch(e){} });
 </script>
+<script src="assets/classic-audio.js"></script>
 <script src="story/story-core.js"></script>
 <script src="story/tower-narrative.js"></script>
 <script src="story/tower-side-stories.js"></script>

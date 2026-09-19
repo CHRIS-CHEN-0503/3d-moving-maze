@@ -68,6 +68,19 @@ function finishObjectives(h) {
   assert.equal(h.state().run.expedition.active.progress.length, 3);
 }
 
+test('臨時互動使用固定無字對話圖示，靠近顯示、開啟對話或離開隱藏', () => {
+  const h=harness(runAt());h.start();
+  const button=h.get('towerTalkBtn'),icon=button.innerHTML;
+  assert.ok(h.get('hudRightBtns').children.includes(button));
+  assert.match(icon,/<svg/);assert.equal(button.textContent,'');
+  assert.equal(button['aria-keyshortcuts'],'R');
+  h.approach(h.state().traders[0].model);
+  assert.equal(button.hidden,false);assert.equal(button.innerHTML,icon);assert.match(button.ariaLabel,/對話/);
+  button.onclick();assert.equal(button.hidden,true);h.click('close');
+  h.context.G.px=-100;h.context.G.pz=-100;h.tick(.2);
+  assert.equal(button.hidden,true);assert.equal(button.innerHTML,icon);assert.equal(button.textContent,'');
+});
+
 for (const id of ['eve', 'rowan', 'mira', 'oren', 'sena']) {
   test(`真實場景建出 ${id} 的人物／姓名／對話，讀檔仍是同一探索者`, () => {
     const run = findRun(r => E.explorerOffer(r)?.explorer.id === id), h = harness(run); h.start();

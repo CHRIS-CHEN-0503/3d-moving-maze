@@ -53,7 +53,11 @@
     const rail = document.createElement('nav'); rail.id = 'towerActionRail'; rail.setAttribute('aria-label', '劇情操作');
     rail.innerHTML = '<button class="tower-btn" id="towerBagBtn">背包 <small>B</small></button><button class="tower-btn" id="towerJournalBtn">日誌 <small>J</small></button><button class="tower-btn" id="towerAttackBtn">揮擊 <small>X</small></button>';
     el('gameScreen').appendChild(rail);
-    const talk=document.createElement('button');talk.id='towerTalkBtn';talk.className='tower-btn';talk.hidden=true;talk.textContent='對話 R';el('gameScreen').appendChild(talk);
+    const talk=document.createElement('button');talk.id='towerTalkBtn';talk.className='round-btn';talk.hidden=true;
+    talk.setAttribute('aria-label','對話（R）');talk.setAttribute('aria-keyshortcuts','R');
+    // 固定圖示不隨互動類型變動；文字僅供輔助閱讀，保留原本 R 互動。
+    talk.innerHTML='<svg viewBox="0 0 32 32" aria-hidden="true" focusable="false"><path d="M23 18h2a3 3 0 0 0 3-3V8a3 3 0 0 0-3-3H13a3 3 0 0 0-3 3v2"/><path d="M7 12h12a3 3 0 0 1 3 3v7a3 3 0 0 1-3 3h-6l-6 4v-4a3 3 0 0 1-3-3v-7a3 3 0 0 1 3-3Z"/><path d="M9 18h.1M13 18h.1M17 18h.1"/></svg>';
+    el('hudRightBtns').appendChild(talk);
     const objective = document.createElement('div'); objective.id = 'towerObjective'; el('gameScreen').appendChild(objective);
     const overlay = document.createElement('div'); overlay.id = 'towerOverlay'; overlay.hidden = true;
     overlay.innerHTML = '<section id="towerDialog" class="tower-card" role="dialog" aria-modal="true" aria-labelledby="towerDialogTitle" tabindex="-1"></section>';
@@ -563,7 +567,7 @@
     el('towerFloor').textContent = run.floor + ' F'; el('towerHealth').textContent = Math.ceil(run.hp) + ' / 100';
     el('towerHp').value = run.hp; el('towerCoins').textContent = run.coins;
     el('towerChapter').textContent = floorConfig.name;
-    el('towerTalkBtn').disabled = !nearest && !nearestWarrior && !nearbyEncounter; el('towerTalkBtn').textContent = nearbyEncounter ? (nearbyEncounter===chest?'開箱 R':'對話 R') : nearestWarrior ? '聘請 R' : nearest ? '交易 R' : '附近無人';
+    el('towerTalkBtn').disabled = !nearest && !nearestWarrior && !nearbyEncounter; el('towerTalkBtn').ariaLabel = nearbyEncounter ? (nearbyEncounter===chest?'開箱（R）':'對話（R）') : nearestWarrior ? '對話：聘請（R）' : nearest ? '對話：交易（R）' : '附近無人';
     el('towerGuardStatus').hidden = !run.warrior;
     el('towerGuardStatus').textContent = warriorStatus();
     el('towerGearStatus').textContent=Object.entries(run.equipment).map(([slot,gear])=>({helmet:'盔',armor:'甲',shield:'盾',weapon:'武'}[slot])+' '+(gear?gear.durability:'—')).join(' · ');
@@ -575,7 +579,7 @@
     else if(q&&q.status!=='claimed'&&!nearest&&!nearestWarrior)el('towerObjective').textContent=(E.explorerOffer(run)?.title||'探索者委託')+' · '+q.progress+'/'+q.goal+(q.status==='ready'?' · 報酬待領':'');
     else if(N&&!nearest&&!nearestWarrior)el('towerObjective').textContent=N.objective(run);
     if(inDungeon()){const offer=dungeonOffer(),state=run.expedition.active;el('towerFloor').textContent='裂隙 · '+run.floor+' F';el('towerObjective').textContent=offer.title+' · '+state.progress.length+'/3 · 剩 '+Math.ceil(Math.max(0,offer.timeLimit-state.elapsed))+' 秒'+(['bells','threads'].includes(offer.kind)?' · '+offer.order.map(i=>i+1).join('→'):offer.kind==='stars'&&state.progress.length===1?(state.shiftCount>state.shiftAtStart?' · 星路已更新':' · 等待牆壁變形'):'');el('towerAttackBtn').disabled=true;el('towerAttackBtn').textContent='探索試煉';}
-    if(nearbyJourney){el('towerTalkBtn').disabled=false;el('towerTalkBtn').textContent=nearbyJourney===rift?'裂隙 R':nearbyJourney===mainClue?'印記 R':'調查 R';el('towerObjective').textContent=nearbyJourney===rift?'裂隙副本 · 自願進入，結束回到原層':nearbyJourney===mainClue?'主線印記 · '+N.chapterForFloor(run.floor).clueName:el('towerObjective').textContent;}
+    if(nearbyJourney){el('towerTalkBtn').disabled=false;el('towerTalkBtn').ariaLabel=nearbyJourney===rift?'裂隙（R）':nearbyJourney===mainClue?'印記（R）':'調查（R）';el('towerObjective').textContent=nearbyJourney===rift?'裂隙副本 · 自願進入，結束回到原層':nearbyJourney===mainClue?'主線印記 · '+N.chapterForFloor(run.floor).clueName:el('towerObjective').textContent;}
     el('towerTalkBtn').hidden=paused||!G.running||el('towerTalkBtn').disabled;
     document.body.classList.toggle('tower-danger',run.hp<=25);
   }

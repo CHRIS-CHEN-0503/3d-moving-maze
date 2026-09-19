@@ -19,6 +19,18 @@
     const score=v=>(/^zh[-_]TW$/i.test(v.lang)?40:0)+(female.test(v.name)?80:0)+(v.localService?4:0)+(v.default?2:0);
     return zh.slice().sort((a,b)=>score(b)-score(a))[0]||null;
   }
+  function panelText(panel){
+    if(!panel?.querySelectorAll)return '';
+    const text=node=>clean(node?.innerText||node?.textContent||'');
+    const visible=node=>!node.closest('[data-voice-controls],[hidden],.tower-close');
+    // 故事正文與日誌保留全文；一般操作介面只讀摘要及主要動作。
+    if(panel.voiceScope==='full'||panel.querySelector?.('.tower-prose'))return [...panel.querySelectorAll('h2,h3,p,li,dt,dd,small,button')].filter(visible).map(text).filter(Boolean).join('。');
+    const title=text(panel.querySelector?.('h2'));
+    const lead=text(panel.querySelector?.('p.tower-copy')).split(/[。！？\n]/)[0];
+    const summary=panel.voiceSummary||[title,lead].filter(Boolean).join('。');
+    const actions=[...new Set([...panel.querySelectorAll('.tower-actions > button:not(:disabled)')].filter(visible).map(text).filter(Boolean))];
+    return [summary,...actions].filter(Boolean).join('。');
+  }
   function create(env){
     const synth=env.speechSynthesis,Utterance=env.SpeechSynthesisUtterance;
     const supported=!!(synth&&Utterance),now=()=>env.Date?.now?.()??Date.now();
@@ -50,10 +62,6 @@
       const items=chunks(text).map(text=>({text,expires:story?0:now()+12000}));
       queue.push(...(story?items:items.slice(0,4-pending)));next();return true;
     }
-    function panelText(panel){
-      if(!panel?.querySelectorAll)return '';
-      return [...panel.querySelectorAll('h2,h3,p,li,dt,dd,button')].filter(node=>!node.closest('[data-voice-controls],[hidden],.tower-close')).map(node=>node.innerText||node.textContent).filter(Boolean).join('。');
-    }
     function readPanel(panel){return say(panelText(panel),{replace:true,story:true});}
     function configure(settings={}){const changed=preferred!==(settings.voice||'');enabled=settings.enabled!==false;preferred=settings.voice||'';if(!enabled||changed)stop();refresh();}
     function listen(fn){listener=typeof fn==='function'?fn:()=>{};notify();}
@@ -62,5 +70,5 @@
     env.addEventListener?.('pagehide',()=>stop(true));refresh();
     return {configure,status,listen,refresh,readPanel,stop,announce:(text,replace=false)=>say(text,{replace}),replay:()=>say(lastStory,{replace:true,story:true}),preview:()=>say('你好，我會陪你探索迷宮。準備好了，就一起出發吧！',{replace:true})};
   }
-  return {create,clean,chunks,chooseVoice};
+  return {create,clean,chunks,chooseVoice,panelText};
 });

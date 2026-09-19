@@ -16,7 +16,7 @@ test('自動優先台灣中文女聲，尊重指定中文聲音，延遲載入�
   const h=harness();h.voices([en,male,female]);h.voice.announce('你好');assert.equal(h.spoken[0].voice,female);assert.equal(h.spoken[0].rate,.9);assert.equal(h.spoken[0].pitch,1.03);
 });
 test('完整故事分段串接不重疊，換頁與停止使舊回呼失效',()=>{
-  const h=harness();h.voice.readPanel({querySelectorAll:()=>[{closest:()=>null,textContent:'第一段。第二段。第三段。'}]});
+  const h=harness();h.voice.readPanel({voiceScope:'full',querySelectorAll:()=>[{closest:()=>null,textContent:'第一段。第二段。第三段。'}]});
   assert.equal(h.spoken.length,1);const old=h.spoken[0];h.finish();assert.equal(h.spoken.length,2);
   h.voice.announce('新頁',true);old.onend();assert.equal(h.spoken.length,3);assert.equal(h.spoken.at(-1).text,'新頁');
   h.voice.stop();h.finish();assert.equal(h.spoken.length,3);assert.equal(h.voice.status().speaking,false);
@@ -36,11 +36,31 @@ test('播放錯誤顯示失敗狀態，試聽可重試而非永久鎖死',()=>{
 });
 test('故事抽取包含內文與選項，不朗讀控制列或隱藏文字',()=>{
   const h=harness(),node=(text,hidden=false)=>({textContent:text,closest:()=>hidden?{}:null});
-  h.voice.readPanel({querySelectorAll:()=>[node('塔頂'),node('故事內文'),node('下一頁'),node('停止',true)]});
+  h.voice.readPanel({voiceScope:'full',querySelectorAll:()=>[node('塔頂'),node('故事內文'),node('下一頁'),node('停止',true)]});
   while(h.voice.status().speaking)h.finish();assert.equal(h.spoken.map(u=>u.text).join(''),'塔頂。故事內文。下一頁');
 });
 test('一般版與劇情版共用語音，不再跟隨音樂靜音；道具事件有播報',()=>{
   const html=readFileSync(new URL('../index.html',import.meta.url),'utf8'),tower=readFileSync(new URL('../story/tower-mode.js',import.meta.url),'utf8');
   assert.match(html,/id="cfgSpeech"/);assert.match(html,/speechOn:s.speechOn===0\?0:1/);assert.match(html,/function speak\(text\)\{window.GameVoice\?\.announce/);
-  assert.match(html,/announce\('獲得'\+t.name/);assert.match(tower,/GameVoice\?\.readPanel/);assert.match(tower,/announce\('使用了'\+C.ITEMS/);
+  assert.match(html,/announce\('獲得 '\+t.name/);assert.match(tower,/GameVoice\?\.readPanel/);assert.match(tower,/announce\('使用 '\+C.ITEMS/);
+});
+
+test('背包摘要及重聽不讀裝備詳細數值，保留主要操作',()=>{
+  const node=textContent=>({textContent,closest:()=>null}),h=harness();
+  const panel={voiceSummary:'裝備與補給。穿戴中：木仗',querySelector:()=>null,querySelectorAll:selector=>selector.startsWith('.tower-actions')?[node('回到迷宮')]:[node('耐久 9，防禦 3，擊暈 10 秒')]};
+  assert.equal(V.panelText(panel),'裝備與補給。穿戴中：木仗。回到迷宮');
+  h.voice.readPanel(panel);while(h.voice.status().speaking)h.finish();const first=h.spoken.map(u=>u.text).join('');
+  h.voice.replay();while(h.voice.status().speaking)h.finish();assert.equal(h.spoken.map(u=>u.text).join(''),first+first);assert.doesNotMatch(first,/耐久|防禦|擊暈/);
+});
+test('一般介面只讀標題、首句重點及主要選項，故事正文仍完整',()=>{
+  const node=textContent=>({textContent,closest:()=>null});
+  const panel={querySelector:s=>s==='h2'?node('整理行囊'):s==='p.tower-copy'?node('請選擇裝備。詳細耐久 8'):null,querySelectorAll:s=>s.startsWith('.tower-actions')?[node('返回'),node('返回')]:[node('故事一'),node('故事二')]};
+  assert.equal(V.panelText(panel),'整理行囊。請選擇裝備。返回');
+  const select=panel.querySelector;panel.querySelector=s=>s==='.tower-prose'?{}:select(s);
+  assert.equal(V.panelText(panel),'故事一。故事二');
+});
+test('一般拾取、食物、鐵鍬與購物均只提供名稱播報',()=>{
+  const html=readFileSync(new URL('../index.html',import.meta.url),'utf8');
+  assert.match(html,/typeof readAloud==='string'\?readAloud:msg/);
+  assert.match(html,/'獲得 '\+f.type.name/);assert.match(html,/'獲得 '\+gd.g.name/);assert.match(html,/'使用 鐵鍬'/);
 });

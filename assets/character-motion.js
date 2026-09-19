@@ -46,6 +46,7 @@
     if (!state) return null;
     const data = model.userData;
     if (!data.armL || !data.armR || !data.legL || !data.legR) return state;
+    if(globalThis.CharacterFace)globalThis.CharacterFace.update(model,time,state.action?'focus':data.mood||'calm');
     const step = Math.max(0, Math.min(.1, Number.isFinite(dt) ? dt : 0));
     const pace = Math.max(.5, Math.min(2.5, Number.isFinite(speed) ? speed : 1));
     state.stride += (clamp(moving) - state.stride) * (1 - Math.exp(-step * 13));

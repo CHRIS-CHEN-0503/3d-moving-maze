@@ -965,7 +965,7 @@ button:focus-visible,input:focus-visible{outline:3px solid #fff;outline-offset:3
    3D移動迷宮 — 給小朋友的變形迷宮冒險
    ===================================================== */
 const $=id=>document.getElementById(id);
-const GAME_VERSION='1.26.0';
+const GAME_VERSION='1.26.1';
 
 /* ---------- 設定（後台可調） ---------- */
 const DEFAULT_CFG={teamSize:2,shiftMin:3,itemCount:6,foodCount:4,hungerMin:3,stunSec:3,pingSec:3,smellCells:3,mazeSize:13,musicOn:1,speechOn:1,speechVoice:'',apiUrl:'',roomMax:3,rounds:3,goodsCount:16,shopMin:2.5,cartFull:400,views:{fp:1,tp:1,top:1},broker:'wss://broker.emqx.io:8084/mqtt'};
@@ -2120,7 +2120,7 @@ function applyFood(f){
   const gain=Math.round(f.type.restore*(jobPerk('foodMul')||1));
   G.satiety=Math.min(100,G.satiety+gain);
   updateSatietyBar();
-  showToast(`${f.type.emoji} ${f.type.name}！飽足感 +${gain}%`);
+  showToast(`${f.type.emoji} ${f.type.name}！飽足感 +${gain}%`,1800,'獲得 '+f.type.name);
 }
 function loseGame(){
   if(window.TowerMode&&TowerMode.active){TowerMode.defeat();return;}
@@ -2135,7 +2135,7 @@ function loseGame(){
 function showToast(msg,ms=1800,readAloud=true){
   const t=$('toast'); t.textContent=msg; t.style.display='block';
   clearTimeout(t._tm); t._tm=setTimeout(()=>t.style.display='none',ms);
-  if(readAloud)window.GameVoice?.announce(msg);
+  if(readAloud)window.GameVoice?.announce(typeof readAloud==='string'?readAloud:msg);
 }
 function addEffect(id,label,dur){
   G.effects[id]={until:performance.now()+dur*1000,label};
@@ -2159,11 +2159,11 @@ function applyItem(it){
   if(MP.on&&MP.mode==='tag'&&MP.taggedId===MP.id&&MP.itPower==='dur')durMul*=1.5; // 鬼能力：魔法
   const dur=t.dur*durMul;
   showToast(t.msg,1800,false);
-  window.GameVoice?.announce('獲得'+t.name+'。'+t.msg);
+  if(t.id!=='shovel'||G.shovels<shovelCap())window.GameVoice?.announce('獲得 '+t.name);
   if(t.id==='speed'){ AudioEng.sfxUse(); addEffect('speed','⚡加速',dur); }
   else if(t.id==='superspeed'){ AudioEng.sfxUse(); addEffect('superspeed','🚀強力加速',dur); }
   else if(t.id==='shovel'){
-    if(G.shovels>=shovelCap())showToast('⛏️ 鐵鍬最多只能帶 '+shovelCap()+' 把');
+    if(G.shovels>=shovelCap())showToast('⛏️ 鐵鍬最多只能帶 '+shovelCap()+' 把',1800,'鐵鍬已滿');
     else G.shovels++;
     updateShovelBtn();
   }
@@ -2218,7 +2218,7 @@ function useKite(){
   const cp=cellToWorld(target.x,target.y);
   G.px=cp.x; G.pz=cp.z;
   playerGroup.position.set(G.px,0,G.pz);
-  showToast('🪁 使用大風箏，咻～飛過牆了！');
+  showToast('🪁 使用大風箏，咻～飛過牆了！',1800,'使用 大風箏');
 }
 /* 火山震波：震碎自己所在格子四周的牆（外圍牆除外） */
 function quakeWalls(){
@@ -2231,7 +2231,7 @@ function quakeWalls(){
   if(pc.y<G.mazeH-1)hit('h',pc.x,pc.y);
   if(pc.x>0)hit('v',pc.x-1,pc.y);
   if(pc.x<G.mazeW-1)hit('v',pc.x,pc.y);
-  showToast(n?('💥 震碎了 '+n+' 面牆！'):'💥 身邊都是外圍牆，震不碎');
+  showToast(n?('💥 震碎了 '+n+' 面牆！'):'💥 身邊都是外圍牆，震不碎',1800,false);
 }
 /* ===== 傳送 helper（調皮鬼 / 集合口哨共用） ===== */
 function teleportSelfTo(x,z){
@@ -2272,7 +2272,7 @@ function applyPrank(list,fromId){
     else teleportOtherTo(e.id,e.x,e.z);
   }
   AudioEng.sfxUse();
-  showToast('😜 調皮鬼搗蛋！大家的位置都被打亂了',2800);
+  showToast('😜 調皮鬼搗蛋！大家的位置都被打亂了',2800,false);
 }
 /* 📣 集合口哨：把所有人叫到自己身邊 */
 function useWhistle(){
@@ -2291,7 +2291,7 @@ function applyGather(x,z,fromId){
     else teleportOtherTo(id,tx,tz);
   });
   AudioEng.sfxWhistle();
-  showToast('📣 '+(fromId===MP.id?'你':mpName(fromId))+'吹了集合口哨！大家都被叫過來了',2800);
+  showToast('📣 '+(fromId===MP.id?'你':mpName(fromId))+'吹了集合口哨！大家都被叫過來了',2800,fromId===MP.id?'使用 集合口哨':'有人使用集合口哨');
 }
 function updateWhistleBtn(){
   if(isShop()){$('whistleBtn').style.display='none';return;}
@@ -2349,7 +2349,7 @@ function grantShovelKit(quiet){
   if(!hasShovelKit())return;
   if(G.shovels<1){
     G.shovels=1; G.shovelRechargeAt=0; updateShovelBtn();
-    if(!quiet)showToast('⛏️ 工具箱到手！先給你一把鐵鍬');
+    if(!quiet)showToast('⛏️ 工具箱到手！先給你一把鐵鍬',1800,'獲得 鐵鍬');
   }
 }
 function tickShovelRecharge(){
@@ -2359,7 +2359,7 @@ function tickShovelRecharge(){
   if(G.shovelRechargeAt&&now>=G.shovelRechargeAt){
     if(G.shovels<shovelCap()){
       G.shovels++; updateShovelBtn();
-      showToast('⛏️ 鐵鍬補充好了！');
+      showToast('⛏️ 鐵鍬補充好了！',1800,'獲得 鐵鍬');
     }
     G.shovelRechargeAt=0;
   }
@@ -2375,7 +2375,7 @@ function useShovel(){
     updateShovelBtn();
     removeWallBox(best); AudioEng.sfxBreak();
     burstParticles((best.minX+best.maxX)/2,(best.minZ+best.maxZ)/2);
-    showToast('⛏️ 使用鐵鍬，牆壁被敲破了！');
+    showToast('⛏️ 使用鐵鍬，牆壁被敲破了！',1800,'使用 鐵鍬');
   }else{
     showToast('😅 面前沒有可以敲的牆（外圍牆敲不破）');
   }
@@ -2552,7 +2552,7 @@ function updatePlayer(dt,t){
         gd.taken=true; gd.backAt=performance.now()+SHOP_RESTOCK_MS; gd.sprite.visible=false; gd.tag.visible=false; gd.marker.visible=false;
         cartAdd(MP.id,gd.gi);
         AudioEng.sfxCoin();
-        showToast(gd.g.emoji+' '+gd.g.name+' +$'+gd.g.price,1200);
+        showToast(gd.g.emoji+' '+gd.g.name+' +$'+gd.g.price,1200,'獲得 '+gd.g.name);
         updateShopHud();
         mpSend({t:'take',kind:'good',i:gi,round:MP.round,gi:gd.gi,v:gd.g.price});
       }
@@ -4293,10 +4293,10 @@ function mpHandle(m){
       cartAdd(m.f,m.gi);
       if(m.f===MP.id){
         AudioEng.sfxSteal();
-        showToast('🤏 搶到了！'+g.emoji+' '+g.name+' $'+g.price+'（從 '+mpName(m.to)+' 的購物車）',2200);
+        showToast('🤏 搶到了！'+g.emoji+' '+g.name+' $'+g.price+'（從 '+mpName(m.to)+' 的購物車）',2200,'獲得 '+g.name);
       }else if(m.to===MP.id){
         AudioEng.sfxLose();
-        showToast('😱 被 '+mpName(m.f)+' 搶走了 '+g.emoji+' '+g.name+' $'+g.price+'！',2200);
+        showToast('😱 被 '+mpName(m.f)+' 搶走了 '+g.emoji+' '+g.name+' $'+g.price+'！',2200,g.name+'被搶走了');
       }
       updateShopHud();
       break;}

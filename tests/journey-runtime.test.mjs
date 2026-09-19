@@ -87,9 +87,33 @@ test('劇情對話讀出當頁，使用補給後播報正確道具且關閉會�
   h.start();assert.ok(calls.some(([kind,html])=>kind==='panel'&&html.includes('倒轉高塔')));
   h.state().run.hp=50;h.api.handleAction('bag');
   assert.match(h.get('towerDialog').innerHTML,/data-voice-action="replay"/);
+  assert.doesNotMatch(h.get('towerDialog').voiceSummary,/耐久|防禦|35|100/);
+  const before=calls.length;
   h.click('use','heal');assert.equal(h.state().run.hp,85);
-  assert.deepEqual(calls.at(-1),['item','使用了療癒藥。恢復 35 點生命。',true]);
+  assert.deepEqual(calls.slice(before),[['item','使用 療癒藥',true]]);
+  h.api.handleAction('journal');assert.equal(h.get('towerDialog').voiceScope,'full');
   h.click('close');assert.deepEqual(calls.at(-1),['stop']);
+});
+
+test('商店與背包只讀摘要，取得裝備僅播報名稱且不自動重讀商店',()=>{
+  const h=harness(runAt()),calls=[];
+  h.context.GameVoice={status:()=>({enabled:true,supported:true}),readPanel:panel=>calls.push(['panel',panel.voiceSummary]),stop:()=>{},announce:(message,replace)=>calls.push(['item',message,replace])};
+  h.start();const trader=h.state().traders[0];h.state().run.coins=10000;h.interact(trader.model);
+  assert.equal(h.get('towerDialog').voiceScope,'summary');assert.match(h.get('towerDialog').voiceSummary,/出售/);
+  assert.doesNotMatch(h.get('towerDialog').voiceSummary,/耐久|防禦|擊暈/);
+  const before=calls.length,gear=trader.offer.gear[0];h.click('buy-gear',gear.kind);
+  assert.deepEqual(calls.slice(before),[['item','獲得 '+gear.gear.name,true]]);
+});
+
+test('領取委託報酬只讀獲得物品，不自動朗讀任務或裝備數值',()=>{
+  let run=findRun(r=>E.explorerOffer(r)?.type==='donate');const offer=E.explorerOffer(run);
+  run=E.acceptQuest(run,offer.id).run;run.bag[offer.target]=offer.goal;
+  run=E.questProgress(run,'donate').run;
+  const h=harness(run),calls=[];
+  h.context.GameVoice={status:()=>({enabled:true,supported:true}),readPanel:()=>calls.push('panel'),stop:()=>{},announce:(message)=>calls.push(message)};
+  h.start();h.interact(h.state().explorer.model);const before=calls.length;h.click('quest-reward');
+  assert.equal(h.state().run.adventure.quest.status,'claimed');assert.equal(calls.length,before+1);
+  assert.match(calls.at(-1),/^獲得 /);assert.doesNotMatch(calls.at(-1),/耐久|防禦|恢復|\d|×/);
 });
 
 for (const id of ['eve', 'rowan', 'mira', 'oren', 'sena']) {

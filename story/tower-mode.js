@@ -99,7 +99,7 @@
   function action(label, key, item, disabled) {
     return '<button class="tower-btn" data-tower="' + key + '"' + (item ? ' data-item="' + text(item) + '"' : '') + (disabled ? ' disabled' : '') + '>' + text(label) + '</button>';
   }
-  function dialog(kicker, title, copy, body, actions) {
+  function dialog(kicker, title, copy, body, actions, narration={}) {
     el('towerTalkBtn').hidden=true;
     if (active && !paused) {
       paused = true; pauseAt = performance.now(); G.frozen = true;
@@ -114,7 +114,9 @@
     el('towerDialog').innerHTML = closeButton+'<div class="tower-kicker">' + text(kicker) + '</div><h2 class="tower-heading" id="towerDialogTitle">' + text(title) + '</h2>'+voiceControls+'<p class="tower-copy">' + text(copy) + '</p>' + (body || '') + '<div class="tower-actions">' + actions + '</div>';
     el('towerDialog').focus();
     el('towerDialog').scrollTop=0;
-    window.GameVoice?.readPanel(el('towerDialog'));
+    el('towerDialog').voiceScope=narration.full?'full':'summary';
+    el('towerDialog').voiceSummary=narration.summary||'';
+    if(!narration.silent)window.GameVoice?.readPanel(el('towerDialog'));
   }
   function closeDialog() {
     if(pendingDungeonShift)return;
@@ -226,7 +228,7 @@
     const clues=N.CHAPTERS.filter(c=>run.chronicle.clues.includes(c.clueId));
     const history=(run.expedition?.history||[]).slice(-5).reverse().map(h=>'第 '+h.floor+' 層 · '+(sideStory(h.kind)?.title||{archive:'無聲信庫',bells:'逆時鐘室',lantern:'餘燼渡廊'}[h.kind])+' · '+({completed:'已完成',abandoned:'已退出',expired:'時間耗盡'}[h.outcome])).join('／');
     const collected=S?S.collectedStories(run):[],sideEntries='<h3 class="tower-section-title">旅途逸聞 '+collected.length+' / 6</h3><p class="tower-copy">完成劇情裂隙可留下永久手記；部分人物會在後續主線回應。不收集也能完成主線。</p>'+collected.map(s=>'<article class="tower-journal-entry"><div><small>'+text(s.title)+'</small><h3>'+text(s.record.title)+'</h3></div>'+action('重讀逸聞','side-story-read',s.kind)+'</article>').join('');
-    dialog('旅人的手記 · '+run.chronicle.read.length+' / 30 幕',chapter.title,N.objective(run),'<section class="tower-guard-summary"><h3>歸途印記 '+clues.length+' / 10</h3><p>'+text(clues.map(c=>c.clueName).join('、')||'第一枚線索仍在塔中等待。')+'</p></section>'+sideEntries+entries+(history?'<p class="tower-copy">裂隙紀錄：'+text(history)+'</p>':''),action(active?'回到迷宮':'回首頁','close')+(run.chronicle.ending?action('閱讀我的結局','ending-read'):'')+(active?(inDungeon()?action('副本目標','dungeon-brief'):action('探索者委託','quest')):''));
+    dialog('旅人的手記 · '+run.chronicle.read.length+' / 30 幕',chapter.title,N.objective(run),'<section class="tower-guard-summary"><h3>歸途印記 '+clues.length+' / 10</h3><p>'+text(clues.map(c=>c.clueName).join('、')||'第一枚線索仍在塔中等待。')+'</p></section>'+sideEntries+entries+(history?'<p class="tower-copy">裂隙紀錄：'+text(history)+'</p>':''),action(active?'回到迷宮':'回首頁','close')+(run.chronicle.ending?action('閱讀我的結局','ending-read'):'')+(active?(inDungeon()?action('副本目標','dungeon-brief'):action('探索者委託','quest')):''),{full:true});
   }
   function readSideStory(kind,page=0,source='record') {
     const story=sideStory(kind);if(!story||!['intro','record','outro'].includes(source))return;
@@ -274,12 +276,12 @@
   }
   function dungeonBriefing() {
     const offer=dungeonOffer();if(!offer)return;
-    dialog('裂隙副本 · '+run.floor+' 層之外',offer.title,offer.description,'<section class="tower-guard-summary"><h3>'+text(offer.objective)+'</h3><p>'+text(dungeonHint(offer))+'</p></section><p class="tower-copy">剩餘 '+Math.ceil(Math.max(0,offer.timeLimit-run.expedition.active.elapsed))+' 秒；暫停與變形時不計時。沒有普通物資，也不推進原層委託。裝備和補給照常消耗，護衛留在原層等候。中途退出不領獎。</p>',action('開始探索','close')+(sideStory(offer.kind)?action('閱讀副本故事','side-story-intro',offer.kind):'')+action('退出副本','dungeon-leave'));
+    dialog('裂隙副本 · '+run.floor+' 層之外',offer.title,offer.description,'<section class="tower-guard-summary"><h3>'+text(offer.objective)+'</h3><p>'+text(dungeonHint(offer))+'</p></section><p class="tower-copy">剩餘 '+Math.ceil(Math.max(0,offer.timeLimit-run.expedition.active.elapsed))+' 秒；暫停與變形時不計時。沒有普通物資，也不推進原層委託。裝備和補給照常消耗，護衛留在原層等候。中途退出不領獎。</p>',action('開始探索','close')+(sideStory(offer.kind)?action('閱讀副本故事','side-story-intro',offer.kind):'')+action('退出副本','dungeon-leave'),{summary:offer.title+'。'+offer.objective+'。'+dungeonHint(offer)});
   }
   function riftDialog() {
     if(inDungeon()||!nearEntity(rift))return;
     const offer=rift.offer;
-    dialog('隨機奇遇 · 裂隙副本',offer.title,offer.description,'<section class="tower-guard-summary"><h3>'+text(offer.objective)+'</h3><p>獨立 '+offer.size+' × '+offer.size+' 小迷宮 · '+offer.timeLimit+' 秒 · 每 '+offer.shiftSeconds+' 秒變形</p></section><p class="tower-copy">完成可獲銅幣與補給或強化裝備。'+(sideStory(offer.kind)?'另收錄永久旅途逸聞，部分會在主線與結局得到回應；不影響主線通關資格。':'')+'任務與護衛留在原層；結束回到入口所在格。原層迷宮重新排列，但已拾取物不重生。每層裂隙只能挑戰一次。</p>',action('暫不進入','close')+action('進入副本','dungeon-enter',offer.id));
+    dialog('隨機奇遇 · 裂隙副本',offer.title,offer.description,'<section class="tower-guard-summary"><h3>'+text(offer.objective)+'</h3><p>獨立 '+offer.size+' × '+offer.size+' 小迷宮 · '+offer.timeLimit+' 秒 · 每 '+offer.shiftSeconds+' 秒變形</p></section><p class="tower-copy">完成可獲銅幣與補給或強化裝備。'+(sideStory(offer.kind)?'另收錄永久旅途逸聞，部分會在主線與結局得到回應；不影響主線通關資格。':'')+'任務與護衛留在原層；結束回到入口所在格。原層迷宮重新排列，但已拾取物不重生。每層裂隙只能挑戰一次。</p>',action('暫不進入','close')+action('進入副本','dungeon-enter',offer.id),{summary:offer.title+'。'+offer.objective+'。完成後領取報酬，結束回到原層。'});
   }
   function enterDungeon(id) {
     if(!D||inDungeon()||G.shifting||!nearEntity(rift))return;
@@ -354,7 +356,8 @@
     const cell=result.effect.returnCell,p=cellToWorld(cell.x,cell.y);G.px=p.x;G.pz=p.z;playerGroup.position.set(p.x,0,p.z);shiftLeft=result.effect.returnShift;exitDeclined=true;restoreWarriorPosition();
     if(explorer&&run.adventure.quest?.type==='escort')explorer.model.position.set(p.x,0,p.z);
     save();updateHud();
-    dialog('回到第 '+run.floor+' 層',outcome==='completed'?title+' · 記憶歸還':outcome==='expired'?'裂隙的時間已盡':'你離開了裂隙',outcome==='completed'?'副本報酬：'+rewardDescription(result.effect.reward):'這次沒有帶出報酬。你的旅程仍能繼續，消耗的裝備與補給不會重置。',(outcome==='completed'&&story?'<aside class="tower-story-echo"><small>永久逸聞已收錄 · '+text(story.record.title)+'</small><p>'+text(story.outro[0])+'</p></aside>':'')+'<p class="tower-copy">原層任務與主線保留；已拾取物、商店庫存與已擊敗怪物不重生。</p>',action('繼續旅程','close')+(outcome==='completed'&&story?action('閱讀副本後記','side-story-outro',story.kind):'')+action('整理裝備','bag'));
+    dialog('回到第 '+run.floor+' 層',outcome==='completed'?title+' · 記憶歸還':outcome==='expired'?'裂隙的時間已盡':'你離開了裂隙',outcome==='completed'?'副本報酬：'+rewardDescription(result.effect.reward):'這次沒有帶出報酬。你的旅程仍能繼續，消耗的裝備與補給不會重置。',(outcome==='completed'&&story?'<aside class="tower-story-echo"><small>永久逸聞已收錄 · '+text(story.record.title)+'</small><p>'+text(story.outro[0])+'</p></aside>':'')+'<p class="tower-copy">原層任務與主線保留；已拾取物、商店庫存與已擊敗怪物不重生。</p>',action('繼續旅程','close')+(outcome==='completed'&&story?action('閱讀副本後記','side-story-outro',story.kind):'')+action('整理裝備','bag'),{silent:outcome==='completed',summary:outcome==='completed'?title+'。副本完成。'+rewardSpeech(result.effect.reward):'你離開了裂隙。這次沒有帶出報酬，旅程仍能繼續。'});
+    if(outcome==='completed')window.GameVoice?.announce(rewardSpeech(result.effect.reward),true);
   }
   function mapMarkers() {
     if(!active)return [];
@@ -634,7 +637,7 @@
       item.icon.position.y=1+Math.sin(now*.003+item.cx)*.12;item.icon.rotation.y+=dt;
       if (Math.hypot(G.px-item.x,G.pz-item.z)<1.05) {
         const result=C.collect(run,item.kind,item.kind==='coin'?8:1);
-        if(result.ok){run=result.run;run.claimed.push(item.id);item.model.visible=false;AudioEng.sfxPickup();showToast('取得 '+C.ITEMS[item.kind].name+(item.kind==='coin'?' +8':'')+'。'+(C.ITEMS[item.kind].description||''));save();}
+        if(result.ok){run=result.run;run.claimed.push(item.id);item.model.visible=false;AudioEng.sfxPickup();showToast('取得 '+C.ITEMS[item.kind].name+(item.kind==='coin'?' +8':'')+'。'+(C.ITEMS[item.kind].description||''),1800,'獲得 '+C.ITEMS[item.kind].name);save();}
       }
     }
     nearest=traders.find(n=>Math.hypot(G.px-n.x,G.pz-n.z)<2.6&&hasClearPath(G.px,G.pz,n.x,n.z))||null;
@@ -699,7 +702,7 @@
   function damage(amount,source='monster') {
     if(hurtLeft>0||paused||run.status!=='playing')return;
     const result=C.takeDamage(run,amount,source);if(!result.ok)return;run=result.run;hurtLeft=1.5;refreshGear();
-    showToast(result.effect&&result.effect.revived?'復甦羽亮起，你重新站了起來。':'受到 '+result.effect.damage+' 點傷害'+(result.effect.broken.length?' · 裝備已損壞':'，留意紅圈預警'));
+    showToast(result.effect&&result.effect.revived?'復甦羽亮起，你重新站了起來。':'受到 '+result.effect.damage+' 點傷害'+(result.effect.broken.length?' · 裝備已損壞':'，留意紅圈預警'),1800,result.effect.revived?'使用 復甦羽':'受到攻擊'+(result.effect.broken.length?'，裝備已損壞':''));
     if(run.hp<=0||run.status==='dead')defeat();else save();updateHud();
   }
   function attack() {
@@ -741,7 +744,7 @@
     const offer=nearestWarrior.offer,affordable=Object.entries(offer.cost).every(([id,count])=>(id==='coin'?run.coins:run.bag[id]||0)>=count);
     const style=V.WARRIOR_STYLES[offer.strength];
     const ranks='<p>'+text(style.name+'：'+style.equipment+'，手持'+style.weapon)+'。</p><div class="tower-ranks" aria-label="強度 '+offer.strength+' 分，最高 5 分">'+Array.from({length:5},(_,i)=>'<span class="'+(i<offer.strength?'filled':'')+'"></span>').join('')+'</div>';
-    dialog('旅途奇遇 · 護衛契約',offer.name,'「付出約定的報酬，我就替你擋住危險。你只管往下走。」','<section class="tower-guard-offer"><div><h3>戰士強度 '+offer.strength+' / 5</h3>'+ranks+'</div><div><h3>聘請報酬</h3><p>'+text(costText(offer.cost))+'</p></div></section>'+warriorRules()+'<p class="tower-copy">'+(run.warrior?'已有一名護衛，待目前契約結束後才能再聘請。':affordable?'只有按下「同意並聘請」才會扣除報酬。':'補給不足，可先向行商購買或探索收集。')+'</p>',action('暫不聘請','close')+action('同意並聘請','hire',offer.id,!!run.warrior||!affordable));
+    dialog('旅途奇遇 · 護衛契約',offer.name,'「付出約定的報酬，我就替你擋住危險。你只管往下走。」','<section class="tower-guard-offer"><div><h3>戰士強度 '+offer.strength+' / 5</h3>'+ranks+'</div><div><h3>聘請報酬</h3><p>'+text(costText(offer.cost))+'</p></div></section>'+warriorRules()+'<p class="tower-copy">'+(run.warrior?'已有一名護衛，待目前契約結束後才能再聘請。':affordable?'只有按下「同意並聘請」才會扣除報酬。':'補給不足，可先向行商購買或探索收集。')+'</p>',action('暫不聘請','close')+action('同意並聘請','hire',offer.id,!!run.warrior||!affordable),{summary:style.name+'，戰士強度 '+offer.strength+' 分。聘請需要 '+costText(offer.cost)+'。'});
   }
   function hireWarrior(id) {
     if(!active||!G.running||G.shifting||run.status!=='playing'||!warriorNpc||!warriorNpc.model.visible||warriorNpc.offer.id!==id||Math.hypot(G.px-warriorNpc.x,G.pz-warriorNpc.z)>=2.6||!hasClearPath(G.px,G.pz,warriorNpc.x,warriorNpc.z))return;
@@ -800,7 +803,11 @@
   function rewardDescription(reward) {
     return [reward.coins?reward.coins+' 銅幣':'',...Object.entries(reward.items||{}).map(([id,n])=>C.ITEMS[id].name+' × '+n),reward.gear?reward.gear.name+'（'+gearDescription(reward.gear)+'）':''].filter(Boolean).join(' ＋ ');
   }
-  function questDialog() {
+  function gearSpeech(gear) { return C.GEAR[gear.kind]?.name||gear.name; }
+  function rewardSpeech(reward) {
+    return '獲得 '+[reward.coins?'銅幣':'',...Object.keys(reward.items||{}).map(id=>C.ITEMS[id].name),reward.gear?gearSpeech(reward.gear):''].filter(Boolean).join('、');
+  }
+  function questDialog(quiet=false) {
     if(!active||G.shifting||run.status!=='playing')return;
     const offer=E.explorerOffer(run),q=run.adventure.quest;
     if(!offer||(!q&&!nearExplorer())){dialog('探索者委託','目前沒有委託','每層有 20% 機會遇見五位探索者之一；他們的委託都隨機抽選。靠近本人可查看委託。','',action('回到迷宮','close'));return;}
@@ -811,7 +818,7 @@
     if(!q)actions+=action('接受委託','quest-accept',offer.id,!nearExplorer());
     else if(q.status==='ready')actions+=action('領取報酬','quest-reward',null,!nearExplorer());
     else if(q.status==='active'&&q.type==='donate')actions+=action('交付 '+q.goal+' 份'+C.ITEMS[q.target].name,'quest-donate',null,!nearExplorer()||run.bag[q.target]<q.goal);
-    dialog(explorerName(),q?.status==='claimed'?'感謝你的幫助':offer.title,copy,(!q?'<p class="tower-copy">'+text(explorerIdentity().greeting||'')+'</p>':'')+'<section class="tower-guard-summary"><h3>完成報酬</h3><p>'+text(rewardDescription(offer.reward))+'</p></section><p class="tower-copy">離開本層、保存回首頁或重整挑戰會解除未結案委託；報酬必須向探索者領取。進出口前會再次確認。裝備放入行囊後請自行穿戴。</p>',actions);
+    dialog(explorerName(),q?.status==='claimed'?'感謝你的幫助':offer.title,copy,(!q?'<p class="tower-copy">'+text(explorerIdentity().greeting||'')+'</p>':'')+'<section class="tower-guard-summary"><h3>完成報酬</h3><p>'+text(rewardDescription(offer.reward))+'</p></section><p class="tower-copy">離開本層、保存回首頁或重整挑戰會解除未結案委託；報酬必須向探索者領取。進出口前會再次確認。裝備放入行囊後請自行穿戴。</p>',actions,{full:true,silent:quiet===true});
   }
   function chestDialog() {
     if(!chest||!chest.model.visible)return;
@@ -823,16 +830,17 @@
     chest.model.visible=false;nearbyEncounter=null;
     if(run.status==='dead'){defeat();return;}
     const copy=result.effect.outcome==='gear'?result.effect.gear.name+' · '+gearDescription(result.effect.gear)+'，已放入裝備行囊。':'陷阱造成 '+result.effect.damage+' 點傷害。'+(result.effect.revived?'復甦羽保護了你。':'防具已按命中消耗耐久。');
-    dialog('寶箱已開啟',result.effect.outcome==='gear'?'獲得強化裝備':'小心，是陷阱！',copy,'',action('查看裝備','bag')+action('繼續前進','close'));
+    dialog('寶箱已開啟',result.effect.outcome==='gear'?'獲得強化裝備':'小心，是陷阱！',copy,'',action('查看裝備','bag')+action('繼續前進','close'),{silent:result.effect.outcome==='gear',summary:result.effect.outcome==='gear'?'獲得 '+gearSpeech(result.effect.gear):'小心，是陷阱！'});
+    if(result.effect.outcome==='gear')window.GameVoice?.announce('獲得 '+gearSpeech(result.effect.gear),true);
   }
-  function inventory() {
+  function inventory(quiet=false) {
     if(!active||G.shifting||run.status!=='playing')return;
     syncEngine();
     const cards=Object.entries(C.ITEMS).filter(([id])=>id!=='coin').map(([id,item])=>'<article class="tower-item"><h3>'+text(item.name)+' <span>×'+(run.bag[id]||0)+'</span></h3><p>'+text(item.description||item.desc||'高塔冒險補給')+'</p>'+action(id==='feather'?'瀕死自動使用':'使用','use',id,!run.bag[id]||id==='feather')+'</article>').join('');
     const stats=C.equipmentStats(run),worn=Object.values(run.equipment).filter(Boolean).map(g=>gearCard(g,true)).join(''),stored=run.gearBag.map(g=>gearCard(g)).join('');
-    dialog('旅人背包 · 暫停中','裝備與補給','生命 '+Math.ceil(run.hp)+' / 100 · 飽足 '+Math.ceil(run.hunger)+'% · 銅幣 '+run.coins,'<section class="tower-guard-summary"><h3>防禦 '+stats.defense+' · 強化 +'+stats.bonus+' · 擊暈 '+stats.stunSeconds+' 秒</h3><p>每次命中，三件已穿防具各減 1 耐久；武器命中減 1。每點已穿裝備強化增加 10 秒擊暈，耐久耗盡即損壞。</p></section><h3>穿戴中</h3><div class="tower-grid">'+(worn||'<p>尚未穿戴裝備。</p>')+'</div><h3 class="tower-section-title">裝備行囊 '+run.gearBag.length+'/24</h3><div class="tower-grid">'+(stored||'<p>商人與寶箱取得的裝備會放在這裡。</p>')+'</div><h3 class="tower-section-title">生存補給</h3><div class="tower-grid">'+cards+'</div><section class="tower-guard-summary"><h3>'+text(warriorStatus())+'</h3></section>'+warriorRules(),(N?action('故事日誌','journal'):'')+action('任務日誌','quest')+(inDungeon()?action('副本目標','dungeon-brief'):'')+action('回到迷宮','close')+action('保存並離開','quit'));
+    dialog('旅人背包 · 暫停中','裝備與補給','生命 '+Math.ceil(run.hp)+' / 100 · 飽足 '+Math.ceil(run.hunger)+'% · 銅幣 '+run.coins,'<section class="tower-guard-summary"><h3>防禦 '+stats.defense+' · 強化 +'+stats.bonus+' · 擊暈 '+stats.stunSeconds+' 秒</h3><p>每次命中，三件已穿防具各減 1 耐久；武器命中減 1。每點已穿裝備強化增加 10 秒擊暈，耐久耗盡即損壞。</p></section><h3>穿戴中</h3><div class="tower-grid">'+(worn||'<p>尚未穿戴裝備。</p>')+'</div><h3 class="tower-section-title">裝備行囊 '+run.gearBag.length+'/24</h3><div class="tower-grid">'+(stored||'<p>商人與寶箱取得的裝備會放在這裡。</p>')+'</div><h3 class="tower-section-title">生存補給</h3><div class="tower-grid">'+cards+'</div><section class="tower-guard-summary"><h3>'+text(warriorStatus())+'</h3></section>'+warriorRules(),(N?action('故事日誌','journal'):'')+action('任務日誌','quest')+(inDungeon()?action('副本目標','dungeon-brief'):'')+action('回到迷宮','close')+action('保存並離開','quit'),{silent:quiet===true,summary:'裝備與補給。穿戴中：'+(Object.values(run.equipment).filter(Boolean).map(gearSpeech).join('、')||'尚未穿戴裝備')+'。可以更換裝備或使用補給。'});
   }
-  function trade() {
+  function trade(quiet=false) {
     if(!active||G.shifting||run.status!=='playing')return;
     if(nearbyJourney){if(nearbyJourney===mainClue)mainClueDialog();else if(nearbyJourney===rift)riftDialog();else dungeonObjectDialog(nearbyJourney.index);return;}
     if(nearbyEncounter){if(nearbyEncounter===chest)chestDialog();else questDialog();return;}
@@ -841,7 +849,7 @@
     syncEngine();
     const cards=nearest.offer.supplies.map(id=>{const item=C.ITEMS[id];return '<article class="tower-item"><h3>'+text(item.name)+'</h3><p>'+text(item.description)+' · 持有 '+run.bag[id]+'</p>'+action('買 '+item.buyPrice+' 幣','buy',id)+action('賣出','sell',id,!run.bag[id])+'</article>';}).join('');
     const gear=nearest.offer.gear.map(({kind,gear,price})=>'<article class="tower-item tower-gear-card"><h3>'+text(gear.name)+'</h3><p>'+text(gearDescription(gear))+'</p>'+action(run.adventure.claimed.includes('stock:'+run.floor+':'+nearest.id+':'+kind)?'本層已售出':'購買 '+price+' 幣','buy-gear',kind,run.adventure.claimed.includes('stock:'+run.floor+':'+nearest.id+':'+kind)||run.coins<price)+'</article>').join('');
-    dialog(nearest.name+' · 行商營地','專門裝備與補給','每位商人固定專賣一種防具與一種武器。剩餘銅幣 '+run.coins,'<div class="tower-grid">'+gear+cards+'</div><p class="tower-copy">買到的裝備放入行囊，請在背包選擇「裝備」；每件本層限一件，讀檔不會補貨。</p>',action('整理裝備','bag')+action('結束交易','close'));
+    dialog(nearest.name+' · 行商營地','專門裝備與補給','每位商人固定專賣一種防具與一種武器。剩餘銅幣 '+run.coins,'<div class="tower-grid">'+gear+cards+'</div><p class="tower-copy">買到的裝備放入行囊，請在背包選擇「裝備」；每件本層限一件，讀檔不會補貨。</p>',action('整理裝備','bag')+action('結束交易','close'),{silent:quiet===true,summary:nearest.name+'。出售：'+[...nearest.offer.gear.map(g=>gearSpeech(g.gear)),...nearest.offer.supplies.map(id=>C.ITEMS[id].name)].join('、')+'。選擇物品購買或賣出。'});
   }
   function useItem(id) {
     syncEngine();const before={...run.effects};
@@ -849,7 +857,7 @@
     const mul=CH().itemDurMul||1;for(const key of Object.keys(run.effects))if(run.effects[key]>before[key])run.effects[key]*=mul;
     if(id==='ration'&&CH().foodMul)G.satiety=run.hunger=Math.min(100,run.hunger+45*(CH().foodMul-1));
     if(id==='map'){const p=worldToCell(G.px,G.pz);G.solutionPath=solveMaze(p.x,p.y);G.mapUntil=performance.now()+run.effects.reveal*1000;}
-    save();inventory();window.GameVoice?.announce('使用了'+C.ITEMS[id].name+'。'+(C.ITEMS[id].description||''),true);
+    save();inventory(true);window.GameVoice?.announce('使用 '+C.ITEMS[id].name,true);
   }
   function reachExit(confirmed=false) {
     if(!active||paused||!G.running||run.status!=='playing'||(exitDeclined&&!confirmed))return;
@@ -870,7 +878,7 @@
       dialog('出口確認',q.status==='ready'?'還有委託報酬尚未領取':'本層還有進行中的委託','下降後會解除本層委託，尚未領取的報酬也會失去。你可以先繼續探索。','<p class="tower-copy">'+text(E.explorerOffer(run)?.title||'探索者委託')+' · '+q.progress+'/'+q.goal+'</p>',action('留在本層','close')+(q.status==='ready'&&nearExplorer()?action('領取報酬並下降','exit-reward'):'')+action('放棄委託並下降','exit-confirm'));return;
     }
     if(N&&run.floor===N.chapterForFloor(run.floor).low){const scene=N.scenesForFloor(run.floor).find(entry=>!run.chronicle.read.includes(entry.id));if(scene){exitDeclined=true;readStory(scene.id,false,0,true);return;}}
-    if(N&&run.floor===1&&!run.chronicle.ending){exitDeclined=true;dialog('主線終章 · 由你決定','把這座塔帶往哪裡？','三條路都不必犧牲任何人。這一次，高塔會等待你的回答。','<div class="tower-grid">'+N.ENDINGS.map(ending=>'<article class="tower-item"><h3>'+text(ending.title)+'</h3><p>'+text(ending.description)+'</p>'+action('選擇這條歸途','ending',ending.id)+'</article>').join('')+'</div>',action('再想一想','close'));return;}
+    if(N&&run.floor===1&&!run.chronicle.ending){exitDeclined=true;dialog('主線終章 · 由你決定','把這座塔帶往哪裡？','三條路都不必犧牲任何人。這一次，高塔會等待你的回答。','<div class="tower-grid">'+N.ENDINGS.map(ending=>'<article class="tower-item"><h3>'+text(ending.title)+'</h3><p>'+text(ending.description)+'</p>'+action('選擇這條歸途','ending',ending.id)+'</article>').join('')+'</div>',action('再想一想','close'),{full:true});return;}
     syncEngine();const result=C.descend(run);
     if(!transact(result))return;G.running=false;floorStarted=false;
     if(run.status==='won'){const ending=N&&N.ENDINGS.find(e=>e.id===run.chronicle.ending);dialog('塔外的第一道晨光',ending?ending.title:'你找到了回家的路',ending?'九十九層的旅程，終於有了你的答案。':C.ENDING.text,ending?endingProse(ending):'<p class="tower-copy">99 層旅程完成。你保住的不只是自己的生命，還有其他旅人的希望。</p>',action('回到首頁','home'));return;}
@@ -935,14 +943,14 @@
     if(key==='dungeon-leave'){leaveDungeonDialog();return;}
     if(key==='dungeon-abandon'){finishDungeon('abandoned');return;}
     if(key==='dungeon-settle'){finishDungeon(id);return;}
-    if(key==='equip'){const gear=run.gearBag.find(g=>g.id===id);if(transact(C.equipGear(run,id,run.revision))){inventory();window.GameVoice?.announce('已裝備'+(gear?.name||'裝備'),true);}return;}
+    if(key==='equip'){const gear=run.gearBag.find(g=>g.id===id);if(transact(C.equipGear(run,id,run.revision))){inventory(true);window.GameVoice?.announce('裝備 '+(gear?gearSpeech(gear):'裝備'),true);}return;}
     if(key==='discard-ask'){const gear=[...run.gearBag,...Object.values(run.equipment)].find(g=>g&&g.id===id);if(gear)dialog('捨棄裝備確認','捨棄'+gear.name+'？','捨棄後不能取回，若這是最後一把武器，你會暫時無法擊暈怪物。','',action('保留裝備','bag')+action('確認捨棄','discard',id));return;}
     if(key==='discard'){if(transact(C.discardGear(run,id,run.revision)))inventory();return;}
     if(key==='quest'){questDialog();return;}
     if(key==='quest-accept'){if(nearExplorer()&&transact(E.acceptQuest(run,id,run.revision))){if(relic)relic.model.visible=run.adventure.quest.type==='relic';closeDialog();showToast('委託已接受，背包可查看進度。');}return;}
     if(key==='quest-donate'){if(nearExplorer()&&questEvent('donate',{}))questDialog();return;}
-    if(key==='quest-reward'){if(nearExplorer()&&transact(E.claimQuestReward(run,run.revision)))questDialog();return;}
-    if(key==='exit-reward'){if(!nearExplorer()||!transact(E.claimQuestReward(run,run.revision)))return;closeDialog();reachExit(true);return;}
+    if(key==='quest-reward'){if(!nearExplorer())return;const result=E.claimQuestReward(run,run.revision);if(transact(result)){questDialog(true);window.GameVoice?.announce(rewardSpeech(result.effect.reward),true);}return;}
+    if(key==='exit-reward'){if(!nearExplorer())return;const result=E.claimQuestReward(run,run.revision);if(!transact(result))return;closeDialog();reachExit(true);window.GameVoice?.announce(rewardSpeech(result.effect.reward));return;}
     if(key==='exit-confirm'){closeDialog();reachExit(true);return;}
     if(key==='chest-open'){openChest(id);return;}
     if(key==='use'){useItem(id);return;}
@@ -950,7 +958,7 @@
     if(key==='buy'||key==='sell'||key==='buy-gear'){
       if(!active||!G.running||!nearest||Math.hypot(G.px-nearest.x,G.pz-nearest.z)>=2.6||!hasClearPath(G.px,G.pz,nearest.x,nearest.z))return;
       const result=key==='buy-gear'?E.buyMerchantGear(run,nearest.id,id,run.revision):E[key==='buy'?'buySupply':'sellSupply'](run,nearest.id,id,1,run.revision);
-      if(transact(result)){trade();window.GameVoice?.announce((key==='sell'?'賣出了':'獲得了')+(C.ITEMS[id]?.name||C.GEAR[id]?.name||'裝備'),true);}return;
+      if(transact(result)){trade(true);window.GameVoice?.announce((key==='sell'?'賣出 ':'獲得 ')+(C.ITEMS[id]?.name||C.GEAR[id]?.name||'裝備'),true);}return;
     }
   }
   window.TowerMode = { get active(){return active;}, get paused(){return paused;}, open, beginNew, tick, floorSeed, atmosphereStyle, scheduleShift, updateShift, reachExit, defeat, requestQuit, canCollectOriginal, collectedOriginal, itemConfig, reservedCells, preserveFloorPickups, soundChanged, mapMarkers };

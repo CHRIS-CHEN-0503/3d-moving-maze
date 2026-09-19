@@ -8,6 +8,7 @@ const require = createRequire(import.meta.url);
 const core = require('../story/story-core.js');
 const encounters = require('../story/tower-encounters.js');
 const narrative = require('../story/tower-narrative.js');
+const characters = require('../story/tower-characters.js');
 const source = readFileSync(new URL('../story/tower-mode.js', import.meta.url), 'utf8');
 // This bridge exists only in tests. Production keeps its private state private.
 const bridge = `window.__warriorTest = {
@@ -42,7 +43,7 @@ function runtime(run) {
     lerp(v,t) { this.x+=(v.x-this.x)*t;this.y+=(v.y-this.y)*t;this.z+=(v.z-this.z)*t;return this; }
   }
   class Object3D {
-    constructor() { this.position=new Vector();this.rotation=new Vector();this.scale=new Vector().set(1,1,1);this.userData={};this.children=[];this.visible=true; }
+    constructor() { this.position=new Vector();this.rotation=new Vector();this.quaternion=new Vector();this.scale=new Vector().set(1,1,1);this.userData={};this.children=[];this.visible=true; }
     add(...items) { this.children.push(...items); }
     remove(item) { this.children=this.children.filter(child=>child!==item); }
   }
@@ -56,7 +57,7 @@ function runtime(run) {
   for(const id of ['CylinderGeometry','BoxGeometry','OctahedronGeometry','ConeGeometry','SphereGeometry','TorusGeometry'])THREE[id]=Geometry;
   const G={running:true,frozen:false,shifting:false,satiety:100,px:0,pz:0,startTime:100,shovels:1,kites:0,whistles:0,shovelRechargeAt:0,skillCoolUntil:0,effects:{},cell:4,mazeW:7,mazeH:7,invisUntil:0,items:[],foods:[]};
   const context=vm.createContext({
-    window:{TowerCore:core,TowerEncounters:encounters,TowerCharacters:{buildMerchant:character,buildExplorer:character,buildChest:()=>new Object3D()}},THREE,G,scene:new Object3D(),wallMesh:new Mesh(new Geometry(),new Material()),
+    window:{TowerCore:core,TowerEncounters:encounters,TowerCharacters:{...characters,buildMerchant:character,buildExplorer:character,buildChest:()=>new Object3D()}},THREE,G,scene:new Object3D(),wallMesh:new Mesh(new Geometry(),new Material()),
     document:{getElementById:node,activeElement:node('focus'),body:{classList:{add(){},remove(){},toggle(){}}},createElement:()=>({getContext:()=>({strokeText(){},fillText(){}})})},
     performance:{now:()=>now},localStorage:{getItem:key=>storage.get(key)??null,setItem:(key,value)=>storage.set(key,value)},
     keys:{},joy:{active:false,dx:0,dy:0},escapeHtml:value=>String(value),
@@ -151,6 +152,8 @@ test('五分戰士立即解決三分怪物，剩餘二分續行且怪物不會�
   const h=runtime(hiredRun(5,19)),monster=positionThreat(h,'wisp');h.api.replaceMonsters([monster]);h.api.updateWarrior(.05,h.now());
   assert.equal(monster.alive,false);assert.equal(monster.model.visible,false);
   assert.equal(h.api.state().run.warrior.strength,2);assert.equal(h.api.state().run.warrior.mode,'escort');
+  assert.equal(h.api.state().escort.model.userData.strength,2,'分數消耗後模型必須同步換裝');
+  assert.equal(h.api.state().escort.model.userData.style.weapon,'短矛');
   assert.ok(h.api.state().run.defeatedMonsters.includes(monster.id));
   const coins=h.api.state().run.coins;h.api.updateWarrior(.05,h.now());assert.equal(h.api.state().run.coins,coins);
   h.api.save();const restored=runtime(h.api.readSave());

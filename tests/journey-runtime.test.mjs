@@ -81,6 +81,17 @@ test('臨時互動使用固定無字對話圖示，靠近顯示、開啟對話�
   assert.equal(button.hidden,true);assert.equal(button.innerHTML,icon);assert.equal(button.textContent,'');
 });
 
+test('劇情對話讀出當頁，使用補給後播報正確道具且關閉會停止',()=>{
+  const h=harness(runAt()),calls=[];
+  h.context.GameVoice={status:()=>({enabled:true,supported:true}),readPanel:panel=>calls.push(['panel',panel.innerHTML]),stop:()=>calls.push(['stop']),announce:(message,replace)=>calls.push(['item',message,replace])};
+  h.start();assert.ok(calls.some(([kind,html])=>kind==='panel'&&html.includes('倒轉高塔')));
+  h.state().run.hp=50;h.api.handleAction('bag');
+  assert.match(h.get('towerDialog').innerHTML,/data-voice-action="replay"/);
+  h.click('use','heal');assert.equal(h.state().run.hp,85);
+  assert.deepEqual(calls.at(-1),['item','使用了療癒藥。恢復 35 點生命。',true]);
+  h.click('close');assert.deepEqual(calls.at(-1),['stop']);
+});
+
 for (const id of ['eve', 'rowan', 'mira', 'oren', 'sena']) {
   test(`真實場景建出 ${id} 的人物／姓名／對話，讀檔仍是同一探索者`, () => {
     const run = findRun(r => E.explorerOffer(r)?.explorer.id === id), h = harness(run); h.start();

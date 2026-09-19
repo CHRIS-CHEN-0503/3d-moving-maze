@@ -19,6 +19,14 @@
     sena: Object.freeze({ id: 'sena', name: '星奈', title: '探索者', description: '身形嬌小的年輕觀星旅人，透過望遠鏡追尋高塔之外的星光。', silhouette: '女性、小巧身形、銀紫短髮、流星髮飾、單肩短披與望遠鏡' }),
   });
   const aliases = Object.freeze({ blacksmith: 'tieLing', smith: 'tieLing', armorer: 'jinHe', tailor: 'jinHe', shieldsmith: 'lanZhou', warden: 'lanZhou' });
+  const WARRIOR_STYLES = Object.freeze([
+    null,
+    Object.freeze({name:'見習守衛',equipment:'布帽、皮背心、木圓盾',weapon:'木棒',cloth:0x688665,metal:0x9a7751,accent:0xd6bc86}),
+    Object.freeze({name:'巡塔槍兵',equipment:'鐵盔、輕鎖甲、菱形鐵盾',weapon:'短矛',cloth:0x398785,metal:0x839aa1,accent:0xb9ded7}),
+    Object.freeze({name:'鋼盾衛士',equipment:'覆面盔、藍披肩、鋼鎧、鳶形盾',weapon:'長劍',cloth:0x3566a0,metal:0xb0c5d5,accent:0xd8e9ef}),
+    Object.freeze({name:'赤焰戟衛',equipment:'角冠重甲、赤紅披風、塔盾',weapon:'長戟',cloth:0x9f3947,metal:0x535b73,accent:0xe9b674}),
+    Object.freeze({name:'晨光統領',equipment:'金冠、白金甲、白披風、日輪盾',weapon:'星徽戰錘',cloth:0xf2e6c8,metal:0xc8af68,accent:0x9fe7e3}),
+  ]);
   // 相對於一般版 playerGroup 的建議掛載點；回傳模型自身仍以原點為中心／握柄。
   const GEAR_MOUNTS = Object.freeze({
     helmet: Object.freeze({ position: Object.freeze([0, 1.82, 0]), rotation: Object.freeze([0, 0, 0]) }),
@@ -306,6 +314,84 @@
     return group;
   }
 
+  function buildWarrior(strength,deps) {
+    if(!Number.isInteger(strength)||strength<1||strength>5)throw new RangeError('戰士強度必須為 1 到 5。');
+    const k=kit(deps),s=WARRIOR_STYLES[strength],g=figure(k,{width:.6+strength*.025,shirt:s.cloth,pants:0x354453});
+    g.name='tower-warrior-'+strength;
+    const armor=k.box(g,[.62,.58,.09],s.metal,'rank-'+strength+'-breastplate',0,.98,.23);
+    k.box(g,[.65,.1,.42],0x51453d,'guard-belt',0,.7,0);
+    // 胸前 1～5 枚金釘：色覺不敏感的孩子也能靠數量辨別。
+    for(let i=0;i<strength;i++)k.box(g,[.055,.085,.03],0xffe5a0,'rank-pin-'+i,(i-(strength-1)/2)*.09,1.04,.3);
+    if(strength===1){
+      k.box(g,[.59,.15,.55],s.cloth,'cloth-cap',0,1.87,0);
+      k.box(g,[.62,.04,.21],s.cloth,'soft-cap-brim',0,1.8,.29);
+      k.box(g,[.08,.48,.025],s.accent,'leather-strap',.16,1,.29).rotation.z=.3;
+    }else{
+      k.cylinder(g,[.29,.34,.19,8],s.metal,'helmet-'+strength,0,1.88,0);
+      for(const side of [-1,1])k.box(g,[.085,.26,.38],s.metal,'cheek-guard',side*.29,1.65,0);
+      for(const side of [-1,1])k.box(g,[.25,.17+strength*.014,.44],s.metal,'pauldron',side*.4,1.23,0).rotation.z=side*.17;
+      if(strength===2){
+        k.box(g,[.06,.2,.51],s.accent,'spear-helmet-ridge',0,1.94,0);
+        for(let i=0;i<3;i++)k.box(g,[.48,.025,.025],0x465d65,'chainmail-band',0,.84+i*.08,.292);
+      }
+      if(strength>=3){
+        k.box(g,[.48,.11,.065],s.metal,'visor',0,1.64,.275);
+        for(const side of [-1,1])k.box(g,[.1,.025,.014],0x263845,'visor-slit',side*.12,1.65,.317);
+        k.box(g,[.72,.85,.065],s.cloth,'cape-'+strength,0,.91,-.29).rotation.x=.1;
+        for(const side of [-1,1])k.box(g,[.23,.34,.06],s.metal,'greave',side*.17,.3,.16);
+      }
+      if(strength===4){
+        for(const side of [-1,1])k.cone(g,[.09,.4,5],s.accent,'horn-crown',side*.26,2.1,0).rotation.z=-side*.45;
+        k.box(g,[.67,.1,.08],s.accent,'heavy-armor-trim',0,.78,.3);
+      }
+      if(strength===5){
+        for(let i=-1;i<=1;i++)k.cone(g,[.075,.23+(i===0?.09:0),4],s.metal,'sun-crown',i*.2,2.06,.02);
+        k.crystal(g,[.11,0],s.accent,'sun-heart',0,1.21,.3);
+        for(const side of [-1,1])k.box(g,[.06,.72,.08],s.metal,'white-cape-trim',side*.32,.94,-.34);
+      }
+    }
+    const shield=new k.T.Group();shield.name='guard-shield';shield.position.set(-.12,-.3,.13);g.userData.armL.add(shield);
+    if(strength===1||strength===5){
+      const radius=strength===5?.34:.28;
+      k.cylinder(shield,[radius,radius,.09,10],strength===1?0x99764c:s.metal,'round-shield-'+strength,0,0,0).rotation.x=Math.PI/2;
+      k.torus(shield,[radius-.025,.025,4,10],s.accent,'shield-rim',0,0,.055);
+      if(strength===1)for(const x of [-.1,.1])k.box(shield,[.022,.44,.03],0x554538,'wooden-shield-brace',x,0,.06);
+      else for(let i=0;i<8;i++){const a=i*Math.PI/4;k.box(shield,[.045,.12,.035],s.accent,'sun-ray',Math.sin(a)*.21,Math.cos(a)*.21,.065).rotation.z=-a;}
+    }else if(strength===2){
+      k.box(shield,[.38,.38,.09],s.metal,'diamond-shield',0,0,0).rotation.z=Math.PI/4;
+      k.box(shield,[.04,.49,.04],s.accent,'shield-spine',0,0,.065);
+    }else if(strength===3){
+      k.box(shield,[.46,.38,.09],s.cloth,'kite-shield-top',0,.12,0);
+      k.cone(shield,[.255,.38,3],s.metal,'kite-shield-tip',0,-.18,0).rotation.z=Math.PI;
+      k.box(shield,[.04,.54,.04],s.accent,'kite-cross',0,0,.09);
+    }else{
+      k.box(shield,[.4,.73,.11],s.metal,'tower-shield',0,0,0);
+      k.box(shield,[.055,.66,.035],s.accent,'tower-shield-ridge',0,0,.08);
+      k.crystal(shield,[.13,0],s.cloth,'flame-shield-crest',0,.12,.1);
+    }
+    const weapon=new k.T.Group();weapon.name='guard-weapon-'+strength;weapon.position.set(0,-.35,.13);g.userData.armR.add(weapon);
+    if(strength===1){
+      k.cylinder(weapon,[.075,.035,.7,7],0xad8855,'wooden-club',0,.26,0);
+      k.cylinder(weapon,[.042,.042,.17,6],0x60534a,'club-grip',0,-.08,0);
+    }else if(strength===2||strength===4){
+      k.cylinder(weapon,[.032,.04,strength===4?1.4:1.1,6],0x74563f,'pole-shaft',0,.3,0);
+      k.cone(weapon,[.09,.36,4],s.metal,'spear-tip',0,strength===4?1.16:.99,0);
+      if(strength===4){k.box(weapon,[.38,.23,.065],s.metal,'halberd-axe',.16,.91,0);k.cone(weapon,[.105,.28,3],s.accent,'halberd-hook',-.15,.85,0).rotation.z=Math.PI/2;}
+    }else if(strength===3){
+      k.box(weapon,[.07,.23,.07],0x514435,'sword-grip',0,-.02,0);
+      k.box(weapon,[.36,.075,.1],s.accent,'sword-crossguard',0,.12,0);
+      k.box(weapon,[.095,.68,.055],s.metal,'longsword-blade',0,.48,0);
+      k.cone(weapon,[.066,.2,4],s.metal,'sword-tip',0,.91,0);
+    }else{
+      k.cylinder(weapon,[.04,.04,.68,6],s.metal,'hammer-haft',0,.22,0);
+      k.box(weapon,[.49,.27,.26],s.cloth,'sun-hammer-head',0,.64,0);
+      for(const side of [-1,1])k.box(weapon,[.07,.31,.3],s.metal,'hammer-gold-cap',side*.245,.64,0);
+      k.crystal(weapon,[.13,0],s.accent,'hammer-star',0,.64,.2);
+    }
+    Object.assign(g.userData,{role:'warrior',strength,style:s,guardBlade:weapon,armor,modelFamily:'tower-original'});
+    return g;
+  }
+
   function buildChest(deps) {
     const k = kit(deps), group = new k.T.Group(); group.name = 'tower-treasure-chest';
     const body = k.box(group, [1.06, .53, .7], 0x855c3c, 'chest-body', 0, .285, 0);
@@ -323,5 +409,5 @@
     return group;
   }
 
-  return Object.freeze({ MERCHANT_STYLES, EXPLORER_STYLES, GEAR_MOUNTS, buildMerchant, buildExplorer, buildChest, buildGear });
+  return Object.freeze({ MERCHANT_STYLES, EXPLORER_STYLES, WARRIOR_STYLES, GEAR_MOUNTS, buildMerchant, buildExplorer, buildWarrior, buildChest, buildGear });
 });

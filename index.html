@@ -650,7 +650,7 @@ button:focus-visible,input:focus-visible{outline:3px solid #fff;outline-offset:3
         <button class="home-action primary-story" id="storyEntryBtn"><span class="home-icon ui-icon icon-castle" aria-hidden="true"></span><span><strong>劇情模式・倒轉高塔</strong><small>被召喚至第 99 層。在變形迷宮中交易、求生，找到回家的路。</small></span></button>
         <button class="home-action primary" id="singleBtn"><span class="home-icon ui-icon icon-compass" aria-hidden="true"></span><span><strong>單人遊戲</strong><small>自己闖關，或和電腦練習尋寶、搶購與合作奪旗。</small></span></button>
         <button class="home-action multiplayer" id="mpBtn"><span class="home-icon ui-icon icon-duo" aria-hidden="true"></span><span><strong>多人遊戲</strong><small>先建立角色，再建立房間或輸入朋友的房號。</small></span></button>
-        <button class="home-action utility" id="admBtn"><span class="home-icon ui-icon icon-settings" aria-hidden="true"></span><span><strong>遊戲設定</strong><small>設定這台裝置的音樂偏好。</small></span></button>
+        <button class="home-action utility" id="admBtn"><span class="home-icon ui-icon icon-settings" aria-hidden="true"></span><span><strong>遊戲設定</strong><small>設定音樂、語音朗讀與提示。</small></span></button>
         <button class="home-action utility history" id="lbBtn"><span class="home-icon ui-icon icon-history" aria-hidden="true"></span><span><strong>勇者歷史</strong><small>查看最快紀錄與歷代勇者。</small></span></button>
         <button class="home-action utility help" id="helpBtn"><span class="home-icon ui-icon icon-help" aria-hidden="true"></span><span><strong>遊戲說明</strong><small>查看操作、道具與各種玩法。</small></span></button>
       </div>
@@ -882,10 +882,16 @@ button:focus-visible,input:focus-visible{outline:3px solid #fff;outline-offset:3
 <div class="modal" id="admModal">
   <div class="m-card">
     <h3><span class="ui-icon icon-settings inline-ui-icon" aria-hidden="true"></span>遊戲設定 <span id="admVer" style="font-size:.7rem;color:#aaa;font-weight:normal;"></span></h3>
-    <p>調整這台裝置的音樂偏好。迷宮大小與玩法規則在開始遊戲前設定。</p>
+    <p>調整這台裝置的音樂與語音。迷宮大小與玩法規則在開始遊戲前設定。</p>
     <div class="adm-row"><label for="cfgMusic">開啟音樂</label>
       <select id="cfgMusic"><option value="1">開</option><option value="0">關</option></select>
     </div>
+    <div class="adm-row"><label for="cfgSpeech">語音朗讀與道具提示</label>
+      <select id="cfgSpeech"><option value="1">開啟</option><option value="0">關閉</option></select>
+    </div>
+    <div class="voice-choice"><label for="cfgSpeechVoice">朗讀聲音</label><select id="cfgSpeechVoice"><option value="">自動選擇溫柔中文女聲</option></select></div>
+    <p id="speechStatus" role="status">正在載入裝置語音。</p>
+    <button class="mini-btn" id="speechPreview" type="button">試聽語音</button>
     <button class="mini-btn button-with-icon" id="admSave"><span class="ui-icon icon-settings" aria-hidden="true"></span>儲存設定</button>
   </div>
 </div>
@@ -952,18 +958,20 @@ button:focus-visible,input:focus-visible{outline:3px solid #fff;outline-offset:3
 <script src="./assets/character-motion.js"></script>
 <script src="./assets/maze-atmosphere.js"></script>
 <script src="./assets/game-rules.js"></script>
+<script src="./assets/game-voice.js"></script>
 <script>
 'use strict';
 /* =====================================================
    3D移動迷宮 — 給小朋友的變形迷宮冒險
    ===================================================== */
 const $=id=>document.getElementById(id);
-const GAME_VERSION='1.25.1';
+const GAME_VERSION='1.26.0';
 
 /* ---------- 設定（後台可調） ---------- */
-const DEFAULT_CFG={teamSize:2,shiftMin:3,itemCount:6,foodCount:4,hungerMin:3,stunSec:3,pingSec:3,smellCells:3,mazeSize:13,musicOn:1,apiUrl:'',roomMax:3,rounds:3,goodsCount:16,shopMin:2.5,cartFull:400,views:{fp:1,tp:1,top:1},broker:'wss://broker.emqx.io:8084/mqtt'};
+const DEFAULT_CFG={teamSize:2,shiftMin:3,itemCount:6,foodCount:4,hungerMin:3,stunSec:3,pingSec:3,smellCells:3,mazeSize:13,musicOn:1,speechOn:1,speechVoice:'',apiUrl:'',roomMax:3,rounds:3,goodsCount:16,shopMin:2.5,cartFull:400,views:{fp:1,tp:1,top:1},broker:'wss://broker.emqx.io:8084/mqtt'};
 let CFG={...DEFAULT_CFG};
-try{const s=JSON.parse(localStorage.getItem('maze3d_cfg')||'{}');CFG={...DEFAULT_CFG,...GameRules.normalize(s),musicOn:s.musicOn===0?0:1,rounds:Math.max(1,Math.min(10,Number(s.rounds)||3))};}catch(e){}
+try{const s=JSON.parse(localStorage.getItem('maze3d_cfg')||'{}');CFG={...DEFAULT_CFG,...GameRules.normalize(s),musicOn:s.musicOn===0?0:1,speechOn:s.speechOn===0?0:1,speechVoice:typeof s.speechVoice==='string'?s.speechVoice.slice(0,300):'',rounds:Math.max(1,Math.min(10,Number(s.rounds)||3))};}catch(e){}
+window.GameVoice?.configure({enabled:!!CFG.speechOn,voice:CFG.speechVoice});
 function saveCfg(){const {broker,apiUrl,...preferences}=CFG;localStorage.setItem('maze3d_cfg',JSON.stringify(preferences));}
 const runtimeConfigReady=fetch('/api/runtime-config',{signal:AbortSignal.timeout(5000)}).then(r=>r.ok?r.json():null).then(config=>{if(config){CFG.broker=config.broker||DEFAULT_CFG.broker;CFG.apiUrl=config.apiUrl||'';}}).catch(()=>{});
 function matchRules(){return MP.on&&MP.started&&MP.rules?MP.rules:CFG;}
@@ -2124,9 +2132,10 @@ function loseGame(){
   renderSingleSeriesResult(false);
   switchScreen('failScreen');
 }
-function showToast(msg,ms=1800){
+function showToast(msg,ms=1800,readAloud=true){
   const t=$('toast'); t.textContent=msg; t.style.display='block';
   clearTimeout(t._tm); t._tm=setTimeout(()=>t.style.display='none',ms);
+  if(readAloud)window.GameVoice?.announce(msg);
 }
 function addEffect(id,label,dur){
   G.effects[id]={until:performance.now()+dur*1000,label};
@@ -2149,7 +2158,8 @@ function applyItem(it){
   let durMul=jobPerk('itemDurMul')||1; // 小魔法師：道具時間 ×1.5
   if(MP.on&&MP.mode==='tag'&&MP.taggedId===MP.id&&MP.itPower==='dur')durMul*=1.5; // 鬼能力：魔法
   const dur=t.dur*durMul;
-  showToast(t.msg);
+  showToast(t.msg,1800,false);
+  window.GameVoice?.announce('獲得'+t.name+'。'+t.msg);
   if(t.id==='speed'){ AudioEng.sfxUse(); addEffect('speed','⚡加速',dur); }
   else if(t.id==='superspeed'){ AudioEng.sfxUse(); addEffect('superspeed','🚀強力加速',dur); }
   else if(t.id==='shovel'){
@@ -2208,7 +2218,7 @@ function useKite(){
   const cp=cellToWorld(target.x,target.y);
   G.px=cp.x; G.pz=cp.z;
   playerGroup.position.set(G.px,0,G.pz);
-  showToast('🪁 咻～飛過牆了！');
+  showToast('🪁 使用大風箏，咻～飛過牆了！');
 }
 /* 火山震波：震碎自己所在格子四周的牆（外圍牆除外） */
 function quakeWalls(){
@@ -2365,7 +2375,7 @@ function useShovel(){
     updateShovelBtn();
     removeWallBox(best); AudioEng.sfxBreak();
     burstParticles((best.minX+best.maxX)/2,(best.minZ+best.maxZ)/2);
-    showToast('⛏️ 牆壁被敲破了！');
+    showToast('⛏️ 使用鐵鍬，牆壁被敲破了！');
   }else{
     showToast('😅 面前沒有可以敲的牆（外圍牆敲不破）');
   }
@@ -4684,32 +4694,8 @@ function botSim(dt,now){
   }
 }
 function getEmojiTex(emoji){ makeEmojiSprite(emoji,1); return spriteCache[emoji]; } // 只要貼圖
-/* 語音播報（跟隨音樂靜音設定），gender：'m'=男聲、'f'=女聲 */
-let _voices=[];
-function _loadVoices(){ try{_voices=speechSynthesis.getVoices()||[];}catch(e){} }
-if('speechSynthesis' in window){ _loadVoices(); try{speechSynthesis.onvoiceschanged=_loadVoices;}catch(e){} }
-const _maleRe=/男|male|云希|雲希|yunxi|yunjhe|kangkang|zhiyu|yunyang/i;
-const _femaleRe=/女|female|mei[-\s]?jia|xiaoxiao|hanhan|yating|tracy|hsiao/i;
-function voiceParamsFor(gender){
-  const zh=_voices.filter(v=>/^zh/i.test(v.lang));
-  const re=gender==='m'?_maleRe:_femaleRe;
-  const dedicated=zh.find(v=>re.test(v.name));
-  const voice=dedicated||zh.find(v=>/zh[-_](TW|HK)/i.test(v.lang))||zh[0]||null;
-  // 沒有專屬性別語音時，用音調模擬：男聲低沉、女聲高亢
-  const pitch=dedicated?(gender==='m'?1.0:1.1):(gender==='m'?0.6:1.4);
-  return {voice,pitch,rate:gender==='m'?0.98:1.06};
-}
-function speak(text,gender){
-  if(G.muted)return;
-  try{
-    const u=new SpeechSynthesisUtterance(text);
-    u.lang='zh-TW';
-    const vp=voiceParamsFor(gender||'f');
-    if(vp.voice)u.voice=vp.voice;
-    u.pitch=vp.pitch; u.rate=vp.rate;
-    speechSynthesis.cancel(); speechSynthesis.speak(u);
-  }catch(e){}
-}
+/* 所有播報使用同一佇列；語音開關獨立於背景音樂。 */
+function speak(text){window.GameVoice?.announce(text,true);}
 /* 換鬼公告：大字橫幅 + 語音（男生鬼抓到人放男聲、女生鬼放女聲） */
 function announceTag(name,gender){
   const el=$('tagAnnounce');
@@ -4916,6 +4902,7 @@ window.addEventListener('pagehide',()=>{ if(MP.on)try{mpSend({t:'bye'});}catch(e
 </script>
 <script src="assets/classic-audio.js"></script>
 <script src="assets/setup-controls.js"></script>
+<script src="assets/voice-settings.js"></script>
 <script src="assets/capture-core.js"></script>
 <script src="assets/capture-mode.js"></script>
 <script src="story/story-core.js"></script>

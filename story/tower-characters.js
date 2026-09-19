@@ -63,7 +63,8 @@
     const { width = .62, legHeight = .55, bodyY = .97, headY = 1.58, shirt, pants, skin = 0xe5b593 } = options;
     const body = k.box(g, [width, .64, .37], shirt, 'torso', 0, bodyY, 0);
     const head = k.box(g, [.53, .49, .48], skin, 'head', 0, headY, 0);
-    for (const side of [-1, 1]) k.box(g, [.066, .085, .025], 0x222b34, 'eye', side * .12, headY + .03, .253);
+    const eyes=[];
+    for (const side of [-1, 1]) eyes.push(k.box(g, [.066, .085, .025], 0x222b34, 'eye', side * .12, headY + .03, .253));
     const limbs = {};
     for (const [side, suffix] of [[-1, 'L'], [1, 'R']]) {
       const arm = new k.T.Group(); arm.name = 'arm' + suffix; arm.position.set(side * (width / 2 + .09), bodyY + .24, 0);
@@ -75,6 +76,7 @@
       limbs['arm' + suffix] = arm; limbs['leg' + suffix] = leg;
     }
     g.userData = { ...limbs, body, head, modelFamily: 'tower-original', frontAxis: '+Z' };
+    if(globalThis.CharacterFace)globalThis.CharacterFace.attach(k.T,g,g,eyes,headY);
     return g;
   }
 

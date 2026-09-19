@@ -262,6 +262,7 @@ test('劇情重建隱藏已拿的原版道具，拾取效果先套用再保存�
     applyItem: () => applied.push('item'), applyFood: () => applied.push('food'), winGame() { throw new Error('不在出口'); },
   });
   vm.runInContext(slice('function spawnItems()', 'function pickFoodType()'), context);
+  vm.runInContext(slice('function matchRules()', '/* ---------- 角色資料'), context);
   vm.runInContext(slice('function updatePlayer(dt,t)', '/* =====================================================\n   尋寶模式：攻擊'), context);
   vm.runInContext('spawnItems()', context);
   for (const list of [context.G.items, context.G.foods]) {
@@ -304,6 +305,7 @@ test('劇情同層變形完全保留原道具實例、類型、位置與拾取�
   assert.ok(preserve, '必須測試真正的高塔拾取保留判斷');
   vm.runInContext(preserve, context);
   tower.preserveFloorPickups = context.preserveFloorPickups;
+  vm.runInContext(slice('function matchRules()', '/* ---------- 角色資料'), context);
   vm.runInContext(slice('function spawnItems()', 'function pickFoodType()'), context);
   vm.runInContext('spawnItems()', context);
   assert.equal(context.G.items.length, 1, '劇情使用少量配置，不能額外加入環境道具');

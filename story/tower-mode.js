@@ -51,8 +51,9 @@
     el('gameScreen').appendChild(hud);
     const gearStatus=document.createElement('div');gearStatus.id='towerGearStatus';gearStatus.className='tower-gear-status';hud.appendChild(gearStatus);
     const rail = document.createElement('nav'); rail.id = 'towerActionRail'; rail.setAttribute('aria-label', '劇情操作');
-    rail.innerHTML = '<button class="tower-btn" id="towerBagBtn">背包 <small>B</small></button><button class="tower-btn" id="towerTalkBtn" disabled>附近無人 <small>R</small></button><button class="tower-btn" id="towerAttackBtn">揮擊 <small>X</small></button>';
+    rail.innerHTML = '<button class="tower-btn" id="towerBagBtn">背包 <small>B</small></button><button class="tower-btn" id="towerJournalBtn">日誌 <small>J</small></button><button class="tower-btn" id="towerAttackBtn">揮擊 <small>X</small></button>';
     el('gameScreen').appendChild(rail);
+    const talk=document.createElement('button');talk.id='towerTalkBtn';talk.className='tower-btn';talk.hidden=true;talk.textContent='對話 R';el('gameScreen').appendChild(talk);
     const objective = document.createElement('div'); objective.id = 'towerObjective'; el('gameScreen').appendChild(objective);
     const overlay = document.createElement('div'); overlay.id = 'towerOverlay'; overlay.hidden = true;
     overlay.innerHTML = '<section id="towerDialog" class="tower-card" role="dialog" aria-modal="true" aria-labelledby="towerDialogTitle" tabindex="-1"></section>';
@@ -60,6 +61,7 @@
     el('storyEntryBtn').onclick = open;
     bindActionBtn(el('towerBagBtn'), inventory);
     bindActionBtn(el('towerTalkBtn'), trade);
+    bindActionBtn(el('towerJournalBtn'), journal);
     bindActionBtn(el('towerAttackBtn'), attack);
     overlay.addEventListener('click', event => {
       const button = event.target.closest('button[data-tower]');
@@ -94,6 +96,7 @@
     return '<button class="tower-btn" data-tower="' + key + '"' + (item ? ' data-item="' + text(item) + '"' : '') + (disabled ? ' disabled' : '') + '>' + text(label) + '</button>';
   }
   function dialog(kicker, title, copy, body, actions) {
+    el('towerTalkBtn').hidden=true;
     if (active && !paused) {
       paused = true; pauseAt = performance.now(); G.frozen = true;
       if(window.TowerAudio)window.TowerAudio.setPaused(true);
@@ -573,6 +576,7 @@
     else if(N&&!nearest&&!nearestWarrior)el('towerObjective').textContent=N.objective(run);
     if(inDungeon()){const offer=dungeonOffer(),state=run.expedition.active;el('towerFloor').textContent='裂隙 · '+run.floor+' F';el('towerObjective').textContent=offer.title+' · '+state.progress.length+'/3 · 剩 '+Math.ceil(Math.max(0,offer.timeLimit-state.elapsed))+' 秒'+(['bells','threads'].includes(offer.kind)?' · '+offer.order.map(i=>i+1).join('→'):offer.kind==='stars'&&state.progress.length===1?(state.shiftCount>state.shiftAtStart?' · 星路已更新':' · 等待牆壁變形'):'');el('towerAttackBtn').disabled=true;el('towerAttackBtn').textContent='探索試煉';}
     if(nearbyJourney){el('towerTalkBtn').disabled=false;el('towerTalkBtn').textContent=nearbyJourney===rift?'裂隙 R':nearbyJourney===mainClue?'印記 R':'調查 R';el('towerObjective').textContent=nearbyJourney===rift?'裂隙副本 · 自願進入，結束回到原層':nearbyJourney===mainClue?'主線印記 · '+N.chapterForFloor(run.floor).clueName:el('towerObjective').textContent;}
+    el('towerTalkBtn').hidden=paused||!G.running||el('towerTalkBtn').disabled;
     document.body.classList.toggle('tower-danger',run.hp<=25);
   }
   function saveDungeonShift() {
@@ -639,6 +643,10 @@
     const threat=!nearest&&run.effects.repel<=0&&!(now<G.invisUntil)&&monsters.some(m=>m.alive&&!isHeld(m)&&!(run.monsterStuns[m.id]>0)&&Math.hypot(G.px-m.model.position.x,G.pz-m.model.position.z)<m.def.sight&&(m.path.length>0||m.windup>0));
     encounterHold=threat?4:Math.max(0,encounterHold-dt);
     if(window.TowerAudio)window.TowerAudio.setEncounter(encounterHold>0);
+    if(window.CharacterFace){
+      CharacterFace.update(playerGroup,now/1000,hurtLeft>0?'hurt':threat?'focus':nearest||nearestWarrior||nearbyEncounter?'happy':'calm');
+      for(const npc of [...traders,warriorNpc,explorer].filter(Boolean))if(npc.model?.visible)CharacterFace.update(npc.model,now/1000,npc===nearest||npc===nearestWarrior||npc===nearbyEncounter?'happy':'calm');
+    }
     if(run.effects.reveal>0){G.mapUntil=now+250; if(!G.solutionPath){const p=worldToCell(G.px,G.pz);G.solutionPath=solveMaze(p.x,p.y);}}
     hudClock+=dt;if(hudClock>.15){hudClock=0;updateHud();}
     saveClock+=dt;if(saveClock>8){saveClock=0;save();}

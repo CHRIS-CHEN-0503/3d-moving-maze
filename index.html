@@ -648,9 +648,9 @@ button:focus-visible,input:focus-visible{outline:3px solid #fff;outline-offset:3
       <p class="home-intro" id="homeTitle">準備好進入會移動的奇幻迷宮了嗎？先選擇今天想做的事。</p>
       <div class="home-menu">
         <button class="home-action primary-story" id="storyEntryBtn"><span class="home-icon ui-icon icon-castle" aria-hidden="true"></span><span><strong>劇情模式・倒轉高塔</strong><small>被召喚至第 99 層。在變形迷宮中交易、求生，找到回家的路。</small></span></button>
-        <button class="home-action primary" id="singleBtn"><span class="home-icon ui-icon icon-compass" aria-hidden="true"></span><span><strong>單人遊戲</strong><small>自己闖關，或和電腦挑戰尋寶、鬼抓人與搶購。</small></span></button>
+        <button class="home-action primary" id="singleBtn"><span class="home-icon ui-icon icon-compass" aria-hidden="true"></span><span><strong>單人遊戲</strong><small>自己闖關，或和電腦練習尋寶、搶購與合作奪旗。</small></span></button>
         <button class="home-action multiplayer" id="mpBtn"><span class="home-icon ui-icon icon-duo" aria-hidden="true"></span><span><strong>多人遊戲</strong><small>先建立角色，再建立房間或輸入朋友的房號。</small></span></button>
-        <button class="home-action utility" id="admBtn"><span class="home-icon ui-icon icon-settings" aria-hidden="true"></span><span><strong>遊戲設定</strong><small>調整迷宮、音樂與視角。</small></span></button>
+        <button class="home-action utility" id="admBtn"><span class="home-icon ui-icon icon-settings" aria-hidden="true"></span><span><strong>遊戲設定</strong><small>設定這台裝置的音樂偏好。</small></span></button>
         <button class="home-action utility history" id="lbBtn"><span class="home-icon ui-icon icon-history" aria-hidden="true"></span><span><strong>勇者歷史</strong><small>查看最快紀錄與歷代勇者。</small></span></button>
         <button class="home-action utility help" id="helpBtn"><span class="home-icon ui-icon icon-help" aria-hidden="true"></span><span><strong>遊戲說明</strong><small>查看操作、道具與各種玩法。</small></span></button>
       </div>
@@ -683,6 +683,7 @@ button:focus-visible,input:focus-visible{outline:3px solid #fff;outline-offset:3
         <div class="setup-section setup-levels">
           <div class="sec-label level-label">選擇關卡環境</div>
           <div class="lvl-row" id="lvlRow"></div>
+          <details class="match-settings" open><summary>本次冒險設定</summary><p id="matchSettingsHint"></p><div id="matchSettings" class="match-grid"></div></details>
         </div>
         <div class="setup-side">
           <div class="setup-section setup-summary-card">
@@ -699,6 +700,7 @@ button:focus-visible,input:focus-visible{outline:3px solid #fff;outline-offset:3
               <button class="view-btn mode-choice" data-m="treasure"><span class="visual-atlas atlas-treasure title-mode-art" aria-hidden="true"></span><span class="mode-copy">尋寶對戰</span></button>
               <button class="view-btn mode-choice" data-m="tag"><span class="visual-atlas atlas-tag title-mode-art" aria-hidden="true"></span><span class="mode-copy">鬼抓人</span></button>
               <button class="view-btn mode-choice" data-m="shop"><span class="visual-atlas atlas-shop title-mode-art" aria-hidden="true"></span><span class="mode-copy">搶購模式</span></button>
+              <button class="view-btn mode-choice" data-m="ctf"><span class="flag-emblem" aria-hidden="true"></span><span class="mode-copy">合作奪旗</span></button>
             </div>
           </div>
           <div class="setup-section setup-view">
@@ -788,18 +790,19 @@ button:focus-visible,input:focus-visible{outline:3px solid #fff;outline-offset:3
 <!-- ============ 多人連線 ============ -->
 <div class="modal" id="mpModal">
   <div class="m-card">
-    <h3><span class="ui-icon icon-duo inline-ui-icon" aria-hidden="true"></span>多人房間（2～5 人）</h3>
+    <h3><span class="ui-icon icon-duo inline-ui-icon" aria-hidden="true"></span>多人房間</h3>
     <div id="mpSetup">
       <div class="lb-tabs mp-mode-tabs" hidden aria-hidden="true">
         <button class="lb-tab mp-mode-btn sel" id="mpModeRace"><span class="visual-atlas atlas-race mp-mode-art" aria-hidden="true"></span><span class="mp-mode-copy">比賽搶終點</span></button>
         <button class="lb-tab mp-mode-btn" id="mpModeTag"><span class="visual-atlas atlas-tag mp-mode-art" aria-hidden="true"></span><span class="mp-mode-copy">鬼抓人</span></button>
         <button class="lb-tab mp-mode-btn" id="mpModeTre"><span class="visual-atlas atlas-treasure mp-mode-art" aria-hidden="true"></span><span class="mp-mode-copy">尋寶</span></button>
         <button class="lb-tab mp-mode-btn" id="mpModeShop"><span class="visual-atlas atlas-shop mp-mode-art" aria-hidden="true"></span><span class="mp-mode-copy">搶購</span></button>
+        <button class="lb-tab mp-mode-btn" id="mpModeCtf"><span class="flag-emblem" aria-hidden="true"></span><span class="mp-mode-copy">合作奪旗</span></button>
       </div>
       <div id="mpChosenMode">🏁 已選擇：比賽搶終點</div>
       <div style="font-size:.85rem;color:#666;margin:6px 0;" id="mpModeDesc">大家從不同角落出發，看誰最快搶到中間的傳送門！</div>
       <div style="font-size:.8rem;color:#999;margin-bottom:8px;">人物、名稱、關卡與視角都已準備完成。遊戲中仍可自由切換開放的視角。</div>
-      <div style="font-size:.85rem;color:#666;margin:8px 0 2px;">房間人數上限（最少 2 人、最多 5 人）</div>
+      <div id="mpCapacityLabel" style="font-size:.85rem;color:#666;margin:8px 0 2px;">房間人數上限（最少 2 人、最多 5 人）</div>
       <div class="lb-tabs" id="mpSizeRow">
         <button class="lb-tab" data-n="2">2 人</button>
         <button class="lb-tab sel" data-n="3">3 人</button>
@@ -879,40 +882,11 @@ button:focus-visible,input:focus-visible{outline:3px solid #fff;outline-offset:3
 <div class="modal" id="admModal">
   <div class="m-card">
     <h3><span class="ui-icon icon-settings inline-ui-icon" aria-hidden="true"></span>遊戲設定 <span id="admVer" style="font-size:.7rem;color:#aaa;font-weight:normal;"></span></h3>
-    <div class="adm-row"><label>🌀 迷宮每幾分鐘變換一次</label><input type="number" id="cfgShiftMin" min="0.5" max="10" step="0.5"></div>
-    <div class="adm-row"><label>🎁 每次出現的道具數量</label><input type="number" id="cfgItems" min="3" max="12" step="1"></div>
-    <div class="adm-row"><label>🍎 每次出現的食物數量</label><input type="number" id="cfgFood" min="2" max="10" step="1"></div>
-    <div class="adm-row"><label>🍗 飽足感可以撐幾分鐘（歸零＝失敗）</label><input type="number" id="cfgHunger" min="1" max="10" step="0.5"></div>
-    <div class="adm-row"><label>💫 尋寶模式：被攻擊暈眩幾秒</label><input type="number" id="cfgStun" min="1" max="10" step="0.5"></div>
-    <div class="adm-row"><label>💎 尋寶模式：寶藏位置每幾秒更新</label><input type="number" id="cfgPing" min="1" max="10" step="1"></div>
-    <div class="adm-row"><label>👃 鬼抓人：鬼的嗅覺範圍（格）</label><input type="number" id="cfgSmell" min="1" max="8" step="1"></div>
-    <div class="adm-row"><label>🛒 搶購模式：架上商品數量</label><input type="number" id="cfgGoods" min="6" max="60" step="1"></div>
-    <div class="adm-row"><label>🛒 搶購模式：一場幾分鐘</label><input type="number" id="cfgShopMin" min="1" max="10" step="0.5"></div>
-    <div class="adm-row"><label>🛒 搶購模式：購物車裝滿（100% 重量）是多少 $</label><input type="number" id="cfgCartFull" min="100" max="2000" step="50"></div>
-    <div class="adm-row" style="flex-direction:column;align-items:stretch;">
-      <label>👁️ 開放的視角（單機與多人都適用）</label>
-      <div style="display:flex;gap:12px;justify-content:center;margin-top:4px;">
-        <label style="flex:none;"><input type="checkbox" id="cfgVtp"> 🎥 第三人稱</label>
-        <label style="flex:none;"><input type="checkbox" id="cfgVfp"> 👀 第一人稱</label>
-        <label style="flex:none;"><input type="checkbox" id="cfgVtop"> 🗺️ 俯視</label>
-      </div>
-    </div>
-    <div class="adm-row"><label>🧱 迷宮大小</label>
-      <select id="cfgSize"><option value="11">小 11×11</option><option value="13">中 13×13</option><option value="15">大 15×15</option><option value="19">特大 19×19</option><option value="25">超大 25×25</option></select>
-    </div>
-    <div class="adm-row"><label>🎵 預設開啟音樂</label>
+    <p>調整這台裝置的音樂偏好。迷宮大小與玩法規則在開始遊戲前設定。</p>
+    <div class="adm-row"><label for="cfgMusic">開啟音樂</label>
       <select id="cfgMusic"><option value="1">開</option><option value="0">關</option></select>
     </div>
-    <div class="adm-row" style="flex-direction:column;align-items:stretch;">
-      <label>📡 多人連線伺服器（MQTT over WebSocket）</label>
-      <input type="text" id="cfgBroker" placeholder="wss://broker.emqx.io:8084/mqtt">
-    </div>
-    <div class="adm-row" style="flex-direction:column;align-items:stretch;">
-      <label>☁️ 勇者歷史 API 網址（選填）</label>
-      <input type="text" id="cfgApi" placeholder="https://script.google.com/...（留空＝只存在本機）">
-    </div>
-    <div class="adm-note">💡 填入 Google Apps Script 網址後，所有玩家的分數就能互相看見。做法請看資料夾內 README.md。</div>
-    <button class="m-close button-with-icon" id="admSave"><span class="ui-icon icon-settings" aria-hidden="true"></span>儲存設定</button>
+    <button class="mini-btn button-with-icon" id="admSave"><span class="ui-icon icon-settings" aria-hidden="true"></span>儲存設定</button>
   </div>
 </div>
 
@@ -960,6 +934,7 @@ button:focus-visible,input:focus-visible{outline:3px solid #fff;outline-offset:3
     </div>
     <div>👥 <b>多人連線</b>（2～5 人，房主可選人數上限，視角可自由切換）：標題按「多人連線」，房主建房間唸房號給朋友加入。🏁 比賽搶終點：從不同角落出發搶中間的傳送門；👹 鬼抓人：被抓到就換你當鬼，時間到還是鬼就輸了；💎 尋寶：搶寶藏帶出口；🛒 搶購：比誰的購物車金額多（大地圖人數不足電腦會補位（最多補到房間上限））。</div>
     <div>🗺️ 點右上角小地圖可以放大成全螢幕；小地圖左上角的 ⤢ 鈕可以切換 1.2 倍大小（特大地圖好用）。</div>
+    <section class="help-coop"><h4>合作奪旗｜2 對 2～5 對 5</h4><p>玩家依加入順序交錯分成蒼藍隊、琥珀隊，缺額由電腦補位。中央搶到金旗後，送到<strong>對方基地</strong>守住 3 秒獲勝。敵人站在基地範圍內會中斷佔領。</p><p>持旗速度減少 18%，可按「接力傳旗」或 R，傳給 6 公尺內、沒有牆壁阻擋的隊友。X 攻擊只會擊退敌隊，命中讓對手掉旗並回基地休整 3 秒，之後有 3 秒保護。掉落的旗 20 秒沒人撿會回中央。</p><p>小地圖標示雙方基地、隊友與旗幟。鐵鍬可幫全隊開路；指南針與魔法地圖會指向旗幟或目標基地。勝隊每人 1000 分、送旗者再加 500 分、擊退 +75、幸運星 +100、時間寶石 +150；接力次數另列，不重複刷分。可選 1～10 輪，最後統計隊伍與個人。</p></section>
     <button class="m-close" id="helpClose" style="display:block;margin:10px auto 0;">知道了！</button>
   </div>
 </div>
@@ -973,21 +948,25 @@ button:focus-visible,input:focus-visible{outline:3px solid #fff;outline-offset:3
 </div>
 
 <script src="./lib/three.min.js"></script>
+<script src="./assets/character-face.js"></script>
 <script src="./assets/character-motion.js"></script>
 <script src="./assets/maze-atmosphere.js"></script>
+<script src="./assets/game-rules.js"></script>
 <script>
 'use strict';
 /* =====================================================
    3D移動迷宮 — 給小朋友的變形迷宮冒險
    ===================================================== */
 const $=id=>document.getElementById(id);
-const GAME_VERSION='1.24.1';
+const GAME_VERSION='1.25.0';
 
 /* ---------- 設定（後台可調） ---------- */
-const DEFAULT_CFG={shiftMin:3,itemCount:6,foodCount:4,hungerMin:3,stunSec:3,pingSec:3,smellCells:3,mazeSize:13,musicOn:1,apiUrl:'',roomMax:3,rounds:3,goodsCount:16,shopMin:2.5,cartFull:400,views:{fp:1,tp:1,top:1},broker:'wss://broker.emqx.io:8084/mqtt'};
+const DEFAULT_CFG={teamSize:2,shiftMin:3,itemCount:6,foodCount:4,hungerMin:3,stunSec:3,pingSec:3,smellCells:3,mazeSize:13,musicOn:1,apiUrl:'',roomMax:3,rounds:3,goodsCount:16,shopMin:2.5,cartFull:400,views:{fp:1,tp:1,top:1},broker:'wss://broker.emqx.io:8084/mqtt'};
 let CFG={...DEFAULT_CFG};
-try{const s=JSON.parse(localStorage.getItem('maze3d_cfg')||'{}');CFG={...DEFAULT_CFG,...s};}catch(e){}
-function saveCfg(){localStorage.setItem('maze3d_cfg',JSON.stringify(CFG));}
+try{const s=JSON.parse(localStorage.getItem('maze3d_cfg')||'{}');CFG={...DEFAULT_CFG,...GameRules.normalize(s),musicOn:s.musicOn===0?0:1,rounds:Math.max(1,Math.min(10,Number(s.rounds)||3))};}catch(e){}
+function saveCfg(){const {broker,apiUrl,...preferences}=CFG;localStorage.setItem('maze3d_cfg',JSON.stringify(preferences));}
+const runtimeConfigReady=fetch('/api/runtime-config',{signal:AbortSignal.timeout(5000)}).then(r=>r.ok?r.json():null).then(config=>{if(config){CFG.broker=config.broker||DEFAULT_CFG.broker;CFG.apiUrl=config.apiUrl||'';}}).catch(()=>{});
+function matchRules(){return MP.on&&MP.started&&MP.rules?MP.rules:CFG;}
 
 /* ---------- 角色資料 ---------- */
 const CHARS=[
@@ -1070,7 +1049,7 @@ function isShop(){ return MP.on&&MP.mode==='shop'; }
 function skillsAllowed(){ return !isShop(); } // 搶購模式沒有任何技能
 /* 購物車有多重（0～1）：用車上「還沒結帳」的金額算 */
 function cartLoad(id){
-  const full=Math.max(50,CFG.cartFull||400);
+  const full=Math.max(50,matchRules().cartFull||400);
   return Math.min(1,(MP.carts[id!==undefined?id:MP.id]||0)/full);
 }
 /* 越重跑越慢：<50% 是 1.2 倍，50% 掉到 1.1、75% 剩 1.0、裝滿只剩 0.9 */
@@ -1490,7 +1469,8 @@ function buildWalls(theme){
 }
 
 /* 敲破一面牆：把該牆縮到看不見 + 更新格子與碰撞資料 */
-function removeWallBox(wb){
+function removeWallBox(wb,remote=false){
+  if(!remote&&window.CaptureFlag&&MP.on&&MP.mode==='ctf')CaptureFlag.wall(wb);
   if(mazeAtmosphere)mazeAtmosphere.removeWall(wb.inst);
   if(wb.type==='h')G.hWalls[wb.gy][wb.gx]=false;
   else if(wb.type==='v')G.vWalls[wb.gy][wb.gx]=false;
@@ -1503,7 +1483,7 @@ function removeWallBox(wb){
    BFS：從玩家到出口的路線（魔法地圖用）
    ===================================================== */
 function solveMaze(fromX,fromY,toX,toY){
-  if(toX===undefined){toX=G.exitCell.x;toY=G.exitCell.y;}
+  if(toX===undefined){const goal=window.CaptureFlag&&MP.on&&MP.mode==='ctf'?CaptureFlag.goal():G.exitCell;toX=goal.x;toY=goal.y;}
   const W=G.mazeW,H=G.mazeH;
   const prev=Array.from({length:H},()=>Array(W).fill(null));
   const q=[[fromX,fromY]]; prev[fromY][fromX]=[fromX,fromY];
@@ -1714,25 +1694,28 @@ function makePickupMarker(color,label){
    ===================================================== */
 function buildCharacter(cd){
   const g=new THREE.Group();
-  const M=c=>new THREE.MeshLambertMaterial({color:c});
+  const materials=new Map();
+  const M=c=>{if(!materials.has(c))materials.set(c,new THREE.MeshLambertMaterial({color:c}));return materials.get(c);};
   const box=(w,h,d,c)=>new THREE.Mesh(new THREE.BoxGeometry(w,h,d),M(c));
+  const bevel=(w,h,d,c)=>{const b=.025,s=new THREE.Shape();s.moveTo(-w/2+b,-h/2+b);s.lineTo(w/2-b,-h/2+b);s.lineTo(w/2-b,h/2-b);s.lineTo(-w/2+b,h/2-b);s.closePath();const geo=new THREE.ExtrudeGeometry(s,{depth:d-2*b,bevelEnabled:true,bevelThickness:b,bevelSize:b,bevelSegments:1,steps:1});geo.translate(0,0,-d/2+b);return new THREE.Mesh(geo,M(c));};
   // 身體
-  const body=box(0.62,0.62,0.36,cd.shirt); body.position.y=0.95; g.add(body);
+  const body=bevel(0.62,0.62,0.36,cd.shirt); body.position.y=0.95; g.add(body);
   // 頭
   const headRig=new THREE.Group();headRig.position.y=1.55;g.add(headRig);
-  const head=box(0.52,0.5,0.48,cd.type==='robot'?0xb0bec5:cd.skin); headRig.add(head);
+  const head=bevel(0.52,0.5,0.48,cd.type==='robot'?0xb0bec5:cd.skin); headRig.add(head);
   // 眼睛
   const eyeMat=M(0x222222);
+  const faceEyes=[];
   [-0.13,0.13].forEach(ex=>{
     const eye=new THREE.Mesh(new THREE.BoxGeometry(0.07,0.09,0.05),eyeMat);
-    eye.position.set(ex,.03,0.25); headRig.add(eye);
+    eye.position.set(ex,.03,0.25); headRig.add(eye);faceEyes.push(eye);
   });
   // 頭髮 / 頭頂
   if(cd.type==='robot'){
     const ant=box(0.05,0.3,0.05,0x616161); ant.position.y=.39; headRig.add(ant);
     const bulb=new THREE.Mesh(new THREE.SphereGeometry(0.08,8,8),new THREE.MeshBasicMaterial({color:0x00e5ff}));
     bulb.position.y=.57; headRig.add(bulb);
-    [-0.13,0.13].forEach(ex=>{const led=new THREE.Mesh(new THREE.BoxGeometry(0.1,0.1,0.05),new THREE.MeshBasicMaterial({color:0x00e5ff}));led.position.set(ex,.03,0.26);headRig.add(led);});
+    for(const eye of faceEyes){eye.material=new THREE.MeshBasicMaterial({color:0x00e5ff});eye.position.z=.26;}
   }else if(cd.type==='cat'){
     [-0.17,0.17].forEach(ex=>{const ear=new THREE.Mesh(new THREE.ConeGeometry(0.11,0.22,4),M(cd.hair));ear.position.set(ex,.35,0);headRig.add(ear);});
     const tail=box(0.09,0.09,0.5,cd.hair); tail.position.set(0,0.85,-0.4); tail.rotation.x=0.6; g.add(tail);
@@ -1754,6 +1737,13 @@ function buildCharacter(cd){
   // 裙子（女生）
   if(cd.type==='girl'){const skirt=new THREE.Mesh(new THREE.ConeGeometry(0.42,0.4,8),M(cd.shirt));skirt.position.y=0.62;g.add(skirt);}
   g.userData={armL,armR,legL,legR,body,head:headRig,frontAxis:'+Z'};
+  for(const arm of [armL,armR]){const sleeve=box(.18,.16,.19,cd.shirt);sleeve.position.y=-.03;arm.add(sleeve);}
+  for(const leg of [legL,legR]){const boot=box(.23,.13,.3,0x263847);boot.position.set(0,-.45,.045);leg.add(boot);}
+  const belt=box(.64,.055,.38,0x405167);belt.position.y=.7;g.add(belt);
+  const buckle=box(.09,.07,.03,0xe3c486);buckle.position.set(0,.7,.21);g.add(buckle);
+  const collar=box(.22,.05,.025,0xe5dfc9);collar.position.set(0,1.23,.191);g.add(collar);
+  if(window.CharacterFace)CharacterFace.attach(THREE,g,headRig,faceEyes,0,cd.type==='robot');
+  const shade=new THREE.Mesh(new THREE.CircleGeometry(.37,16),new THREE.MeshBasicMaterial({color:0x132434,transparent:true,opacity:.17,depthWrite:false}));shade.rotation.x=-Math.PI/2;shade.position.y=.013;shade.name='contact-shadow';g.add(shade);
   if(window.CharacterMotion)CharacterMotion.prepare(g);
   return g;
 }
@@ -1985,6 +1975,12 @@ function buildEnvironment(theme){
       dt.position.set(Math.cos(a)*R,0,Math.sin(a)*R); envGroup.add(dt);
     }
   }
+  // One low-cost batch of suspended dust; no glowing pickup-like objects on the paths.
+  const moteGeometry=new THREE.BufferGeometry(),motePositions=new Float32Array(48*3);
+  for(let i=0;i<48;i++){motePositions[i*3]=Math.sin(i*17.13)*span*.48;motePositions[i*3+1]=3.8+(i%11)*.21;motePositions[i*3+2]=Math.cos(i*11.73)*span*.48;}
+  moteGeometry.setAttribute('position',new THREE.BufferAttribute(motePositions,3));
+  const motes=new THREE.Points(moteGeometry,new THREE.PointsMaterial({color:theme.amb,size:.065,transparent:true,opacity:.27,depthWrite:false}));envGroup.add(motes);
+  envGroup.userData.anim.push(t=>{motes.position.y=Math.sin(t*.25)*.16;});
   envGroup.userData.high=envGroup.children.filter(o=>o.position.y>2.6&&!o.isLight);
   scene.add(envGroup);
 }
@@ -2016,7 +2012,7 @@ function spawnItems(){
   const pc=worldToCell(G.px,G.pz);
   const used=MP.on?new Set([G.exitCell.x+','+G.exitCell.y])
                   :new Set([pc.x+','+pc.y, G.exitCell.x+','+G.exitCell.y]);
-  const pickupCfg=window.TowerMode&&TowerMode.active&&TowerMode.itemConfig?TowerMode.itemConfig():CFG;
+  const pickupCfg=window.TowerMode&&TowerMode.active&&TowerMode.itemConfig?TowerMode.itemConfig():matchRules();
   if(window.TowerMode&&TowerMode.active&&TowerMode.reservedCells)for(const key of TowerMode.reservedCells())used.add(key);
   // 搶購：出發點不放商品，才不會有人一開場就白撿一件
   if(isShop()&&G.startCells)for(const c of G.startCells)used.add(c.x+','+c.y);
@@ -2066,7 +2062,7 @@ function spawnItems(){
   // 🛒 搶購模式：路徑上的商品
   G.goods=[];
   if(isShop()){
-    const want=Math.max(6,Math.min(60,CFG.goodsCount||16));
+    const want=Math.max(6,Math.min(60,matchRules().goodsCount||16));
     tries=0;
     while(G.goods.length<want&&tries<600){
       tries++;
@@ -2078,7 +2074,7 @@ function spawnItems(){
   }
   // 食物（綠色光圈）
   G.foods=[]; tries=0;
-  const foodWant=isShop()?0:pickupCfg.foodCount;
+  const foodWant=isShop()||(MP.on&&MP.mode==='ctf')?0:pickupCfg.foodCount;
   while(G.foods.length<foodWant&&tries<300){
     tries++;
     const cx=Math.floor(RNG()*G.mazeW), cy=Math.floor(RNG()*G.mazeH);
@@ -2496,7 +2492,7 @@ function updatePlayer(dt,t){
       tagBoost=1.15; // 鬼＝一般玩家的 1.15 倍速
       if(MP.itPower==='speed')tagBoost*=1.12; // 鬼能力：疾風
     }
-    const sp=G.baseSpeed*(jobPerk('speedBonus')||1)*G.hungerMul*G.speedMul*tagBoost*shopSpeed()*mag;
+    const sp=G.baseSpeed*(jobPerk('speedBonus')||1)*G.hungerMul*G.speedMul*tagBoost*shopSpeed()*mag*(window.CaptureFlag?CaptureFlag.speed():1);
     // 相對於相機方向移動（俯視時相機固定朝北）
     const base=(G.view==='top')?Math.PI:G.camYaw+Math.PI;
     const ang=base+Math.atan2(-ix,-iy);
@@ -2517,6 +2513,7 @@ function updatePlayer(dt,t){
   }
   playerGroup.position.set(G.px,0,G.pz);
   playerGroup.rotation.y=G.heading;
+  playerGroup.userData.mood=performance.now()<G.stunnedUntil||G.satiety<20?'hurt':mag>.7?'focus':'calm';
   if(window.CharacterMotion)CharacterMotion.update(playerGroup,dt,t,mag>.12?mag:0,G.speedMul||1,G.view==='fp');
   if(G.myCart)G.myCart.position.z=Math.max(0.24,Math.min(0.62,frontClear(1.05)-0.36));
   playerGroup.visible=(G.view!=='fp');
@@ -2558,7 +2555,7 @@ function updatePlayer(dt,t){
   }
   // 到出口了嗎？（鬼抓人模式沒有終點）
   const md=MP.on?MP.mode:'classic';
-  if(md!=='tag'&&md!=='shop'){
+  if(md!=='tag'&&md!=='shop'&&md!=='ctf'){
     const ep=cellToWorld(G.exitCell.x,G.exitCell.y);
     if((ep.x-G.px)**2+(ep.z-G.pz)**2<2.2){
       if(md==='treasure'){
@@ -2576,12 +2573,13 @@ function updateAtkBtn(){
   if(isShop()){$('atkBtn').style.display='none';return;}
   const tre=MP.mode==='treasure'&&MP.treasure&&MP.treasure.holder&&MP.treasure.holder!==MP.id;
   const tag=MP.mode==='tag'; // 鬼抓人：大家隨時可以互相攻擊
-  const on=MP.on&&MP.started&&!MP.ended&&(tre||tag);
+  const on=MP.on&&MP.started&&!MP.ended&&(tre||tag||MP.mode==='ctf');
   $('atkBtn').style.display=on?'block':'none';
 }
 function doAttack(){
   const now=performance.now();
   if(!skillsAllowed()||!MP.on||MP.ended||G.frozen)return;
+  if(MP.mode==='ctf'){CaptureFlag.attack();return;}
   if(MP.mode!=='treasure'&&MP.mode!=='tag')return;
   if(now<G.atkCoolUntil||now<G.stunnedUntil)return;
   if(MP.mode==='treasure'&&(!MP.treasure||!MP.treasure.holder||MP.treasure.holder===MP.id))return; // 拿寶藏的人不能攻擊
@@ -2604,7 +2602,7 @@ function doAttack(){
 }
 /* 技能鍵：隱身（小花的鬼抓人能力；當鬼抽到隱身能力也可用） */
 function myInvisSecs(){
-  if(!skillsAllowed()||!(MP.on&&MP.mode==='tag'))return 0;
+  if(!skillsAllowed()||!(MP.on&&(MP.mode==='tag'||MP.mode==='ctf')))return 0;
   const own=tagAbilOf(MP.id)==='invis';
   const ghost=MP.taggedId===MP.id&&MP.itPower==='invis';
   if(own&&ghost)return 10;
@@ -2825,7 +2823,7 @@ function drawMap(cv,big){
     ctx.textBaseline='alphabetic';
   };
   // 出口（搶購模式沒有出口就不畫）
-  if(!isShop())mark('🚩',G.exitCell.x,G.exitCell.y);
+  if(!isShop()&&MP.mode!=='ctf')mark('🚩',G.exitCell.x,G.exitCell.y);
   if(window.TowerMode&&TowerMode.active&&TowerMode.mapMarkers){
     ctx.save();
     for(const m of TowerMode.mapMarkers()){
@@ -2856,7 +2854,7 @@ function drawMap(cv,big){
     }
   }
   // 鬼抓人雷達：顯示大家的位置（喵喵能力 / 鬼的雷達能力）
-  if(MP.on&&MP.mode==='tag'&&G.radarPings){
+  if(MP.on&&(MP.mode==='tag'||MP.mode==='ctf')&&G.radarPings){
     for(const pg of G.radarPings){
       const mx=pad+(pg.x/G.cell+(W-1)/2)*cw+cw*0.5;
       const my=pad+(pg.z/G.cell+(H-1)/2)*ch+ch*0.5;
@@ -2878,6 +2876,7 @@ function drawMap(cv,big){
       ctx.fillText('💎',mx,my+(big?8:4));
     }
   }
+  if(window.CaptureFlag)CaptureFlag.map(ctx,big,pad,cw,ch);
   // 玩家（帶方向的三角形）
   const PX=pad+(G.px/G.cell+(W-1)/2)*cw+cw*0.5;
   const PZ=pad+(G.pz/G.cell+(H-1)/2)*ch+ch*0.5;
@@ -3145,7 +3144,7 @@ function updateSmell(now){
   const active=MP.on&&MP.mode==='tag'&&MP.started&&!MP.ended&&MP.taggedId===MP.id&&G.running;
   if(!active){ hideSmell(); return; }
   ensureSmellMarks();
-  const range=(CFG.smellCells||3)*G.cell;
+  const range=(matchRules().smellCells||3)*G.cell;
   // 找範圍內最近的人（隱身中的人氣味被遮住，聞不到）
   let best=null,bd=range*range,bpos=null;
   for(const id in MP.players){
@@ -3198,7 +3197,8 @@ function updateCompass(){
   const on=performance.now()<G.compassUntil;
   $('compassHud').style.display=on?'block':'none';
   if(!on){if(compass3D)compass3D.visible=false;return;}
-  const ep=cellToWorld(G.exitCell.x,G.exitCell.y);
+  const goal=window.CaptureFlag&&MP.on&&MP.mode==='ctf'?CaptureFlag.goal():G.exitCell;
+  const ep=cellToWorld(goal.x,goal.y);
   const worldAng=Math.atan2(ep.x-G.px,ep.z-G.pz);
   // HUD 箭頭：相對於目前相機朝向
   const camF=(G.view==='top')?Math.PI:G.camYaw+Math.PI;
@@ -3375,6 +3375,7 @@ function loadLocalRecords(){
 }
 function scoreApiUrl(){ return CFG.apiUrl||'/api/scores'; } // 沒填就試同網域（Cloudflare Pages Function）
 async function fetchRemoteRecords(){
+  await runtimeConfigReady;
   try{
     const r=await fetch(scoreApiUrl(),{method:'GET'});
     if(!r.ok){G._remoteOk=false;return null;}
@@ -3385,6 +3386,7 @@ async function fetchRemoteRecords(){
   }catch(e){G._remoteOk=false;return null;}
 }
 async function saveRecord(rec){
+  await runtimeConfigReady;
   const local=loadLocalRecords(); local.push(rec);
   local.sort((a,b)=>a.timeSec-b.timeSec);
   localStorage.setItem('maze3d_lb',JSON.stringify(local.slice(0,200)));
@@ -3575,14 +3577,14 @@ function startGame(){
   let scell={x:0,y:0};
   G.startCells=null;
   if(MP.on){
-    G.startCells=chooseStarts(Math.max(2,MP.order.length));
+    G.startCells=MP.mode==='ctf'?MP.order.map((id,i)=>CaptureFlag.spawnCell(i,G.mazeW)):chooseStarts(Math.max(2,MP.order.length));
     const me=Math.max(0,MP.order.indexOf(MP.id));
     scell=G.startCells[me%G.startCells.length];
   }
   const sp=cellToWorld(scell.x,scell.y);
   G.px=sp.x; G.pz=sp.z; G.heading=Math.PI/4; G.camYaw=Math.PI*1.25; G.camPitch=0;
   buildFloor(theme); buildWalls(theme); buildExit(); buildEnvironment(theme);
-  if(MP.on&&(MP.mode==='tag'||MP.mode==='shop'))exitGroup.visible=false;
+  if(MP.on&&(MP.mode==='tag'||MP.mode==='shop'||MP.mode==='ctf'))exitGroup.visible=false;
   // 玩家
   playerGroup=buildCharacter(CHARS[G.charIdx]);
   playerGroup.position.set(G.px,0,G.pz);
@@ -3597,7 +3599,7 @@ function startGame(){
   // 狀態重設
   G.items=[]; G.foods=[]; G.goods=[]; G.registers=[]; G.coUntil=0; G.effects={}; G.shovels=jobPerk('startShovels')||0; G.starBonus=0; G.timeOffset=0;
   G.satiety=100; G.hungerMul=1;
-  G.hungerOn=!(MP.on&&(MP.mode==='treasure'||MP.mode==='shop')); // 尋寶／搶購不用擔心肚子餓
+  G.hungerOn=!(MP.on&&(MP.mode==='treasure'||MP.mode==='shop'||MP.mode==='ctf')); // 尋寶／搶購／奪旗不用擔心肚子餓
   G.hungerLethal=!(MP.on&&MP.mode==='tag');        // 鬼抓人：肚子餓只會變慢，不會失敗
   G.starvedNoted=false;
   G.drainPerSec=100/((MP.on?MP.hungerMin:CFG.hungerMin)*60); updateSatietyBar();
@@ -3733,7 +3735,8 @@ function loop(tms){
    按鈕 & 後台設定
    ===================================================== */
 function allowedViews(){
-  const o=[]; if(CFG.views.tp)o.push('tp'); if(CFG.views.fp)o.push('fp'); if(CFG.views.top)o.push('top');
+  const views=matchRules().views;
+  const o=[]; if(views.tp)o.push('tp'); if(views.fp)o.push('fp'); if(views.top)o.push('top');
   return o.length?o:['tp','fp','top'];
 }
 function applyViewConfig(){
@@ -3842,53 +3845,30 @@ function wireUI(){
   // 說明
   $('helpBtn').onclick=()=>$('helpModal').style.display='flex';
   $('helpClose').onclick=()=>$('helpModal').style.display='none';
-  // 後台
+  // 本機偏好；玩法規則由開局面板管理。
   $('admBtn').onclick=()=>{
-    $('cfgShiftMin').value=CFG.shiftMin; $('cfgItems').value=CFG.itemCount;
-    $('cfgFood').value=CFG.foodCount; $('cfgHunger').value=CFG.hungerMin;
-    $('cfgStun').value=CFG.stunSec; $('cfgPing').value=CFG.pingSec; $('cfgSmell').value=CFG.smellCells;
-    $('cfgGoods').value=CFG.goodsCount; $('cfgShopMin').value=CFG.shopMin; $('cfgCartFull').value=CFG.cartFull;
-    $('cfgVtp').checked=!!CFG.views.tp; $('cfgVfp').checked=!!CFG.views.fp; $('cfgVtop').checked=!!CFG.views.top;
-    $('cfgSize').value=CFG.mazeSize; $('cfgMusic').value=CFG.musicOn?'1':'0';
-    $('cfgApi').value=CFG.apiUrl; $('cfgBroker').value=CFG.broker;
+    $('cfgMusic').value=CFG.musicOn?'1':'0';
     $('admModal').style.display='flex';
   };
   $('admSave').onclick=()=>{
-    CFG.shiftMin=Math.max(0.5,Math.min(10,parseFloat($('cfgShiftMin').value)||3));
-    CFG.itemCount=Math.max(3,Math.min(12,parseInt($('cfgItems').value)||6));
-    CFG.foodCount=Math.max(2,Math.min(10,parseInt($('cfgFood').value)||4));
-    CFG.hungerMin=Math.max(1,Math.min(10,parseFloat($('cfgHunger').value)||3));
-    CFG.stunSec=Math.max(1,Math.min(10,parseFloat($('cfgStun').value)||3));
-    CFG.pingSec=Math.max(1,Math.min(10,parseInt($('cfgPing').value)||3));
-    CFG.smellCells=Math.max(1,Math.min(8,parseInt($('cfgSmell').value)||3));
-    CFG.goodsCount=Math.max(6,Math.min(60,parseInt($('cfgGoods').value)||16));
-    CFG.shopMin=Math.max(1,Math.min(10,parseFloat($('cfgShopMin').value)||2.5));
-    CFG.cartFull=Math.max(100,Math.min(2000,parseInt($('cfgCartFull').value)||400));
-    CFG.views={tp:$('cfgVtp').checked?1:0,fp:$('cfgVfp').checked?1:0,top:$('cfgVtop').checked?1:0};
-    if(!CFG.views.tp&&!CFG.views.fp&&!CFG.views.top)CFG.views={fp:1,tp:1,top:1}; // 全關＝視同全開
-    applyViewConfig();
-    CFG.mazeSize=parseInt($('cfgSize').value)||13;
     CFG.musicOn=$('cfgMusic').value==='1'?1:0;
-    CFG.apiUrl=$('cfgApi').value.trim();
-    CFG.broker=$('cfgBroker').value.trim()||DEFAULT_CFG.broker;
     saveCfg(); G.muted=!CFG.musicOn;
     $('admModal').style.display='none';
-    alert('✅ 設定已儲存！下一場遊戲生效');
   };
 }
 /* 單機開始：經典直接開；尋寶＝建立一場「沒有網路的多人局」跟電腦對戰（重用多人邏輯） */
 function launchGame(){
-  if(G.spMode==='treasure'||G.spMode==='tag'||G.spMode==='shop'){
+  if(G.spMode==='treasure'||G.spMode==='tag'||G.spMode==='shop'||G.spMode==='ctf'){
     if(MP.on)mpLeave();
     const mode=G.spMode;
     const me={id:MP.id,name:getPlayerName(),charIdx:G.charIdx};
-    const bots=makeBots((mode==='tag'||mode==='shop')?2:(CFG.mazeSize>=15?2:1),[me]); // 鬼抓人／搶購固定 3 人比較好玩
+    const bots=makeBots(mode==='ctf'?GameRules.normalize(CFG).teamSize*2-1:(mode==='tag'||mode==='shop')?2:(CFG.mazeSize>=15?2:1),[me]);
     MP.on=true; MP.host=true; MP.net=null; MP.started=false; MP.ended=false;
     MP.mode=mode; MP.roster=[me,...bots];
     const order=MP.roster.map(r=>r.id);
     mpHandle({t:'start',f:MP.id,seed:(Math.random()*2**31)|0,mode,lvl:G.lvlIdx,size:CFG.mazeSize,
       shiftMs:CFG.shiftMin*60000,hungerMin:CFG.hungerMin,roundMs:(mode==='shop'?(CFG.shopMin||2.5)*60000:150000),
-      stunSec:CFG.stunSec,pingSec:CFG.pingSec,
+      stunSec:CFG.stunSec,pingSec:CFG.pingSec,rules:GameRules.normalize(CFG),
       seriesKind:'single',seriesRound:SERIES.current+1,seriesTotal:SERIES.total,
       order,players:MP.roster,itpw:mode==='tag'?randPower():null,
       it:mode==='tag'?order[Math.floor(Math.random()*order.length)]:null});
@@ -3903,9 +3883,7 @@ function sizeBigMap(){
   $('bigMap').style.width=s+'px';$('bigMap').style.height=s+'px';
 }
 
-/* ===== 啟動 ===== */
-buildTitleUI(); wireUI(); initRenderer(); initPreview(); setupTouch();
-requestAnimationFrame(loop);
+/* 啟動延後至多人狀態初始化之後，開場設定才能安全讀取房間規則。 */
 </script>
 <script>
 'use strict';
@@ -3993,10 +3971,13 @@ const MP={
   shopEndSent:false, robCoolUntil:0,
   net:null, posTimer:null, helloTimer:null,
 };
-const MP_ROUND_EVENTS=new Set(['pos','take','shift','reach','out','tag','hit','end','tres','prank','rob','costart','coend','codone','restock','shopend','wget','gather','inv','twin']);
+buildTitleUI(); wireUI(); initRenderer(); initPreview(); setupTouch();
+requestAnimationFrame(loop);
+const MP_ROUND_EVENTS=new Set(['pos','take','shift','reach','out','tag','hit','end','tres','prank','rob','costart','coend','codone','restock','shopend','wget','gather','inv','twin','ctfstate','ctfattack','ctfpass','ctfwall','ctfpos']);
 function mpTopic(){return 'ziwei-maze3d/'+MP.room;}
-function modeLabel(m){return m==='race'?'比賽搶終點':(m==='tag'?'鬼抓人':(m==='shop'?'搶購大作戰':'尋寶大作戰'));}
+function modeLabel(m){return m==='ctf'?'合作奪旗':m==='race'?'比賽搶終點':(m==='tag'?'鬼抓人':(m==='shop'?'搶購大作戰':'尋寶大作戰'));}
 const MP_MODE_DESCS={
+  ctf:'2 對 2～5 對 5，中央搶旗送到敵方基地，守住 3 秒獲勝！可傳旗、護送、攔截，缺額由電腦補位。',
   race:'大家從不同角落出發，看誰最快搶到中間的傳送門！',
   tag:'一個人當鬼追大家，被抓到就換你當鬼。時間到還是鬼的人就輸了！',
   treasure:'搶寶藏💎帶到出口就贏！別人拿寶藏時可以用職業武器攻擊搶回來。',
@@ -4004,10 +3985,12 @@ const MP_MODE_DESCS={
 };
 function selectMultiplayerMode(mode){
   MP.pendingMode=mode;
-  const ids={race:'mpModeRace',tag:'mpModeTag',treasure:'mpModeTre',shop:'mpModeShop'};
+  const ids={race:'mpModeRace',tag:'mpModeTag',treasure:'mpModeTre',shop:'mpModeShop',ctf:'mpModeCtf'};
   Object.values(ids).forEach(id=>$(id).classList.toggle('sel',id===ids[mode]));
   $('mpChosenMode').textContent=`已選擇：${modeLabel(mode)}｜${MP.plannedRounds||selectedRoundTotal()} 輪`;
   $('mpModeDesc').textContent=MP_MODE_DESCS[mode];
+  $('mpSizeRow').style.display=mode==='ctf'?'none':'';
+  $('mpCapacityLabel').textContent=mode==='ctf'?`${CFG.teamSize} 對 ${CFG.teamSize}｜共 ${CFG.teamSize*2} 位，缺額電腦補位`:'房間人數上限（最少 2 人、最多 5 人）';
 }
 function openMultiplayerRoom(){
   AudioEng.init(); AudioEng.resume();
@@ -4015,7 +3998,7 @@ function openMultiplayerRoom(){
   CFG.rounds=selectedRoundTotal(); saveCfg();
   MP.plannedRounds=CFG.rounds;
   selectMultiplayerMode(G.spMode==='classic'?'race':G.spMode);
-  MP.maxPlayers=Math.max(2,Math.min(5,CFG.roomMax||3));
+  MP.maxPlayers=MP.pendingMode==='ctf'?GameRules.normalize(CFG).teamSize*2:Math.max(2,Math.min(5,CFG.roomMax||3));
   document.querySelectorAll('#mpSizeRow .lb-tab').forEach(x=>x.classList.toggle('sel',parseInt(x.dataset.n)===MP.maxPlayers));
   $('mpModal').style.display='flex';
 }
@@ -4051,7 +4034,7 @@ function updateHpHud(){
 }
 function makeBots(n,taken){
   const used=new Set(taken.map(r=>r.charIdx));
-  const names=['電腦1號','電腦2號','電腦3號','電腦4號'];
+  const names=Array.from({length:9},(_,i)=>'電腦'+(i+1)+'號');
   const out=[];
   for(let i=0;i<n&&i<names.length;i++){
     let ci=0; for(let c=0;c<CHARS.length;c++)if(!used.has(c)){ci=c;used.add(c);break;}
@@ -4068,11 +4051,13 @@ function mpSend(obj){
 function mpName(id){ const p=MP.roster.find(r=>r.id===id); return p?p.name:'玩家'; }
 
 /* ---- 連線 ---- */
-function mpConnect(cb){
+async function mpConnect(cb){
   $('mpStatus').textContent='連線中…';
+  await runtimeConfigReady;
+  if(!MP.on)return;
   MP.net=new MiniMQTT(CFG.broker);
   MP.net.onready=()=>{ MP.net.subscribe(mpTopic()); $('mpStatus').textContent=''; cb&&cb(); };
-  MP.net.onfail=()=>{ $('mpStatus').textContent='⚠️ 連不上連線伺服器，請檢查網路，或到遊戲設定換一個伺服器'; };
+  MP.net.onfail=()=>{ $('mpStatus').textContent='暫時連不上房間服務，請檢查網路或聯絡主辦人'; };
   MP.net.onmsg=raw=>{ try{ const m=JSON.parse(raw); if(m&&m.t)mpHandle(m); }catch(e){} };
   MP.net.connect();
 }
@@ -4082,6 +4067,15 @@ function mpHandle(m){
   const now=performance.now();
   if(MP_ROUND_EVENTS.has(m.t)&&Number(m.sr||1)!==MP.seriesRound)return; // 忽略上一輪延遲到達的封包
   switch(m.t){
+    case 'ctfpos':
+      if(MP.mode!=='ctf'||!MP.started||!Array.isArray(m.poses)||m.poses.length>10)break;
+      for(const pose of m.poses){
+        const r=MP.roster.find(r=>r.id===pose.id),p=MP.players[pose.id];
+        if(!r||!p||!(pose.id===m.f||r.bot&&m.f===MP.order[0])||![pose.x,pose.z,pose.h].every(Number.isFinite)||Math.abs(pose.x)>G.mazeW*G.cell/2||Math.abs(pose.z)>G.mazeH*G.cell/2)continue;
+        p.tx=pose.x;p.tz=pose.z;p.th=pose.h;p.lastSeen=now;if(p.mesh)p.mesh.visible=true;
+      }
+      break;
+    case 'ctfstate':case 'ctfattack':case 'ctfpass':case 'ctfwall':CaptureFlag.handle(m);break;
     case 'hello':
       if(!MP.host||MP.started)break;
       if(!MP.roster.find(r=>r.id===m.f)){
@@ -4121,6 +4115,7 @@ function mpHandle(m){
         MP.seriesRound=round;
         MP.plannedRounds=total;
       }
+      MP.rules=GameRules.normalize(m.rules||{});
       MP.started=true; MP.ended=false; MP.endSent=false;
       MP.seed=m.seed; MP.mode=m.mode; MP.size=m.size; MP.shiftMs=m.shiftMs;
       MP.hungerMin=m.hungerMin; MP.roundMs=m.roundMs;
@@ -4129,7 +4124,7 @@ function mpHandle(m){
       MP.hp={}; MP.itRegenAt=performance.now()+15000; MP.whistleHolder=null;
       MP.stunSec=m.stunSec||3; MP.pingSec=m.pingSec||3;
       MP.bots=null;
-      if(MP.host&&(m.mode==='treasure'||m.mode==='tag'||m.mode==='shop')){
+      if(MP.host&&(m.mode==='treasure'||m.mode==='tag'||m.mode==='shop'||m.mode==='ctf')){
         MP.bots=m.players.filter(pl=>pl.bot).map(pl=>
           ({id:pl.id,charIdx:pl.charIdx,x:0,z:0,cell:{x:0,y:0},h:0,path:null,pathI:0,goalKey:'',repathAt:0,stunnedUntil:0,atkAt:0,robAt:0,coUntil:0,coPending:false}));
       }
@@ -4143,6 +4138,7 @@ function mpHandle(m){
         b.cell=(G.startCells&&G.startCells[bi])||{x:0,y:0};
         const wp=cellToWorld(b.cell.x,b.cell.y); b.x=wp.x; b.z=wp.z;
       }
+      if(MP.mode==='ctf')CaptureFlag.start(m.f);
       if(MP.mode==='shop'){
         MP.carts={}; MP.cartList={}; MP.banked={}; MP.coUntil={}; MP.robCoolUntil=0; G.coUntil=0;
         G.roundEndsAt=performance.now()+MP.roundMs; MP.shopEndSent=false;
@@ -4169,6 +4165,7 @@ function mpHandle(m){
       if(p){p.tx=m.x;p.tz=m.z;p.th=m.h;p.lastSeen=now;if(p.mesh)p.mesh.visible=true;}
       break;}
     case 'take':{
+      if(MP.mode==='ctf')CaptureFlag.collect(m);
       if(m.f===MP.id||m.round!==MP.round)break;
       if(m.kind==='good'){
         const gd=G.goods&&G.goods[m.i];
@@ -4367,6 +4364,7 @@ function mpHandle(m){
       break;
     case 'bye':
       if(m.f===MP.id)break;
+      if(MP.mode==='ctf'&&MP.started)CaptureFlag.leave(m.f);
       if(!MP.started){
         MP.roster=MP.roster.filter(r=>r.id!==m.f);
         if(MP.host)mpSend({t:'lobby',players:MP.roster,mode:MP.mode,max:MP.maxPlayers,rounds:MP.plannedRounds});
@@ -4408,11 +4406,16 @@ function mpAfterStart(){
   clearInterval(MP.posTimer);
   MP.posTimer=setInterval(()=>{
     if(MP.started&&!MP.ended){
+      if(MP.mode==='ctf'){
+        const poses=[{id:MP.id,x:+G.px.toFixed(2),z:+G.pz.toFixed(2),h:+G.heading.toFixed(2)}];
+        if(MP.host)for(const b of MP.bots||[])poses.push({id:b.id,x:+b.x.toFixed(2),z:+b.z.toFixed(2),h:+b.h.toFixed(2)});
+        mpSend({t:'ctfpos',poses});return;
+      }
       mpSend({t:'pos',x:+G.px.toFixed(2),z:+G.pz.toFixed(2),h:+G.heading.toFixed(2)});
       if(MP.host&&MP.bots)for(const b of MP.bots) // 房主幫電腦報位置
         mpSend({t:'pos',f:b.id,x:+b.x.toFixed(2),z:+b.z.toFixed(2),h:+b.h.toFixed(2)});
     }
-  },120);
+  },MP.mode==='ctf'?200:120);
   mpUpdateTagVisuals();
 }
 
@@ -4422,6 +4425,7 @@ function mpFrame(dt){
   for(const id in MP.players){
     const p=MP.players[id];
     if(!p.mesh)continue;
+    if(MP.host&&MP.mode==='ctf'&&p.bot){const b=MP.bots?.find(b=>b.id===id);if(b){p.tx=b.x;p.tz=b.z;p.th=b.h;p.lastSeen=now;}}
     if(now-p.lastSeen>6000){p.mesh.visible=false;continue;}
     const k=Math.min(1,dt*9);
     const dx=p.tx-p.mesh.position.x, dz=p.tz-p.mesh.position.z;
@@ -4435,6 +4439,7 @@ function mpFrame(dt){
       u.legL.rotation.x=-sw;u.legR.rotation.x=sw;u.armL.rotation.x=sw;u.armR.rotation.x=-sw;}
   }
   if(MP.ended)return;
+  if(MP.mode==='ctf'&&MP.started)CaptureFlag.frame(dt,now);
   // ===== 尋寶模式 =====
   if(MP.mode==='treasure'&&MP.started&&MP.treasure){
     // 持有者位置每 N 秒才在小地圖上更新一次
@@ -4457,7 +4462,7 @@ function mpFrame(dt){
     if(invis)p.mesh.visible=false;
     else if(!p.mesh.visible&&now-p.lastSeen<6000)p.mesh.visible=true;
   }
-  if(MP.mode==='tag'&&MP.started&&!MP.ended){
+  if((MP.mode==='tag'||MP.mode==='ctf')&&MP.started&&!MP.ended){
     // 鬼每 15 秒回 1 格體力
     if(MP.taggedId&&now>MP.itRegenAt){
       MP.itRegenAt=now+15000;
@@ -4792,7 +4797,7 @@ function showMPResults(title,html,results=[]){
 function mpRenderLobby(){
   const box=$('mpPlayers');
   box.innerHTML=MP.roster.map((r,i)=>
-    `<div style="font-size:1.1rem;">${CHARS[r.charIdx||0].emoji} ${escapeHtml(r.name)}${r.id===MP.id?'（你）':''}${i===0?' 👑':''}</div>`
+    `<div style="font-size:1.1rem;">${MP.mode==='ctf'?(i%2?'琥珀隊 · ':'蒼藍隊 · '):''}${CHARS[r.charIdx||0].emoji} ${escapeHtml(r.name)}${r.id===MP.id?'（你）':''}${i===0?' 👑':''}</div>`
   ).join('')||'<div style="color:#999;">還沒有人…</div>';
   if(MP.host){
     $('mpStart').style.display=MP.roster.length>=2?'block':'none';
@@ -4802,6 +4807,7 @@ function mpRenderLobby(){
   }
 }
 function mpLeave(){
+  if(window.CaptureFlag)CaptureFlag.stop();
   try{mpSend({t:'bye'});}catch(e){}
   clearInterval(MP.posTimer); clearInterval(MP.helloTimer);
   MP.posTimer=MP.helloTimer=null;
@@ -4835,7 +4841,7 @@ function sendMpRoundStart(players,seriesRound){
   const order=players.map(r=>r.id),tagPool=players.map(r=>r.id);
   mpSend({t:'start',seed:(Math.random()*2**31)|0,mode:MP.mode,lvl:G.lvlIdx,size:CFG.mazeSize,
     shiftMs:CFG.shiftMin*60000,hungerMin:CFG.hungerMin,roundMs:(MP.mode==='shop'?(CFG.shopMin||2.5)*60000:150000),
-    stunSec:CFG.stunSec,pingSec:CFG.pingSec,seriesKind:'multi',seriesRound,seriesTotal:SERIES.total,
+    stunSec:CFG.stunSec,pingSec:CFG.pingSec,rules:GameRules.normalize(CFG),seriesKind:'multi',seriesRound,seriesTotal:SERIES.total,
     order,players,itpw:MP.mode==='tag'?randPower():null,
     it:MP.mode==='tag'?tagPool[Math.floor(Math.random()*tagPool.length)]:null});
 }
@@ -4868,9 +4874,11 @@ document.querySelectorAll('#mpSizeRow .lb-tab').forEach(b=>{
 $('mpModeRace').onclick=()=>selectMultiplayerMode('race');
 $('mpModeTag').onclick=()=>selectMultiplayerMode('tag');
 $('mpModeShop').onclick=()=>selectMultiplayerMode('shop');
+$('mpModeCtf').onclick=()=>selectMultiplayerMode('ctf');
 $('mpModeTre').onclick=()=>selectMultiplayerMode('treasure');
 $('mpCreate').onclick=()=>{
   MP.on=true; MP.host=true; MP.mode=MP.pendingMode;
+  if(MP.mode==='ctf')MP.maxPlayers=GameRules.normalize(CFG).teamSize*2;
   MP.room=String(1000+Math.floor(Math.random()*9000));
   MP.roster=[{id:MP.id,name:getPlayerName(),charIdx:G.charIdx}];
   $('mpSetup').style.display='none'; $('mpLobby').style.display='block';
@@ -4894,6 +4902,7 @@ $('mpJoin').onclick=()=>{
 $('mpStart').onclick=()=>{
   if(!MP.host||MP.roster.length<2)return;
   let players=[...MP.roster];
+  if(MP.mode==='ctf')players=players.concat(makeBots(MP.maxPlayers-players.length,players));
   if((MP.mode==='treasure'||MP.mode==='shop')&&CFG.mazeSize>=15){ // 大地圖人數不足 → 電腦補位
     players=players.concat(makeBots(MP.maxPlayers-players.length,players));
   }
@@ -4906,6 +4915,9 @@ window.addEventListener('beforeunload',e=>{
 window.addEventListener('pagehide',()=>{ if(MP.on)try{mpSend({t:'bye'});}catch(e){} });
 </script>
 <script src="assets/classic-audio.js"></script>
+<script src="assets/setup-controls.js"></script>
+<script src="assets/capture-core.js"></script>
+<script src="assets/capture-mode.js"></script>
 <script src="story/story-core.js"></script>
 <script src="story/tower-narrative.js"></script>
 <script src="story/tower-side-stories.js"></script>

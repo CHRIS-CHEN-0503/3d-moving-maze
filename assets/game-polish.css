@@ -26,8 +26,11 @@ body { background: #091422; }
 .flag-emblem { display: block; width: 32px; height: 36px; position: relative; margin: 0 auto; border-left: 3px solid #ffebbf; }
 .flag-emblem::before { content: ''; position: absolute; top: 1px; left: 0; width: 30px; height: 22px; background: linear-gradient(135deg,#62d7fa 0 48%,#ffd389 49%); clip-path: polygon(0 0,100% 0,76% 50%,100% 100%,0 100%); }
 #captureHud { position: absolute; z-index: 24; top: calc(62px + env(safe-area-inset-top)); left: 16px; max-width: min(510px,62vw); padding: 9px 13px; border: 1px solid #8ccccc; border-radius: 11px; color: #fff1c9; background: #102136eb; font-size: 14px; pointer-events: none; }
-#captureRelay,#towerTalkBtn { position: absolute; z-index: 35; bottom: calc(16px + env(safe-area-inset-bottom)); right: var(--action-right-near,100px); min-height: 48px; padding: 10px 18px; border: 1px solid #adefeb; border-radius: 14px; color: #efffff; background: #195565; box-shadow: 0 4px 18px #07122199; font-weight: 700; }
-#towerTalkBtn { bottom:auto; right:auto; top:48%; left:50%; transform:translate(-50%,-50%); }
+#captureRelay { position: absolute; z-index: 35; bottom: calc(16px + env(safe-area-inset-bottom)); right: var(--action-right-near,100px); min-height: 48px; padding: 10px 18px; border: 1px solid #adefeb; border-radius: 14px; color: #efffff; background: #195565; box-shadow: 0 4px 18px #07122199; font-weight: 700; }
+/* 與視角同一容器、同一頂線；絕對定位不佔用右側工具列的排列空間。 */
+#towerTalkBtn { position:absolute; top:0; right:calc(100% + 120px); bottom:auto; left:auto; z-index:35; padding:0; border:2px solid #adefeb; border-radius:50%; color:#efffff; background:#195565; box-shadow:0 4px 18px #07122199; display:grid; place-items:center; }
+#towerTalkBtn svg { width:65%; height:65%; fill:none; stroke:currentColor; stroke-width:2; stroke-linecap:round; stroke-linejoin:round; pointer-events:none; }
+#towerTalkBtn:focus-visible { outline:3px solid #ffe1a0; outline-offset:3px; }
 #captureRelay[hidden],#captureHud[hidden],#towerTalkBtn[hidden],body:not(.story-active) #towerTalkBtn { display: none !important; }
 @media (max-height:500px) { .match-grid {gap:8px;} .match-field{font-size:14px;} #captureHud{top:54px;font-size:12px;max-width:59vw;padding:6px 10px;} }
 button, input, select { font: inherit; }
@@ -471,6 +474,7 @@ body.story-active #towerActionRail {
   #minimapWrap.big #minimap { width: 114px; height: 114px; }
   #hudRightBtns { bottom: calc(9px + env(safe-area-inset-bottom)); gap: 6px; }
   .round-btn { width: 44px; height: 44px; border-radius: 12px; }
+  #towerTalkBtn { right:calc(100% + 104px); }
   .round-btn .bl { font-size: 10px; bottom: 4px; }
   #gameScreen { --action-rail-space: 64px; }
   #shovelBtn, #kiteBtn, #atkBtn, #robBtn, #coBtn, #skillBtn, #whistleBtn { width: 62px; height: 62px; }

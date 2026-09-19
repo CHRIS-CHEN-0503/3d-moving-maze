@@ -48,7 +48,7 @@ function harness(initialSave, runtimeBridge = '') {
     focus() { document.activeElement = this; }
   }
   const document = { body: new Element('body'), hidden: false, activeElement: null, getElementById: id => elements.get(id) || null, createElement: tag => new Element(tag), addEventListener() {} };
-  for (const id of ['gameScreen', 'storyEntryBtn', 'joyBase', 'joyStick', 'playerName', 'profileTitle', 'profileNextBtn', 'hudLvlName', 'hudRound', 'shiftCountdown', 'preWarn', 'preWarnSec']) { const element = new Element(); element.id = id; }
+  for (const id of ['gameScreen', 'hudRightBtns', 'storyEntryBtn', 'joyBase', 'joyStick', 'playerName', 'profileTitle', 'profileNextBtn', 'hudLvlName', 'hudRound', 'shiftCountdown', 'preWarn', 'preWarnSec']) { const element = new Element(); element.id = id; }
   const buildCharacter = () => {
     const model = new THREE.Group();
     for (const name of ['body', 'armL', 'armR', 'legL', 'legR']) { const part = new THREE.Group(); model.userData[name] = part; model.add(part); }

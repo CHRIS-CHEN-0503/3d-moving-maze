@@ -101,6 +101,21 @@ function geometryFingerprint(group, includeStyle = false) {
   return JSON.stringify(parts);
 }
 
+test('一到五分戰士有不同幾何、盔甲與武器，分數標記正確且保持低面數',()=>{
+  const prints=new Set(),weapons=['wooden-club','spear-tip','longsword-blade','halberd-axe','sun-hammer-head'];
+  for(let rank=1;rank<=5;rank++){
+    const model=characters.buildWarrior(rank,deps),summary=details(model);prints.add(geometryFingerprint(model));
+    assert.equal(model.userData.strength,rank);assert.equal(model.userData.role,'warrior');
+    assert.ok(model.getObjectByName(weapons[rank-1]));assert.ok(model.getObjectByName('rank-'+rank+'-breastplate'));
+    assert.equal(model.userData.guardBlade.parent,model.userData.armR);
+    let pins=0;model.traverse(o=>{if(o.name.startsWith('rank-pin-'))pins++;});assert.equal(pins,rank);
+    assert.ok(summary.meshes<=65,`rank ${rank}: ${summary.meshes} meshes`);assert.ok(summary.triangles<2200);
+    assert.ok(summary.size.y<2.65);assert.equal(model.userData.style,characters.WARRIOR_STYLES[rank]);
+  }
+  assert.equal(prints.size,5);
+  for(const value of [0,6,1.5,'3',null])assert.throws(()=>characters.buildWarrior(value,deps),RangeError);
+});
+
 test('五位探索者皆有原創輪廓與不同髮型配件，不是同模型換色且保持低面數', () => {
   const expected = {
     eve: ['travel-hat-crown', 'traveler-braid', 'travel-cloak', 'unfolded-map'],

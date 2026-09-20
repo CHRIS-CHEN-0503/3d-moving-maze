@@ -10,6 +10,13 @@ function harness(){
   const env={speechSynthesis:synth,SpeechSynthesisUtterance:class{constructor(text){this.text=text;}},Date:{now:()=>now},document:{hidden:false,addEventListener:(key,fn)=>docEvents[key]=fn},addEventListener:(key,fn)=>events[key]=fn};
   const voice=V.create(env);return{voice,spoken,synth,env,at:t=>now=t,voices:list=>{voices=list;events.voiceschanged();},finish:()=>spoken.at(-1).onend(),hide:()=>{env.document.hidden=true;docEvents.visibilitychange();}};
 }
+function recordedHarness(){
+  const audio=[],spoken=[];
+  class FakeAudio{constructor(src){this.src=src;audio.push(this);}play(){this.played=true;}pause(){this.paused=true;}}
+  const synth={getVoices:()=>[],addEventListener(){},cancel(){},speak(u){spoken.push(u);}};
+  const env={Audio:FakeAudio,MazeVoicePack:{get:id=>id==='intro'?{src:'./intro.mp3',text:'專用旁白'}:null},speechSynthesis:synth,SpeechSynthesisUtterance:class{constructor(text){this.text=text;}},Date:{now:()=>1000},document:{hidden:false,addEventListener(){}},addEventListener(){}};
+  return{voice:V.create(env),audio,spoken};
+}
 const female={voiceURI:'mei',name:'Mei-Jia',lang:'zh-TW',localService:true},male={voiceURI:'yun',name:'YunJhe',lang:'zh-TW'},en={voiceURI:'en',name:'Samantha',lang:'en-US'};
 test('自動優先台灣中文女聲，尊重指定中文聲音，延遲載入也能更新',()=>{
   assert.equal(V.chooseVoice([en,male,female]),female);assert.equal(V.chooseVoice([female,male],'yun'),male);assert.equal(V.chooseVoice([en]),null);
@@ -35,6 +42,15 @@ test('關閉立即取消、阻止新語音；換分頁取消，缺少語音支�
 test('播放錯誤顯示失敗狀態，試聽可重試而非永久鎖死',()=>{
   const h=harness();h.voice.preview();h.spoken[0].onerror({error:'not-allowed'});assert.equal(h.voice.status().failure,'not-allowed');h.voice.preview();assert.equal(h.voice.status().failure,'');assert.equal(h.spoken.length,2);
 });
+test('有專用錄音時延後下載並優先播放，結束後才朗讀操作選項，重聽會重播錄音',()=>{
+  const h=recordedHarness(),panel={voiceAsset:'intro',voiceAfterText:'下一頁',querySelectorAll:()=>[{closest:()=>null,textContent:'專用旁白。下一頁'}]};
+  assert.equal(h.audio.length,0);assert.equal(h.voice.readPanel(panel),true);assert.equal(h.audio.length,1);assert.equal(h.audio[0].src,'./intro.mp3');assert.equal(h.spoken.length,0);assert.equal(h.voice.status().recorded,true);
+  h.audio[0].onended();assert.equal(h.spoken[0].text,'下一頁');h.voice.replay();assert.equal(h.audio.length,2);assert.equal(h.audio[1].played,true);
+});
+test('專用錄音不可用時自動改用裝置朗讀，不中斷故事',()=>{
+  const h=recordedHarness(),panel={voiceAsset:'intro',querySelectorAll:()=>[{closest:()=>null,textContent:'完整故事。繼續'}]};
+  h.voice.readPanel(panel);h.audio[0].onerror();assert.equal(h.spoken[0].text,'完整故事。');h.spoken[0].onend();assert.equal(h.spoken[1].text,'繼續');
+});
 test('故事抽取包含內文與選項，不朗讀控制列或隱藏文字',()=>{
   const h=harness(),node=(text,hidden=false)=>({textContent:text,closest:()=>hidden?{}:null});
   h.voice.readPanel({voiceScope:'full',querySelectorAll:()=>[node('塔頂'),node('故事內文'),node('下一頁'),node('停止',true)]});
@@ -42,8 +58,9 @@ test('故事抽取包含內文與選項，不朗讀控制列或隱藏文字',()=
 });
 test('一般版與劇情版共用語音，不再跟隨音樂靜音；道具事件有播報',()=>{
   const html=readFileSync(new URL('../index.html',import.meta.url),'utf8'),tower=readFileSync(new URL('../story/tower-mode.js',import.meta.url),'utf8');
-  assert.match(html,/id="cfgSpeech"/);assert.match(html,/speechOn:s.speechOn===0\?0:1/);assert.match(html,/function speak\(text\)\{window.GameVoice\?\.announce/);
+  assert.match(html,/id="cfgSpeech"/);assert.match(html,/speechOn:s.speechOn===0\?0:1/);assert.match(html,/function speak\(text\)\{window.GameVoice\?\.announce/);assert.match(html,/assets\/voice-pack\.js/);
   assert.match(html,/announce\('獲得 '\+t.name/);assert.match(tower,/GameVoice\?\.readPanel/);assert.match(tower,/announce\('使用 '\+C.ITEMS/);
+  assert.match(tower,/announceAsset\('alert\.monster'/);assert.match(tower,/story\.scene99\./);assert.match(tower,/merchant\.'\+nearest\.id/);assert.match(tower,/explorer\.'\+person\.id/);
 });
 
 test('背包摘要及重聽不讀裝備詳細數值，保留主要操作',()=>{

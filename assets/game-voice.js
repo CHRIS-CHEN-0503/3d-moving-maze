@@ -1,4 +1,4 @@
-/* 裝置語音朗讀：不下載音檔、不使用麥克風；每次只朗讀一段。 */
+/* 專用錄音優先、裝置語音備援；不使用麥克風，每次只朗讀一段。 */
 (function(root,factory){
   const api=factory();
   if(typeof module==='object'&&module.exports)module.exports=api;
@@ -33,15 +33,20 @@
   }
   function create(env){
     const synth=env.speechSynthesis,Utterance=env.SpeechSynthesisUtterance;
-    const supported=!!(synth&&Utterance),now=()=>env.Date?.now?.()??Date.now();
-    let enabled=true,preferred='',voices=[],queue=[],current=null,generation=0,lastStory='',failure='',listener=()=>{};
+    const speechSupported=!!(synth&&Utterance),AudioCtor=env.Audio,pack=env.MazeVoicePack;
+    const recordedSupported=typeof AudioCtor==='function'&&!!pack?.get,supported=speechSupported||recordedSupported,now=()=>env.Date?.now?.()??Date.now();
+    let enabled=true,preferred='',voices=[],queue=[],current=null,currentAudio=null,generation=0,lastStory=null,failure='',listener=()=>{};
     const recent=new Map();
-    function status(){return {supported,enabled,speaking:!!current,voice:chooseVoice(voices,preferred),voices:voices.filter(v=>/^zh(?:[-_]|$)/i.test(v.lang)),failure};}
+    function status(){return {supported,enabled,speaking:!!(current||currentAudio),voice:chooseVoice(voices,preferred),voices:voices.filter(v=>/^zh(?:[-_]|$)/i.test(v.lang)),failure,recorded:recordedSupported};}
     function notify(){listener(status());}
     function refresh(){try{voices=synth?.getVoices()||[];}catch(_){voices=[];}notify();}
-    function stop(forget=false){generation++;queue=[];current=null;if(forget)lastStory='';try{synth?.cancel();}catch(_){}notify();}
+    function stop(forget=false){
+      generation++;queue=[];current=null;
+      if(currentAudio){try{currentAudio.pause();currentAudio.currentTime=0;}catch(_){}currentAudio=null;}
+      if(forget)lastStory=null;try{synth?.cancel();}catch(_){}notify();
+    }
     function next(){
-      if(!enabled||!supported||current)return;
+      if(!enabled||!speechSupported||current||currentAudio)return;
       while(queue.length&&queue[0].expires&&queue[0].expires<now())queue.shift();
       const entry=queue.shift();if(!entry){notify();return;}
       const token=generation,u=new Utterance(entry.text),voice=chooseVoice(voices,preferred);
@@ -52,23 +57,40 @@
       try{synth.speak(u);notify();}catch(_){failure='unavailable';current=null;queue=[];notify();}
     }
     function say(value,{replace=false,story=false}={}){
-      if(!enabled||!supported||env.document?.hidden)return false;
+      if(!enabled||!speechSupported||env.document?.hidden)return false;
       const text=clean(value);if(!text)return false;
       if(!story&&!replace){const previous=recent.get(text);if(previous!==undefined&&now()-previous<1800)return false;recent.set(text,now());if(recent.size>32)recent.delete(recent.keys().next().value);}
       if(replace)stop();failure='';
-      if(story)lastStory=text;
+      if(story)lastStory={text,asset:'',after:''};
       const pending=queue.filter(e=>e.expires).length;
       if(!story&&pending>=4)return false;
       const items=chunks(text).map(text=>({text,expires:story?0:now()+12000}));
       queue.push(...(story?items:items.slice(0,4-pending)));next();return true;
     }
-    function readPanel(panel){return say(panelText(panel),{replace:true,story:true});}
+    function playAsset(id,fallbackText,{replace=false,story=false,after=''}={}){
+      const track=pack?.get?.(id),fallback=clean(fallbackText||track?.text),tail=clean(after);
+      if(!enabled||env.document?.hidden||!track?.src||!recordedSupported)return say(fallback,{replace,story});
+      if(replace)stop();failure='';
+      if(story)lastStory={text:fallback,asset:id,after:tail};
+      const token=generation,audio=new AudioCtor(track.src);currentAudio=audio;
+      try{audio.preload='auto';audio.volume=1;}catch(_){}
+      const finish=()=>{if(token!==generation||currentAudio!==audio)return;currentAudio=null;notify();if(tail&&!say(tail,{story:false}))next();else if(!tail)next();};
+      const fallbackToSpeech=error=>{if(token!==generation||currentAudio!==audio)return;currentAudio=null;failure=error||'recording-unavailable';notify();if(!say(fallback,{story}))next();};
+      audio.onended=finish;audio.onerror=()=>fallbackToSpeech('recording-unavailable');
+      try{const result=audio.play();result?.catch?.(()=>fallbackToSpeech('recording-unavailable'));notify();return true;}
+      catch(_){fallbackToSpeech('recording-unavailable');return speechSupported;}
+    }
+    function readPanel(panel){
+      const spoken=panelText(panel),asset=panel?.voiceAsset||'',after=panel?.voiceAfterText||'';
+      return asset?playAsset(asset,spoken,{replace:true,story:true,after}):say(spoken,{replace:true,story:true});
+    }
     function configure(settings={}){const changed=preferred!==(settings.voice||'');enabled=settings.enabled!==false;preferred=settings.voice||'';if(!enabled||changed)stop();refresh();}
     function listen(fn){listener=typeof fn==='function'?fn:()=>{};notify();}
     synth?.addEventListener?.('voiceschanged',refresh);
     env.document?.addEventListener?.('visibilitychange',()=>{if(env.document.hidden)stop();});
     env.addEventListener?.('pagehide',()=>stop(true));refresh();
-    return {configure,status,listen,refresh,readPanel,stop,announce:(text,replace=false)=>say(text,{replace}),replay:()=>say(lastStory,{replace:true,story:true}),preview:()=>say('你好，我會陪你探索迷宮。準備好了，就一起出發吧！',{replace:true})};
+    function replay(){return lastStory?.asset?playAsset(lastStory.asset,lastStory.text,{replace:true,story:true,after:lastStory.after}):say(lastStory?.text||'',{replace:true,story:true});}
+    return {configure,status,listen,refresh,readPanel,stop,announce:(text,replace=false)=>say(text,{replace}),announceAsset:(id,text,replace=false)=>playAsset(id,text,{replace}),replay,preview:()=>say('你好，我會陪你探索迷宮。準備好了，就一起出發吧！',{replace:true})};
   }
   return {create,clean,chunks,chooseVoice,panelText};
 });

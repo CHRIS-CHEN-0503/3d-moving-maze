@@ -116,6 +116,8 @@
     el('towerDialog').scrollTop=0;
     el('towerDialog').voiceScope=narration.full?'full':'summary';
     el('towerDialog').voiceSummary=narration.summary||'';
+    el('towerDialog').voiceAsset=narration.asset||'';
+    el('towerDialog').voiceAfterText=narration.afterText||'';
     if(!narration.silent)window.GameVoice?.readPanel(el('towerDialog'));
   }
   function closeDialog() {
@@ -218,8 +220,10 @@
     if(!N||!run)return;
     const entry=N.availableScenes(run).find(s=>s.id===id);if(!entry)return;
     page=Math.max(0,Math.min(entry.paragraphs.length-1,page));reader={id,page,enter,exit};
-    dialog('倒轉高塔 · 第 '+entry.floor+' 層 · '+(page+1)+' / '+entry.paragraphs.length,entry.title,'',prose([entry.paragraphs[page]])+(page===entry.paragraphs.length-1?echoCards(S?S.echoesForScene(run,id):[]):''),
-      (page?action('上一頁','story-prev'):'')+(page<entry.paragraphs.length-1?action('下一頁','story-next'):action(exit?'收進日誌，走向門後':enter?'收進日誌，繼續探索':'收進日誌','story-finish'))+action(exit?'暫留本層':'稍後在日誌閱讀','close'));
+    const storyActions=(page?action('上一頁','story-prev'):'')+(page<entry.paragraphs.length-1?action('下一頁','story-next'):action(exit?'收進日誌，走向門後':enter?'收進日誌，繼續探索':'收進日誌','story-finish'))+action(exit?'暫留本層':'稍後在日誌閱讀','close');
+    const recorded=id==='scene:99'?'story.scene99.'+(page+1):'';
+    const after=recorded?[page?'上一頁':'',page<entry.paragraphs.length-1?'下一頁':exit?'收進日誌，走向門後':enter?'收進日誌，繼續探索':'收進日誌',exit?'暫留本層':'稍後在日誌閱讀'].filter(Boolean).join('。'):'';
+    dialog('倒轉高塔 · 第 '+entry.floor+' 層 · '+(page+1)+' / '+entry.paragraphs.length,entry.title,'',prose([entry.paragraphs[page]])+(page===entry.paragraphs.length-1?echoCards(S?S.echoesForScene(run,id):[]):''),storyActions,{asset:recorded,afterText:after});
   }
   function journal() {
     if(!N||!run||G.shifting)return;
@@ -668,6 +672,7 @@
     updateWarrior(dt,now);
     for(const monster of monsters) updateMonster(monster,dt,now);
     const threat=!nearest&&run.effects.repel<=0&&!(now<G.invisUntil)&&monsters.some(m=>m.alive&&!isHeld(m)&&!(run.monsterStuns[m.id]>0)&&Math.hypot(G.px-m.model.position.x,G.pz-m.model.position.z)<m.def.sight&&(m.path.length>0||m.windup>0));
+    if(threat&&encounterHold===0)window.GameVoice?.announceAsset('alert.monster','小心，附近有怪物。留意地上的紅圈，準備閃避，或請護衛攔住牠。',true);
     encounterHold=threat?4:Math.max(0,encounterHold-dt);
     if(window.TowerAudio)window.TowerAudio.setEncounter(encounterHold>0);
     if(window.CharacterFace){
@@ -830,7 +835,8 @@
     if(!q)actions+=action('接受委託','quest-accept',offer.id,!nearExplorer());
     else if(q.status==='ready')actions+=action('領取報酬','quest-reward',null,!nearExplorer());
     else if(q.status==='active'&&q.type==='donate')actions+=action('交付 '+q.goal+' 份'+C.ITEMS[q.target].name,'quest-donate',null,!nearExplorer()||run.bag[q.target]<q.goal);
-    dialog(explorerName(),q?.status==='claimed'?'感謝你的幫助':offer.title,copy,(!q?'<p class="tower-copy">'+text(explorerIdentity().greeting||'')+'</p>':'')+'<section class="tower-guard-summary"><h3>完成報酬</h3><p>'+text(rewardDescription(offer.reward))+'</p></section><p class="tower-copy">離開本層、保存回首頁或重整挑戰會解除未結案委託；報酬必須向探索者領取。進出口前會再次確認。裝備放入行囊後請自行穿戴。</p>',actions,{full:true,silent:quiet===true});
+    const person=explorerIdentity(),after=!q?[offer.title,copy,'完成報酬：'+rewardDescription(offer.reward),'繼續探索','接受委託'].join('。'):'';
+    dialog(explorerName(),q?.status==='claimed'?'感謝你的幫助':offer.title,copy,(!q?'<p class="tower-copy">'+text(person.greeting||'')+'</p>':'')+'<section class="tower-guard-summary"><h3>完成報酬</h3><p>'+text(rewardDescription(offer.reward))+'</p></section><p class="tower-copy">離開本層、保存回首頁或重整挑戰會解除未結案委託；報酬必須向探索者領取。進出口前會再次確認。裝備放入行囊後請自行穿戴。</p>',actions,{full:true,silent:quiet===true,asset:!q?'explorer.'+person.id:'',afterText:after});
   }
   function chestDialog() {
     if(!chest||!chest.model.visible)return;
@@ -861,7 +867,9 @@
     syncEngine();
     const cards=nearest.offer.supplies.map(id=>{const item=C.ITEMS[id];return '<article class="tower-item"><h3>'+text(item.name)+'</h3><p>'+text(item.description)+' · 持有 '+run.bag[id]+'</p>'+action('買 '+item.buyPrice+' 幣','buy',id)+action('賣出','sell',id,!run.bag[id])+'</article>';}).join('');
     const gear=nearest.offer.gear.map(({kind,gear,price})=>'<article class="tower-item tower-gear-card"><h3>'+text(gear.name)+'</h3><p>'+text(gearDescription(gear))+'</p>'+action(run.adventure.claimed.includes('stock:'+run.floor+':'+nearest.id+':'+kind)?'本層已售出':'購買 '+price+' 幣','buy-gear',kind,run.adventure.claimed.includes('stock:'+run.floor+':'+nearest.id+':'+kind)||run.coins<price)+'</article>').join('');
-    dialog(nearest.name+' · 行商營地','專門裝備與補給','每位商人固定專賣一種防具與一種武器。剩餘銅幣 '+run.coins,'<div class="tower-grid">'+gear+cards+'</div><p class="tower-copy">買到的裝備放入行囊，請在背包選擇「裝備」；每件本層限一件，讀檔不會補貨。</p>',action('整理裝備','bag')+action('結束交易','close'),{silent:quiet===true,summary:nearest.name+'。出售：'+[...nearest.offer.gear.map(g=>gearSpeech(g.gear)),...nearest.offer.supplies.map(id=>C.ITEMS[id].name)].join('、')+'。選擇物品購買或賣出。'});
+    const stockVoice='出售：'+[...nearest.offer.gear.map(g=>gearSpeech(g.gear)),...nearest.offer.supplies.map(id=>C.ITEMS[id].name)].join('、')+'。選擇物品購買或賣出。';
+    const voiceSummary=nearest.name+'。'+stockVoice;
+    dialog(nearest.name+' · 行商營地','專門裝備與補給','每位商人固定專賣一種防具與一種武器。剩餘銅幣 '+run.coins,'<p class="tower-copy">'+text(nearest.offer.greeting||'')+'</p><div class="tower-grid">'+gear+cards+'</div><p class="tower-copy">買到的裝備放入行囊，請在背包選擇「裝備」；每件本層限一件，讀檔不會補貨。</p>',action('整理裝備','bag')+action('結束交易','close'),{silent:quiet===true,summary:voiceSummary,asset:'merchant.'+nearest.id,afterText:stockVoice+'。整理裝備。結束交易。'});
   }
   function useItem(id) {
     syncEngine();const before={...run.effects};

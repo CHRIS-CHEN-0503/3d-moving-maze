@@ -6,9 +6,9 @@
 })(typeof globalThis !== 'undefined' ? globalThis : this, function (core) {
   'use strict';
   const MERCHANTS = Object.freeze({
-    tieLing: Object.freeze({ id: 'tieLing', name: '鐵嶺', title: '鐵匠', equipmentKinds: Object.freeze(['helmet', 'bat']), supplies: Object.freeze(['heal', 'shield']) }),
-    jinHe: Object.freeze({ id: 'jinHe', name: '錦禾', title: '裁甲師', equipmentKinds: Object.freeze(['armor', 'pan']), supplies: Object.freeze(['ration', 'feather']) }),
-    lanZhou: Object.freeze({ id: 'lanZhou', name: '嵐舟', title: '盾匠', equipmentKinds: Object.freeze(['shield', 'staff']), supplies: Object.freeze(['map', 'bell', 'hourglass']) }),
+    tieLing: Object.freeze({ id: 'tieLing', name: '鐵嶺', title: '鐵匠', greeting: '我是鐵匠鐵嶺。頭盔、球棒和保命補給，都在這裡挑。', equipmentKinds: Object.freeze(['helmet', 'bat']), supplies: Object.freeze(['heal', 'shield']) }),
+    jinHe: Object.freeze({ id: 'jinHe', name: '錦禾', title: '裁甲師', greeting: '我是裁甲師錦禾。盔甲、平底鍋和旅途糧食，由我準備。', equipmentKinds: Object.freeze(['armor', 'pan']), supplies: Object.freeze(['ration', 'feather']) }),
+    lanZhou: Object.freeze({ id: 'lanZhou', name: '嵐舟', title: '盾匠', greeting: '我是盾匠嵐舟。盾牌、木杖和探路工具，都在這裡。', equipmentKinds: Object.freeze(['shield', 'staff']), supplies: Object.freeze(['map', 'bell', 'hourglass']) }),
   });
   const EXPLORERS = Object.freeze({
     eve: Object.freeze({ id: 'eve', name: '伊芙', title: '探索者', greeting: '我的地圖又被高塔改寫了。沒關係，我們一起把路找回來。' }),

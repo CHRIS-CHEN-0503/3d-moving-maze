@@ -3,7 +3,7 @@
   'use strict';
   const FIELDS=Object.freeze({
     mazeSize:{label:'迷宮大小',value:13,choices:[11,13,15,19,25]},
-    teamSize:{label:'每隊人數（缺額電腦補位）',value:2,choices:[2,3,4,5],modes:['ctf']},
+    teamSize:{label:'每隊人數',value:2,choices:[2,3,4,5],modes:['ctf']},
     shiftMin:{label:'迷宮變換間隔（分鐘）',value:3,min:.5,max:10,step:.5},
     itemCount:{label:'每次出現的道具',value:6,min:3,max:12,step:1},
     foodCount:{label:'每次出現的食物',value:4,min:2,max:10,step:1,modes:['classic','tag']},

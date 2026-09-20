@@ -741,8 +741,10 @@ button:focus-visible,input:focus-visible{outline:3px solid #fff;outline-offset:3
   <div id="hudRightBtns">
     <button class="round-btn" id="viewToggle" aria-label="切換視角"><span class="ui-icon icon-camera" aria-hidden="true"></span><span class="bl">視角</span></button>
     <button class="round-btn" id="soundToggle" aria-label="切換音樂"><span class="ui-icon icon-sound" aria-hidden="true"></span><span class="bl">音樂</span></button>
-    <button class="round-btn" id="zoomInBtn" aria-label="拉近" style="display:none;"><span class="ui-icon icon-zoom-in" aria-hidden="true"></span><span class="bl">拉近</span></button>
-    <button class="round-btn" id="zoomOutBtn" aria-label="拉遠" style="display:none;"><span class="ui-icon icon-zoom-out" aria-hidden="true"></span><span class="bl">拉遠</span></button>
+    <div class="camera-zoom">
+      <button class="round-btn" id="zoomInBtn" aria-label="拉近" style="display:none;"><span class="ui-icon icon-zoom-in" aria-hidden="true"></span><span class="bl">拉近</span></button>
+      <button class="round-btn" id="zoomOutBtn" aria-label="拉遠" style="display:none;"><span class="ui-icon icon-zoom-out" aria-hidden="true"></span><span class="bl">拉遠</span></button>
+    </div>
     <button class="round-btn" id="quitBtn" aria-label="離開遊戲"><span class="ui-icon icon-exit" aria-hidden="true"></span><span class="bl">離開</span></button>
   </div>
   <div id="compassHud"><div id="compassArrow">🔺</div></div>
@@ -820,6 +822,8 @@ button:focus-visible,input:focus-visible{outline:3px solid #fff;outline-offset:3
       <div style="font-size:2.4rem;font-weight:bold;color:#00838f;letter-spacing:8px;" id="mpCode"></div>
       <div id="mpModeShow" style="color:#7e57c2;font-weight:bold;margin:4px 0;"></div>
       <div id="mpPlayers" style="margin:10px 0;"></div>
+      <label id="mpBotOptions" class="mp-bot-option" hidden><input type="checkbox" id="mpFillBots">空位加入電腦玩家</label>
+      <p id="mpBotSummary" role="status" style="color:#475569;font-size:.9rem;"></p>
       <div id="mpStatus" style="font-size:.85rem;color:#999;min-height:20px;"></div>
       <button class="start-btn button-with-icon" id="mpStart" style="display:none;"><span class="ui-icon icon-compass" aria-hidden="true"></span>大家到齊，開始！</button>
     </div>
@@ -886,6 +890,8 @@ button:focus-visible,input:focus-visible{outline:3px solid #fff;outline-offset:3
     <div class="adm-row"><label for="cfgMusic">開啟音樂</label>
       <select id="cfgMusic"><option value="1">開</option><option value="0">關</option></select>
     </div>
+    <div class="adm-row"><label for="cfgCameraDistance">第三人稱距離</label><select id="cfgCameraDistance"><option value="3">近</option><option value="4.6">原本距離</option><option value="5.8">稍遠（預設）</option><option value="7">最遠</option></select></div>
+    <p>遊戲中可用「拉近／拉遠」或滑鼠滾輪微調。遇到牆壁，鏡頭會自動靠近。</p>
     <div class="adm-row"><label for="cfgSpeech">語音朗讀與道具提示</label>
       <select id="cfgSpeech"><option value="1">開啟</option><option value="0">關閉</option></select>
     </div>
@@ -965,7 +971,7 @@ button:focus-visible,input:focus-visible{outline:3px solid #fff;outline-offset:3
    3D移動迷宮 — 給小朋友的變形迷宮冒險
    ===================================================== */
 const $=id=>document.getElementById(id);
-const GAME_VERSION='1.26.1';
+const GAME_VERSION='1.27.0';
 
 /* ---------- 設定（後台可調） ---------- */
 const DEFAULT_CFG={teamSize:2,shiftMin:3,itemCount:6,foodCount:4,hungerMin:3,stunSec:3,pingSec:3,smellCells:3,mazeSize:13,musicOn:1,speechOn:1,speechVoice:'',apiUrl:'',roomMax:3,rounds:3,goodsCount:16,shopMin:2.5,cartFull:400,views:{fp:1,tp:1,top:1},broker:'wss://broker.emqx.io:8084/mqtt'};
@@ -973,6 +979,12 @@ let CFG={...DEFAULT_CFG};
 try{const s=JSON.parse(localStorage.getItem('maze3d_cfg')||'{}');CFG={...DEFAULT_CFG,...GameRules.normalize(s),musicOn:s.musicOn===0?0:1,speechOn:s.speechOn===0?0:1,speechVoice:typeof s.speechVoice==='string'?s.speechVoice.slice(0,300):'',rounds:Math.max(1,Math.min(10,Number(s.rounds)||3))};}catch(e){}
 window.GameVoice?.configure({enabled:!!CFG.speechOn,voice:CFG.speechVoice});
 function saveCfg(){const {broker,apiUrl,...preferences}=CFG;localStorage.setItem('maze3d_cfg',JSON.stringify(preferences));}
+function cameraDistance(value){const n=Number(value);return value!=null&&value!==''&&Number.isFinite(n)?Math.max(3,Math.min(7,n)):5.8;}
+try{CFG.cameraDistance=cameraDistance(JSON.parse(localStorage.getItem('maze3d_cfg')||'{}').cameraDistance);}catch(_){CFG.cameraDistance=5.8;}
+function zoomCamera(delta){
+  if(G.view==='tp'){CFG.cameraDistance=cameraDistance(CFG.cameraDistance+delta*.12);}
+  else if(G.view==='top')G.topZoom=Math.max(10,Math.min(48,G.topZoom+delta));
+}
 const runtimeConfigReady=fetch('/api/runtime-config',{signal:AbortSignal.timeout(5000)}).then(r=>r.ok?r.json():null).then(config=>{if(config){CFG.broker=config.broker||DEFAULT_CFG.broker;CFG.apiUrl=config.apiUrl||'';}}).catch(()=>{});
 function matchRules(){return MP.on&&MP.started&&MP.rules?MP.rules:CFG;}
 
@@ -2440,12 +2452,12 @@ function unstuckPlayer(){
 }
 /* 從玩家往指定方向走，回傳撞到牆之前的最遠距離（第三人稱相機用） */
 function cameraClearDist(dx,dz,maxD){
-  const m=0.35;
-  for(let st=0.5;st<=maxD;st+=0.25){
+  const m=0.18;
+  for(let st=0.1;st<=maxD;st+=0.1){
     const x=G.px+dx*st, z=G.pz+dz*st;
     for(const wb of G.wallBoxes){
       if(x+m>wb.minX&&x-m<wb.maxX&&z+m>wb.minZ&&z-m<wb.maxZ)
-        return Math.max(1.1,st-0.35);
+        return Math.max(0.05,st-0.2);
     }
   }
   return maxD;
@@ -2677,12 +2689,14 @@ function updateCamera(dt){
     camera.lookAt(lx,1.6+G.camPitch*3.2,lz);
   }else if(G.view==='tp'){
     // 平視跟隨：像另一個人跟在主角後面（相機比牆矮，看不到隔壁走道）
-    const dist=4.6,hh=2.35;
+    const dist=cameraDistance(CFG.cameraDistance),hh=2.35;
     const dx=Math.sin(G.camYaw), dz=Math.cos(G.camYaw);
     // 後面有牆就拉近，不穿牆；賣場的貨架比鏡頭矮，鏡頭直接從上面掠過就好
     const d=(G.wallH<hh-0.3)?dist:cameraClearDist(dx,dz,dist);
     const tx=G.px+dx*d, tz=G.pz+dz*d;
     camera.position.lerp(new V3(tx,hh,tz),Math.min(1,dt*10));
+    // 旋轉與平滑跟隨也必須檢查，避免繞過轉角時鏡頭插入側牆。
+    if(G.wallH>=hh-.3){const ox=camera.position.x-G.px,oz=camera.position.z-G.pz,len=Math.hypot(ox,oz);if(len>.001){const safe=cameraClearDist(ox/len,oz/len,len);if(safe<len){camera.position.x=G.px+ox/len*safe;camera.position.z=G.pz+oz/len*safe;}}}
     camera.lookAt(G.px,1.5,G.pz);
   }else{ // top（滾輪 / 雙指 / ＋－按鈕可拉近拉遠）
     const owl=performance.now()<G.owlUntil;
@@ -2783,8 +2797,8 @@ function setupTouch(){
       if($('bigMapOverlay').style.display==='flex')$('bigMapOverlay').style.display='none';
       else{$('bigMapOverlay').style.display='flex';sizeBigMap();drawMap($('bigMap'),true);}
     }
-    if((c==='Equal'||c==='NumpadAdd')&&G.view==='top')G.topZoom=Math.max(10,G.topZoom-4);
-    if((c==='Minus'||c==='NumpadSubtract')&&G.view==='top')G.topZoom=Math.min(48,G.topZoom+4);
+    if(c==='Equal'||c==='NumpadAdd')zoomCamera(-4);
+    if(c==='Minus'||c==='NumpadSubtract')zoomCamera(4);
   });
 }
 
@@ -3705,7 +3719,7 @@ function loop(tms){
     if(G.ghostUntil&&performance.now()>G.ghostUntil){G.ghostUntil=0;setGhostLook(false);unstuckPlayer();}
     if(G.owlUntil&&performance.now()>G.owlUntil){G.owlUntil=0;
       G.view=(G.viewBefore&&allowedViews().includes(G.viewBefore))?G.viewBefore:allowedViews()[0];}
-    const isTop=G.view==='top';
+    const isTop=G.view==='top'||G.view==='tp';
     $('zoomInBtn').style.display=isTop?'':'none';
     $('zoomOutBtn').style.display=isTop?'':'none';
     fitRenderer(); // 轉向/尺寸自我修復
@@ -3828,11 +3842,11 @@ function wireUI(){
   bindActionBtn($('robBtn'),doRob);
   bindActionBtn($('coBtn'),startCheckout);
   bindActionBtn($('skillBtn'),useSkill);
-  const zoomBy=d=>{G.topZoom=Math.max(10,Math.min(48,G.topZoom+d));};
+  const zoomBy=zoomCamera;
   bindActionBtn($('zoomInBtn'),()=>zoomBy(-5));
   bindActionBtn($('zoomOutBtn'),()=>zoomBy(5));
   window.addEventListener('wheel',e=>{
-    if(G.view==='top'&&$('gameScreen').classList.contains('active'))zoomBy(e.deltaY*0.02);
+    if((G.view==='top'||G.view==='tp')&&G.running&&!G.frozen&&!e.target.closest?.('.modal,#towerOverlay')&&$('gameScreen').classList.contains('active'))zoomBy(e.deltaY*0.02);
   },{passive:true});
   // 雙指縮放（俯視）
   let pinchDist=0;
@@ -3858,10 +3872,12 @@ function wireUI(){
   // 本機偏好；玩法規則由開局面板管理。
   $('admBtn').onclick=()=>{
     $('cfgMusic').value=CFG.musicOn?'1':'0';
+    const distance=cameraDistance(CFG.cameraDistance),choices=[3,4.6,5.8,7];$('cfgCameraDistance').value=String(choices.reduce((a,b)=>Math.abs(b-distance)<Math.abs(a-distance)?b:a));
     $('admModal').style.display='flex';
   };
   $('admSave').onclick=()=>{
     CFG.musicOn=$('cfgMusic').value==='1'?1:0;
+    CFG.cameraDistance=cameraDistance($('cfgCameraDistance').value);
     saveCfg(); G.muted=!CFG.musicOn;
     $('admModal').style.display='none';
   };
@@ -3971,7 +3987,7 @@ function makeTextSprite(text){
 const MP={
   on:false, started:false, ended:false, endSent:false, host:false,
   room:'', id:'p'+Math.random().toString(36).slice(2,8),
-  mode:'race', pendingMode:'race', maxPlayers:3, plannedRounds:3,
+  mode:'race', pendingMode:'race', maxPlayers:3, plannedRounds:3, fillBots:false,
   seed:0, round:0, seriesRound:1, size:13, shiftMs:180000, hungerMin:3, roundMs:150000,
   order:[], roster:[], players:{}, outs:{},
   taggedId:null, tagImmuneUntil:0, raceEndAt:0, finishers:[],
@@ -3987,7 +4003,7 @@ const MP_ROUND_EVENTS=new Set(['pos','take','shift','reach','out','tag','hit','e
 function mpTopic(){return 'ziwei-maze3d/'+MP.room;}
 function modeLabel(m){return m==='ctf'?'合作奪旗':m==='race'?'比賽搶終點':(m==='tag'?'鬼抓人':(m==='shop'?'搶購大作戰':'尋寶大作戰'));}
 const MP_MODE_DESCS={
-  ctf:'2 對 2～5 對 5，中央搶旗送到敵方基地，守住 3 秒獲勝！可傳旗、護送、攔截，缺額由電腦補位。',
+  ctf:'2 對 2～5 對 5，中央搶旗送到敵方基地，守住 3 秒獲勝！可傳旗、護送、攔截，房主可選擇是否讓電腦補位。',
   race:'大家從不同角落出發，看誰最快搶到中間的傳送門！',
   tag:'一個人當鬼追大家，被抓到就換你當鬼。時間到還是鬼的人就輸了！',
   treasure:'搶寶藏💎帶到出口就贏！別人拿寶藏時可以用職業武器攻擊搶回來。',
@@ -4000,7 +4016,7 @@ function selectMultiplayerMode(mode){
   $('mpChosenMode').textContent=`已選擇：${modeLabel(mode)}｜${MP.plannedRounds||selectedRoundTotal()} 輪`;
   $('mpModeDesc').textContent=MP_MODE_DESCS[mode];
   $('mpSizeRow').style.display=mode==='ctf'?'none':'';
-  $('mpCapacityLabel').textContent=mode==='ctf'?`${CFG.teamSize} 對 ${CFG.teamSize}｜共 ${CFG.teamSize*2} 位，缺額電腦補位`:'房間人數上限（最少 2 人、最多 5 人）';
+  $('mpCapacityLabel').textContent=mode==='ctf'?`${CFG.teamSize} 對 ${CFG.teamSize}｜共 ${CFG.teamSize*2} 位`:'房間人數上限（最少 2 人、最多 5 人）';
 }
 function openMultiplayerRoom(){
   AudioEng.init(); AudioEng.resume();
@@ -4092,7 +4108,7 @@ function mpHandle(m){
         if(MP.roster.length>=MP.maxPlayers){ mpSend({t:'full',to:m.f}); break; }
         MP.roster.push({id:m.f,name:m.name,charIdx:m.charIdx||0});
       }
-      mpSend({t:'lobby',players:MP.roster,mode:MP.mode,max:MP.maxPlayers,rounds:MP.plannedRounds});
+      mpBroadcastLobby();
       mpRenderLobby();
       break;
     case 'full':
@@ -4103,6 +4119,7 @@ function mpHandle(m){
     case 'lobby':
       if(MP.host||m.f===MP.id)break;
       MP.roster=m.players; MP.mode=m.mode; MP.maxPlayers=m.max||MP.maxPlayers;
+      MP.fillBots=m.fillBots===true;
       MP.plannedRounds=Math.max(1,Math.min(10,parseInt(m.rounds)||1));
       clearInterval(MP.helloTimer); MP.helloTimer=null;
       $('mpSetup').style.display='none'; $('mpLobby').style.display='block';
@@ -4130,11 +4147,12 @@ function mpHandle(m){
       MP.seed=m.seed; MP.mode=m.mode; MP.size=m.size; MP.shiftMs=m.shiftMs;
       MP.hungerMin=m.hungerMin; MP.roundMs=m.roundMs;
       MP.order=m.order; MP.roster=m.players; MP.round=0;
+      MP.fillBots=m.fillBots===true;
       MP.taggedId=m.it||null; MP.itPower=m.itpw||null; MP.tagImmuneUntil=0;
       MP.hp={}; MP.itRegenAt=performance.now()+15000; MP.whistleHolder=null;
       MP.stunSec=m.stunSec||3; MP.pingSec=m.pingSec||3;
       MP.bots=null;
-      if(MP.host&&(m.mode==='treasure'||m.mode==='tag'||m.mode==='shop'||m.mode==='ctf')){
+      if(MP.host){
         MP.bots=m.players.filter(pl=>pl.bot).map(pl=>
           ({id:pl.id,charIdx:pl.charIdx,x:0,z:0,cell:{x:0,y:0},h:0,path:null,pathI:0,goalKey:'',repathAt:0,stunnedUntil:0,atkAt:0,robAt:0,coUntil:0,coPending:false}));
       }
@@ -4377,13 +4395,14 @@ function mpHandle(m){
       if(MP.mode==='ctf'&&MP.started)CaptureFlag.leave(m.f);
       if(!MP.started){
         MP.roster=MP.roster.filter(r=>r.id!==m.f);
-        if(MP.host)mpSend({t:'lobby',players:MP.roster,mode:MP.mode,max:MP.maxPlayers,rounds:MP.plannedRounds});
+        if(MP.host)mpBroadcastLobby();
         mpRenderLobby();
       }else{
         if(MP.whistleHolder===m.f)MP.whistleHolder=null; // 持有者離線→口哨釋放
         const p=MP.players[m.f];
         if(p&&p.mesh)p.mesh.visible=false;
         MP.outs[m.f]=1;
+        const departed=MP.roster.find(r=>r.id===m.f);if(departed)departed.disconnected=true;
         showToast('👋 '+mpName(m.f)+' 離開了');
         if(MP.mode==='race'&&!MP.ended&&
            MP.finishers.length+Object.keys(MP.outs).length>=MP.roster.length)mpEndRace();
@@ -4435,7 +4454,7 @@ function mpFrame(dt){
   for(const id in MP.players){
     const p=MP.players[id];
     if(!p.mesh)continue;
-    if(MP.host&&MP.mode==='ctf'&&p.bot){const b=MP.bots?.find(b=>b.id===id);if(b){p.tx=b.x;p.tz=b.z;p.th=b.h;p.lastSeen=now;}}
+    if(MP.host&&p.bot){const b=MP.bots?.find(b=>b.id===id);if(b){p.tx=b.x;p.tz=b.z;p.th=b.h;p.lastSeen=now;}}
     if(now-p.lastSeen>6000){p.mesh.visible=false;continue;}
     const k=Math.min(1,dt*9);
     const dx=p.tx-p.mesh.position.x, dz=p.tz-p.mesh.position.z;
@@ -4449,6 +4468,7 @@ function mpFrame(dt){
       u.legL.rotation.x=-sw;u.legR.rotation.x=sw;u.armL.rotation.x=sw;u.armR.rotation.x=-sw;}
   }
   if(MP.ended)return;
+  if(MP.mode==='race'&&MP.started&&MP.host&&!G.shifting&&(!G.frozen||MP.meFinished||MP.meOut))botSimRace(dt,now);
   if(MP.mode==='ctf'&&MP.started)CaptureFlag.frame(dt,now);
   // ===== 尋寶模式 =====
   if(MP.mode==='treasure'&&MP.started&&MP.treasure){
@@ -4519,15 +4539,18 @@ function mpFrame(dt){
 /* 電腦共用：往目標格沿 BFS 路徑走 */
 function botWalk(b,goal,goalKey,dt,now,spMul){
   if(!goal)return;
-  if(!b.path||b.goalKey!==goalKey||now>b.repathAt||b.pathI>=b.path.length){
+  const clear=np=>{const steps=Math.max(1,Math.ceil(Math.hypot(np.x-b.x,np.z-b.z)/.15));for(let i=1;i<=steps;i++)if(playerInWall(b.x+(np.x-b.x)*i/steps,b.z+(np.z-b.z)*i/steps,.28))return false;return true;};
+  let waypoint=b.path?.[b.pathI];
+  if(waypoint){const p=cellToWorld(...waypoint);if(Math.hypot(p.x-b.x,p.z-b.z)<.03){b.pathI++;waypoint=null;}}
+  if(!b.path||b.pathI>=b.path.length||(!waypoint&&(b.goalKey!==goalKey||now>b.repathAt))){
     const bc=worldToCell(b.x,b.z);
-    b.path=solveMaze(bc.x,bc.y,goal.x,goal.y); b.pathI=1; b.goalKey=goalKey; b.repathAt=now+2000;
+    b.path=solveMaze(bc.x,bc.y,goal.x,goal.y);b.pathI=b.path.length>1&&clear(cellToWorld(...b.path[1]))?1:0;b.goalKey=goalKey;b.repathAt=now+2000;
   }
   if(b.path&&b.pathI<b.path.length){
     const [nx,ny]=b.path[b.pathI], np=cellToWorld(nx,ny);
     const dx=np.x-b.x,dz=np.z-b.z,dl=Math.hypot(dx,dz);
-    if(dl<0.3)b.pathI++;
-    else{const sp=4.3*(spMul||1)*dt;b.x+=dx/dl*sp;b.z+=dz/dl*sp;b.h=Math.atan2(dx,dz);}
+    if(dl<.03)b.pathI++;
+    else{const sp=Math.min(dl,4.3*(spMul||1)*Math.min(dt,.1)),next={x:b.x+dx/dl*sp,z:b.z+dz/dl*sp};if(!clear(next)){b.path=null;b.repathAt=0;return;}b.x=next.x;b.z=next.z;b.h=Math.atan2(dx,dz);}
   }
 }
 function botPosOf(id){ // 房主端查任何人的位置
@@ -4535,6 +4558,16 @@ function botPosOf(id){ // 房主端查任何人的位置
   if(MP.bots){const bb=MP.bots.find(x=>x.id===id);if(bb)return {x:bb.x,z:bb.z};}
   const pl=MP.players[id];
   return pl&&pl.mesh?{x:pl.mesh.position.x,z:pl.mesh.position.z}:null;
+}
+function botSimRace(dt,now){
+  for(const b of MP.bots||[]){
+    if(b.finished||MP.outs[b.id]||MP.finishers.some(f=>f.id===b.id))continue;
+    b.elapsed=(b.elapsed||0)+dt;
+    if(now<(b.stunnedUntil||0))continue;
+    botWalk(b,G.exitCell,'exit:'+MP.round+':'+G.exitCell.x+','+G.exitCell.y,dt,now,1);
+    const end=cellToWorld(G.exitCell.x,G.exitCell.y);
+    if(Math.hypot(end.x-b.x,end.z-b.z)<1){b.finished=true;mpSend({t:'reach',f:b.id,tm:Math.round(b.elapsed)});}
+  }
 }
 /* 電腦的搶奪：冷卻比真人長很多（8 秒），才不會一直被欺負 */
 function botTryRob(b,now){
@@ -4780,16 +4813,35 @@ function showMPResults(title,html,results=[]){
 }
 
 /* ---- 大廳 UI ---- */
+function mpLobbyPlan(){
+  const humans=MP.roster.filter(r=>!r.bot&&!r.disconnected),missing=Math.max(0,MP.maxPlayers-humans.length);
+  const bots=MP.fillBots?missing:0,total=humans.length+bots;
+  const ready=humans.length>=1&&(MP.mode==='ctf'?total===MP.maxPlayers:total>=2);
+  const reason=MP.mode==='ctf'?`合作奪旗需要 ${MP.maxPlayers} 位；請等朋友加入或開啟電腦補位。`:'至少需要 2 位玩家；請等朋友加入或開啟電腦補位。';
+  return {humans,bots,ready,reason};
+}
+function mpBroadcastLobby(){
+  if(MP.host)mpSend({t:'lobby',players:MP.roster,mode:MP.mode,max:MP.maxPlayers,rounds:MP.plannedRounds,fillBots:MP.fillBots});
+}
+function mpRoundPlayers(){
+  const plan=mpLobbyPlan();
+  if(!plan.ready){showToast(plan.reason);return null;}
+  return [...plan.humans,...makeBots(plan.bots,plan.humans)];
+}
 function mpRenderLobby(){
+  const plan=mpLobbyPlan();
+  $('mpBotOptions').hidden=!MP.host;
+  $('mpFillBots').checked=MP.fillBots;
+  $('mpBotSummary').textContent=MP.fillBots?`電腦補位：開啟｜${plan.humans.length} 位真人，開始時加入 ${plan.bots} 位電腦。`:'電腦補位：關閉｜只與真人遊玩。';
   const box=$('mpPlayers');
   box.innerHTML=MP.roster.map((r,i)=>
     `<div style="font-size:1.1rem;">${MP.mode==='ctf'?(i%2?'琥珀隊 · ':'蒼藍隊 · '):''}${CHARS[r.charIdx||0].emoji} ${escapeHtml(r.name)}${r.id===MP.id?'（你）':''}${i===0?' 👑':''}</div>`
   ).join('')||'<div style="color:#999;">還沒有人…</div>';
   if(MP.host){
-    $('mpStart').style.display=MP.roster.length>=2?'block':'none';
-    $('mpStatus').textContent=MP.roster.length<2
-      ?('把房號告訴朋友，等他們加入（'+MP.roster.length+' / '+MP.maxPlayers+' 人）')
-      :(MP.roster.length<MP.maxPlayers?('可以開始了，或再等人加入（'+MP.roster.length+' / '+MP.maxPlayers+' 人）'):'人數到齊，可以開始了！');
+    $('mpStart').style.display='block';$('mpStart').disabled=!plan.ready;
+    $('mpStatus').textContent=plan.ready?'可以開始，或繼續等待朋友加入。':plan.reason;
+  }else{
+    $('mpStart').style.display='none';$('mpStatus').textContent='等房主按開始…';
   }
 }
 function mpLeave(){
@@ -4828,7 +4880,7 @@ function sendMpRoundStart(players,seriesRound){
   mpSend({t:'start',seed:(Math.random()*2**31)|0,mode:MP.mode,lvl:G.lvlIdx,size:CFG.mazeSize,
     shiftMs:CFG.shiftMin*60000,hungerMin:CFG.hungerMin,roundMs:(MP.mode==='shop'?(CFG.shopMin||2.5)*60000:150000),
     stunSec:CFG.stunSec,pingSec:CFG.pingSec,rules:GameRules.normalize(CFG),seriesKind:'multi',seriesRound,seriesTotal:SERIES.total,
-    order,players,itpw:MP.mode==='tag'?randPower():null,
+    order,players,fillBots:MP.fillBots,itpw:MP.mode==='tag'?randPower():null,
     it:MP.mode==='tag'?tagPool[Math.floor(Math.random()*tagPool.length)]:null});
 }
 
@@ -4847,8 +4899,9 @@ $('mpNextRound').onclick=()=>{
     return;
   }
   if(!MP.host)return;
+  const players=mpRoundPlayers();if(!players)return;
   $('mpNextRound').style.display='none';
-  sendMpRoundStart([...MP.roster],SERIES.current+1);
+  sendMpRoundStart(players,SERIES.current+1);
 };
 document.querySelectorAll('#mpSizeRow .lb-tab').forEach(b=>{
   b.onclick=()=>{
@@ -4862,8 +4915,13 @@ $('mpModeTag').onclick=()=>selectMultiplayerMode('tag');
 $('mpModeShop').onclick=()=>selectMultiplayerMode('shop');
 $('mpModeCtf').onclick=()=>selectMultiplayerMode('ctf');
 $('mpModeTre').onclick=()=>selectMultiplayerMode('treasure');
+$('mpFillBots').onchange=()=>{
+  if(!MP.host||MP.started){mpRenderLobby();return;}
+  MP.fillBots=$('mpFillBots').checked;mpRenderLobby();mpBroadcastLobby();
+};
 $('mpCreate').onclick=()=>{
   MP.on=true; MP.host=true; MP.mode=MP.pendingMode;
+  MP.fillBots=false;
   if(MP.mode==='ctf')MP.maxPlayers=GameRules.normalize(CFG).teamSize*2;
   MP.room=String(1000+Math.floor(Math.random()*9000));
   MP.roster=[{id:MP.id,name:getPlayerName(),charIdx:G.charIdx}];
@@ -4886,12 +4944,8 @@ $('mpJoin').onclick=()=>{
   });
 };
 $('mpStart').onclick=()=>{
-  if(!MP.host||MP.roster.length<2)return;
-  let players=[...MP.roster];
-  if(MP.mode==='ctf')players=players.concat(makeBots(MP.maxPlayers-players.length,players));
-  if((MP.mode==='treasure'||MP.mode==='shop')&&CFG.mazeSize>=15){ // 大地圖人數不足 → 電腦補位
-    players=players.concat(makeBots(MP.maxPlayers-players.length,players));
-  }
+  if(!MP.host||MP.started)return;
+  const players=mpRoundPlayers();if(!players)return;
   resetSeries('multi',selectedRoundTotal(),players);
   sendMpRoundStart(players,1);
 };

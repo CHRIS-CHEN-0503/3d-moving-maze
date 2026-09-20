@@ -86,7 +86,7 @@ function harness() {
     removeEventListener: noop,
   });
   context.window = context;
-  vm.runInContext(['let entryMode="single";', ...['switchScreen', 'setFlowPanel', 'enterMainMenu', 'beginEntryFlow', 'wireUI', 'setupTouch'].map(functionSource)].join('\n'), context);
+  vm.runInContext(['let entryMode="single";', ...['cameraDistance','zoomCamera','switchScreen', 'setFlowPanel', 'enterMainMenu', 'beginEntryFlow', 'wireUI', 'setupTouch'].map(functionSource)].join('\n'), context);
   const keyboardStart = html.indexOf("window.addEventListener('keydown',e=>{", html.indexOf('const keys='));
   const keyboardEnd = html.indexOf('const joy=', keyboardStart);
   assert.ok(keyboardStart > 0 && keyboardEnd > keyboardStart);

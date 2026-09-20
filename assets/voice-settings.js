@@ -20,6 +20,9 @@
   // 系統語音需使用者操作才可播放；正式開始時以一句簡短提示啟動。
   document.getElementById('enterMenuBtn')?.addEventListener('click',()=>voice.announce('歡迎來到移動迷宮。請選擇你的冒險。',true));
   document.addEventListener('click',event=>{
+    // 只讀首頁六個選項的名稱；冒泡階段執行，保留原本按鈕的導覽。
+    const choice=event.target.closest('#homePanel .home-action');
+    if(choice){voice.announce(choice.querySelector('strong')?.textContent||'',true);return;}
     const button=event.target.closest('[data-voice-action]');if(!button)return;
     if(button.dataset.voiceAction==='replay')voice.readPanel(document.getElementById('towerDialog'));
     else voice.stop();

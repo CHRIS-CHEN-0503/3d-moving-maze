@@ -62,7 +62,7 @@
     const overlay = document.createElement('div'); overlay.id = 'towerOverlay'; overlay.hidden = true;
     overlay.innerHTML = '<section id="towerDialog" class="tower-card" role="dialog" aria-modal="true" aria-labelledby="towerDialogTitle" tabindex="-1"></section>';
     document.body.appendChild(overlay);
-    el('storyEntryBtn').onclick = open;
+    el('storyEntryBtn').onclick = () => open(true);
     bindActionBtn(el('towerBagBtn'), inventory);
     bindActionBtn(el('towerTalkBtn'), trade);
     bindActionBtn(el('towerJournalBtn'), journal);
@@ -158,10 +158,10 @@
     if (!active || !run || inDungeon() || run.claimed.includes(id)) return;
     run.claimed.push(id); questEvent('collect',{id}); save();
   }
-  function open() {
+  function open(silent=false) {
     const saved = readSave();
     dialog('全新單人長篇冒險', '倒轉高塔・第 99 層', '你在陌生的召喚陣中醒來。塔頂只有一扇向下的門。每下一層，空間更大，牆壁的心跳也更快。與同樣受困的冒險者交易，帶著補給活著走到第一層。', '<div class="tower-story-cover" role="img" aria-label="被召喚到雲上高塔的冒險者"></div><p class="tower-copy">單人故事 · 沿用原本職業與操作 · 每層自動保存（繼續時回到該層入口）</p>',
-      (saved && saved.status !== 'won' ? action('繼續：第 ' + saved.floor + ' 層', 'continue') : saved&&N?action('回顧已完成故事','story-archive'):'') + action(saved ? '重新開始故事' : '建立主角', 'new') + action('回首頁', 'close'));
+      (saved && saved.status !== 'won' ? action('繼續：第 ' + saved.floor + ' 層', 'continue') : saved&&N?action('回顧已完成故事','story-archive'):'') + action(saved ? '重新開始故事' : '建立主角', 'new') + action('回首頁', 'close'),{silent});
   }
   function beginNew() {
     run = C.newRun({ name: getPlayerName(), charIdx: G.charIdx, seed: (Math.random() * 0x7fffffff) | 0 });
@@ -536,15 +536,33 @@
         refreshWarriorLabel();save();updateHud();return;
       }
     }
-    // 至多一名護衛，每半秒尋路；與玩家共用牆壁碰撞，不新增物理引擎。
-    escort.pathLeft-=dt;
-    if(Math.hypot(G.px-p.x,G.pz-p.z)<1.2)return;
-    if(escort.pathLeft<=0){const a=worldToCell(p.x,p.z),b=worldToCell(G.px,G.pz);escort.path=solveMaze(a.x,a.y,b.x,b.y).slice(1);escort.pathLeft=.5;}
-    const waypoint=escort.path.length?cellToWorld(...escort.path[0]):{x:G.px,z:G.pz};
-    const dx=waypoint.x-p.x,dz=waypoint.z-p.z,len=Math.hypot(dx,dz),step=Math.min(len,5.8*dt);
-    if(len>.001){const x=p.x+dx/len*step,z=p.z+dz/len*step;if(!playerInWall(x,z,.28)){p.x=x;p.z=z;}else escort.pathLeft=0;escort.model.rotation.y=Math.atan2(dx,dz);}
-    if(len<.15)escort.path.shift();
-    escort.model.userData.legL.rotation.x=Math.sin(now*.009)*.35;escort.model.userData.legR.rotation.x=-Math.sin(now*.009)*.35;
+    const moving=followNpc(escort,dt,5.8,1.2);
+    escort.model.userData.legL.rotation.x=moving?Math.sin(now*.009)*.35:0;escort.model.userData.legR.rotation.x=-escort.model.userData.legL.rotation.x;
+  }
+  function followerClear(a,b) {
+    const steps=Math.max(1,Math.ceil(Math.hypot(b.x-a.x,b.z-a.z)/.15));
+    for(let i=1;i<=steps;i++)if(playerInWall(a.x+(b.x-a.x)*i/steps,a.z+(b.z-a.z)*i/steps,.28))return false;
+    return true;
+  }
+  function followNpc(actor,dt,speed,stopDistance) {
+    const p=actor.model.position,target={x:G.px,z:G.pz};
+    actor.pathLeft=Math.max(0,(actor.pathLeft||0)-dt);
+    if(Math.hypot(target.x-p.x,target.z-p.z)<=stopDistance&&followerClear(p,target))return false;
+    let waypoint=actor.path?.length?cellToWorld(...actor.path[0]):null;
+    // 到達安全路點才重算，不能因已跨入下一格就略過尚未走完的轉角。
+    if(waypoint&&Math.hypot(waypoint.x-p.x,waypoint.z-p.z)<.03){actor.path.shift();waypoint=null;}
+    if((!actor.path?.length||!waypoint)&&actor.pathLeft<=0){
+      const a=worldToCell(p.x,p.z),b=worldToCell(target.x,target.z);
+      actor.path=solveMaze(a.x,a.y,b.x,b.y);actor.pathLeft=.5;
+      if(actor.path.length>1&&followerClear(p,cellToWorld(...actor.path[1])))actor.path.shift();
+    }
+    waypoint=actor.path?.length?cellToWorld(...actor.path[0]):target;
+    if(Math.hypot(waypoint.x-p.x,waypoint.z-p.z)<.03){actor.path.shift();return false;}
+    const dx=waypoint.x-p.x,dz=waypoint.z-p.z,len=Math.hypot(dx,dz),step=Math.min(len,speed*Math.min(dt,.1));
+    const next={x:p.x+dx/len*step,z:p.z+dz/len*step};
+    if(!followerClear(p,next)){actor.path=[];return false;}
+    p.x=next.x;p.z=next.z;actor.model.rotation.y=Math.atan2(dx,dz);
+    return step>0;
   }
   function floorSeed() { return (run.seed ^ Math.imul(run.floor, 7919) ^ (inDungeon()?0x7316dea:0)) | 0; }
   function soundChanged() {
@@ -790,14 +808,8 @@
   }
   function updateExplorer(dt,now) {
     if(!explorer||run.adventure.quest?.type!=='escort'||run.adventure.quest.status!=='active')return;
-    const p=explorer.model.position;if(Math.hypot(G.px-p.x,G.pz-p.z)<1.6)return;
-    explorer.pathLeft-=dt;
-    if(explorer.pathLeft<=0){const a=worldToCell(p.x,p.z),b=worldToCell(G.px,G.pz);explorer.path=solveMaze(a.x,a.y,b.x,b.y).slice(1);explorer.pathLeft=.65;}
-    const waypoint=explorer.path.length?cellToWorld(...explorer.path[0]):{x:G.px,z:G.pz};
-    const dx=waypoint.x-p.x,dz=waypoint.z-p.z,length=Math.hypot(dx,dz),step=Math.min(length,5.5*dt);
-    if(length>.001){const x=p.x+dx/length*step,z=p.z+dz/length*step;if(!playerInWall(x,z,.28)){p.x=x;p.z=z;}else explorer.pathLeft=0;explorer.model.rotation.y=Math.atan2(dx,dz);}
-    if(length<.15)explorer.path.shift();
-    explorer.model.userData.legL.rotation.x=Math.sin(now*.008)*.3;explorer.model.userData.legR.rotation.x=-Math.sin(now*.008)*.3;
+    const moving=followNpc(explorer,dt,5.5,1.6);
+    explorer.model.userData.legL.rotation.x=moving?Math.sin(now*.008)*.3:0;explorer.model.userData.legR.rotation.x=-explorer.model.userData.legL.rotation.x;
   }
   function nearExplorer() { return explorer&&Math.hypot(G.px-explorer.model.position.x,G.pz-explorer.model.position.z)<2.8&&hasClearPath(G.px,G.pz,explorer.model.position.x,explorer.model.position.z); }
   function rewardDescription(reward) {

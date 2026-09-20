@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {createRequire} from 'node:module';
 import {readFileSync} from 'node:fs';
+import vm from 'node:vm';
 const require=createRequire(import.meta.url),V=require('../assets/game-voice.js');
 function harness(){
   let now=1000,voices=[];const spoken=[],events={},docEvents={};
@@ -63,4 +64,18 @@ test('一般拾取、食物、鐵鍬與購物均只提供名稱播報',()=>{
   const html=readFileSync(new URL('../index.html',import.meta.url),'utf8');
   assert.match(html,/typeof readAloud==='string'\?readAloud:msg/);
   assert.match(html,/'獲得 '\+f.type.name/);assert.match(html,/'獲得 '\+gd.g.name/);assert.match(html,/'使用 鐵鍬'/);
+});
+
+test('首頁六個選項只讀名稱，快速改選會取代舊朗讀，關閉語音不播報',()=>{
+  const h=harness(),events={},nodes=new Map();
+  const document={getElementById:id=>{if(!nodes.has(id))nodes.set(id,{addEventListener(){}});return nodes.get(id);},addEventListener:(type,fn)=>events[type]=fn};
+  const voice={...h.voice,listen(){}};
+  vm.runInNewContext(readFileSync(new URL('../assets/voice-settings.js',import.meta.url),'utf8'),{window:{GameVoice:voice},document,CFG:{speechOn:1,speechVoice:''}});
+  const html=readFileSync(new URL('../index.html',import.meta.url),'utf8');
+  const choices=[...html.matchAll(/<button class="home-action[^>]*>[\s\S]*?<strong>([^<]+)<\/strong>/g)].map(m=>m[1]);
+  assert.deepEqual(choices,['劇情模式・倒轉高塔','單人遊戲','多人遊戲','遊戲設定','勇者歷史','遊戲說明']);
+  const click=label=>events.click({target:{closest:selector=>selector==='#homePanel .home-action'?{querySelector:()=>({textContent:label})}:null}});
+  choices.forEach(click);assert.deepEqual(h.spoken.map(u=>u.text),choices);assert.ok(h.synth.cancelled>=6);
+  h.voice.configure({enabled:false});choices.forEach(click);assert.equal(h.spoken.length,6);
+  const tower=readFileSync(new URL('../story/tower-mode.js',import.meta.url),'utf8');assert.match(tower,/storyEntryBtn'\)\.onclick = \(\) => open\(true\)/);
 });

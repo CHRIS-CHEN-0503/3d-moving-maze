@@ -239,6 +239,11 @@ button, input, select { -webkit-font-smoothing: antialiased; }
 #minimap { border: 2px solid #aabccb; border-radius: 12px; background: rgba(8, 19, 32, .9); }
 #mapSizeBtn { width: 32px; height: 32px; border-width: 1px; border-color: #aabccb; background: #1b3049; line-height: 28px; }
 #hudRightBtns { top: auto; bottom: calc(12px + env(safe-area-inset-bottom)); gap: 8px; }
+.camera-zoom { position:absolute; right:calc(100% + 8px); top:0; display:flex; gap:6px; }
+.mp-bot-option { display:flex; justify-content:center; align-items:center; gap:10px; margin:12px 0; padding:12px; border:1px solid #9ab5bb; border-radius:12px; color:#214555; background:#edf8f8; }
+.mp-bot-option[hidden] { display:none; }
+.mp-bot-option input { width:22px; height:22px; accent-color:#147b81; }
+#mpStart:disabled { opacity:.55; cursor:not-allowed; }
 .round-btn { width: 52px; height: 52px; border-radius: 15px; border-width: 1px; border-color: rgba(202, 224, 235, .7); background: rgba(12, 28, 45, .94); box-shadow: 0 3px 12px rgba(0, 0, 0, .2); }
 .round-btn .ui-icon { left: 24%; top: 6%; width: 52%; height: 52%; }
 .round-btn .bl { bottom: 5px; font-size: 11px; font-weight: 600; }

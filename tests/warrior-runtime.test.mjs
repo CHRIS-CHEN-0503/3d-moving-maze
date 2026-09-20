@@ -23,7 +23,7 @@ const bridge = `window.__warriorTest = {
   approachWarrior() { nearestWarrior=warriorNpc;nearest=null;G.px=warriorNpc.x;G.pz=warriorNpc.z; },
   replaceMonsters(value) { monsters=value; },
   shifted() { wasShifting=true;G.shifting=false; },
-  updateWarrior,updateMonster,isHeld,warriorDialog,hireWarrior,trade,
+  followNpc,updateWarrior,updateMonster,isHeld,warriorDialog,hireWarrior,trade,
   restoreWarriorPosition,dialog,closeDialog,save,readSave,attack,
 };`;
 assert.match(source, /  install\(\);\s*\}\)\(\);\s*$/);
@@ -91,6 +91,26 @@ function positionThreat(h,kind='sentinel',id='monster-0',distance=1.4) {
   model.userData.body={position:{}};model.userData.ring={material:{}};
   return {id,kind,def,strength:core.monsterStrength(kind,h.api.state().run.floor),phase:Number(id.split('-').at(-1))||0,hp:60,alive:true,path:[],pathLeft:1,cooldown:0,windup:0,model,cx:0,cy:0,x:distance,z:0};
 }
+
+test('護衛通過直角連續轉彎：重新尋路不省略走道中心、不穿牆',()=>{
+  const h=runtime(hiredRun()),actor=h.api.state().escort,p=actor.model.position;
+  p.set(.8,0,1.7);actor.path=[];actor.pathLeft=0;h.context.G.px=4;h.context.G.pz=8;
+  const route=[[0,0],[0,1],[1,1],[1,2]];let solves=0;
+  h.context.solveMaze=(x,y)=>{solves++;const at=route.findIndex(c=>c[0]===x&&c[1]===y);return route.slice(Math.max(0,at));};
+  const inside=(x,z)=>((x>=-1.3&&x<=1.3&&z>=-1.3&&z<=5.3)||(x>=-1.3&&x<=5.3&&z>=2.7&&z<=5.3)||(x>=2.7&&x<=5.3&&z>=2.7&&z<=9.3));
+  h.context.playerInWall=(x,z,r)=>![[x-r,z-r],[x-r,z+r],[x+r,z-r],[x+r,z+r]].every(([a,b])=>inside(a,b));
+  for(let i=0;i<600;i++){h.api.followNpc(actor,1/60,5.8,1.2);assert.equal(h.context.playerInWall(p.x,p.z,.28),false);}
+  assert.ok(Math.hypot(p.x-4,p.z-8)<=1.2);assert.ok(solves<30,'不能每幀重做搜尋');
+});
+test('隔牆距離再近仍須繞路；無路時不穿牆，恢復路線後能繼續',()=>{
+  const h=runtime(hiredRun()),actor=h.api.state().escort,p=actor.model.position;
+  p.set(0,0,0);h.context.G.px=1;h.context.G.pz=0;actor.path=[];actor.pathLeft=0;
+  h.context.playerInWall=(x,z,r)=>x+r>.3&&x-r<.7;h.context.solveMaze=()=>[];
+  for(let i=0;i<60;i++)h.api.followNpc(actor,1/60,5.8,1.2);
+  assert.equal(p.x,0);h.context.playerInWall=()=>false;h.context.G.px=4;h.context.solveMaze=()=>[[0,0],[1,0]];
+  for(let i=0;i<120;i++)h.api.followNpc(actor,1/60,5.8,1.2);
+  assert.ok(p.x>=2.8);
+});
 
 test('戰士報價與取消不收費，確認委託只支付一次',()=>{
   const h=runtime(core.newRun({seed:123}));h.api.approachWarrior();

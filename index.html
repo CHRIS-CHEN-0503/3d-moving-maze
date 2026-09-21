@@ -614,6 +614,7 @@ button:focus-visible,input:focus-visible{outline:3px solid #fff;outline-offset:3
 @media(prefers-reduced-motion:reduce){.flow-panel{animation:none}.home-action{transition:none}}
 </style>
 <link rel="stylesheet" href="assets/game-polish.css">
+<link rel="stylesheet" href="assets/play-controls.css">
 </head>
 <body>
 
@@ -738,13 +739,11 @@ button:focus-visible,input:focus-visible{outline:3px solid #fff;outline-offset:3
     </div>
   </div>
   <div id="effectChips"></div>
+  <button id="actionsToggle" class="round-btn" aria-label="展開或收合操作" aria-expanded="false"><svg viewBox="0 0 32 32" aria-hidden="true"><path d="M5 9h22M5 16h22M5 23h22"/></svg><span class="bl">操作</span></button>
+  <button id="shopTrapBtn" class="game-action-btn" style="display:none" aria-label="放置油漬或黏鼠板"><svg viewBox="0 0 32 32" aria-hidden="true"><path d="M16 3 29 27H3Z M16 11v7 M16 22v1"/></svg><span id="shopTrapCount">3</span></button>
   <div id="hudRightBtns">
     <button class="round-btn" id="viewToggle" aria-label="切換視角"><span class="ui-icon icon-camera" aria-hidden="true"></span><span class="bl">視角</span></button>
     <button class="round-btn" id="soundToggle" aria-label="切換音樂"><span class="ui-icon icon-sound" aria-hidden="true"></span><span class="bl">音樂</span></button>
-    <div class="camera-zoom">
-      <button class="round-btn" id="zoomInBtn" aria-label="拉近" style="display:none;"><span class="ui-icon icon-zoom-in" aria-hidden="true"></span><span class="bl">拉近</span></button>
-      <button class="round-btn" id="zoomOutBtn" aria-label="拉遠" style="display:none;"><span class="ui-icon icon-zoom-out" aria-hidden="true"></span><span class="bl">拉遠</span></button>
-    </div>
     <button class="round-btn" id="quitBtn" aria-label="離開遊戲"><span class="ui-icon icon-exit" aria-hidden="true"></span><span class="bl">離開</span></button>
   </div>
   <div id="compassHud"><div id="compassArrow">🔺</div></div>
@@ -825,11 +824,14 @@ button:focus-visible,input:focus-visible{outline:3px solid #fff;outline-offset:3
       <label id="mpBotOptions" class="mp-bot-option" hidden><input type="checkbox" id="mpFillBots">空位加入電腦玩家</label>
       <p id="mpBotSummary" role="status" style="color:#475569;font-size:.9rem;"></p>
       <div id="mpStatus" style="font-size:.85rem;color:#999;min-height:20px;"></div>
-      <button class="start-btn button-with-icon" id="mpStart" style="display:none;"><span class="ui-icon icon-compass" aria-hidden="true"></span>大家到齊，開始！</button>
+      <button class="start-btn" id="mpReady" style="display:none;">準備完成</button>
+      <button class="start-btn button-with-icon" id="mpStart" style="display:none;"><span class="ui-icon icon-compass" aria-hidden="true"></span>開始五秒倒數</button>
     </div>
     <button class="m-close" id="mpClose" style="background:#90a4ae;">離開</button>
   </div>
 </div>
+
+<div id="roomCountdown" role="status" aria-live="polite" hidden></div>
 
 <div class="modal" id="mpResult">
   <div class="m-card">
@@ -963,6 +965,7 @@ button:focus-visible,input:focus-visible{outline:3px solid #fff;outline-offset:3
 <script src="./assets/character-face.js"></script>
 <script src="./assets/character-motion.js"></script>
 <script src="./assets/maze-atmosphere.js"></script>
+<script src="./assets/native-symbols.js"></script>
 <script src="./assets/game-rules.js"></script>
 <script src="./assets/voice-pack.js"></script>
 <script src="./assets/game-voice.js"></script>
@@ -972,7 +975,7 @@ button:focus-visible,input:focus-visible{outline:3px solid #fff;outline-offset:3
    3D移動迷宮 — 給小朋友的變形迷宮冒險
    ===================================================== */
 const $=id=>document.getElementById(id);
-const GAME_VERSION='1.28.0';
+const GAME_VERSION='1.29.0';
 
 /* ---------- 設定（後台可調） ---------- */
 const DEFAULT_CFG={teamSize:2,shiftMin:3,itemCount:6,foodCount:4,hungerMin:3,stunSec:3,pingSec:3,smellCells:3,mazeSize:13,musicOn:1,speechOn:1,speechVoice:'',apiUrl:'',roomMax:3,rounds:3,goodsCount:16,shopMin:2.5,cartFull:400,views:{fp:1,tp:1,top:1},broker:'wss://broker.emqx.io:8084/mqtt'};
@@ -1423,6 +1426,11 @@ function genMaze(fromX,fromY){
     else{const y=Math.floor(RNG()*H),x=Math.floor(RNG()*(W-1));vW[y][x]=false;}
   }
   G.hWalls=hW; G.vWalls=vW;
+  if(isShop()){
+    // 只拆除內牆，保留連通性；三格主動線與短貨架間的捷徑。
+    for(let y=0;y<H-1;y++)for(let x=0;x<W;x++)if(x%3!==1||y%3===2)hW[y][x]=false;
+    for(let y=0;y<H;y++)for(let x=0;x<W-1;x++)if(y%3===0||x%4===3)vW[y][x]=false;
+  }
 }
 
 /* 世界座標 <-> 格子 */
@@ -1685,7 +1693,7 @@ function makeEmojiSprite(emoji,size){
   if(!spriteCache[emoji]){
     const cv=document.createElement('canvas'); cv.width=cv.height=128;
     const ctx=cv.getContext('2d'); ctx.font='100px sans-serif';
-    ctx.textAlign='center'; ctx.textBaseline='middle'; ctx.fillText(emoji,64,70);
+    if(window.NativeSymbols)NativeSymbols.draw(ctx,emoji,64,64,120);
     const tex=new THREE.CanvasTexture(cv); spriteCache[emoji]=tex;
   }
   const mat=new THREE.SpriteMaterial({map:spriteCache[emoji],transparent:true,depthWrite:false});
@@ -2504,6 +2512,7 @@ function updatePlayer(dt,t){
     ix=(keys.KeyD||keys.ArrowRight?1:0)-(keys.KeyA||keys.ArrowLeft?1:0);
     iy=(keys.KeyS||keys.ArrowDown?1:0)-(keys.KeyW||keys.ArrowUp?1:0);
   }
+  if(isShop()&&window.ShopChaos){const input=ShopChaos.input(ix,iy,MP.id);ix=input.x;iy=input.y;}
   const mag=Math.min(1,Math.hypot(ix,iy));
   if(mag>0.12){
     // 速度效果：飽足感 ≤50% 速度 ×0.8、≤25% 速度 ×0.75，加速道具乘在降速後的數值上
@@ -2515,7 +2524,7 @@ function updatePlayer(dt,t){
       tagBoost=1.15; // 鬼＝一般玩家的 1.15 倍速
       if(MP.itPower==='speed')tagBoost*=1.12; // 鬼能力：疾風
     }
-    const sp=G.baseSpeed*(jobPerk('speedBonus')||1)*G.hungerMul*G.speedMul*tagBoost*shopSpeed()*mag*(window.CaptureFlag?CaptureFlag.speed():1);
+    const sp=G.baseSpeed*(jobPerk('speedBonus')||1)*G.hungerMul*G.speedMul*tagBoost*shopSpeed()*mag*(window.CaptureFlag?CaptureFlag.speed():1)*(isShop()&&window.ShopChaos?ShopChaos.speed(MP.id):1);
     // 相對於相機方向移動（俯視時相機固定朝北）
     const base=(G.view==='top')?Math.PI:G.camYaw+Math.PI;
     const ang=base+Math.atan2(-ix,-iy);
@@ -2621,7 +2630,7 @@ function doAttack(){
     if(meIt)mpSend({t:'tag',to:best,pw:randPower()}); // 鬼打中人＝抓到！
     else mpSend({t:'hit',to:best,steal:MP.mode==='treasure'&&MP.treasure.holder===best});
   }
-  else showToast('💨 揮空了！要靠近一點再攻擊');
+  else if(!(window.TagRage&&TagRage.raging(MP.id)))showToast('💨 揮空了！要靠近一點再攻擊');
 }
 /* 技能鍵：隱身（小花的鬼抓人能力；當鬼抽到隱身能力也可用） */
 function myInvisSecs(){
@@ -2690,7 +2699,8 @@ function updateCamera(dt){
     camera.lookAt(lx,1.6+G.camPitch*3.2,lz);
   }else if(G.view==='tp'){
     // 平視跟隨：像另一個人跟在主角後面（相機比牆矮，看不到隔壁走道）
-    const dist=cameraDistance(CFG.cameraDistance),hh=2.35;
+    const pitch=Math.max(-.12,Math.min(.9,G.camPitch||0));
+    const radius=cameraDistance(CFG.cameraDistance),dist=radius*Math.cos(pitch),hh=2.35+radius*Math.sin(pitch);
     const dx=Math.sin(G.camYaw), dz=Math.cos(G.camYaw);
     // 後面有牆就拉近，不穿牆；賣場的貨架比鏡頭矮，鏡頭直接從上面掠過就好
     const d=(G.wallH<hh-0.3)?dist:cameraClearDist(dx,dz,dist);
@@ -2833,7 +2843,7 @@ function drawMap(cv,big){
     ctx.font=(big?18:9)+'px sans-serif'; ctx.textAlign='center';
     for(const it of G.items)if(!it.taken){
       const c=worldToCell(it.x,it.z);
-      ctx.fillText(it.type.emoji,gx(c.x)+cw/2,gy(c.y)+ch*0.8);
+      if(window.NativeSymbols)NativeSymbols.draw(ctx,it.type.emoji,gx(c.x)+cw/2,gy(c.y)+ch*.5,big?22:12);
     }
   }
   // 重要地標（出口 / 收銀機 / 寶藏）：小地圖也要看得清楚，不用特地打開大地圖
@@ -2844,7 +2854,7 @@ function drawMap(cv,big){
     ctx.fillStyle='rgba(12,10,34,.82)'; ctx.fill();
     ctx.strokeStyle='rgba(255,255,255,.9)'; ctx.lineWidth=big?2:1.5; ctx.stroke();
     ctx.font=mf+'px sans-serif'; ctx.textAlign='center'; ctx.textBaseline='middle';
-    ctx.fillText(emoji,px,py+mf*0.06);
+    if(window.NativeSymbols)NativeSymbols.draw(ctx,emoji,px,py,mf*1.3);
     ctx.textBaseline='alphabetic';
   };
   // 出口（搶購模式沒有出口就不畫）
@@ -2869,7 +2879,7 @@ function drawMap(cv,big){
         const px=gx(c.x)+cw/2, py=gy(c.y)+ch/2;
         if(big){
           ctx.font='16px sans-serif'; ctx.textAlign='center';
-          ctx.fillText(gd.g.emoji,px,py+5);
+          if(window.NativeSymbols)NativeSymbols.draw(ctx,gd.g.emoji,px,py,23);
         }else{                                    // 小地圖畫成商品顏色的點，才看得出來
           ctx.beginPath(); ctx.arc(px,py,Math.max(2.5,cw*0.24),0,6.28);
           ctx.fillStyle='#'+gd.g.color.toString(16).padStart(6,'0'); ctx.fill();
@@ -2898,7 +2908,7 @@ function drawMap(cv,big){
       const my=pad+(MP.treasure.lastPing.z/G.cell+(H-1)/2)*ch+ch*0.5;
       ctx.beginPath();ctx.arc(mx,my,(big?16:8),0,6.28);
       ctx.strokeStyle='#40c4ff';ctx.lineWidth=big?3:2;ctx.stroke();
-      ctx.fillText('💎',mx,my+(big?8:4));
+      if(window.NativeSymbols)NativeSymbols.draw(ctx,'💎',mx,my,big?24:12);
     }
   }
   if(window.CaptureFlag)CaptureFlag.map(ctx,big,pad,cw,ch);
@@ -3454,7 +3464,7 @@ async function renderLeaderboard(){
   recs.forEach((r,i)=>{
     const tr=document.createElement('tr');
     if(r.name===myName)tr.className='me';
-    const medal=['🥇','🥈','🥉'][i]||(i+1);
+    const medal=i+1;
     const lv=LEVELS.find(l=>l.id===r.level);
     tr.innerHTML=`<td>${medal}</td><td>${escapeHtml(r.name)}</td><td>${r.char||''}${lbFilter==='all'&&lv?' '+lv.emoji:''}</td><td>${fmtTime(r.timeSec)}</td><td>${r.score}</td>`;
     body.appendChild(tr);
@@ -3720,9 +3730,6 @@ function loop(tms){
     if(G.ghostUntil&&performance.now()>G.ghostUntil){G.ghostUntil=0;setGhostLook(false);unstuckPlayer();}
     if(G.owlUntil&&performance.now()>G.owlUntil){G.owlUntil=0;
       G.view=(G.viewBefore&&allowedViews().includes(G.viewBefore))?G.viewBefore:allowedViews()[0];}
-    const isTop=G.view==='top'||G.view==='tp';
-    $('zoomInBtn').style.display=isTop?'':'none';
-    $('zoomOutBtn').style.display=isTop?'':'none';
     fitRenderer(); // 轉向/尺寸自我修復
     tickShovelRecharge(); updateShovelBtn();
     if(MP.on&&MP.mode==='tag')updateHpHud();
@@ -3844,8 +3851,6 @@ function wireUI(){
   bindActionBtn($('coBtn'),startCheckout);
   bindActionBtn($('skillBtn'),useSkill);
   const zoomBy=zoomCamera;
-  bindActionBtn($('zoomInBtn'),()=>zoomBy(-5));
-  bindActionBtn($('zoomOutBtn'),()=>zoomBy(5));
   window.addEventListener('wheel',e=>{
     if((G.view==='top'||G.view==='tp')&&G.running&&!G.frozen&&!e.target.closest?.('.modal,#towerOverlay')&&$('gameScreen').classList.contains('active'))zoomBy(e.deltaY*0.02);
   },{passive:true});
@@ -3930,7 +3935,7 @@ class MiniMQTT{
     };
     this.ws.onmessage=e=>this._feed(new Uint8Array(e.data));
     this.ws.onerror=()=>{this.onfail&&this.onfail();};
-    this.ws.onclose=()=>{clearInterval(this._ping);};
+    this.ws.onclose=()=>{clearInterval(this._ping);this.onfail&&this.onfail();};
   }
   _str(t){const b=new TextEncoder().encode(t);return [b.length>>8,b.length&255,...b];}
   _pkt(type,body){
@@ -3974,6 +3979,7 @@ class MiniMQTT{
 
 /* ---- 名牌貼圖 ---- */
 function makeTextSprite(text){
+  text=String(text).replace(/[\p{Extended_Pictographic}\uFE0F\u200D\u20E3]/gu,'').trim();
   const cv=document.createElement('canvas');cv.width=256;cv.height=64;
   const c=cv.getContext('2d');
   c.font='bold 38px sans-serif';c.textAlign='center';c.textBaseline='middle';
@@ -4006,9 +4012,9 @@ function modeLabel(m){return m==='ctf'?'合作奪旗':m==='race'?'比賽搶終�
 const MP_MODE_DESCS={
   ctf:'2 對 2～5 對 5，中央搶旗送到敵方基地，守住 3 秒獲勝！可傳旗、護送、攔截，房主可選擇是否讓電腦補位。',
   race:'大家從不同角落出發，看誰最快搶到中間的傳送門！',
-  tag:'一個人當鬼追大家，被抓到就換你當鬼。時間到還是鬼的人就輸了！',
+  tag:'被抓到就換你當鬼！鬼一分鐘沒抓到人會暴怒變大，可揮狼牙棒破內牆，小／中／大地圖持續 30／45／60 秒。時間到還是鬼就輸！',
   treasure:'搶寶藏💎帶到出口就贏！別人拿寶藏時可以用職業武器攻擊搶回來。',
-  shop:'在大賣場裡搶購！路徑上有商品，撿到最多金額的人獲勝。',
+  shop:'在開放賣場搶購並結帳！留意反向油漬、定身黏板、泡沫與加速踏板，也能放置陷阱牽制對手。',
 };
 function selectMultiplayerMode(mode){
   MP.pendingMode=mode;
@@ -4355,7 +4361,7 @@ function mpHandle(m){
       const medals=['🥇','🥈','🥉'];
       let html='';
       rows.forEach((r,i)=>{
-        html+=`<div>${medals[i]||'🎖️'} ${escapeHtml(r.name)} — <b>$${r.v}</b>`
+        html+=`<div>第 ${i+1} 名 · ${escapeHtml(r.name)} — <b>$${r.v}</b>`
           +`<span style="font-size:.8rem;color:#8be9fd;">（已結帳 $${r.b}）</span>`
           +`${r.id===MP.id?'（你）':''}</div>`;
       });
@@ -4617,7 +4623,7 @@ function botSimShop(dt,now){
       continue;
     }
     if(now<(b.coUntil||0))continue;            // 結帳中站著不動
-    const spd=loadSpeed(cartLoad(b.id));
+    const spd=loadSpeed(cartLoad(b.id))*(window.ShopChaos?ShopChaos.speed(b.id):1);
     // 車太重就先去結帳，結完再繼續買
     if(!b.coPending&&cartLoad(b.id)>=0.6&&(G.registers||[]).length){
       let best=null,bd=1e9;
@@ -4776,7 +4782,7 @@ function mpEndRace(){
   const medals=['🥇','🥈','🥉'];
   let html='';
   MP.finishers.sort((a,b)=>a.tm-b.tm).forEach((f,i)=>{
-    html+=`<div>${medals[i]||'🎖️'} ${escapeHtml(mpName(f.id))} — ${fmtTime(f.tm)}</div>`;
+    html+=`<div>第 ${i+1} 名 · ${escapeHtml(mpName(f.id))} — ${fmtTime(f.tm)}</div>`;
   });
   MP.roster.forEach(r=>{
     if(!MP.finishers.find(f=>f.id===r.id))
@@ -4801,7 +4807,7 @@ function mpTagEnd(loser){
 function showMPResults(title,html,results=[]){
   const final=recordSeriesRound(results);
   MP.started=false; G.running=false; G.frozen=true;
-  const cleanTitle=title.replace(/^[🏁👹💎🛒🏆]\uFE0F?\s*/, '');
+  const cleanTitle=title.replace(/^[\p{Extended_Pictographic}\uFE0F]+\s*/u, '');
   $('mpResultTitle').textContent=final?'最終結果｜'+cleanTitle:cleanTitle;
   $('mpResultBody').innerHTML=html;
   $('mpSeriesState').textContent=final
@@ -4817,8 +4823,10 @@ function showMPResults(title,html,results=[]){
 function mpLobbyPlan(){
   const humans=MP.roster.filter(r=>!r.bot&&!r.disconnected),missing=Math.max(0,MP.maxPlayers-humans.length);
   const bots=MP.fillBots?missing:0,total=humans.length+bots;
-  const ready=humans.length>=1&&(MP.mode==='ctf'?total===MP.maxPlayers:total>=2);
-  const reason=MP.mode==='ctf'?`合作奪旗需要 ${MP.maxPlayers} 位；請等朋友加入或開啟電腦補位。`:'至少需要 2 位玩家；請等朋友加入或開啟電腦補位。';
+  const enough=humans.length>=1&&(MP.mode==='ctf'?total===MP.maxPlayers:total>=2);
+  const waiting=humans.filter(r=>r.id!==MP.roster[0]?.id&&r.ready!==true);
+  const ready=enough&&waiting.length===0;
+  const reason=enough?'等待 '+waiting.map(r=>r.name).join('、')+' 準備完成。':MP.mode==='ctf'?`合作奪旗需要 ${MP.maxPlayers} 位；請等朋友加入或開啟電腦補位。`:'至少需要 2 位玩家；請等朋友加入或開啟電腦補位。';
   return {humans,bots,ready,reason};
 }
 function mpBroadcastLobby(){
@@ -4836,8 +4844,10 @@ function mpRenderLobby(){
   $('mpBotSummary').textContent=MP.fillBots?`電腦補位：開啟｜${plan.humans.length} 位真人，開始時加入 ${plan.bots} 位電腦。`:'電腦補位：關閉｜只與真人遊玩。';
   const box=$('mpPlayers');
   box.innerHTML=MP.roster.map((r,i)=>
-    `<div style="font-size:1.1rem;">${MP.mode==='ctf'?(i%2?'琥珀隊 · ':'蒼藍隊 · '):''}${CHARS[r.charIdx||0].emoji} ${escapeHtml(r.name)}${r.id===MP.id?'（你）':''}${i===0?' 👑':''}</div>`
+    `<div class="lobby-player"><span>${MP.mode==='ctf'?(i%2?'琥珀隊 · ':'蒼藍隊 · '):''}${escapeHtml(r.name)}${r.id===MP.id?'（你）':''}</span><span class="ready-state">${i===0?'房主':r.bot?'電腦':r.ready?'已準備':'尚未準備'}</span></div>`
   ).join('')||'<div style="color:#999;">還沒有人…</div>';
+  $('mpReady').style.display=MP.host?'none':'block';
+  $('mpReady').textContent=MP.roster.find(r=>r.id===MP.id)?.ready?'取消準備':'準備完成';
   if(MP.host){
     $('mpStart').style.display='block';$('mpStart').disabled=!plan.ready;
     $('mpStatus').textContent=plan.ready?'可以開始，或繼續等待朋友加入。':plan.reason;
@@ -4968,5 +4978,9 @@ window.addEventListener('pagehide',()=>{ if(MP.on)try{mpSend({t:'bye'});}catch(e
 <script src="story/tower-characters.js"></script>
 <script src="story/tower-audio.js"></script>
 <script src="story/tower-mode.js"></script>
+<script src="assets/room-lifecycle.js"></script>
+<script src="assets/shop-chaos.js"></script>
+<script src="assets/tag-rage.js"></script>
+<script src="assets/mobile-controls.js"></script>
 </body>
 </html>

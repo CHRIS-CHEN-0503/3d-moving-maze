@@ -1,4 +1,4 @@
-/* Shared visual layer: no screen visibility or game input behavior is changed. */
+/* Shared visual layer. */
 :root {
   --font: 'PingFang TC', 'Microsoft JhengHei', system-ui, sans-serif;
   --gold: #f6d48a;

@@ -1,0 +1,28 @@
+#mpJoin,#mpReady { background:#175b70; color:#fff; border:2px solid #46bcd0; opacity:1; }
+#mpJoin:hover,#mpReady:hover { background:#21738a; }
+.lobby-player {display:flex;justify-content:space-between;gap:20px;padding:10px 0;border-bottom:1px solid #b9cbd0;font-size:18px;}
+.ready-state {font-size:14px;color:#176c70;align-self:center;}
+#actionsToggle {position:absolute;right:calc(10px + env(safe-area-inset-right));bottom:calc(10px + env(safe-area-inset-bottom));z-index:38;pointer-events:auto;border-radius:50%;width:50px;height:50px;}
+#actionsToggle svg,#shopTrapBtn svg {width:26px;height:26px;fill:none;stroke:currentColor;stroke-width:2.4;stroke-linecap:round;stroke-linejoin:round;}
+#actionsToggle svg {position:absolute;top:3px;left:11px;}
+#gameScreen:not(.actions-open) #hudRightBtns > button:not(#towerTalkBtn),
+#gameScreen:not(.actions-open) > .game-action-btn,
+#gameScreen:not(.actions-open) #towerActionRail,
+#gameScreen:not(.actions-open) #captureRelay {visibility:hidden;pointer-events:none;}
+#hudRightBtns {bottom:calc(72px + env(safe-area-inset-bottom));gap:6px;pointer-events:none;}
+#hudRightBtns > button {pointer-events:auto;}
+#hudRightBtns .round-btn {width:46px;height:46px;}
+#towerTalkBtn {right:calc(100% + 12px);top:auto;bottom:calc(-62px);}
+#shopTrapBtn {position:absolute;right:var(--action-right-far);bottom:calc(168px + env(safe-area-inset-bottom));z-index:30;border-radius:50%;width:58px;height:58px;background:#895818;border:2px solid #ffe19a;color:white;}
+#shopTrapCount {position:absolute;right:-6px;top:-7px;font-size:13px;background:#152638;padding:3px 6px;border-radius:9px;}
+#lookZone {height:78%;width:55%;}
+#toast {top:auto;bottom:calc(8px + env(safe-area-inset-bottom));left:50%;transform:translateX(-50%);max-width:58%;padding:6px 10px;font-size:13px;line-height:1.3;pointer-events:none;max-height:44px;overflow:hidden;}
+#tagAnnounce {top:auto!important;bottom:calc(55px + env(safe-area-inset-bottom))!important;left:50%!important;transform:translateX(-50%)!important;font-size:15px!important;padding:6px 10px!important;pointer-events:none;max-width:60%;}
+#preWarn {top:calc(51px + env(safe-area-inset-top));left:12px;transform:none;font-size:13px;padding:4px 10px;pointer-events:none;}
+#tagBanner,#treasureBanner {top:calc(54px + env(safe-area-inset-top))!important;left:12px!important;transform:none!important;max-width:58vw;font-size:12px!important;white-space:normal;pointer-events:none;}
+#shiftWarn {pointer-events:none;background:transparent!important;align-items:flex-end!important;padding-bottom:55px;}
+#shiftWarn .box {font-size:14px!important;padding:8px 14px!important;}
+#roomCountdown {position:fixed;inset:0;z-index:100;display:grid;place-items:center;background:#071526e8;color:#ffdf94;font-weight:800;font-size:clamp(32px,7vw,70px);pointer-events:auto;}
+#roomCountdown[hidden] {display:none;}
+#compassArrow::before,#smellArrow::before {content:'';display:inline-block;border-left:10px solid transparent;border-right:10px solid transparent;border-bottom:24px solid #ffdd6b;filter:drop-shadow(0 1px 2px #173447);}
+@media(max-height:500px){#toast{font-size:12px;max-width:55%;}#hudRightBtns{bottom:68px;}#actionsToggle{width:46px;height:46px;}#actionsToggle svg{left:9px;}#towerTalkBtn{bottom:-58px;}}

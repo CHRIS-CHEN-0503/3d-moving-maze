@@ -314,7 +314,7 @@ test('the real maze generator keeps every dungeon cell reachable at entry and af
   assert.deepEqual(sizes.sort(), [7, 9], 'More story types must not grow the original lightweight dungeon bounds');
   for (const size of sizes) for (let seed = 1; seed <= 100; seed += 1) {
     let state = seed;
-    const context = vm.createContext({ G: { mazeW: size, mazeH: size }, RNG: () => { state = (Math.imul(state, 1664525) + 1013904223) >>> 0; return state / 4294967296; } });
+    const context = vm.createContext({ isShop:()=>false, G: { mazeW: size, mazeH: size }, RNG: () => { state = (Math.imul(state, 1664525) + 1013904223) >>> 0; return state / 4294967296; } });
     vm.runInContext(source, context);
     for (const [startX, startY] of [[0, 0], [size - 1, Math.floor(size / 2)]]) {
       context.genMaze(startX, startY);

@@ -6,9 +6,19 @@
 #actionsToggle svg,#shopTrapBtn svg {width:26px;height:26px;fill:none;stroke:currentColor;stroke-width:2.4;stroke-linecap:round;stroke-linejoin:round;}
 #actionsToggle svg {position:absolute;top:3px;left:11px;}
 #gameScreen:not(.actions-open) #hudRightBtns > button:not(#towerTalkBtn),
-#gameScreen:not(.actions-open) > .game-action-btn,
-#gameScreen:not(.actions-open) #towerActionRail,
-#gameScreen:not(.actions-open) #captureRelay {visibility:hidden;pointer-events:none;}
+#gameScreen:not(.actions-open) #towerBagBtn,
+#gameScreen:not(.actions-open) #towerJournalBtn {visibility:hidden;pointer-events:none;}
+/* 即時技能、攻擊與道具不受輔助選單控制，僅由玩法決定是否可用。 */
+body.story-active #towerActionRail {pointer-events:none;}
+#towerActionRail > button {pointer-events:auto;}
+#gameScreen .game-action-btn {width:56px;height:56px;border-width:2px;}
+#gameScreen #shovelBtn {right:calc(70px + env(safe-area-inset-right));bottom:calc(76px + env(safe-area-inset-bottom));}
+#gameScreen #atkBtn,#gameScreen #robBtn {right:calc(136px + env(safe-area-inset-right));bottom:calc(76px + env(safe-area-inset-bottom));}
+#gameScreen #skillBtn,#gameScreen #coBtn {right:calc(202px + env(safe-area-inset-right));bottom:calc(76px + env(safe-area-inset-bottom));}
+#gameScreen #kiteBtn {right:calc(70px + env(safe-area-inset-right));bottom:calc(142px + env(safe-area-inset-bottom));}
+#gameScreen #whistleBtn {right:calc(136px + env(safe-area-inset-right));bottom:calc(142px + env(safe-area-inset-bottom));}
+#gameScreen #shopTrapBtn {right:calc(202px + env(safe-area-inset-right));bottom:calc(142px + env(safe-area-inset-bottom));}
+body.story-active #towerTalkBtn {right:calc(100% + 12px);bottom:136px;}
 #hudRightBtns {bottom:calc(72px + env(safe-area-inset-bottom));gap:6px;pointer-events:none;}
 #hudRightBtns > button {pointer-events:auto;}
 #hudRightBtns .round-btn {width:46px;height:46px;}

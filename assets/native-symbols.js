@@ -2,6 +2,13 @@
 (function(root){
   const names={'⚡':'加速','🚀':'飛速','⛏':'鐵鍬','🗺':'地圖','🧭':'指南','👻':'穿牆','⏱':'時間','⭐':'幸運','😜':'換位','📣':'集合','🍬':'糖果','🍞':'麵包','🥛':'牛奶','🧃':'果汁','🍫':'巧克力','🧀':'起司','🍖':'肉排','🦞':'龍蝦','🍎':'蘋果','🍪':'餅乾','🍗':'雞腿','🍰':'蛋糕','🍌':'香蕉','🍉':'西瓜','💳':'結帳','🛒':'購物','🚩':'出口','💎':'寶藏','💫':'暈眩','👹':'鬼','👺':'疾風','🎭':'隱身','😈':'強韌','🎃':'持久','💀':'破牆','👁':'雷達'};
   function draw(c,s,x,y,size){
+    if(root.PickupObjects?.has(s)){
+      if(!root.PickupObjects.draw(c,s,x,y,size)){
+        // 圖集下載失敗或尚未解碼時仍提供可辨識的完整物件，不畫徽章。
+        c.save();c.font=(size*.8)+'px sans-serif';c.textAlign='center';c.textBaseline='middle';c.fillText(s,x,y);c.restore();
+      }
+      return;
+    }
     const key=s.replace(/[\uFE0F\u200D]/g,''),name=names[key]||({'🗝':'鑰匙','🪁':'風箏','🔦':'探照燈','🦉':'俯瞰','🌬':'驅霧','💥':'震波','🍙':'飯糰','🍜':'拉麵','🍱':'便當'})[key];
     c.save();c.translate(x,y);c.scale(size/128,size/128);c.lineWidth=6;c.lineJoin='round';c.lineCap='round';c.strokeStyle='#f8e9c0';
     if(['☀','🌕','☁','🔥','💠','🐦','🦇','🦋','💨','👣'].includes(key)){
@@ -10,12 +17,17 @@
       else if(['🐦','🦇','🦋'].includes(key)){c.moveTo(-52,-20);c.quadraticCurveTo(-30,-42,0,6);c.quadraticCurveTo(30,-42,52,-20);c.lineTo(0,30);}
       else{c.arc(0,0,38,0,Math.PI*2);}c.fill();c.restore();return;
     }
-    c.fillStyle='#172d44';c.beginPath();c.moveTo(0,-58);c.lineTo(51,-29);c.lineTo(51,29);c.lineTo(0,58);c.lineTo(-51,29);c.lineTo(-51,-29);c.closePath();c.fill();c.stroke();
+    // 非拾取的場景標誌也不使用徽章底板，避免被誤認為另一種道具。
+    c.scale(1.3,1.3);c.translate(0,18);
     c.fillStyle='#69d6d5';
     const line=(points)=>{c.beginPath();points.forEach(([a,b],i)=>i?c.lineTo(a,b):c.moveTo(a,b));c.stroke();};
     const circle=(a,b,r,color)=>{c.fillStyle=color;c.beginPath();c.arc(a,b,r,0,Math.PI*2);c.fill();};
     const box=(a,b,w,h,color)=>{c.fillStyle=color;c.fillRect(a,b,w,h);c.strokeRect(a,b,w,h);};
-    if(key==='⚡'||key==='🚀'){box(-18,-28,36,35,key==='⚡'?'#59dab3':'#ae88f7');box(-9,-42,18,12,'#e4ba65');line([[-6,-24],[5,-24],[-4,-12],[7,-12],[-3,0]]);if(key==='🚀'){line([[-29,-20],[-36,-8]]);line([[29,-20],[36,-8]]);}}
+    if(key==='🛒'){line([[-34,-38],[-25,-38],[-15,0],[23,0]]);line([[-22,-29],[30,-29],[25,-8],[-18,-8]]);circle(-12,10,6,'#86bbcf');circle(21,10,6,'#86bbcf');}
+    else if(key==='💳'){box(-31,-39,62,40,'#68b2cf');c.fillStyle='#254967';c.fillRect(-28,-29,56,9);box(-22,-12,12,7,'#f4d583');}
+    else if(key==='🎈'){circle(0,-26,23,'#f398a9');line([[0,-3],[-5,4],[3,12]]);}
+    else if(key==='🏷'){c.beginPath();c.moveTo(-31,-30);c.lineTo(-13,-44);c.lineTo(31,-17);c.lineTo(14,6);c.lineTo(-30,-21);c.closePath();c.fillStyle='#f4c768';c.fill();c.stroke();circle(-19,-30,3,'#365061');}
+    else if(key==='⚡'||key==='🚀'){box(-18,-28,36,35,key==='⚡'?'#59dab3':'#ae88f7');box(-9,-42,18,12,'#e4ba65');line([[-6,-24],[5,-24],[-4,-12],[7,-12],[-3,0]]);if(key==='🚀'){line([[-29,-20],[-36,-8]]);line([[29,-20],[36,-8]]);}}
     else if(key==='⛏'){line([[-18,7],[15,-30]]);line([[-22,-23],[0,-37],[23,-30],[32,-15]]);}
     else if(key==='🗺'){box(-28,-38,56,42,'#c7d2a2');line([[-9,-37],[-9,3]]);line([[9,-37],[9,3]]);c.strokeStyle='#c8765e';line([[-20,-25],[0,-9],[20,-30]]);}
     else if(key==='🧭'||key==='⏱'){circle(0,-19,25,'#467ea8');c.stroke();if(key==='🧭'){c.beginPath();c.moveTo(0,-42);c.lineTo(10,-9);c.lineTo(0,-16);c.lineTo(-10,4);c.closePath();c.fillStyle='#f4aa74';c.fill();}else{line([[0,-36],[0,-18],[12,-12]]);line([[-8,-48],[8,-48]]);}}
@@ -38,7 +50,7 @@
     else if(['🍬','🍞','🥛','🧃','🍫','🧀','🍖','🦞','🍎','🍪','🍗','🍰','🍌','🍉'].includes(key)){
       c.fillStyle=['🍎','🍖','🍗','🦞'].includes(key)?'#f19a79':'#f5cf85';c.beginPath();c.ellipse(0,-19,25,21,0,0,Math.PI*2);c.fill();c.stroke();c.beginPath();c.moveTo(-13,-29);c.lineTo(-5,-13);c.moveTo(4,-32);c.lineTo(12,-15);c.stroke();
     }else{c.beginPath();c.moveTo(0,-40);c.lineTo(20,-19);c.lineTo(0,3);c.lineTo(-20,-19);c.closePath();c.fill();c.stroke();}
-    c.font='bold '+((name||'道具').length>2?23:27)+'px sans-serif';c.textAlign='center';c.textBaseline='middle';c.fillStyle='#fff4d9';c.fillText(name||'道具',0,30);c.restore();
+    c.restore();
   }
   root.NativeSymbols={draw};
 })(window);

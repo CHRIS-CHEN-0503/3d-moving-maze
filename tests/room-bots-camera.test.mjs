@@ -21,7 +21,7 @@ for(const mode of ['race','tag','treasure','shop','ctf'])test(mode+'：補位開
   assert.equal(h.c.mpLobbyPlan().ready,false);h.c.MP.fillBots=true;
   const players=h.c.mpRoundPlayers();assert.equal(players.length,h.c.MP.maxPlayers);assert.equal(players.filter(p=>p.bot).length,players.length-1);
   assert.equal(new Set(players.map(p=>p.id)).size,players.length);
-  h.c.MP.roster=players.map((p,i)=>({...p,id:'human'+i,bot:false}));assert.equal(h.c.mpLobbyPlan().bots,0);
+  h.c.MP.roster=players.map((p,i)=>({...p,id:'human'+i,bot:false,ready:true}));assert.equal(h.c.mpLobbyPlan().bots,0);
   h.c.MP.fillBots=false;assert.equal(h.c.mpLobbyPlan().ready,true);
 });
 test('房主補位設定同步到訪客，訪客只讀且看不到開始鍵；下一輪不重複加電腦',()=>{
@@ -33,7 +33,7 @@ test('房主補位設定同步到訪客，訪客只讀且看不到開始鍵；�
   h.c.MP.fillBots=false;h.c.mpBroadcastLobby();guest.c.mpHandle(h.sent.at(-1));assert.equal(guest.c.MP.fillBots,false);
 });
 test('真人離開後重新計算空位；不補位時禁止不足人數的合作賽',()=>{
-  const h=peer();h.c.MP.mode='ctf';h.c.MP.maxPlayers=4;h.c.MP.roster=Array.from({length:4},(_,i)=>({id:'p'+i,disconnected:i===3}));
+  const h=peer();h.c.MP.mode='ctf';h.c.MP.maxPlayers=4;h.c.MP.roster=Array.from({length:4},(_,i)=>({id:'p'+i,ready:true,disconnected:i===3}));
   assert.equal(h.c.mpRoundPlayers(),null);h.c.MP.fillBots=true;assert.equal(h.c.mpRoundPlayers().filter(p=>p.bot).length,1);
 });
 test('比賽電腦到終點只送一次完成，已出局的不再移動',()=>{

@@ -9,7 +9,7 @@
   function ensureTimer(){if(!timer)timer=setInterval(tick,250);}
   function sendLocal(message){
     const m={...message,f:MP.id,sr:MP.seriesRound,mid:MP.id+':'+Date.now()+':'+(++serial)};
-    mpHandle(m);if(MP.net){baseSend(m);if(['chaoseffect','chaosplaced','ragewall'].includes(m.t))outbox.push({m,left:3,at:performance.now()+400});}return m;
+    mpHandle(m);if(MP.net){baseSend(m);if(['chaoseffect','chaosloot','chaosuse','ragewall'].includes(m.t))outbox.push({m,left:3,at:performance.now()+400});}return m;
   }
   function abort(reason){
     pending=null;startPacket=null;result=null;$('roomCountdown').hidden=true;
@@ -43,7 +43,7 @@
       if(startPacket&&now-lastRetry>800&&Date.now()<startPacket.launchAt+5000){lastRetry=now;if(MP.net)baseSend(startPacket);}
       if(MP.started&&!MP.ended){
         if(['shop','tag'].includes(MP.mode)&&now>=G.roundEndsAt){
-          mpSend(MP.mode==='shop'?{t:'shopend',carts:MP.carts,banked:MP.banked}:{t:'end',loser:MP.taggedId});
+          mpSend(MP.mode==='shop'?{t:'shopend',carts:MP.carts,banked:MP.banked,shopBonus:MP.shopBonus}:{t:'end',loser:MP.taggedId});
         }
       }
       if(now-lastPulse>1000){lastPulse=now;
@@ -107,6 +107,7 @@
   const renderResult=showMPResults;
   showMPResults=function(...args){
     renderResult(...args);
+    window.ShopChaos?.stop();window.ShopCollection?.render();
     for(const p of MP.roster)if(!p.bot)p.ready=false;
     if(SERIES.kind==='multi'&&SERIES.current<SERIES.total){
       $('mpNextRound').style.display='block';$('mpNextRoundLabel').textContent='返回房間準備下一輪';

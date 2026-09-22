@@ -1,14 +1,14 @@
-/* 倒轉高塔專用錄音索引：音檔只在需要播放時才下載。 */
+/* 移動迷宮專用錄音索引：音檔只在需要播放時才下載。 */
 (function(root,factory){
-  const api=factory();
+  const api=factory(typeof module==='object'&&module.exports?require('./voice-catalog.js'):root.MazeVoiceCatalog);
   if(typeof module==='object'&&module.exports)module.exports=api;
   if(root)root.MazeVoicePack=api;
-})(typeof globalThis!=='undefined'?globalThis:this,function(){
+})(typeof globalThis!=='undefined'?globalThis:this,function(catalog){
   'use strict';
-  const saleNames=['糖果','麵包','牛奶','果汁','巧克力','起司','大肉排','龍蝦','衛生紙','肥皂','牙刷','毛巾','洗衣精','清潔海綿','拖鞋','雨傘','馬克杯','保溫瓶','檯燈','平底鍋'];
-  const saleTracks=Object.fromEntries(saleNames.map((name,i)=>['shop.sale.good.'+i,Object.freeze({src:'./assets/voice/sale-good-'+i+'.mp3',text:name+'大拍賣！'})]));
-  for(const [seconds,spoken] of [[15,'十五'],[20,'二十'],[25,'二十五']])saleTracks['shop.sale.limit.'+seconds]=Object.freeze({src:'./assets/voice/sale-limit-'+seconds+'.mp3',text:'限時'+spoken+'秒！只有六件，快來搶購喔！'});
+  const saleTracks={};
+  for(const [seconds,spoken] of [[15,'十五'],[20,'二十'],[25,'二十五']])saleTracks['shop.sale.clear.'+seconds]=Object.freeze({src:'./assets/voice/sale-clear-'+seconds+'.mp3',text:'大拍賣！限時'+seconds+'秒，快來搶購！',spokenText:'大拍賣！限時'+spoken+'秒，快來搶購！'});
   const tracks=Object.freeze({
+    ...(catalog?.tracks||{}),
     ...saleTracks,
     'story.scene99.1':Object.freeze({src:'./assets/voice/story-scene99-1.mp3',text:'你醒來時，背下的石台仍在發熱，雲從破損欄杆外緩緩流過。頭頂沒有天空以外的東西，腳邊卻刻著第九十九層。一道平靜的聲音說：「召喚完成。」你問這是哪裡，它只重複那四個字，像一扇從不聽人回答的門。'}),
     'story.scene99.2':Object.freeze({src:'./assets/voice/story-scene99-2.mp3',text:'披著舊披風的女子從階梯後探出頭。「別站在那條亮線上。」她叫伊芙，話音剛落，整面牆便擦著你的鞋尖滑開。她遞來一張塔頂窄、塔底寬的地圖，說這座塔越往下越寬，牆壁移動得也越快，而她至今沒找到任何向上的路。'}),
@@ -24,5 +24,23 @@
     'alert.monster':Object.freeze({src:'./assets/voice/alert-monster.mp3',text:'小心，附近有怪物。留意地上的紅圈，準備閃避，或請護衛攔住牠。'}),
   });
   function get(id){return typeof id==='string'&&Object.hasOwn(tracks,id)?tracks[id]:null;}
-  return Object.freeze({version:1,tracks,get});
+  const normalize=s=>String(s||'').replace(/[\p{Extended_Pictographic}\uFE0F\u200D]/gu,'').replace(/\s+/g,'').replace(/[·・]/g,'・');
+  const byText=new Map();for(const [id,track] of Object.entries(tracks))byText.set(normalize(track.text),id);
+  const keys=[...byText.keys()].filter(Boolean).sort((a,b)=>b.length-a.length);
+  const pattern=new RegExp(keys.map(k=>k.replace(/[.*+?^${}()|[\]\\]/g,'\\$&')).join('|'),'gu');
+  function plan(text){
+    const original=String(text||'').replace(/[\p{Extended_Pictographic}\uFE0F\u200D]/gu,'').replace(/[·・]/g,'・');
+    const positions=[],characters=[];
+    for(let i=0;i<original.length;i++)if(!/\s/.test(original[i])){positions.push(i);characters.push(original[i]);}
+    const source=characters.join(''),out=[];let cursor=0;
+    for(const match of source.matchAll(pattern)){
+      const start=positions[match.index],end=positions[match.index+match[0].length-1]+1;
+      if(start>cursor)out.push({text:original.slice(cursor,start)});
+      const asset=byText.get(match[0]);out.push({asset,text:tracks[asset].text});cursor=end;
+    }
+    if(!out.length)return [{text:String(text)}];
+    if(cursor<original.length)out.push({text:original.slice(cursor)});
+    return out.filter(x=>x.asset||/[\p{L}\p{N}]/u.test(x.text));
+  }
+  return Object.freeze({version:1,tracks,get,plan});
 });

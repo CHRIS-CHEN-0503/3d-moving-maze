@@ -62,8 +62,8 @@
     if(first)ends=deadline;else ends=Math.min(ends,deadline);
     state={cx:m.cx,cy:m.cy,x:m.x,z:m.z,gi:m.gi,claims:m.claims.slice(),rev:m.rev};rev=m.rev;offered=true;
     if(first&&ends>now()){
-      build();const seconds=duration(G.mazeW)/1000,line=GOODS[state.gi].name+'大拍賣，限時'+seconds+'秒！';showToast(line,3000,false);
-      window.GameVoice?.announceAssets(['shop.sale.good.'+state.gi,'shop.sale.limit.'+seconds],line);
+      build();const seconds=duration(G.mazeW)/1000,line='大拍賣！限時'+seconds+'秒，快來搶購！';showToast(line,3500,false);
+      window.GameVoice?.announceAsset('shop.sale.clear.'+seconds,line,true);
     }
     for(let i=0;i<6;i++)if(state.claims[i]&&!applied.has(i)){
       applied.add(i);cartAdd(state.claims[i],state.gi);

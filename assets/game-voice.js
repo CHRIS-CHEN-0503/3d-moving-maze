@@ -35,20 +35,42 @@
     const synth=env.speechSynthesis,Utterance=env.SpeechSynthesisUtterance;
     const speechSupported=!!(synth&&Utterance),AudioCtor=env.Audio,pack=env.MazeVoicePack;
     const recordedSupported=typeof AudioCtor==='function'&&!!pack?.get,supported=speechSupported||recordedSupported,now=()=>env.Date?.now?.()??Date.now();
-    let enabled=true,preferred='',voices=[],queue=[],current=null,currentAudio=null,generation=0,lastStory=null,failure='',listener=()=>{};
+    let enabled=true,preferred='',voices=[],queue=[],current=null,currentAudio=null,player=null,generation=0,lastStory=null,failure='',listener=()=>{},sequence=0,loadTimer=null;
     const recent=new Map();
     function status(){return {supported,enabled,speaking:!!(current||currentAudio),voice:chooseVoice(voices,preferred),voices:voices.filter(v=>/^zh(?:[-_]|$)/i.test(v.lang)),failure,recorded:recordedSupported};}
     function notify(){listener(status());}
+    function clearLoadTimer(){if(loadTimer!==null){env.clearTimeout?.(loadTimer);loadTimer=null;}}
     function refresh(){try{voices=synth?.getVoices()||[];}catch(_){voices=[];}notify();}
     function stop(forget=false){
-      generation++;queue=[];current=null;
+      generation++;queue=[];current=null;clearLoadTimer();
       if(currentAudio){try{currentAudio.pause();currentAudio.currentTime=0;}catch(_){}currentAudio=null;}
       if(forget)lastStory=null;try{synth?.cancel();}catch(_){}notify();
     }
     function next(){
-      if(!enabled||!speechSupported||current||currentAudio)return;
+      if(!enabled||current||currentAudio)return;
       while(queue.length&&queue[0].expires&&queue[0].expires<now())queue.shift();
       const entry=queue.shift();if(!entry){notify();return;}
+      if(entry.asset&&recordedSupported){
+        // Reuse the user-activated media element; Safari permissions are per element.
+        const token=++generation,track=pack.get(entry.asset),audio=player||(player=new AudioCtor());currentAudio=audio;
+        audio.src=track.src;
+        audio.preload='auto';audio.volume=1;
+        const finish=()=>{if(token!==generation||currentAudio!==audio)return;clearLoadTimer();currentAudio=null;next();};
+        const fallback=()=>{
+          if(token!==generation||currentAudio!==audio)return;
+          clearLoadTimer();try{audio.pause();}catch(_){}currentAudio=null;failure='recording-unavailable';
+          if(entry.group)queue=queue.filter(e=>e.group!==entry.group);
+          // Never rematch a failed recording: use device speech once, then continue.
+          queue.unshift(...chunks(entry.text).map(text=>({text,expires:entry.expires,eventGroup:entry.eventGroup})));next();
+        };
+        audio.onended=finish;audio.onerror=fallback;
+        audio.onplaying=()=>{if(token===generation&&currentAudio===audio)clearLoadTimer();};
+        // A stalled download must not block every later voice event indefinitely.
+        const waiting=()=>{if(token===generation&&currentAudio===audio&&loadTimer===null&&env.setTimeout)loadTimer=env.setTimeout(fallback,8000);};
+        audio.onwaiting=waiting;audio.onstalled=waiting;waiting();
+        try{audio.play()?.catch?.(fallback);notify();}catch(_){fallback();}return;
+      }
+      if(!speechSupported){failure='unavailable';next();return;}
       const token=generation,u=new Utterance(entry.text),voice=chooseVoice(voices,preferred);
       u.lang=voice?.lang||'zh-TW';if(voice)u.voice=voice;u.rate=.9;u.pitch=1.03;u.volume=1;
       current=u;
@@ -56,29 +78,32 @@
       u.onend=finish;u.onerror=e=>{if(token!==generation||current!==u)return;failure=e?.error||'unavailable';current=null;queue=[];notify();};
       try{synth.speak(u);notify();}catch(_){failure='unavailable';current=null;queue=[];notify();}
     }
+    function entriesFor(text,story){
+      const parts=recordedSupported&&pack.plan?pack.plan(text):[{text}],expires=story?0:now()+12000;
+      return parts.flatMap(p=>p.asset?[{...p,expires}]:chunks(p.text).map(text=>({text,expires})));
+    }
     function say(value,{replace=false,story=false}={}){
-      if(!enabled||!speechSupported||env.document?.hidden)return false;
+      if(!enabled||!supported||env.document?.hidden)return false;
       const text=clean(value);if(!text)return false;
       if(!story&&!replace){const previous=recent.get(text);if(previous!==undefined&&now()-previous<1800)return false;recent.set(text,now());if(recent.size>32)recent.delete(recent.keys().next().value);}
       if(replace)stop();failure='';
       if(story)lastStory={text,asset:'',after:''};
-      const pending=queue.filter(e=>e.expires).length;
+      const pending=new Set(queue.filter(e=>e.expires).map(e=>e.eventGroup||e.group)).size;
       if(!story&&pending>=4)return false;
-      const items=chunks(text).map(text=>({text,expires:story?0:now()+12000}));
-      queue.push(...(story?items:items.slice(0,4-pending)));next();return true;
+      const group=++sequence,items=entriesFor(text,story);
+      // Limit queued events, not fragments: a mixed recording/dynamic sentence must remain whole.
+      queue.push(...items.map(e=>({...e,eventGroup:group})));next();return true;
     }
     function playAsset(id,fallbackText,{replace=false,story=false,after='',continuation=[]}={}){
       const track=pack?.get?.(id),fallback=clean(fallbackText||track?.text),tail=clean(after);
       if(!enabled||env.document?.hidden||!track?.src||!recordedSupported)return say(fallback,{replace,story});
       if(replace)stop();failure='';
       if(story)lastStory={text:fallback,asset:id,after:tail};
-      const token=generation,audio=new AudioCtor(track.src);currentAudio=audio;
-      try{audio.preload='auto';audio.volume=1;}catch(_){}
-      const finish=()=>{if(token!==generation||currentAudio!==audio)return;currentAudio=null;if(continuation.length){playAsset(continuation[0],'',{continuation:continuation.slice(1)});return;}notify();if(tail&&!say(tail,{story:false}))next();else if(!tail)next();};
-      const fallbackToSpeech=error=>{if(token!==generation||currentAudio!==audio)return;currentAudio=null;failure=error||'recording-unavailable';notify();if(!say(fallback,{story}))next();};
-      audio.onended=finish;audio.onerror=()=>fallbackToSpeech('recording-unavailable');
-      try{const result=audio.play();result?.catch?.(()=>fallbackToSpeech('recording-unavailable'));notify();return true;}
-      catch(_){fallbackToSpeech('recording-unavailable');return speechSupported;}
+      const group=++sequence,expires=story?0:now()+12000;
+      queue.push({asset:id,text:fallback,expires,group});
+      for(const asset of continuation){const item=pack.get(asset);if(item)queue.push({asset,text:item.text,expires,group});}
+      if(tail)queue.push(...entriesFor(tail,story).map(e=>({...e,group})));
+      next();return true;
     }
     function readPanel(panel){
       const spoken=panelText(panel),asset=panel?.voiceAsset||'',after=panel?.voiceAfterText||'';

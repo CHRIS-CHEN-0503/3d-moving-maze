@@ -613,7 +613,7 @@ button:focus-visible,input:focus-visible{outline:3px solid #fff;outline-offset:3
 }
 @media(prefers-reduced-motion:reduce){.flow-panel{animation:none}.home-action{transition:none}}
 </style>
-<link rel="stylesheet" href="assets/game-polish.css">
+<link rel="stylesheet" href="assets/game-polish.css?v=1.33.0">
 <link rel="stylesheet" href="assets/play-controls.css?v=1.32.0">
 </head>
 <body>
@@ -900,9 +900,10 @@ button:focus-visible,input:focus-visible{outline:3px solid #fff;outline-offset:3
     <div class="adm-row"><label for="cfgSpeech">語音朗讀與道具提示</label>
       <select id="cfgSpeech"><option value="1">開啟</option><option value="0">關閉</option></select>
     </div>
-    <div class="voice-choice"><label for="cfgSpeechVoice">朗讀聲音</label><select id="cfgSpeechVoice"><option value="">自動選擇溫柔中文女聲</option></select></div>
+    <div class="voice-choice"><label for="cfgSpeechVoice">動態文字與備援聲音</label><select id="cfgSpeechVoice"><option value="">自動選擇溫柔中文女聲</option></select></div>
     <p id="speechStatus" role="status">正在載入裝置語音。</p>
     <button class="mini-btn" id="speechPreview" type="button">試聽語音</button>
+    <button class="mini-btn" id="saleSpeechPreview" type="button">試聽大拍賣</button>
     <button class="mini-btn button-with-icon" id="admSave"><span class="ui-icon icon-settings" aria-hidden="true"></span>儲存設定</button>
   </div>
 </div>
@@ -972,15 +973,16 @@ button:focus-visible,input:focus-visible{outline:3px solid #fff;outline-offset:3
 <script src="./assets/pickup-objects.js"></script>
 <script src="./assets/native-symbols.js"></script>
 <script src="./assets/game-rules.js?v=1.31.0"></script>
-<script src="./assets/voice-pack.js?v=1.32.0"></script>
-<script src="./assets/game-voice.js?v=1.32.0"></script>
+<script src="./assets/voice-catalog.js?v=1.33.0"></script>
+<script src="./assets/voice-pack.js?v=1.33.0"></script>
+<script src="./assets/game-voice.js?v=1.33.0"></script>
 <script>
 'use strict';
 /* =====================================================
    3D移動迷宮 — 給小朋友的變形迷宮冒險
    ===================================================== */
 const $=id=>document.getElementById(id);
-const GAME_VERSION='1.32.0';
+const GAME_VERSION='1.33.0';
 
 /* ---------- 設定（後台可調） ---------- */
 const DEFAULT_CFG={teamSize:2,shiftMin:3,itemCount:6,foodCount:4,hungerMin:3,stunSec:3,pingSec:3,smellCells:3,mazeSize:13,musicOn:1,speechOn:1,speechVoice:'',apiUrl:'',roomMax:3,rounds:3,goodsCount:16,shopCollect:1,shopMin:2.5,cartFull:400,views:{fp:1,tp:1,top:1},broker:'wss://broker.emqx.io:8084/mqtt'};
@@ -2177,6 +2179,7 @@ function loseGame(){
   recordSeriesRound([{id:'solo',name:getPlayerName(),charIdx:G.charIdx,win:false,points:0}]);
   renderSingleSeriesResult(false);
   switchScreen('failScreen');
+  window.GameVoice?.announce('遊戲結束',true);
 }
 function showToast(msg,ms=1800,readAloud=true){
   const t=$('toast'); t.textContent=msg; t.style.display='block';
@@ -3425,6 +3428,7 @@ function winGame(){
     $('winRank').textContent=rank?`你是「${LEVELS[G.lvlIdx].name}」第 ${rank} 名！`:'';
   });
   switchScreen('winScreen');
+  window.GameVoice?.announce('恭喜過關！',true);
 }
 
 /* =====================================================
@@ -4852,6 +4856,7 @@ function showMPResults(title,html,results=[]){
   $('mpNextRoundLabel').textContent=`開始第 ${SERIES.current+1} 輪`;
   $('mpNextRound').style.display=!final&&(SERIES.kind==='single'||MP.host)?'block':'none';
   $('mpResult').style.display='flex';
+  window.GameVoice?.announce('遊戲結束',true);
 }
 
 /* ---- 大廳 UI ---- */
@@ -5003,7 +5008,7 @@ window.addEventListener('pagehide',()=>{ if(MP.on)try{mpSend({t:'bye'});}catch(e
 </script>
 <script src="assets/classic-audio.js"></script>
 <script src="assets/setup-controls.js?v=1.31.0"></script>
-<script src="assets/voice-settings.js"></script>
+<script src="assets/voice-settings.js?v=1.33.0"></script>
 <script src="assets/capture-core.js"></script>
 <script src="assets/capture-mode.js"></script>
 <script src="story/story-core.js"></script>
@@ -5013,12 +5018,12 @@ window.addEventListener('pagehide',()=>{ if(MP.on)try{mpSend({t:'bye'});}catch(e
 <script src="story/tower-encounters.js"></script>
 <script src="story/tower-characters.js"></script>
 <script src="story/tower-audio.js"></script>
-<script src="story/tower-mode.js"></script>
+<script src="story/tower-mode.js?v=1.33.0"></script>
 <script src="assets/room-lifecycle.js?v=1.32.0"></script>
 <script src="assets/shop-collection-core.js?v=1.31.0"></script>
 <script src="assets/shop-collection.js?v=1.31.0"></script>
 <script src="assets/shop-chaos.js?v=1.32.0"></script>
-<script src="assets/shop-sale.js?v=1.32.0"></script>
+<script src="assets/shop-sale.js?v=1.33.0"></script>
 <script src="assets/tag-rage.js"></script>
 <script src="assets/mobile-controls.js"></script>
 </body>

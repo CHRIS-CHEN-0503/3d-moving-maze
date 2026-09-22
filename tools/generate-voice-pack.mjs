@@ -9,7 +9,7 @@ import path from 'node:path';
 const require=createRequire(import.meta.url),pack=require('../assets/voice-pack.js');
 const root=path.resolve(path.dirname(fileURLToPath(import.meta.url)),'..');
 const base=process.env.VOICEBOX_URL||'http://127.0.0.1:17493';
-const force=process.argv.includes('--force');
+const force=process.argv.includes('--force'),prefix=process.argv.find(x=>x.startsWith('--prefix='))?.slice(9)||'';
 if(!/^http:\/\/(127\.0\.0\.1|localhost)(:\d+)?$/.test(base))throw new Error('為安全起見，只允許連接本機 Voicebox。');
 
 async function request(route,options={}){
@@ -42,13 +42,14 @@ async function profile(){
 }
 
 await request('/health');
-const voice=await profile(),entries=Object.entries(pack.tracks),outputDir=path.join(root,'assets','voice');
+const voice=await profile(),entries=Object.entries(pack.tracks).filter(([id])=>id.startsWith(prefix)),outputDir=path.join(root,'assets','voice');
 await mkdir(outputDir,{recursive:true});
 for(let index=0;index<entries.length;index++){
   const [id,track]=entries[index],destination=path.join(root,track.src.replace(/^\.\//,''));
   if(!force&&existsSync(destination)){console.log(`略過 ${id}`);continue;}
   console.log(`生成 ${index+1}/${entries.length} ${id}`);
-  const queued=await (await request('/generate',{method:'POST',body:JSON.stringify({profile_id:voice.id,text:track.text,language:'zh',engine:'qwen_custom_voice',model_size:'0.6B',seed:20260920+index,instruct:'溫暖、清楚、自然的女聲，像為兒童講冒險故事；咬字清晰，速度稍慢，不誇張。',normalize:true})})).json();
+  const instruct=id.startsWith('shop.sale.')?'活潑親切、明亮有精神的女店員，用中文熱情叫賣，像歡樂超市的限時特賣廣播。咬字清楚，節奏俐落，開心有笑意，強調商品和限時秒數，不要尖叫。':'溫暖、清楚、自然的女聲，像為兒童講冒險故事；咬字清晰，速度稍慢，不誇張。';
+  const queued=await (await request('/generate',{method:'POST',body:JSON.stringify({profile_id:voice.id,text:track.text,language:'zh',engine:'qwen_custom_voice',model_size:'0.6B',seed:20260920+index,instruct,normalize:true})})).json();
   const generation=await waitForGeneration(queued.id);
   const wav=path.join(outputDir,'.'+path.basename(destination,'.mp3')+'.wav');
   const audio=await request('/audio/'+encodeURIComponent(generation.id),{headers:{}});

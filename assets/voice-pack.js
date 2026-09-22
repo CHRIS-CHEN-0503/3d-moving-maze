@@ -5,7 +5,11 @@
   if(root)root.MazeVoicePack=api;
 })(typeof globalThis!=='undefined'?globalThis:this,function(){
   'use strict';
+  const saleNames=['糖果','麵包','牛奶','果汁','巧克力','起司','大肉排','龍蝦','衛生紙','肥皂','牙刷','毛巾','洗衣精','清潔海綿','拖鞋','雨傘','馬克杯','保溫瓶','檯燈','平底鍋'];
+  const saleTracks=Object.fromEntries(saleNames.map((name,i)=>['shop.sale.good.'+i,Object.freeze({src:'./assets/voice/sale-good-'+i+'.mp3',text:name+'大拍賣！'})]));
+  for(const [seconds,spoken] of [[15,'十五'],[20,'二十'],[25,'二十五']])saleTracks['shop.sale.limit.'+seconds]=Object.freeze({src:'./assets/voice/sale-limit-'+seconds+'.mp3',text:'限時'+spoken+'秒！只有六件，快來搶購喔！'});
   const tracks=Object.freeze({
+    ...saleTracks,
     'story.scene99.1':Object.freeze({src:'./assets/voice/story-scene99-1.mp3',text:'你醒來時，背下的石台仍在發熱，雲從破損欄杆外緩緩流過。頭頂沒有天空以外的東西，腳邊卻刻著第九十九層。一道平靜的聲音說：「召喚完成。」你問這是哪裡，它只重複那四個字，像一扇從不聽人回答的門。'}),
     'story.scene99.2':Object.freeze({src:'./assets/voice/story-scene99-2.mp3',text:'披著舊披風的女子從階梯後探出頭。「別站在那條亮線上。」她叫伊芙，話音剛落，整面牆便擦著你的鞋尖滑開。她遞來一張塔頂窄、塔底寬的地圖，說這座塔越往下越寬，牆壁移動得也越快，而她至今沒找到任何向上的路。'}),
     'story.scene99.3':Object.freeze({src:'./assets/voice/story-scene99-3.mp3',text:'你在掌心發現半枚銅扣碎片，殘缺的扣眼纏著細紅線。伊芙看見它時忽然停住笑容。「這是修門人的記號，我以為再也見不到了。」遠處傳來三短一長的敲擊，你回頭，石台上的召喚陣竟又亮了起來。'}),

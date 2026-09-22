@@ -14,10 +14,22 @@ function recordedHarness(){
   const audio=[],spoken=[];
   class FakeAudio{constructor(src){this.src=src;audio.push(this);}play(){this.played=true;}pause(){this.paused=true;}}
   const synth={getVoices:()=>[],addEventListener(){},cancel(){},speak(u){spoken.push(u);}};
-  const env={Audio:FakeAudio,MazeVoicePack:{get:id=>id==='intro'?{src:'./intro.mp3',text:'專用旁白'}:null},speechSynthesis:synth,SpeechSynthesisUtterance:class{constructor(text){this.text=text;}},Date:{now:()=>1000},document:{hidden:false,addEventListener(){}},addEventListener(){}};
+  const env={Audio:FakeAudio,MazeVoicePack:{get:id=>id==='intro'?{src:'./intro.mp3',text:'專用旁白'}:id==='limit'?{src:'./limit.mp3',text:'限時十五秒'}:null},speechSynthesis:synth,SpeechSynthesisUtterance:class{constructor(text){this.text=text;}},Date:{now:()=>1000},document:{hidden:false,addEventListener(){}},addEventListener(){}};
   return{voice:V.create(env),audio,spoken};
 }
 const female={voiceURI:'mei',name:'Mei-Jia',lang:'zh-TW',localService:true},male={voiceURI:'yun',name:'YunJhe',lang:'zh-TW'},en={voiceURI:'en',name:'Samantha',lang:'en-US'};
+test('叫賣兩段錄音連續播放、拾取朗讀不插隊，關閉語音立即停止',()=>{
+  const h=recordedHarness(),states=[];h.voice.listen(s=>states.push(s.speaking));
+  h.voice.announceAssets(['intro','limit'],'商品大拍賣，限時十五秒');h.voice.announce('獲得商品');
+  assert.equal(h.audio.length,1);assert.equal(h.spoken.length,0);h.audio[0].onended();
+  assert.equal(h.audio[1].src,'./limit.mp3');assert.equal(states.at(-1),true);assert.equal(h.spoken.length,0);
+  h.audio[1].onended();assert.equal(h.spoken[0].text,'獲得商品');
+  h.voice.announceAssets(['intro','limit'],'叫賣');const first=h.audio.at(-1);h.voice.configure({enabled:false});first.onended();assert.equal(first.paused,true);assert.equal(h.audio.length,3);
+});
+test('叫賣第一段失敗朗讀完整句；第二段失敗只讀秒數',()=>{
+  const h=recordedHarness();h.voice.announceAssets(['intro','limit'],'完整叫賣');h.audio[0].onerror();assert.equal(h.spoken[0].text,'完整叫賣');
+  h.voice.announceAssets(['intro','limit'],'完整叫賣');h.audio[1].onended();h.audio[2].onerror();assert.equal(h.spoken.at(-1).text,'限時十五秒');
+});
 test('自動優先台灣中文女聲，尊重指定中文聲音，延遲載入也能更新',()=>{
   assert.equal(V.chooseVoice([en,male,female]),female);assert.equal(V.chooseVoice([female,male],'yun'),male);assert.equal(V.chooseVoice([en]),null);
   assert.equal(V.chooseVoice([{name:'婷婷',lang:'zh-CN'},{name:'美佳',lang:'zh-TW'}]).name,'美佳');

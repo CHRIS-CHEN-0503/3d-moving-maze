@@ -3,12 +3,14 @@
   const kinds={oil:{name:'哎呀！踩到油漬，方向亂掉了！',label:'方向亂掉啦',ms:10000,color:0xe6a827},glue:{name:'踩到黏鼠板，走不動了！',label:'黏住啦',ms:5000,color:0xcb65ad},foam:{name:'滿地泡泡！腳步變得慢吞吞！',label:'慢吞吞',ms:6000,color:0x61cce8},boost:{name:'踩到加速踏板，咻！衝出去囉！',label:'咻！加速中',ms:5000,color:0x65dda1}};
   const items={boost:{name:'加速',path:'M19 2 7 18h8l-2 12 12-18h-8Z'},oil:{name:'油漬',path:'M12 3h8v5l3 4v14H9V12l3-4Z M9 18h14'},glue:{name:'黏鼠板',path:'M5 7h22v18H5Z M8 11l16 10 M8 21l16-10'},foam:{name:'泡沫',path:'M6 21a5 5 0 1 0 10 0a5 5 0 1 0-10 0 M17 11a4 4 0 1 0 8 0a4 4 0 1 0-8 0 M4 7h3'},egg:{name:'雞蛋',path:'M16 3C10 3 6 17 6 21a10 8 0 0 0 20 0C26 17 22 3 16 3Z'}};
   const lootPool=['boost','boost','oil','glue','foam','egg','egg'];
+  const EGG_MS=10000,eggFaces=new Map();
   let traps=[],boxes=[],effects={},stock={},flights=[],root=null,seed=1,active=false,acc=0,epoch=0,eggUntil=0;
   const rand=()=>{seed=(Math.imul(seed,1664525)+1013904223)>>>0;return seed/4294967296;};
   const owner=()=>MP.order?.[0],now=()=>performance.now();
   const player=id=>MP.roster.some(r=>r.id===id&&!r.disconnected);
   function clearMap(){if(root){root.parent?.remove(root);disposeSceneObject(root);}root=null;traps=[];boxes=[];flights=[];}
-  function stop(){clearMap();effects={};stock={};active=false;eggUntil=0;acc=0;$('shopTrapBtn').style.display='none';$('shopEggSplat').hidden=true;}
+  function clearFace(id){const f=eggFaces.get(id);if(f?.mesh){f.mesh.parent?.remove(f.mesh);disposeSceneObject(f.mesh);}eggFaces.delete(id);}
+  function stop(){clearMap();for(const id of eggFaces.keys())clearFace(id);effects={};stock={};active=false;eggUntil=0;acc=0;$('shopTrapBtn').style.display='none';$('shopEggSplat').hidden=true;}
   function safe(x,z){return !(G.startCells||[]).some(c=>{const p=cellToWorld(c.x,c.y);return Math.hypot(p.x-x,p.z-z)<G.cell*1.5;})&&!(G.registers||[]).some(r=>Math.hypot(r.x-x,r.z-z)<G.cell);}
   function add(kind,x,z,by='',id=traps.length){
     if(!kinds[kind]||id>=64||traps[id])return false;
@@ -73,14 +75,35 @@
     const mesh=new THREE.Mesh(new THREE.SphereGeometry(.18,8,6),new THREE.MeshLambertMaterial({color:0xfff3cf}));mesh.scale.y=1.35;root.add(mesh);
     flights.push({...m,mesh,at:now()});
   }
+  // Original low-poly egg white, yolk and drips, attached to the moving head (+Z).
+  function updateEggFaces(){
+    for(const [id,f] of eggFaces){
+      if(now()>=f.until||MP.ended){clearFace(id);continue;}
+      const model=id===MP.id?playerGroup:MP.players[id]?.mesh,head=model?.userData?.head;
+      if(!head)continue;
+      if(f.mesh?.parent!==head){
+        if(f.mesh){f.mesh.parent?.remove(f.mesh);disposeSceneObject(f.mesh);}
+        const group=new THREE.Group();group.name='egg-face';
+        const blob=(x,y,sx,sy,color,z=.294)=>{const m=new THREE.Mesh(new THREE.SphereGeometry(1,8,6),new THREE.MeshLambertMaterial({color}));m.position.set(x,y,z);m.scale.set(sx,sy,.018);group.add(m);};
+        blob(-.09,.045,.17,.14,0xfff6d8);blob(.08,-.005,.16,.16,0xfff6d8);blob(.04,-.025,.10,.09,0xffc326,.318);
+        blob(-.18,-.16,.034,.16,0xfff6d8);blob(.13,-.18,.025,.18,0xffcf39,.315);
+        // A lopsided open mouth and tilted brow make the mishap readable even at a distance.
+        blob(-.025,-.17,.05,.035,0x5b3429,.32);
+        const brow=new THREE.Mesh(new THREE.BoxGeometry(.13,.025,.02),new THREE.MeshLambertMaterial({color:0x5b3429}));brow.position.set(.125,.16,.3);brow.rotation.z=.42;group.add(brow);
+        head.add(group);f.mesh=group;
+      }
+    }
+  }
   function animateEggs(){
     for(let i=flights.length-1;i>=0;i--){const f=flights[i],t=Math.min(1,(now()-f.at)/350);
       f.mesh.position.set(f.x+(f.ex-f.x)*t,1.25+Math.sin(t*Math.PI)*.7,f.z+(f.ez-f.z)*t);
       if(t===1){root.remove(f.mesh);disposeSceneObject(f.mesh);flights.splice(i,1);
-        if(f.target===MP.id){eggUntil=now()+5000;showToast('哎呀！雞蛋糊到臉上了！',1800,'哎呀！雞蛋糊到臉上了！');}
+        if(f.target&&player(f.target)){const old=eggFaces.get(f.target);eggFaces.set(f.target,{mesh:old?.mesh,until:now()+EGG_MS});}
+        if(f.target===MP.id){eggUntil=now()+EGG_MS;showToast('哎呀！雞蛋糊到臉上了！',1800,'哎呀！雞蛋糊到臉上了！');}
         const bot=MP.bots?.find(b=>b.id===f.target);if(bot)bot.stunnedUntil=Math.max(bot.stunnedUntil||0,now()+1500);
       }
     }
+    updateEggFaces();
     $('shopEggSplat').hidden=!(active&&!MP.ended&&now()<eggUntil);
   }
   function use(id){
@@ -144,7 +167,7 @@
     for(const box of boxes)if(!box.used){const d=(box.x-b.x)**2+(box.z-b.z)**2;if(d<dist){best=box;dist=d;}}
     if(!best)return false;botWalk(b,worldToCell(best.x,best.z),'box'+epoch+':'+best.id,dt,time,mul);return true;
   }
-  window.ShopChaos={start,stop,rebuild,input,speed,tick,collectForBot};
+  window.ShopChaos={start,stop,rebuild,input,speed,tick,collectForBot,reserved:(x,z)=>[...traps,...boxes].some(t=>t&&Math.hypot(t.x-x,t.z-z)<G.cell)};
   bindActionBtn($('shopTrapBtn'),()=>{if(active&&!G.frozen&&!G.shifting&&!MP.ended){
     const first=stock[MP.id]?.queue[0];
     if(first&&['oil','glue','foam'].includes(first.kind)&&(!safe(G.px,G.pz)||traps.some(t=>t&&!t.used&&Math.hypot(G.px-t.x,G.pz-t.z)<2))){showToast('這裡太擠了，走開一點再放陷阱吧！',1600);return;}

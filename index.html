@@ -939,7 +939,7 @@ button:focus-visible,input:focus-visible{outline:3px solid #fff;outline-offset:3
     </div>
     <div>💎 <b>尋寶模式</b>：小地圖會顯示寶藏位置，撿到寶藏後帶到出口 🚩 就贏！別人拿寶藏時你會出現<b>攻擊鍵</b>（每個職業武器不同），打中就把人暈眩 3 秒；打中持有者還能搶走寶藏（拿寶藏的人不能攻擊）。持有者位置每 3 秒在小地圖上更新。單機可以跟電腦對戰！</div>
     <div>🌀 迷宮變形時<b>出口也會搬家</b>（外圈的角落或邊線上），記得看小地圖。</div>
-    <div>🛒 <b>搶購模式</b>（單機跟兩個電腦玩，或多人連線）：場景變成<b>大賣場</b>——低天花板、輕鋼架、日光燈盤、會轉的吊扇、擺滿商品的<b>矮貨架</b>、靠牆的收銀台。因為貨架很矮，所以看得到遠方的商品和其他人，但走法還是迷宮！地上到處是商品：🍬糖果 $10、🍞麵包 $20、🥛牛奶 $30、🧃果汁 $35、🍫巧克力 $45、🧀起司 $60、🍖大肉排 $80、🦞龍蝦 $120，撿到就進購物車。<b>這個模式沒有任何技能</b>（不能攻擊、不能隱身、職業能力也不算），道具只有 ⚡加速藥水 和 😜調皮鬼；<b>大家的速度都一樣，而且比平常快 1.2 倍</b>。商品被搶走後過幾秒會在別的地方<b>重新上架</b>，時間到<b>誰的購物車金額最多誰就贏</b>！</div>
+    <div>🛒 <b>搶購模式</b>（單機跟電腦玩，或多人連線）：場景變成有<b>開放式走道與矮貨架的大賣場</b>。場上共有 <b>20 種商品</b>隨機上架：糖果、麵包、牛奶、果汁、巧克力、起司、大肉排、龍蝦，以及衛生紙、肥皂、牙刷、毛巾、洗衣精、清潔海綿、拖鞋、雨傘、馬克杯、保溫瓶、檯燈、平底鍋。<b>完整物件圖＋金色光圈＋價格</b>才是可拾取商品，撿到就進購物車；生活用品也是計分商品，不能當作武器或補血道具。價格介於 $10～$120，較高價商品較少出現。商品被拿走後 <b>6 秒</b>會在別處重新上架。<b>大家沒有職業技能，空車速度都是平常的 1.2 倍</b>；可搶奪商品、使用場內道具與陷阱牽制對手。時間到比較<b>已結帳＋車上金額</b>，最高者獲勝！</div>
     <div style="padding-left:14px;">
       🛒 <b>每個人身前都推著一台購物車</b>：一開始是空的，買越多車上堆得越滿（最多 8 格，顏色就是你買到的東西），被搶走東西車上也會跟著變少——遠遠看就知道誰買得最多。<br>
       🐢 <b>車越重跑越慢</b>：車上金額到 50% 速度從 1.2 掉到 1.1、75% 剩 1.0、裝滿只剩 0.9（裝滿是多少 $ 可以在遊戲設定調，預設 $400）。<br>
@@ -976,7 +976,7 @@ button:focus-visible,input:focus-visible{outline:3px solid #fff;outline-offset:3
    3D移動迷宮 — 給小朋友的變形迷宮冒險
    ===================================================== */
 const $=id=>document.getElementById(id);
-const GAME_VERSION='1.29.1';
+const GAME_VERSION='1.30.0';
 
 /* ---------- 設定（後台可調） ---------- */
 const DEFAULT_CFG={teamSize:2,shiftMin:3,itemCount:6,foodCount:4,hungerMin:3,stunSec:3,pingSec:3,smellCells:3,mazeSize:13,musicOn:1,speechOn:1,speechVoice:'',apiUrl:'',roomMax:3,rounds:3,goodsCount:16,shopMin:2.5,cartFull:400,views:{fp:1,tp:1,top:1},broker:'wss://broker.emqx.io:8084/mqtt'};
@@ -1061,6 +1061,19 @@ const GOODS=[
  {emoji:'🧀',name:'起司',   price:60, weight:8,  color:0xffd54f},
  {emoji:'🍖',name:'大肉排', price:80, weight:5,  color:0xef9a9a},
  {emoji:'🦞',name:'龍蝦',   price:120,weight:3,  color:0xff7043},
+ // 保留前八種商品編號；weight 是出現機率，不是購物車負重。
+ {emoji:'🧻',name:'衛生紙', price:15, weight:12, color:0xfafafa},
+ {emoji:'🧼',name:'肥皂',   price:20, weight:12, color:0x4dd0e1},
+ {emoji:'🪥',name:'牙刷',   price:25, weight:10, color:0x66bb6a},
+ {emoji:'🧣',name:'毛巾',   price:35, weight:10, color:0xff8a80},
+ {emoji:'🧴',name:'洗衣精', price:50, weight:8,  color:0x42a5f5},
+ {emoji:'🧽',name:'清潔海綿',price:10, weight:12, color:0xffd54f},
+ {emoji:'🩴',name:'拖鞋',   price:40, weight:10, color:0xb39ddb},
+ {emoji:'☂',name:'雨傘',   price:65, weight:6,  color:0xff9800},
+ {emoji:'☕',name:'馬克杯', price:30, weight:8,  color:0xef5350},
+ {emoji:'🫙',name:'保溫瓶', price:80, weight:5,  color:0x80cbc4},
+ {emoji:'💡',name:'檯燈',   price:100,weight:4,  color:0xffca28},
+ {emoji:'🍳',name:'平底鍋', price:90, weight:5,  color:0x455a64},
 ];
 const CHECKOUT_MS=5000;      // 結帳要站著等幾秒
 const CHECKOUT_RANGE=2.6;    // 走多近才會出現結帳鈕
@@ -1691,7 +1704,7 @@ function makeTex(kind){
 /* Emoji → Sprite 貼圖（道具、雲、月亮都用這招，超省效能） */
 const spriteCache={};
 window.PickupObjects?.onReady(()=>{
-  for(const [symbol,texture] of Object.entries(spriteCache))if(PickupObjects.has(symbol)){
+  for(const [symbol,texture] of Object.entries(spriteCache))if(PickupObjects.isReady(symbol)){
     const canvas=texture.image,ctx=canvas.getContext('2d');ctx.clearRect(0,0,canvas.width,canvas.height);
     PickupObjects.draw(ctx,symbol,canvas.width/2,canvas.height/2,120);texture.needsUpdate=true;
   }

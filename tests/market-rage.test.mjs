@@ -72,8 +72,19 @@ test('雞蛋朝前命中且不可穿牆、不可在結帳時使用',()=>{
     h.c.isCheckingOut=()=>false;drop(h);const packet=h.sent.at(-1);assert.equal(packet.kind,'egg');assert.equal(packet.target,blocked?'':'g');assert.ok(packet.ez>0);
     const guest=harness();guest.c.MP.id='g';guest.c.MP.host=false;guest.c.window.ShopChaos.start();loot(guest,0,'egg');guest.c.mpHandle(packet);
     guest.advance(350);guest.c.window.ShopChaos.tick(.01);assert.equal(guest.nodes.get('shopEggSplat').hidden,blocked);
+    guest.advance(5000);guest.c.window.ShopChaos.tick(.01);assert.equal(guest.nodes.get('shopEggSplat').hidden,blocked);
     guest.advance(5000);guest.c.window.ShopChaos.tick(.01);assert.equal(guest.nodes.get('shopEggSplat').hidden,true);
   }
+});
+test('雞蛋在自己及遠端角色頭部留下蛋液，十秒到期、離開及換模型會清除',()=>{
+  const h=harness(),api=h.c.window.ShopChaos;api.start();
+  const head=new THREE.Group();h.c.MP.players.g.mesh.userData.head=head;h.c.MP.players.g.mesh.add(head);
+  h.c.botPosOf=id=>id==='h'?{x:0,z:0}:{x:0,z:5};loot(h,0,'egg');drop(h);h.advance(350);api.tick(.01);
+  assert.equal(head.children[0].name,'egg-face');assert.equal(head.children[0].children.length,7);
+  h.advance(9999);api.tick(.01);assert.equal(head.children.length,1);
+  const replacement=new THREE.Group();h.c.MP.players.g.mesh.userData.head=replacement;api.tick(.01);assert.equal(head.children.length,0);assert.equal(replacement.children.length,1);
+  h.advance(1);api.tick(.01);assert.equal(replacement.children.length,0);
+  loot(h,1,'egg');drop(h);h.advance(350);api.tick(.01);assert.equal(replacement.children.length,1);api.stop();assert.equal(replacement.children.length,0);
 });
 test('鬼連續一分鐘沒抓人變身，地圖越大越久，到期恢复身形',()=>{
   const h=harness('tag'),api=h.c.window.TagRage;api.tick();h.advance(59999);api.tick();assert.equal(api.raging('h'),false);

@@ -9,7 +9,7 @@
   function ensureTimer(){if(!timer)timer=setInterval(tick,250);}
   function sendLocal(message){
     const m={...message,f:MP.id,sr:MP.seriesRound,mid:MP.id+':'+Date.now()+':'+(++serial)};
-    mpHandle(m);if(MP.net){baseSend(m);if(['chaoseffect','chaosloot','chaosuse','ragewall'].includes(m.t))outbox.push({m,left:3,at:performance.now()+400});}return m;
+    mpHandle(m);if(MP.net){baseSend(m);if(['chaoseffect','chaosloot','chaosuse','ragewall','salesync'].includes(m.t))outbox.push({m,left:3,at:performance.now()+400});}return m;
   }
   function abort(reason){
     pending=null;startPacket=null;result=null;$('roomCountdown').hidden=true;

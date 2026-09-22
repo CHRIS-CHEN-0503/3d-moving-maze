@@ -67,14 +67,14 @@
       const items=chunks(text).map(text=>({text,expires:story?0:now()+12000}));
       queue.push(...(story?items:items.slice(0,4-pending)));next();return true;
     }
-    function playAsset(id,fallbackText,{replace=false,story=false,after=''}={}){
+    function playAsset(id,fallbackText,{replace=false,story=false,after='',continuation=[]}={}){
       const track=pack?.get?.(id),fallback=clean(fallbackText||track?.text),tail=clean(after);
       if(!enabled||env.document?.hidden||!track?.src||!recordedSupported)return say(fallback,{replace,story});
       if(replace)stop();failure='';
       if(story)lastStory={text:fallback,asset:id,after:tail};
       const token=generation,audio=new AudioCtor(track.src);currentAudio=audio;
       try{audio.preload='auto';audio.volume=1;}catch(_){}
-      const finish=()=>{if(token!==generation||currentAudio!==audio)return;currentAudio=null;notify();if(tail&&!say(tail,{story:false}))next();else if(!tail)next();};
+      const finish=()=>{if(token!==generation||currentAudio!==audio)return;currentAudio=null;if(continuation.length){playAsset(continuation[0],'',{continuation:continuation.slice(1)});return;}notify();if(tail&&!say(tail,{story:false}))next();else if(!tail)next();};
       const fallbackToSpeech=error=>{if(token!==generation||currentAudio!==audio)return;currentAudio=null;failure=error||'recording-unavailable';notify();if(!say(fallback,{story}))next();};
       audio.onended=finish;audio.onerror=()=>fallbackToSpeech('recording-unavailable');
       try{const result=audio.play();result?.catch?.(()=>fallbackToSpeech('recording-unavailable'));notify();return true;}
@@ -90,7 +90,7 @@
     env.document?.addEventListener?.('visibilitychange',()=>{if(env.document.hidden)stop();});
     env.addEventListener?.('pagehide',()=>stop(true));refresh();
     function replay(){return lastStory?.asset?playAsset(lastStory.asset,lastStory.text,{replace:true,story:true,after:lastStory.after}):say(lastStory?.text||'',{replace:true,story:true});}
-    return {configure,status,listen,refresh,readPanel,stop,announce:(text,replace=false)=>say(text,{replace}),announceAsset:(id,text,replace=false)=>playAsset(id,text,{replace}),replay,preview:()=>say('你好，我會陪你探索迷宮。準備好了，就一起出發吧！',{replace:true})};
+    return {configure,status,listen,refresh,readPanel,stop,announce:(text,replace=false)=>say(text,{replace}),announceAsset:(id,text,replace=false)=>playAsset(id,text,{replace}),announceAssets:(ids,text)=>playAsset(ids[0],text,{replace:true,continuation:ids.slice(1)}),replay,preview:()=>say('你好，我會陪你探索迷宮。準備好了，就一起出發吧！',{replace:true})};
   }
   return {create,clean,chunks,chooseVoice,panelText};
 });

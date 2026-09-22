@@ -47,14 +47,15 @@ await mkdir(outputDir,{recursive:true});
 for(let index=0;index<entries.length;index++){
   const [id,track]=entries[index],destination=path.join(root,track.src.replace(/^\.\//,''));
   if(!force&&existsSync(destination)){console.log(`略過 ${id}`);continue;}
+  await mkdir(path.dirname(destination),{recursive:true});
   console.log(`生成 ${index+1}/${entries.length} ${id}`);
-  const instruct=id.startsWith('shop.sale.')?'活潑親切、明亮有精神的女店員，用中文熱情叫賣，像歡樂超市的限時特賣廣播。咬字清楚，節奏俐落，開心有笑意，強調商品和限時秒數，不要尖叫。':'溫暖、清楚、自然的女聲，像為兒童講冒險故事；咬字清晰，速度稍慢，不誇張。';
-  const queued=await (await request('/generate',{method:'POST',body:JSON.stringify({profile_id:voice.id,text:track.text,language:'zh',engine:'qwen_custom_voice',model_size:'0.6B',seed:20260920+index,instruct,normalize:true})})).json();
+  const instruct='用標準中文，以溫暖自然的女聲清楚說話。逐字咬字清晰，語速稍慢，句號與逗號明顯停頓。像耐心對小朋友說話，不要唱歌，不要拖長尾音，不要喊叫，不加任何額外字詞。';
+  const queued=await (await request('/generate',{method:'POST',body:JSON.stringify({profile_id:voice.id,text:track.spokenText||track.text,language:'zh',engine:'qwen_custom_voice',model_size:'0.6B',seed:20260923+index,instruct,normalize:true})})).json();
   const generation=await waitForGeneration(queued.id);
   const wav=path.join(outputDir,'.'+path.basename(destination,'.mp3')+'.wav');
   const audio=await request('/audio/'+encodeURIComponent(generation.id),{headers:{}});
   await writeFile(wav,Buffer.from(await audio.arrayBuffer()));
-  try{await run('ffmpeg',['-nostdin','-loglevel','error','-y','-i',wav,'-ac','1','-ar','24000','-b:a','64k',destination]);}
+  try{await run('ffmpeg',['-nostdin','-loglevel','error','-y','-i',wav,'-af','atempo=0.9,highpass=f=70,loudnorm=I=-16:TP=-1.5:LRA=9','-ac','1','-ar','24000','-b:a','80k',destination]);}
   finally{await unlink(wav).catch(()=>{});}
 }
 console.log(`完成 ${entries.length} 段專用語音。`);

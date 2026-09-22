@@ -11,12 +11,60 @@ function harness(){
   const voice=V.create(env);return{voice,spoken,synth,env,at:t=>now=t,voices:list=>{voices=list;events.voiceschanged();},finish:()=>spoken.at(-1).onend(),hide:()=>{env.document.hidden=true;docEvents.visibilitychange();}};
 }
 function recordedHarness(){
-  const audio=[],spoken=[];
-  class FakeAudio{constructor(src){this.src=src;audio.push(this);}play(){this.played=true;}pause(){this.paused=true;}}
+  const audio=[],spoken=[],instances=[];
+  class FakeAudio{constructor(){instances.push(this);}play(){const self=this;audio.push({src:this.src,played:true,onended:this.onended,onerror:this.onerror,get paused(){return self.paused;}});}pause(){this.paused=true;}}
   const synth={getVoices:()=>[],addEventListener(){},cancel(){},speak(u){spoken.push(u);}};
   const env={Audio:FakeAudio,MazeVoicePack:{get:id=>id==='intro'?{src:'./intro.mp3',text:'專用旁白'}:id==='limit'?{src:'./limit.mp3',text:'限時十五秒'}:null},speechSynthesis:synth,SpeechSynthesisUtterance:class{constructor(text){this.text=text;}},Date:{now:()=>1000},document:{hidden:false,addEventListener(){}},addEventListener(){}};
-  return{voice:V.create(env),audio,spoken};
+  return{voice:V.create(env),audio,spoken,instances};
 }
+function catalogHarness(speech=true){
+  const audio=[],spoken=[],instances=[];let now=1000;
+  const timers=new Map();let timerId=0;
+  class FakeAudio{constructor(){instances.push(this);}play(){const self=this;audio.push({src:this.src,onended:this.onended,onerror:this.onerror,onplaying:this.onplaying,onwaiting:this.onwaiting,get paused(){return self.paused;}});}pause(){this.paused=true;}}
+  const env={Audio:FakeAudio,MazeVoicePack:require('../assets/voice-pack.js'),Date:{now:()=>now},document:{hidden:false,addEventListener(){}},addEventListener(){},setTimeout(fn){timers.set(++timerId,fn);return timerId;},clearTimeout(id){timers.delete(id);}};
+  if(speech){env.speechSynthesis={getVoices:()=>[],addEventListener(){},cancel(){},speak:u=>spoken.push(u)};env.SpeechSynthesisUtterance=class{constructor(text){this.text=text;}};}
+  const voice=V.create(env);
+  return {voice,audio,spoken,instances,timers,at:t=>now=t,drain(){let i=0,j=0,limit=100;while(voice.status().speaking&&limit--){if(audio[i])audio[i++].onended();else if(spoken[j])spoken[j++].onend();else break;}assert.ok(limit>0);}};
+}
+test('連續錄音重用同一播放器，舊音檔的延遲回呼不能結束新音檔',()=>{
+  const h=catalogHarness();h.voice.announce('單人遊戲');h.voice.announce('多人遊戲');
+  const first=h.audio[0];first.onended();assert.equal(h.audio.length,2);assert.equal(h.instances.length,1);
+  first.onended();first.onerror();assert.equal(h.voice.status().speaking,true);assert.equal(h.spoken.length,0);
+  h.audio[1].onended();assert.equal(h.voice.status().speaking,false);
+});
+test('下載卡住會備援，已開始播放或關閉語音會清除等待計時',()=>{
+  const h=catalogHarness();h.voice.announce('單人遊戲');assert.equal(h.timers.size,1);
+  [...h.timers.values()][0]();assert.equal(h.spoken[0].text,'單人遊戲');assert.equal(h.timers.size,0);
+  h.voice.announce('多人遊戲',true);h.audio[1].onplaying();assert.equal(h.timers.size,0);
+  h.audio[1].onwaiting();assert.equal(h.timers.size,1);h.audio[1].onplaying();assert.equal(h.timers.size,0);
+  h.voice.announce('遊戲設定',true);assert.equal(h.timers.size,1);h.voice.stop();assert.equal(h.timers.size,0);
+});
+test('固定提示自動找錄音，不預載；重複拾取去重且不搶話',()=>{
+  const h=catalogHarness();assert.equal(h.audio.length,0);
+  h.voice.announce('獲得 餅乾');h.voice.announce('獲得 餅乾');h.voice.announce('使用 鐵鍬');
+  assert.equal(h.audio.length,1);assert.equal(h.spoken.length,0);h.drain();assert.equal(h.audio.length,2);assert.equal(h.spoken.length,0);
+});
+test('動態名字保留裝置朗讀，錄音與裝置語音不重疊，也不截斷同一事件',()=>{
+  const h=catalogHarness();h.voice.announce('小雨獲得 餅乾。小晴獲得 牛奶。小明獲得 鐵鍬。');
+  assert.equal(h.spoken[0].text,'小雨');assert.equal(h.audio.length,0);h.drain();
+  assert.equal(h.audio.length,3);assert.deepEqual(h.spoken.map(x=>x.text).join('').replace(/[。]/g,''),'小雨小晴小明');
+});
+test('自動錄音失敗只備援該片段，不重試壞音檔或取消後續事件',()=>{
+  const h=catalogHarness();h.voice.announce('獲得 餅乾');h.voice.announce('使用 鐵鍬');
+  h.audio[0].onerror();assert.equal(h.audio[0].paused,true);assert.equal(h.spoken[0].text,'獲得 餅乾');
+  h.spoken[0].onend();assert.equal(h.audio.length,2);h.audio[1].onended();assert.equal(h.voice.status().speaking,false);
+});
+test('沒有裝置語音仍可播放固定音檔，關閉後舊回呼不能續播',()=>{
+  const h=catalogHarness(false);h.voice.announce('單人遊戲');assert.equal(h.audio.length,1);
+  h.voice.configure({enabled:false});h.audio[0].onended();assert.equal(h.voice.status().speaking,false);assert.equal(h.voice.announce('多人遊戲'),false);
+});
+test('一般事件最多排四個，過期提示不延遲重播；故事不使用事件上限',()=>{
+  const h=catalogHarness();h.voice.announce('單人遊戲');
+  for(const label of ['多人遊戲','遊戲設定','勇者歷史','遊戲說明'])assert.equal(h.voice.announce(label),true);
+  assert.equal(h.voice.announce('鬼抓人'),false);h.at(15000);h.audio[0].onended();assert.equal(h.audio.length,1);
+  const text=['單人遊戲','多人遊戲','遊戲設定','勇者歷史','遊戲說明','鬼抓人'].join('。');
+  const story=catalogHarness();story.voice.readPanel({voiceScope:'full',querySelectorAll:()=>[{closest:()=>null,textContent:text}]});story.drain();assert.equal(story.audio.length,6);
+});
 const female={voiceURI:'mei',name:'Mei-Jia',lang:'zh-TW',localService:true},male={voiceURI:'yun',name:'YunJhe',lang:'zh-TW'},en={voiceURI:'en',name:'Samantha',lang:'en-US'};
 test('叫賣兩段錄音連續播放、拾取朗讀不插隊，關閉語音立即停止',()=>{
   const h=recordedHarness(),states=[];h.voice.listen(s=>states.push(s.speaking));
@@ -95,6 +143,14 @@ test('一般拾取、食物、鐵鍬與購物均只提供名稱播報',()=>{
   assert.match(html,/'獲得 '\+f.type.name/);assert.match(html,/'獲得 '\+gd.g.name/);assert.match(html,/'使用 鐵鍬'/);
 });
 
+test('單人過關、失敗與多人結算提供簡短結果朗讀',()=>{
+  const html=readFileSync(new URL('../index.html',import.meta.url),'utf8');
+  for(const [name,label] of [['winGame','恭喜過關！'],['loseGame','遊戲結束'],['showMPResults','遊戲結束']]){
+    const body=html.slice(html.indexOf('function '+name+'(')).split('\n}')[0];
+    assert.ok(body.includes("window.GameVoice?.announce('"+label+"',true)"),name);
+  }
+});
+
 test('首頁六個選項只讀名稱，快速改選會取代舊朗讀，關閉語音不播報',()=>{
   const h=harness(),events={},nodes=new Map();
   const document={getElementById:id=>{if(!nodes.has(id))nodes.set(id,{addEventListener(){}});return nodes.get(id);},addEventListener:(type,fn)=>events[type]=fn};
@@ -107,4 +163,25 @@ test('首頁六個選項只讀名稱，快速改選會取代舊朗讀，關閉�
   choices.forEach(click);assert.deepEqual(h.spoken.map(u=>u.text),choices);assert.ok(h.synth.cancelled>=6);
   h.voice.configure({enabled:false});choices.forEach(click);assert.equal(h.spoken.length,6);
   const tower=readFileSync(new URL('../story/tower-mode.js',import.meta.url),'utf8');assert.match(tower,/storyEntryBtn'\)\.onclick = \(\) => open\(true\)/);
+});
+
+test('朗讀期間降低背景音樂與道具音效，結束後恢復原本音量',()=>{
+  const nodes=new Map(),levels={};let render;
+  const document={getElementById:id=>{if(!nodes.has(id))nodes.set(id,{addEventListener(){},replaceChildren(){},appendChild(){}});return nodes.get(id);},createElement:()=>({}),addEventListener(){}};
+  const AudioEng={ctx:{currentTime:0}};
+  for(const name of ['musicGain','fxGain','itemGain'])AudioEng[name]={gain:{setTargetAtTime:value=>levels[name]=value}};
+  const voice={listen:fn=>render=fn,configure(){}};
+  vm.runInNewContext(readFileSync(new URL('../assets/voice-settings.js',import.meta.url),'utf8'),{window:{GameVoice:voice},document,AudioEng,CFG:{speechOn:1,speechVoice:''}});
+  render({supported:true,enabled:true,voices:[],speaking:true});assert.deepEqual(levels,{musicGain:.09,fxGain:.45,itemGain:.16});
+  render({supported:true,enabled:true,voices:[],speaking:false});assert.deepEqual(levels,{musicGain:.32,fxGain:.8,itemGain:.4});
+});
+
+test('角色、環境、視角與多人玩法選擇讀出名稱',()=>{
+  const h=harness(),events={},nodes=new Map();
+  const document={getElementById:id=>{if(!nodes.has(id))nodes.set(id,{addEventListener(){}});return nodes.get(id);},addEventListener:(type,fn)=>events[type]=fn};
+  vm.runInNewContext(readFileSync(new URL('../assets/voice-settings.js',import.meta.url),'utf8'),{window:{GameVoice:{...h.voice,listen(){}}},document,CFG:{speechOn:1,speechVoice:''}});
+  for(const [selector,label] of [['#charRow .char-btn','疾風跑者'],['#lvlRow .lvl-btn','神祕城堡'],['#viewRow .view-btn','第三人稱'],['.mp-mode-btn','比賽搶終點']]){
+    events.click({target:{closest:query=>query.split(', ').includes(selector)?{textContent:label}:null}});
+  }
+  assert.deepEqual(h.spoken.map(u=>u.text),['疾風跑者','神祕城堡','第三人稱','比賽搶終點']);
 });

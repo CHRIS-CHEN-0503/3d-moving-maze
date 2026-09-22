@@ -8,7 +8,7 @@ const source=readFileSync(new URL('../assets/shop-sale.js',import.meta.url),'utf
 function harness(size=13,host=true){
   let time=100000;const nodes=new Map(),sent=[],spoken=[],walked=[];
   const chaos={start(){},stop(){},rebuild(){},reserved:()=>false,speed:()=>1};
-  const c=vm.createContext({THREE,window:{ShopChaos:chaos,GameVoice:{announceAssets:(...x)=>spoken.push(x)}},performance:{now:()=>time},Date:{now:()=>time},scene:new THREE.Scene(),
+  const c=vm.createContext({THREE,window:{ShopChaos:chaos,GameVoice:{announceAsset:(...x)=>spoken.push(x)}},performance:{now:()=>time},Date:{now:()=>time},scene:new THREE.Scene(),
     G:{mazeW:size,mazeH:size,cell:4,px:0,pz:0,goods:[],registers:[],roundEndsAt:300000,nextShiftAt:300000},
     MP:{host,on:true,id:host?'h':'g',started:true,ended:false,seed:71,seriesRound:1,round:0,order:['h','g'],roster:[{id:'h'},{id:'g'}],bots:[],cartList:{},carts:{}},
     GOODS:Array.from({length:20},(_,i)=>({name:'商品'+i,emoji:'圖'+i,price:10+i})),CHARS:[{}],
@@ -26,7 +26,8 @@ test('每張地圖只出現一次，六件同品、三種尺寸正確時間、�
   for(const [size,ms] of [[11,15000],[13,20000],[15,20000],[19,25000],[25,25000]]){
     const h=harness(size);h.advance(7999);assert.equal(h.stall,undefined);h.advance(12001);
     assert.ok(h.stall);assert.equal(h.packet.left,ms);assert.equal(h.stall.children.filter(x=>Number.isInteger(x.userData.saleSlot)).length,6);
-    assert.equal(h.spoken.length,1);assert.equal(h.spoken[0][0][1],'shop.sale.limit.'+ms/1000);
+    assert.equal(h.spoken.length,1);assert.equal(h.spoken[0][0],'shop.sale.clear.'+ms/1000);
+    assert.equal(h.spoken[0][1],'大拍賣！限時'+ms/1000+'秒，快來搶購！');assert.equal(h.spoken[0][2],true);
     h.advance(ms-1);assert.ok(h.stall);h.advance(1);assert.equal(h.stall,undefined);
     h.advance(5000);assert.equal(h.stall,undefined);assert.equal(h.spoken.length,1);
     h.c.MP.round++;h.c.window.ShopChaos.rebuild();h.advance(20000);assert.ok(h.stall);assert.equal(h.spoken.length,2);

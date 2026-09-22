@@ -222,8 +222,9 @@
     page=Math.max(0,Math.min(entry.paragraphs.length-1,page));reader={id,page,enter,exit};
     const storyActions=(page?action('上一頁','story-prev'):'')+(page<entry.paragraphs.length-1?action('下一頁','story-next'):action(exit?'收進日誌，走向門後':enter?'收進日誌，繼續探索':'收進日誌','story-finish'))+action(exit?'暫留本層':'稍後在日誌閱讀','close');
     const recorded=id==='scene:99'?'story.scene99.'+(page+1):'';
-    const after=recorded?[page?'上一頁':'',page<entry.paragraphs.length-1?'下一頁':exit?'收進日誌，走向門後':enter?'收進日誌，繼續探索':'收進日誌',exit?'暫留本層':'稍後在日誌閱讀'].filter(Boolean).join('。'):'';
-    dialog('倒轉高塔 · 第 '+entry.floor+' 層 · '+(page+1)+' / '+entry.paragraphs.length,entry.title,'',prose([entry.paragraphs[page]])+(page===entry.paragraphs.length-1?echoCards(S?S.echoesForScene(run,id):[]):''),storyActions,{asset:recorded,afterText:after});
+    const echoes=page===entry.paragraphs.length-1&&S?S.echoesForScene(run,id):[];
+    const after=recorded?[...echoes.flatMap(e=>[e.title,e.text]),page?'上一頁':'',page<entry.paragraphs.length-1?'下一頁':exit?'收進日誌，走向門後':enter?'收進日誌，繼續探索':'收進日誌',exit?'暫留本層':'稍後在日誌閱讀'].filter(Boolean).join('。'):'';
+    dialog('倒轉高塔 · 第 '+entry.floor+' 層 · '+(page+1)+' / '+entry.paragraphs.length,entry.title,'',prose([entry.paragraphs[page]])+echoCards(echoes),storyActions,{asset:recorded,afterText:after});
   }
   function journal() {
     if(!N||!run||G.shifting)return;

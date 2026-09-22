@@ -614,7 +614,7 @@ button:focus-visible,input:focus-visible{outline:3px solid #fff;outline-offset:3
 @media(prefers-reduced-motion:reduce){.flow-panel{animation:none}.home-action{transition:none}}
 </style>
 <link rel="stylesheet" href="assets/game-polish.css">
-<link rel="stylesheet" href="assets/play-controls.css">
+<link rel="stylesheet" href="assets/play-controls.css?v=1.31.0">
 </head>
 <body>
 
@@ -740,7 +740,9 @@ button:focus-visible,input:focus-visible{outline:3px solid #fff;outline-offset:3
   </div>
   <div id="effectChips"></div>
   <button id="actionsToggle" class="round-btn" aria-label="展開或收合操作" aria-expanded="false"><svg viewBox="0 0 32 32" aria-hidden="true"><path d="M5 9h22M5 16h22M5 23h22"/></svg><span class="bl">操作</span></button>
-  <button id="shopTrapBtn" class="game-action-btn" style="display:none" aria-label="放置油漬或黏鼠板"><svg viewBox="0 0 32 32" aria-hidden="true"><path d="M16 3 29 27H3Z M16 11v7 M16 22v1"/></svg><span id="shopTrapCount">3</span></button>
+  <section id="shopMission" hidden aria-label="蒐集任務"><div id="shopMissionTitle"></div><div id="shopMissionItems"></div></section>
+  <div id="shopEggSplat" hidden aria-hidden="true"><i></i><i></i><i></i></div>
+  <button id="shopTrapBtn" class="game-action-btn" style="display:none" aria-label="使用取得的道具"><svg viewBox="0 0 32 32" aria-hidden="true"><path id="shopItemIcon" d="M16 3 29 27H3Z M16 11v7 M16 22v1"/></svg><small id="shopItemName"></small><span id="shopTrapCount">0</span></button>
   <div id="hudRightBtns">
     <button class="round-btn" id="viewToggle" aria-label="切換視角"><span class="ui-icon icon-camera" aria-hidden="true"></span><span class="bl">視角</span></button>
     <button class="round-btn" id="soundToggle" aria-label="切換音樂"><span class="ui-icon icon-sound" aria-hidden="true"></span><span class="bl">音樂</span></button>
@@ -947,6 +949,7 @@ button:focus-visible,input:focus-visible{outline:3px solid #fff;outline-offset:3
       🤏 <b>搶奪</b>：從對手身邊經過時按右下角的<b>搶奪鈕</b>（電腦按 <b>X</b>），會<b>隨機搶走對方購物車裡的一件商品</b>。有對手在旁邊時按鈕會變成橘色閃爍，離太遠會「搶空了」。搶到會顯示<b>搶到什麼</b>，被搶的人也會看到<b>被搶走什麼</b>。冷卻 1.5 秒；電腦也會搶你的東西（開場 8 秒後才開始，之後每 8 秒一次）。
     </div>
     <div>👥 <b>多人連線</b>（2～5 人，房主可選人數上限，視角可自由切換）：標題按「多人連線」，房主建房間唸房號給朋友加入。🏁 比賽搶終點：從不同角落出發搶中間的傳送門；👹 鬼抓人：被抓到就換你當鬼，時間到還是鬼就輸了；💎 尋寶：搶寶藏帶出口；🛒 搶購：比誰的購物車金額多（大地圖人數不足電腦會補位（最多補到房間上限））。</div>
+    <section class="help-coop"><h4>搶購：五樣商品蒐集與？道具箱</h4><p>開始前可選擇開啟「五樣商品蒐集任務」。每輪所有玩家共用隨機五樣商品，<b>可以分次結帳</b>；每樣至少一件完成結帳後，額外獲得 <b>300 分，每輪限一次</b>。畫面左上顯示「待找／車上／已結帳」，點商品圖可聽名稱。車上的商品被搶走就不算，已結帳進度不會丟失。目標商品持續補貨，變形不重設任務。總分＝已結帳金額＋車上金額＋蒐集獎勵。</p><p>開場沒有道具。靠近藍色金蓋的 <b>？道具箱</b>，隨機取得加速（5 秒）、油漬（反向 10 秒）、黏鼠板（定身 5 秒）、泡沫（減速 6 秒）或雞蛋。最多攜帶三個，依取得順序點右側道具鈕使用，間隔 5 秒。滿了不會吃掉道具箱；結帳中不能使用。放置的陷阱 1.5 秒後生效，也可能害到自己。</p><p><b>雞蛋</b>朝角色面向投擲，最遠 10 公尺，牆壁可阻擋；命中對手會遮擋部分視線 5 秒，操作鈕與計時仍可見，雞蛋不會偷走商品。電腦受擊短暫停頓 1.5 秒。超市本身也有地面陷阱及加速踏板，開場和每次變形後重排，前 2.5 秒不觸發。道具箱也會重新出現，已取得的道具仍保留。</p></section>
     <div>🗺️ 點右上角小地圖可以放大成全螢幕；小地圖左上角的 ⤢ 鈕可以切換 1.2 倍大小（特大地圖好用）。</div>
     <section class="help-coop"><h4>合作奪旗｜2 對 2～5 對 5</h4><p>玩家依加入順序交錯分成蒼藍隊、琥珀隊，缺額由電腦補位。中央搶到金旗後，送到<strong>對方基地</strong>守住 3 秒獲勝。敵人站在基地範圍內會中斷佔領。</p><p>持旗速度減少 18%，可按「接力傳旗」或 R，傳給 6 公尺內、沒有牆壁阻擋的隊友。X 攻擊只會擊退敌隊，命中讓對手掉旗並回基地休整 3 秒，之後有 3 秒保護。掉落的旗 20 秒沒人撿會回中央。</p><p>小地圖標示雙方基地、隊友與旗幟。鐵鍬可幫全隊開路；指南針與魔法地圖會指向旗幟或目標基地。勝隊每人 1000 分、送旗者再加 500 分、擊退 +75、幸運星 +100、時間寶石 +150；接力次數另列，不重複刷分。可選 1～10 輪，最後統計隊伍與個人。</p></section>
     <button class="m-close" id="helpClose" style="display:block;margin:10px auto 0;">知道了！</button>
@@ -967,7 +970,7 @@ button:focus-visible,input:focus-visible{outline:3px solid #fff;outline-offset:3
 <script src="./assets/maze-atmosphere.js"></script>
 <script src="./assets/pickup-objects.js"></script>
 <script src="./assets/native-symbols.js"></script>
-<script src="./assets/game-rules.js"></script>
+<script src="./assets/game-rules.js?v=1.31.0"></script>
 <script src="./assets/voice-pack.js"></script>
 <script src="./assets/game-voice.js"></script>
 <script>
@@ -976,10 +979,10 @@ button:focus-visible,input:focus-visible{outline:3px solid #fff;outline-offset:3
    3D移動迷宮 — 給小朋友的變形迷宮冒險
    ===================================================== */
 const $=id=>document.getElementById(id);
-const GAME_VERSION='1.30.0';
+const GAME_VERSION='1.31.0';
 
 /* ---------- 設定（後台可調） ---------- */
-const DEFAULT_CFG={teamSize:2,shiftMin:3,itemCount:6,foodCount:4,hungerMin:3,stunSec:3,pingSec:3,smellCells:3,mazeSize:13,musicOn:1,speechOn:1,speechVoice:'',apiUrl:'',roomMax:3,rounds:3,goodsCount:16,shopMin:2.5,cartFull:400,views:{fp:1,tp:1,top:1},broker:'wss://broker.emqx.io:8084/mqtt'};
+const DEFAULT_CFG={teamSize:2,shiftMin:3,itemCount:6,foodCount:4,hungerMin:3,stunSec:3,pingSec:3,smellCells:3,mazeSize:13,musicOn:1,speechOn:1,speechVoice:'',apiUrl:'',roomMax:3,rounds:3,goodsCount:16,shopCollect:1,shopMin:2.5,cartFull:400,views:{fp:1,tp:1,top:1},broker:'wss://broker.emqx.io:8084/mqtt'};
 let CFG={...DEFAULT_CFG};
 try{const s=JSON.parse(localStorage.getItem('maze3d_cfg')||'{}');CFG={...DEFAULT_CFG,...GameRules.normalize(s),musicOn:s.musicOn===0?0:1,speechOn:s.speechOn===0?0:1,speechVoice:typeof s.speechVoice==='string'?s.speechVoice.slice(0,300):'',rounds:Math.max(1,Math.min(10,Number(s.rounds)||3))};}catch(e){}
 window.GameVoice?.configure({enabled:!!CFG.speechOn,voice:CFG.speechVoice});
@@ -2066,7 +2069,7 @@ function spawnItems(){
   // 搶購：出發點不放商品，才不會有人一開場就白撿一件
   if(isShop()&&G.startCells)for(const c of G.startCells)used.add(c.x+','+c.y);
   let tries=0;
-  while(G.items.length<pickupCfg.itemCount&&tries<300){
+  while(!isShop()&&G.items.length<pickupCfg.itemCount&&tries<300){
     tries++;
     const cx=Math.floor(RNG()*G.mazeW), cy=Math.floor(RNG()*G.mazeH);
     const key=cx+','+cy; if(used.has(key))continue; used.add(key);
@@ -2118,7 +2121,8 @@ function spawnItems(){
       const cx=Math.floor(RNG()*G.mazeW), cy=Math.floor(RNG()*G.mazeH);
       const key=cx+','+cy; if(used.has(key))continue; used.add(key);
       G.goods.push(null);
-      placeGood(G.goods.length-1,GOODS.indexOf(pickGood()),cx,cy);
+      const slot=G.goods.length-1,randomGood=GOODS.indexOf(pickGood());
+      placeGood(slot,window.ShopCollection?.goodForSlot(slot,randomGood)??randomGood,cx,cy);
     }
   }
   // 食物（綠色光圈）
@@ -3054,7 +3058,7 @@ function cartAdd(id,gi){
   MP.carts[id]=(MP.carts[id]||0)+g.price;
 }
 function fromMyBot(id){ return !!(MP.host&&MP.bots&&MP.bots.some(b=>b.id===id)); }
-function shopTotal(id){ return (MP.banked[id]||0)+(MP.carts[id]||0); }   // 已結帳＋還在車上
+function shopTotal(id){ return (MP.banked[id]||0)+(MP.carts[id]||0)+(MP.shopBonus?.[id]||0); }   // 已結帳＋還在車上＋蒐集獎勵
 function isCheckingOut(id){ return performance.now()<(id===MP.id?G.coUntil:(MP.coUntil[id]||0)); }
 /* 離最近的收銀機多遠 */
 function nearRegister(x,z){
@@ -3160,11 +3164,12 @@ function swingRob(){ // 搶奪動作：手往前抓一下
 }
 /* 🛒 搶購模式 HUD：自己的金額、名次、剩餘商品 */
 function updateShopHud(){
+  window.ShopCollection?.render();
   const on=isShop()&&MP.started&&!MP.ended;
   refreshCarts();
   $('cartWrap').style.display=on?'':'none';
   if(!on)return;
-  const cart=MP.carts[MP.id]||0, bank=MP.banked[MP.id]||0, mine=bank+cart;
+  const cart=MP.carts[MP.id]||0, bank=MP.banked[MP.id]||0, mine=shopTotal(MP.id);
   $('cartAmt').textContent='$'+mine;
   const sorted=MP.roster.map(r=>({id:r.id,v:shopTotal(r.id)})).sort((a,b)=>b.v-a.v);
   const rank=sorted.findIndex(x=>x.id===MP.id)+1;
@@ -3333,6 +3338,7 @@ function doShift(){
       buildWalls(theme);
       wallMesh.position.y=-(G.wallH+0.35);
       spawnItems();
+      if(isShop())window.ShopChaos?.rebuild();
       shiftDelay=setTimeout(()=>{
         if(!stillCurrent())return; shiftDelay=0;
         const t1=performance.now();
@@ -4187,6 +4193,7 @@ function mpHandle(m){
       G.lvlIdx=m.lvl;
       $('mpModal').style.display='none';
       $('mpResult').style.display='none';
+      window.ShopCollection?.start();
       startGame();
       if(MP.bots)for(const b of MP.bots){ // 出發點跟真人一樣由 chooseStarts 指派
         const bi=Math.max(0,MP.order.indexOf(b.id))%(G.startCells?G.startCells.length:1);
@@ -4358,9 +4365,10 @@ function mpHandle(m){
       MP.coUntil[m.f]=0;
       const v=Math.max(0,Math.min(m.v||0,MP.carts[m.f]||0));
       MP.banked[m.f]=(MP.banked[m.f]||0)+v;
+      const bonus=v>0?(window.ShopCollection?.checkout(m.f,MP.cartList[m.f]||[])||0):0;
       MP.carts[m.f]=0; MP.cartList[m.f]=[];
-      if(m.f===MP.id)showToast('✅ 結帳完成！$'+v+' 已經入帳，購物車清空了',2400);
-      else showToast('💳 '+mpName(m.f)+' 結完帳了（$'+v+'）',1600);
+      if(m.f===MP.id&&!bonus)showToast('✅ 結帳完成！$'+v+' 已經入帳，購物車清空了',2400);
+      else if(m.f!==MP.id)showToast('💳 '+mpName(m.f)+' 結完帳了（$'+v+'）',1600);
       updateShopHud();
       break;}
     case 'restock':{
@@ -4375,6 +4383,7 @@ function mpHandle(m){
       AudioEng.stopMusic(); AudioEng.stopItemLoop();
       if(m.carts)MP.carts=m.carts;
       if(m.banked)MP.banked=m.banked;
+      if(m.shopBonus)MP.shopBonus=m.shopBonus;
       const rows=MP.roster.map(r=>({name:r.name,id:r.id,charIdx:r.charIdx||0,v:shopTotal(r.id),b:MP.banked[r.id]||0})).sort((a,b)=>b.v-a.v||a.name.localeCompare(b.name,'zh-Hant'));
       const win=rows[0];
       if(win&&win.id===MP.id)AudioEng.sfxWin(); else AudioEng.sfxLose();
@@ -4382,10 +4391,11 @@ function mpHandle(m){
       let html='';
       rows.forEach((r,i)=>{
         html+=`<div>第 ${i+1} 名 · ${escapeHtml(r.name)} — <b>$${r.v}</b>`
-          +`<span style="font-size:.8rem;color:#8be9fd;">（已結帳 $${r.b}）</span>`
+          +`<span style="font-size:.8rem;color:#8be9fd;">（已結帳 $${r.b} · 蒐集 +${MP.shopBonus?.[r.id]||0}）</span>`
           +`${r.id===MP.id?'（你）':''}</div>`;
       });
       $('cartWrap').style.display='none';
+      window.ShopCollection?.render();
       showMPResults('🛒 搶購結果',html,rows.map((r,i)=>({id:r.id,name:r.name,charIdx:r.charIdx,win:i===0,points:r.v})));
       break;}
     case 'wget': // 集合口哨全場唯一：記錄誰拿著
@@ -4549,7 +4559,7 @@ function mpFrame(dt){
     if(MP.host&&!G.frozen)shopRestock(now); // 補貨：架上永遠有東西可以搶
     if(MP.host&&!MP.shopEndSent&&left<=0){
       MP.shopEndSent=true;
-      mpSend({t:'shopend',carts:MP.carts,banked:MP.banked});
+      mpSend({t:'shopend',carts:MP.carts,banked:MP.banked,shopBonus:MP.shopBonus});
     }
   }
   // 鬼抓人：電腦 AI（房主端模擬）
@@ -4630,7 +4640,8 @@ function shopRestock(now){
     }
     if(!found){gd.backAt=now+1500;continue;}
     gd.backAt=now+1e9; // 等廣播回來才真的上架，避免重複補
-    mpSend({t:'restock',i,gi:GOODS.indexOf(pickGood(Math.random)),cx,cy,round:MP.round});
+    const randomGood=GOODS.indexOf(pickGood(Math.random));
+    mpSend({t:'restock',i,gi:window.ShopCollection?.goodForSlot(i,randomGood)??randomGood,cx,cy,round:MP.round});
   }
 }
 /* 🛒 搶購 AI：走去最近還沒被撿的商品；經過別人身邊偶爾也會搶一件 */
@@ -4645,7 +4656,7 @@ function botSimShop(dt,now){
     if(now<(b.coUntil||0))continue;            // 結帳中站著不動
     const spd=loadSpeed(cartLoad(b.id))*(window.ShopChaos?ShopChaos.speed(b.id):1);
     // 車太重就先去結帳，結完再繼續買
-    if(!b.coPending&&cartLoad(b.id)>=0.6&&(G.registers||[]).length){
+    if(!b.coPending&&(cartLoad(b.id)>=0.6||window.ShopCollection?.ready(b.id)||(G.roundEndsAt-now<15000&&(MP.carts[b.id]||0)>0))&&(G.registers||[]).length){
       let best=null,bd=1e9;
       for(const r of G.registers){const d=(r.x-b.x)**2+(r.z-b.z)**2;if(d<bd){bd=d;best=r;}}
       if(best){
@@ -4657,16 +4668,17 @@ function botSimShop(dt,now){
       }
     }
     botTryRob(b,now);
+    if(window.ShopChaos?.collectForBot(b,dt,now,spd))continue;
     let best=null,bd=1e9,bi=-1;
     (G.goods||[]).forEach((gd,i)=>{
       if(!gd||gd.taken)return;
-      const d=(gd.x-b.x)**2+(gd.z-b.z)**2;
+      const d=((gd.x-b.x)**2+(gd.z-b.z)**2)*(window.ShopCollection?.needed(b.id,gd.gi) ? 0.35 : 1);
       if(d<bd){bd=d;best=gd;bi=i;}
     });
     if(!best)continue;
     const c=worldToCell(best.x,best.z);
     botWalk(b,c,'g'+bi,dt,now,spd);
-    if(bd<1.4){ // 撿到（裝進購物車要花點時間，才不會把貨架掃光）
+    if((best.x-b.x)**2+(best.z-b.z)**2<1.4){ // 撿到（裝進購物車要花點時間，才不會把貨架掃光）
       best.taken=true; best.backAt=now+SHOP_RESTOCK_MS; best.sprite.visible=false; best.tag.visible=false;
       cartAdd(b.id,best.gi);
       b.stunnedUntil=now+1400; b.path=null;
@@ -4876,6 +4888,7 @@ function mpRenderLobby(){
   }
 }
 function mpLeave(){
+  window.ShopCollection?.reset();
   if(window.CaptureFlag)CaptureFlag.stop();
   try{mpSend({t:'bye'});}catch(e){}
   clearInterval(MP.posTimer); clearInterval(MP.helloTimer);
@@ -4986,7 +4999,7 @@ window.addEventListener('beforeunload',e=>{
 window.addEventListener('pagehide',()=>{ if(MP.on)try{mpSend({t:'bye'});}catch(e){} });
 </script>
 <script src="assets/classic-audio.js"></script>
-<script src="assets/setup-controls.js"></script>
+<script src="assets/setup-controls.js?v=1.31.0"></script>
 <script src="assets/voice-settings.js"></script>
 <script src="assets/capture-core.js"></script>
 <script src="assets/capture-mode.js"></script>
@@ -4998,8 +5011,10 @@ window.addEventListener('pagehide',()=>{ if(MP.on)try{mpSend({t:'bye'});}catch(e
 <script src="story/tower-characters.js"></script>
 <script src="story/tower-audio.js"></script>
 <script src="story/tower-mode.js"></script>
-<script src="assets/room-lifecycle.js"></script>
-<script src="assets/shop-chaos.js"></script>
+<script src="assets/room-lifecycle.js?v=1.31.0"></script>
+<script src="assets/shop-collection-core.js?v=1.31.0"></script>
+<script src="assets/shop-collection.js?v=1.31.0"></script>
+<script src="assets/shop-chaos.js?v=1.31.0"></script>
 <script src="assets/tag-rage.js"></script>
 <script src="assets/mobile-controls.js"></script>
 </body>

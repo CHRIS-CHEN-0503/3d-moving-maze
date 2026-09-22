@@ -32,6 +32,6 @@ test('加權抽樣與補貨可選到每一種新商品，所有商品均可入�
     assert.equal(c.MP.cartList.player.at(-1),i);assert.equal(c.MP.carts.player,expected);
   });
   c.MP.banked.player=175;assert.equal(c.shopTotal('player'),expected+175);
-  assert.match(html,/gi:GOODS\.indexOf\(pickGood\(Math.random\)\)/);
+  assert.match(html,/randomGood=GOODS\.indexOf\(pickGood\(Math.random\)\)/);
   assert.match(html,/const SHOP_RESTOCK_MS=6000/);
 });

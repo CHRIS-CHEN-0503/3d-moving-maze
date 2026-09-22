@@ -4,9 +4,9 @@ import vm from 'node:vm';
 
 const html = await readFile(new URL('../index.html', import.meta.url), 'utf8');
 
-for (const asset of ['pickup-objects','native-symbols','room-lifecycle','shop-chaos','tag-rage','mobile-controls']) {
+for (const asset of ['pickup-objects','native-symbols','room-lifecycle','shop-collection-core','shop-collection','shop-chaos','tag-rage','mobile-controls']) {
   new vm.Script(await readFile(new URL(`../assets/${asset}.js`, import.meta.url), 'utf8'), {filename:asset+'.js'});
-  assert.match(html, new RegExp(`src="(?:\\./)?assets/${asset}\\.js"`), `缺少遊戲模組：${asset}`);
+  assert.match(html, new RegExp(`src="(?:\\./)?assets/${asset}\\.js(?:\\?v=[\\d.]+)?"`), `缺少遊戲模組：${asset}`);
 }
 
 const requiredIds = [

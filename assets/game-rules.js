@@ -12,6 +12,7 @@
     pingSec:{label:'寶藏位置更新（秒）',value:3,min:1,max:10,step:1,modes:['treasure']},
     smellCells:{label:'鬼的嗅覺範圍（格）',value:3,min:1,max:8,step:1,modes:['tag']},
     goodsCount:{label:'架上商品數量',value:16,min:6,max:60,step:1,modes:['shop']},
+    shopCollect:{label:'五樣商品蒐集任務',value:1,choices:[1,0],labels:{1:'開啟：集齊結帳加 300 分',0:'關閉：只比購物金額'},modes:['shop']},
     shopMin:{label:'每輪時間（分鐘）',value:2.5,min:1,max:10,step:.5,modes:['shop']},
     cartFull:{label:'購物車滿載金額',value:400,min:100,max:2000,step:50,modes:['shop']},
   });

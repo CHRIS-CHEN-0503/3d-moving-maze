@@ -13,7 +13,7 @@ function harness(mode='shop'){
     $:id=>{if(!nodes.has(id))nodes.set(id,{style:{},textContent:'',onclick(){},setAttribute(k,v){this[k]=v;}});return nodes.get(id);},
     matchRules:()=>({itemCount:6}),isCheckingOut:()=>false,
     isShop:()=>mode==='shop',cellToWorld:(x,y)=>({x:(x-6)*4,z:(y-6)*4}),
-    makeTextSprite:()=>new THREE.Group(),disposeSceneObject(){},mpFrame(){},mpHandle(){},botWalk(){},playerInWall:()=>false,bindActionBtn:(el,fn)=>{el.onclick=fn;},
+    makeTextSprite:label=>{const g=new THREE.Group();g.userData.label=label;return g;},disposeSceneObject(){},mpFrame(){},mpHandle(){},botWalk(){},playerInWall:()=>false,bindActionBtn:(el,fn)=>{el.onclick=fn;},
     cancelCheckout(){},addEffect(){},showToast:s=>messages.push(s),mpSend:m=>sent.push(m),
     mpName:id=>id,mpUpdateTagVisuals(){},mpLeave(){},swingWeapon(){},doAttack(){},AudioEng:{sfxBreak(){}},burstParticles(){}});
   c.botPosOf=id=>id==='h'?{x:c.G.px,z:c.G.pz}:id==='g'?{x:50,z:50}:null;
@@ -22,6 +22,18 @@ function harness(mode='shop'){
   vm.runInContext(mode==='shop'?shop:rage,c);
   return {c,nodes,sent,messages,advance:ms=>time+=ms};
 }
+test('地面黏鼠板顯示物件名稱、紙板及雙膠面，不再使用紫色定身色塊',()=>{
+  const h=harness();h.c.window.ShopChaos.start();
+  const boards=h.c.scene.children[0].children.filter(g=>g.children.some(o=>o.userData.label==='黏鼠板'));
+  assert.ok(boards.length>0);
+  for(const board of boards){
+    assert.equal(board.children[0].material.color.getHex(),0xba874e);
+    const pads=board.children.filter(o=>o.material?.isMeshPhongMaterial);
+    assert.equal(pads.length,2);assert.ok(pads.every(o=>o.material.color.getHex()===0xf3c969));
+    assert.equal(pads[0].material,pads[1].material);assert.equal(pads[0].geometry,pads[1].geometry);
+    assert.ok(board.children.every(o=>o.userData.label!=='定身'));
+  }
+});
 test('油漬精確反向十秒、黏板定身五秒，不可由訪客偽造效果',()=>{
   const h=harness();h.c.window.ShopChaos.start();
   h.c.mpHandle({t:'chaoseffect',f:'g',sr:1,round:0,trap:0,id:'h',kind:'oil'});assert.equal(h.c.window.ShopChaos.input(1,0,'h').x,1);

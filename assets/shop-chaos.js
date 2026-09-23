@@ -1,6 +1,6 @@
 (function(){
   'use strict';
-  const kinds={oil:{name:'哎呀！踩到油漬，方向亂掉了！',label:'方向亂掉啦',ms:10000,color:0xe6a827},glue:{name:'踩到黏鼠板，走不動了！',label:'黏住啦',ms:5000,color:0xcb65ad},foam:{name:'滿地泡泡！腳步變得慢吞吞！',label:'慢吞吞',ms:6000,color:0x61cce8},boost:{name:'踩到加速踏板，咻！衝出去囉！',label:'咻！加速中',ms:5000,color:0x65dda1}};
+  const kinds={oil:{name:'哎呀！踩到油漬，方向亂掉了！',label:'方向亂掉啦',ms:10000,color:0xe6a827},glue:{name:'踩到黏鼠板，走不動了！',label:'黏住啦',ms:5000,color:0xba874e},foam:{name:'滿地泡泡！腳步變得慢吞吞！',label:'慢吞吞',ms:6000,color:0x61cce8},boost:{name:'踩到加速踏板，咻！衝出去囉！',label:'咻！加速中',ms:5000,color:0x65dda1}};
   const items={boost:{name:'加速',path:'M19 2 7 18h8l-2 12 12-18h-8Z'},oil:{name:'油漬',path:'M12 3h8v5l3 4v14H9V12l3-4Z M9 18h14'},glue:{name:'黏鼠板',path:'M5 7h22v18H5Z M8 11l16 10 M8 21l16-10'},foam:{name:'泡沫',path:'M6 21a5 5 0 1 0 10 0a5 5 0 1 0-10 0 M17 11a4 4 0 1 0 8 0a4 4 0 1 0-8 0 M4 7h3'},egg:{name:'雞蛋',path:'M16 3C10 3 6 17 6 21a10 8 0 0 0 20 0C26 17 22 3 16 3Z'}};
   const lootPool=['boost','boost','oil','glue','foam','egg','egg'];
   const EGG_MS=10000,eggFaces=new Map();
@@ -16,7 +16,13 @@
     if(!kinds[kind]||id>=64||traps[id])return false;
     const def=kinds[kind],group=new THREE.Group();
     const base=new THREE.Mesh(kind==='glue'?new THREE.BoxGeometry(1.65,.07,1.25):new THREE.CylinderGeometry(.85,1,.06,12),new THREE.MeshLambertMaterial({color:def.color}));base.position.y=.07;group.add(base);
-    const mark=makeTextSprite({oil:'反向',glue:'定身',foam:'減速',boost:'加速'}[kind]);mark.position.y=.45;mark.scale.set(1.25,.38,1);group.add(mark);
+    const mark=makeTextSprite({oil:'反向',glue:'黏鼠板',foam:'減速',boost:'加速'}[kind]);mark.position.y=.45;mark.scale.set(kind==='glue'?1.65:1.25,.38,1);group.add(mark);
+    if(kind==='glue'){
+      // 紙板邊框、中央摺痕與兩片琥珀色膠面；不用紫色技能色塊表示實體道具。
+      const glueMaterial=new THREE.MeshPhongMaterial({color:0xf3c969,specular:0xffedbc,shininess:65});
+      const glueGeometry=new THREE.BoxGeometry(.69,.015,1.03);
+      for(const x of [-.39,.39]){const pad=new THREE.Mesh(glueGeometry,glueMaterial);pad.position.set(x,.1125,0);group.add(pad);}
+    }
     if(kind==='oil'){const bottle=new THREE.Mesh(new THREE.CylinderGeometry(.12,.16,.5,6),new THREE.MeshLambertMaterial({color:0xffdb72}));bottle.rotation.z=1.45;bottle.position.set(.65,.15,.35);group.add(bottle);}
     group.position.set(x,0,z);root.add(group);
     traps[id]={id,kind,x,z,by,armed:now()+(by?1500:2500),mesh:group,used:false};return true;

@@ -10,17 +10,17 @@
     const chosen=CFG.speechVoice,signature=JSON.stringify([chosen,state.voices.map(v=>[v.voiceURI,v.name,v.lang])]);
     if(signature!==voiceSignature){
       voiceSignature=signature;select.replaceChildren();
-      const auto=document.createElement('option');auto.value='';auto.textContent='自動選擇溫柔中文女聲';select.appendChild(auto);
+      const auto=document.createElement('option');auto.value='';auto.textContent='自動：角色配聲／溫暖旁白';select.appendChild(auto);
       for(const v of state.voices){const option=document.createElement('option');option.value=v.voiceURI;option.textContent=v.name+'（'+v.lang+'）';select.appendChild(option);}
       if(chosen&&!state.voices.some(v=>v.voiceURI===chosen)){const missing=document.createElement('option');missing.value=chosen;missing.textContent='上次聲音目前不可用（改用自動）';select.appendChild(missing);}
     }
     select.value=chosen;on.value=String(CFG.speechOn);on.disabled=!state.supported;select.disabled=!state.supported||!state.enabled;preview.disabled=!state.supported||!state.enabled;
     if(salePreview)salePreview.disabled=!state.supported||!state.enabled;
-    hint.textContent=!state.supported?'這個瀏覽器不支援朗讀，文字與遊戲仍可正常使用。':!state.enabled?'語音已關閉，與背景音樂分開設定。':state.failure?'專用音檔暫時無法播放，會嘗試裝置朗讀。請點「試聽」重試並檢查音量。':'固定台詞使用專用女聲音檔；玩家姓名與隨機數字使用裝置朗讀。'+(state.voice?'備援聲音：'+state.voice.name+'。':'裝置中文聲音仍在載入；專用音檔可直接播放。');
+    hint.textContent=!state.supported?'這個瀏覽器不支援朗讀，文字與遊戲仍可正常使用。':!state.enabled?'語音已關閉，與背景音樂分開設定。':state.failure?'專用音檔暫時無法播放，會嘗試裝置朗讀。請點「試聽」重試並檢查音量。':'正常語速；人物固定台詞依性別、年齡與個性配聲。道具提示跟隨角色男女聲，故事旁白保持溫暖女聲。隨機內容的聲線依裝置可用聲音而定。'+(state.voice?'備援旁白：'+state.voice.name+'。':'裝置中文聲音仍在載入；專用音檔可直接播放。');
   }
   on.addEventListener('change',save);select.addEventListener('change',save);preview.addEventListener('click',()=>voice.preview());
   salePreview?.addEventListener('click',()=>voice.announceAsset('shop.sale.clear.20','大拍賣！限時20秒，快來搶購！',true));
-  voice.listen(render);voice.configure({enabled:!!CFG.speechOn,voice:CFG.speechVoice});
+  voice.listen(render);voice.configure({enabled:!!CFG.speechOn,voice:CFG.speechVoice,character:()=>({gender:CH().gender==='m'?'male':'female',age:G.charIdx<4?'child':'adult'})});
   // 系統語音需使用者操作才可播放；正式開始時以一句簡短提示啟動。
   document.getElementById('enterMenuBtn')?.addEventListener('click',()=>voice.announce('歡迎來到移動迷宮。請選擇你的冒險。',true));
   document.addEventListener('click',event=>{

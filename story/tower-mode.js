@@ -118,6 +118,8 @@
     el('towerDialog').voiceSummary=narration.summary||'';
     el('towerDialog').voiceAsset=narration.asset||'';
     el('towerDialog').voiceAfterText=narration.afterText||'';
+    const roleSpeaker=narration.speaker||window.MazeRoleVoices?.profiles?.[narration.asset]||(kicker==='旅途奇遇 · 護衛契約'?{gender:'male',age:nearestWarrior?.offer?.strength===1?'young':'adult'}:null);
+    el('towerDialog').voiceSpeaker=roleSpeaker?{...roleSpeaker,npc:true}:{};
     if(!narration.silent)window.GameVoice?.readPanel(el('towerDialog'));
   }
   function closeDialog() {
@@ -837,7 +839,7 @@
     else if(q.status==='ready')actions+=action('領取報酬','quest-reward',null,!nearExplorer());
     else if(q.status==='active'&&q.type==='donate')actions+=action('交付 '+q.goal+' 份'+C.ITEMS[q.target].name,'quest-donate',null,!nearExplorer()||run.bag[q.target]<q.goal);
     const person=explorerIdentity(),after=!q?[offer.title,copy,'完成報酬：'+rewardDescription(offer.reward),'繼續探索','接受委託'].join('。'):'';
-    dialog(explorerName(),q?.status==='claimed'?'感謝你的幫助':offer.title,copy,(!q?'<p class="tower-copy">'+text(person.greeting||'')+'</p>':'')+'<section class="tower-guard-summary"><h3>完成報酬</h3><p>'+text(rewardDescription(offer.reward))+'</p></section><p class="tower-copy">離開本層、保存回首頁或重整挑戰會解除未結案委託；報酬必須向探索者領取。進出口前會再次確認。裝備放入行囊後請自行穿戴。</p>',actions,{full:true,silent:quiet===true,asset:!q?'explorer.'+person.id:'',afterText:after});
+    dialog(explorerName(),q?.status==='claimed'?'感謝你的幫助':offer.title,copy,(!q?'<p class="tower-copy">'+text(person.greeting||'')+'</p>':'')+'<section class="tower-guard-summary"><h3>完成報酬</h3><p>'+text(rewardDescription(offer.reward))+'</p></section><p class="tower-copy">離開本層、保存回首頁或重整挑戰會解除未結案委託；報酬必須向探索者領取。進出口前會再次確認。裝備放入行囊後請自行穿戴。</p>',actions,{full:true,silent:quiet===true,asset:!q?'explorer.'+person.id:'',afterText:after,speaker:window.MazeRoleVoices?.profiles?.['explorer.'+person.id]});
   }
   function chestDialog() {
     if(!chest||!chest.model.visible)return;

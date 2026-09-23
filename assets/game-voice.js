@@ -11,12 +11,13 @@
     for(const part of parts)for(let i=0;i<part.length;i+=90)out.push(part.slice(i,i+90));
     return out;
   }
-  function chooseVoice(voices,preferred=''){
+  function chooseVoice(voices,preferred='',profile={}){
     const zh=voices.filter(v=>/^zh(?:[-_]|$)/i.test(v.lang));
-    const selected=zh.find(v=>v.voiceURI===preferred);if(selected)return selected;
+    const selected=zh.find(v=>v.voiceURI===preferred);if(selected&&!profile.gender)return selected;
     // 裝置不提供性別欄位，只能優先辨識已知女聲名稱，不假裝保證性別。
     const female=/女|female|mei[-\s]?jia|meijia|美佳|美嘉|曉曉|晓晓|xiaoxiao|hanhan|涵涵|yating|雅婷|hsiao|曉臻|曉雨|tracy|tingting|婷婷|sinji/i;
-    const score=v=>(/^zh[-_]TW$/i.test(v.lang)?40:0)+(female.test(v.name)?80:0)+(v.localService?4:0)+(v.default?2:0);
+    const male=/男|male|yun[-\s]?(jhe|zhe|xi|yang)|雲哲|云哲|云希|云扬|zhiwei|志偉|志伟|kangkang|康康/i;
+    const score=v=>(/^zh[-_]TW$/i.test(v.lang)?40:0)+((profile.gender==='male'?male.test(v.name)&&!female.test(v.name):female.test(v.name))?80:0)+(v.localService?4:0)+(v.default?2:0);
     return zh.slice().sort((a,b)=>score(b)-score(a))[0]||null;
   }
   function panelText(panel){
@@ -35,7 +36,7 @@
     const synth=env.speechSynthesis,Utterance=env.SpeechSynthesisUtterance;
     const speechSupported=!!(synth&&Utterance),AudioCtor=env.Audio,pack=env.MazeVoicePack;
     const recordedSupported=typeof AudioCtor==='function'&&!!pack?.get,supported=speechSupported||recordedSupported,now=()=>env.Date?.now?.()??Date.now();
-    let enabled=true,preferred='',voices=[],queue=[],current=null,currentAudio=null,player=null,generation=0,lastStory=null,failure='',listener=()=>{},sequence=0,loadTimer=null;
+    let enabled=true,preferred='',voices=[],queue=[],current=null,currentAudio=null,player=null,generation=0,lastStory=null,failure='',listener=()=>{},sequence=0,loadTimer=null,character=()=>({});
     const recent=new Map();
     function status(){return {supported,enabled,speaking:!!(current||currentAudio),voice:chooseVoice(voices,preferred),voices:voices.filter(v=>/^zh(?:[-_]|$)/i.test(v.lang)),failure,recorded:recordedSupported};}
     function notify(){listener(status());}
@@ -55,13 +56,14 @@
         const token=++generation,track=pack.get(entry.asset),audio=player||(player=new AudioCtor());currentAudio=audio;
         audio.src=track.src;
         audio.preload='auto';audio.volume=1;
+        audio.playbackRate=track.rate||1.16;audio.preservesPitch=true;
         const finish=()=>{if(token!==generation||currentAudio!==audio)return;clearLoadTimer();currentAudio=null;next();};
         const fallback=()=>{
           if(token!==generation||currentAudio!==audio)return;
           clearLoadTimer();try{audio.pause();}catch(_){}currentAudio=null;failure='recording-unavailable';
           if(entry.group)queue=queue.filter(e=>e.group!==entry.group);
           // Never rematch a failed recording: use device speech once, then continue.
-          queue.unshift(...chunks(entry.text).map(text=>({text,expires:entry.expires,eventGroup:entry.eventGroup})));next();
+          queue.unshift(...chunks(entry.text).map(text=>({text,expires:entry.expires,eventGroup:entry.eventGroup,speaker:entry.speaker||track})));next();
         };
         audio.onended=finish;audio.onerror=fallback;
         audio.onplaying=()=>{if(token===generation&&currentAudio===audio)clearLoadTimer();};
@@ -71,51 +73,52 @@
         try{audio.play()?.catch?.(fallback);notify();}catch(_){fallback();}return;
       }
       if(!speechSupported){failure='unavailable';next();return;}
-      const token=generation,u=new Utterance(entry.text),voice=chooseVoice(voices,preferred);
-      u.lang=voice?.lang||'zh-TW';if(voice)u.voice=voice;u.rate=.9;u.pitch=1.03;u.volume=1;
+      const profile=entry.speaker||{},token=generation,u=new Utterance(entry.text),voice=chooseVoice(voices,preferred,profile);
+      u.lang=voice?.lang||'zh-TW';if(voice)u.voice=voice;u.rate=1;u.pitch=profile.age==='elder'?.95:profile.age==='child'?1.06:1;u.volume=1;
       current=u;
       const finish=()=>{if(token!==generation||current!==u)return;current=null;next();};
       u.onend=finish;u.onerror=e=>{if(token!==generation||current!==u)return;failure=e?.error||'unavailable';current=null;queue=[];notify();};
       try{synth.speak(u);notify();}catch(_){failure='unavailable';current=null;queue=[];notify();}
     }
-    function entriesFor(text,story){
-      const parts=recordedSupported&&pack.plan?pack.plan(text):[{text}],expires=story?0:now()+12000;
-      return parts.flatMap(p=>p.asset?[{...p,expires}]:chunks(p.text).map(text=>({text,expires})));
+    function entriesFor(text,story,speaker={}){
+      const parts=(speaker.deviceOnly||speaker.npc)?[{text}]:recordedSupported&&pack.plan?pack.plan(text,speaker.gender):[{text}],expires=story?0:now()+12000;
+      return parts.flatMap(p=>p.asset?[{...p,expires,speaker}]:chunks(p.text).map(text=>({text,expires,speaker})));
     }
-    function say(value,{replace=false,story=false}={}){
+    function say(value,{replace=false,story=false,speaker={}}={}){
       if(!enabled||!supported||env.document?.hidden)return false;
       const text=clean(value);if(!text)return false;
       if(!story&&!replace){const previous=recent.get(text);if(previous!==undefined&&now()-previous<1800)return false;recent.set(text,now());if(recent.size>32)recent.delete(recent.keys().next().value);}
       if(replace)stop();failure='';
-      if(story)lastStory={text,asset:'',after:''};
+      if(story)lastStory={text,asset:'',after:'',speaker};
       const pending=new Set(queue.filter(e=>e.expires).map(e=>e.eventGroup||e.group)).size;
       if(!story&&pending>=4)return false;
-      const group=++sequence,items=entriesFor(text,story);
+      const group=++sequence,items=entriesFor(text,story,speaker);
       // Limit queued events, not fragments: a mixed recording/dynamic sentence must remain whole.
       queue.push(...items.map(e=>({...e,eventGroup:group})));next();return true;
     }
-    function playAsset(id,fallbackText,{replace=false,story=false,after='',continuation=[]}={}){
+    function playAsset(id,fallbackText,{replace=false,story=false,after='',continuation=[],speaker={}}={}){
       const track=pack?.get?.(id),fallback=clean(fallbackText||track?.text),tail=clean(after);
-      if(!enabled||env.document?.hidden||!track?.src||!recordedSupported)return say(fallback,{replace,story});
+      if(!enabled||env.document?.hidden||!track?.src||!recordedSupported)return say(fallback,{replace,story,speaker});
       if(replace)stop();failure='';
-      if(story)lastStory={text:fallback,asset:id,after:tail};
+      if(story)lastStory={text:fallback,asset:id,after:tail,speaker};
       const group=++sequence,expires=story?0:now()+12000;
-      queue.push({asset:id,text:fallback,expires,group});
+      queue.push({asset:id,text:fallback,expires,group,speaker});
       for(const asset of continuation){const item=pack.get(asset);if(item)queue.push({asset,text:item.text,expires,group});}
-      if(tail)queue.push(...entriesFor(tail,story).map(e=>({...e,group})));
+      if(tail)queue.push(...entriesFor(tail,story,speaker).map(e=>({...e,group})));
       next();return true;
     }
     function readPanel(panel){
       const spoken=panelText(panel),asset=panel?.voiceAsset||'',after=panel?.voiceAfterText||'';
-      return asset?playAsset(asset,spoken,{replace:true,story:true,after}):say(spoken,{replace:true,story:true});
+      const speaker=panel?.voiceSpeaker||{};
+      return asset?playAsset(asset,spoken,{replace:true,story:true,after,speaker}):say(spoken,{replace:true,story:true,speaker});
     }
-    function configure(settings={}){const changed=preferred!==(settings.voice||'');enabled=settings.enabled!==false;preferred=settings.voice||'';if(!enabled||changed)stop();refresh();}
+    function configure(settings={}){if(typeof settings.character==='function')character=settings.character;const changed=preferred!==(settings.voice||'');enabled=settings.enabled!==false;preferred=settings.voice||'';if(!enabled||changed)stop();refresh();}
     function listen(fn){listener=typeof fn==='function'?fn:()=>{};notify();}
     synth?.addEventListener?.('voiceschanged',refresh);
     env.document?.addEventListener?.('visibilitychange',()=>{if(env.document.hidden)stop();});
     env.addEventListener?.('pagehide',()=>stop(true));refresh();
-    function replay(){return lastStory?.asset?playAsset(lastStory.asset,lastStory.text,{replace:true,story:true,after:lastStory.after}):say(lastStory?.text||'',{replace:true,story:true});}
-    return {configure,status,listen,refresh,readPanel,stop,announce:(text,replace=false)=>say(text,{replace}),announceAsset:(id,text,replace=false)=>playAsset(id,text,{replace}),announceAssets:(ids,text)=>playAsset(ids[0],text,{replace:true,continuation:ids.slice(1)}),replay,preview:()=>say('你好，我會陪你探索迷宮。準備好了，就一起出發吧！',{replace:true})};
+    function replay(){return lastStory?.asset?playAsset(lastStory.asset,lastStory.text,{replace:true,story:true,after:lastStory.after,speaker:lastStory.speaker}):say(lastStory?.text||'',{replace:true,story:true,speaker:lastStory?.speaker});}
+    return {configure,status,listen,refresh,readPanel,stop,announce:(text,replace=false)=>say(text,{replace,speaker:/^(獲得|使用|裝備|賣出)\s/.test(clean(text))?character():{}}),announceAsset:(id,text,replace=false)=>playAsset(id,text,{replace}),announceAssets:(ids,text)=>playAsset(ids[0],text,{replace:true,continuation:ids.slice(1)}),replay,preview:()=>say('你好，我會陪你探索迷宮。準備好了，就一起出發吧！',{replace:true})};
   }
   return {create,clean,chunks,chooseVoice,panelText};
 });

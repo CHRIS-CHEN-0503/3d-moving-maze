@@ -1,13 +1,13 @@
 /* 移動迷宮專用錄音索引：音檔只在需要播放時才下載。 */
 (function(root,factory){
-  const api=factory(typeof module==='object'&&module.exports?require('./voice-catalog.js'):root.MazeVoiceCatalog);
+  const api=factory(typeof module==='object'&&module.exports?require('./voice-catalog.js'):root.MazeVoiceCatalog,typeof module==='object'&&module.exports?require('./role-voices.js'):root.MazeRoleVoices);
   if(typeof module==='object'&&module.exports)module.exports=api;
   if(root)root.MazeVoicePack=api;
-})(typeof globalThis!=='undefined'?globalThis:this,function(catalog){
+})(typeof globalThis!=='undefined'?globalThis:this,function(catalog,roles){
   'use strict';
   const saleTracks={};
   for(const [seconds,spoken] of [[15,'十五'],[20,'二十'],[25,'二十五']])saleTracks['shop.sale.clear.'+seconds]=Object.freeze({src:'./assets/voice/sale-clear-'+seconds+'.mp3',text:'大拍賣！限時'+seconds+'秒，快來搶購！',spokenText:'大拍賣！限時'+spoken+'秒，快來搶購！'});
-  const tracks=Object.freeze({
+  const originalTracks={
     ...(catalog?.tracks||{}),
     ...saleTracks,
     'story.scene99.1':Object.freeze({src:'./assets/voice/story-scene99-1.mp3',text:'你醒來時，背下的石台仍在發熱，雲從破損欄杆外緩緩流過。頭頂沒有天空以外的東西，腳邊卻刻著第九十九層。一道平靜的聲音說：「召喚完成。」你問這是哪裡，它只重複那四個字，像一扇從不聽人回答的門。'}),
@@ -22,13 +22,14 @@
     'explorer.oren':Object.freeze({src:'./assets/voice/explorer-oren.mp3',text:'石壁上的古文還沒讀完，牆就搬走啦。年輕人，陪我找找下一句？'}),
     'explorer.sena':Object.freeze({src:'./assets/voice/explorer-sena.mp3',text:'從塔頂看過的流星，我一顆都記得。希望下一次，能站在塔外仰望。'}),
     'alert.monster':Object.freeze({src:'./assets/voice/alert-monster.mp3',text:'小心，附近有怪物。留意地上的紅圈，準備閃避，或請護衛攔住牠。'}),
-  });
+  };
+  const tracks=Object.freeze({...originalTracks,...roles?.tracks,...roles?.overrides});
   function get(id){return typeof id==='string'&&Object.hasOwn(tracks,id)?tracks[id]:null;}
   const normalize=s=>String(s||'').replace(/[\p{Extended_Pictographic}\uFE0F\u200D]/gu,'').replace(/\s+/g,'').replace(/[·・]/g,'・');
-  const byText=new Map();for(const [id,track] of Object.entries(tracks))byText.set(normalize(track.text),id);
+  const byText=new Map();for(const [id,track] of Object.entries(tracks))if(!id.startsWith('role.'))byText.set(normalize(track.text),id);
   const keys=[...byText.keys()].filter(Boolean).sort((a,b)=>b.length-a.length);
   const pattern=new RegExp(keys.map(k=>k.replace(/[.*+?^${}()|[\]\\]/g,'\\$&')).join('|'),'gu');
-  function plan(text){
+  function plan(text,gender){
     const original=String(text||'').replace(/[\p{Extended_Pictographic}\uFE0F\u200D]/gu,'').replace(/[·・]/g,'・');
     const positions=[],characters=[];
     for(let i=0;i<original.length;i++)if(!/\s/.test(original[i])){positions.push(i);characters.push(original[i]);}
@@ -36,7 +37,7 @@
     for(const match of source.matchAll(pattern)){
       const start=positions[match.index],end=positions[match.index+match[0].length-1]+1;
       if(start>cursor)out.push({text:original.slice(cursor,start)});
-      const asset=byText.get(match[0]);out.push({asset,text:tracks[asset].text});cursor=end;
+      const base=byText.get(match[0]),asset=roles?.variants?.[base]?.[gender]||base;out.push({asset,text:tracks[asset].text});cursor=end;
     }
     if(!out.length)return [{text:String(text)}];
     if(cursor<original.length)out.push({text:original.slice(cursor)});

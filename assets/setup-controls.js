@@ -2,6 +2,8 @@
 (function(){
   'use strict';
   const panel=document.getElementById('matchSettings');
+  let lastMode=G.spMode;
+  const shiftByMode={shop:1};
   for(const [key,def] of Object.entries(GameRules.FIELDS)){
     const label=document.createElement('label');label.className='match-field';label.dataset.rule=key;
     const caption=document.createElement('span');caption.textContent=def.label;label.appendChild(caption);
@@ -24,6 +26,12 @@
   for(const [value,title] of [['1','開啟'],['0','關閉']]){const option=document.createElement('option');option.value=value;option.textContent=title;music.appendChild(option);}
   music.value=String(CFG.musicOn);music.addEventListener('change',()=>{CFG.musicOn=Number(music.value);G.muted=!CFG.musicOn;saveCfg();updateSoundBtn();});musicLabel.appendChild(music);panel.appendChild(musicLabel);
   function refresh(){
+    if(lastMode!==G.spMode){
+      shiftByMode[lastMode]=CFG.shiftMin;
+      CFG.shiftMin=shiftByMode[G.spMode]??3;
+      document.getElementById('rule-shiftMin').value=CFG.shiftMin;
+      lastMode=G.spMode;
+    }
     const shown=GameRules.visible(G.spMode);
     panel.querySelectorAll('[data-rule]').forEach(row=>{row.hidden=!shown.includes(row.dataset.rule);});
     panel.querySelector('[data-rule="itemCount"] > span').textContent=G.spMode==='shop'?'每次出現的？道具箱':'每次出現的道具';

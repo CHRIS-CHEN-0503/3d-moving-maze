@@ -21,7 +21,8 @@ parser.add_argument("--prefix", default="generated.")
 parser.add_argument("--force", action="store_true")
 parser.add_argument("--batch", type=int, default=4)
 parser.add_argument("--limit", type=int, default=0)
-parser.add_argument("--speaker", default="serena", choices=["serena", "vivian"])
+parser.add_argument("--speaker", default="serena", choices=["serena", "vivian", "uncle_fu", "dylan", "eric"])
+parser.add_argument("--manifest", type=Path, help="Explicit track manifest with optional speaker/instruction")
 parser.add_argument("--output-dir", type=Path)
 parser.add_argument("--resume-log", type=Path)
 parser.add_argument("--retry-ids", type=Path, help="JSON array of existing recording IDs to replace")
@@ -29,7 +30,7 @@ args = parser.parse_args()
 if not 1 <= args.batch <= 16:
     parser.error("batch must be between 1 and 16")
 root = Path(__file__).resolve().parent.parent
-tracks = json.loads(subprocess.check_output(
+tracks = json.loads(args.manifest.read_text()) if args.manifest else json.loads(subprocess.check_output(
     ["node", "-e", "console.log(JSON.stringify(require('./assets/voice-pack.js').tracks))"], cwd=root
 ))
 retry_ids = set(json.loads(args.retry_ids.read_text())) if args.retry_ids else set()
@@ -52,7 +53,7 @@ model = load_model(model_id)
 mx.set_memory_limit(6 * 1024 ** 3)
 print("模型已載入，開始合成。", flush=True)
 spoken_chinese = OpenCC("t2s")
-instruction = "用温暖自然的女声，像耐心对小朋友说话一样，清晰准确地读出每个字。语速稍慢，标点处自然停顿，不要喊叫，不要唱歌。"
+instruction = "用自然清晰的普通话朗读，正常说话速度，短句连贯，不要拖长字音。标点处短暂停顿，不要喊叫，不要唱歌。饼干读作 bǐng gān，铜币读作 tóng bì。"
 started = time.monotonic()
 with tempfile.TemporaryDirectory(prefix="maze-voice-encode-") as temporary:
     for start in range(0, len(entries), args.batch):
@@ -65,7 +66,7 @@ with tempfile.TemporaryDirectory(prefix="maze-voice-encode-") as temporary:
         # Leave generous headroom and reject capped output instead of saving a cut-off sentence.
         token_limit = max(256, max(len(text) for text in texts) * 12 + 128)
         for result in model.batch_generate(
-            texts=texts, voices=[args.speaker] * len(batch), instructs=[instruction] * len(batch),
+            texts=texts, voices=[track.get("speaker", args.speaker) for _, track in batch], instructs=[instruction + track.get("instruction", "") for _, track in batch],
             lang_code="chinese", temperature=0.65, top_p=0.9,
             max_tokens=token_limit,
             repetition_penalty=1.1, stream=False,
@@ -84,7 +85,7 @@ with tempfile.TemporaryDirectory(prefix="maze-voice-encode-") as temporary:
             encoded = destination.with_suffix(".partial.mp3")
             subprocess.run([
                 "ffmpeg", "-nostdin", "-loglevel", "error", "-y", "-i", str(wav),
-                "-af", "atempo=0.93,highpass=f=70,loudnorm=I=-16:TP=-1.5:LRA=9",
+                "-af", "highpass=f=70,loudnorm=I=-16:TP=-1.5:LRA=9",
                 "-ac", "1", "-ar", "24000", "-b:a", "80k", str(encoded),
             ], check=True, timeout=45)
             encoded.replace(destination)

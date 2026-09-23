@@ -974,15 +974,16 @@ button:focus-visible,input:focus-visible{outline:3px solid #fff;outline-offset:3
 <script src="./assets/native-symbols.js"></script>
 <script src="./assets/game-rules.js?v=1.31.0"></script>
 <script src="./assets/voice-catalog.js?v=1.33.0"></script>
-<script src="./assets/voice-pack.js?v=1.33.0"></script>
-<script src="./assets/game-voice.js?v=1.33.0"></script>
+<script src="./assets/role-voices.js?v=1.34.0"></script>
+<script src="./assets/voice-pack.js?v=1.34.0"></script>
+<script src="./assets/game-voice.js?v=1.34.0"></script>
 <script>
 'use strict';
 /* =====================================================
    3D移動迷宮 — 給小朋友的變形迷宮冒險
    ===================================================== */
 const $=id=>document.getElementById(id);
-const GAME_VERSION='1.33.1';
+const GAME_VERSION='1.34.0';
 
 /* ---------- 設定（後台可調） ---------- */
 const DEFAULT_CFG={teamSize:2,shiftMin:3,itemCount:6,foodCount:4,hungerMin:3,stunSec:3,pingSec:3,smellCells:3,mazeSize:13,musicOn:1,speechOn:1,speechVoice:'',apiUrl:'',roomMax:3,rounds:3,goodsCount:16,shopCollect:1,shopMin:2.5,cartFull:400,views:{fp:1,tp:1,top:1},broker:'wss://broker.emqx.io:8084/mqtt'};
@@ -5012,8 +5013,8 @@ window.addEventListener('beforeunload',e=>{
 window.addEventListener('pagehide',()=>{ if(MP.on)try{mpSend({t:'bye'});}catch(e){} });
 </script>
 <script src="assets/classic-audio.js"></script>
-<script src="assets/setup-controls.js?v=1.31.0"></script>
-<script src="assets/voice-settings.js?v=1.33.0"></script>
+<script src="assets/setup-controls.js?v=1.34.0"></script>
+<script src="assets/voice-settings.js?v=1.34.0"></script>
 <script src="assets/capture-core.js"></script>
 <script src="assets/capture-mode.js"></script>
 <script src="story/story-core.js"></script>
@@ -5023,11 +5024,11 @@ window.addEventListener('pagehide',()=>{ if(MP.on)try{mpSend({t:'bye'});}catch(e
 <script src="story/tower-encounters.js"></script>
 <script src="story/tower-characters.js"></script>
 <script src="story/tower-audio.js"></script>
-<script src="story/tower-mode.js?v=1.33.0"></script>
-<script src="assets/room-lifecycle.js?v=1.32.0"></script>
+<script src="story/tower-mode.js?v=1.34.0"></script>
+<script src="assets/room-lifecycle.js?v=1.34.0"></script>
 <script src="assets/shop-collection-core.js?v=1.31.0"></script>
 <script src="assets/shop-collection.js?v=1.31.0"></script>
-<script src="assets/shop-chaos.js?v=1.33.1"></script>
+<script src="assets/shop-chaos.js?v=1.34.0"></script>
 <script src="assets/shop-sale.js?v=1.33.0"></script>
 <script src="assets/tag-rage.js"></script>
 <script src="assets/mobile-controls.js"></script>

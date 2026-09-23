@@ -15,8 +15,10 @@ function room(){
       mpSend:m=>packets.push(JSON.parse(JSON.stringify({...m,f:m.f||id}))),
       mpHandle:m=>{if(m.t==='start'){MP.started=true;MP.ended=false;MP.seriesRound=m.seriesRound||1;G.running=true;G.roundEndsAt=time+10000;starts.push(m);}
         if(['shopend','end'].includes(m.t)&&MP.started&&!MP.ended){MP.started=false;MP.ended=true;ends.push(m);}
+        if(m.t==='lobby'&&!host)MP.roster=m.players;
         if(m.t==='bye')MP.roster=MP.roster.filter(r=>r.id!==m.f);},
-      mpLeave(){MP.on=false;},mpConnect:async()=>{},mpRenderLobby(){},mpBroadcastLobby(){},mpLobbyPlan:()=>({ready:MP.roster.filter(r=>r.id!=='h').every(r=>r.ready)&&MP.roster.length===2}),
+      bindActionBtn:(node,fn)=>node.onclick=fn,
+      mpLeave(){MP.on=false;},mpConnect:async()=>{},mpRenderLobby(){},mpBroadcastLobby(){packets.push(JSON.parse(JSON.stringify({t:'lobby',f:id,players:MP.roster})));},mpLobbyPlan:()=>({ready:MP.roster.filter(r=>r.id!=='h').every(r=>r.ready)&&MP.roster.length===2}),
       mpRoundPlayers:()=>MP.roster,mpEndRace(){MP.started=false;MP.ended=true;ends.push('race');},showMPResults(){},resetSeries(){},selectedRoundTotal:()=>2,sendMpRoundStart(){}});
     vm.runInContext(src,c);const p={c,nodes,ends,starts};peers.push(p);return p;
   }
@@ -48,4 +50,17 @@ test('準備狀態只由房主更新名單，未知玩家不能插入',()=>{
   const r=room();r.host.c.mpHandle({t:'ready',f:'g',ready:false});assert.equal(r.host.c.MP.roster[1].ready,false);
   r.host.c.mpHandle({t:'ready',f:'g',ready:true});assert.equal(r.host.c.MP.roster[1].ready,true);
   r.host.c.mpHandle({t:'ready',f:'stranger',ready:true});assert.equal(r.host.c.MP.roster.length,2);
+});
+test('訪客按一次準備立即顯示傳送中，遺失封包重送直到房主確認',()=>{
+  const r=room();r.host.c.MP.roster[1].ready=false;r.guest.c.MP.roster[1].ready=false;
+  r.guest.nodes.get('mpReady').onclick();assert.equal(r.guest.nodes.get('mpReady').disabled,true);
+  assert.match(r.guest.nodes.get('mpReady').textContent,/傳送中/);r.packets.length=0;
+  r.advance(801);r.flush();assert.equal(r.host.c.MP.roster[1].ready,true);assert.equal(r.guest.nodes.get('mpReady').disabled,false);
+  r.guest.nodes.get('mpReady').onclick();r.flush();assert.equal(r.host.c.MP.roster[1].ready,false);
+  r.host.c.mpHandle({t:'ready',f:'g',ready:true,readySeq:1});assert.equal(r.host.c.MP.roster[1].ready,false);
+});
+test('準備確認逾時解鎖重試；離開清除待送狀態',()=>{
+  const r=room();r.guest.nodes.get('mpReady').onclick();r.packets.length=0;r.advance(10001);
+  assert.equal(r.guest.nodes.get('mpReady').disabled,false);assert.match(r.guest.nodes.get('mpStatus').textContent,/再按一次/);
+  r.guest.nodes.get('mpReady').onclick();r.guest.c.mpLeave();r.packets.length=0;r.advance(1000);assert.equal(r.packets.some(m=>m.t==='ready'),false);
 });

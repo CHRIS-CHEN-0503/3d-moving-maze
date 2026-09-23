@@ -66,6 +66,18 @@ test('一般事件最多排四個，過期提示不延遲重播；故事不使�
   const story=catalogHarness();story.voice.readPanel({voiceScope:'full',querySelectorAll:()=>[{closest:()=>null,textContent:text}]});story.drain();assert.equal(story.audio.length,6);
 });
 const female={voiceURI:'mei',name:'Mei-Jia',lang:'zh-TW',localService:true},male={voiceURI:'yun',name:'YunJhe',lang:'zh-TW'},en={voiceURI:'en',name:'Samantha',lang:'en-US'};
+test('角色男聲、女聲與修正版讀音使用專用錄音，正常速度且維持音高',()=>{
+  const h=catalogHarness();h.voice.configure({character:()=>({gender:'male'})});h.voice.announce('獲得 餅乾');
+  assert.match(h.audio[0].src,/roles\/male-/);assert.equal(h.instances[0].playbackRate,1);assert.equal(h.instances[0].preservesPitch,true);
+  h.voice.configure({character:()=>({gender:'female'})});h.voice.announce('獲得 銅幣',true);assert.match(h.audio[1].src,/roles\/fix-/);
+  h.voice.announce('單人遊戲',true);assert.equal(h.instances[0].playbackRate,1.16);
+  assert.equal(V.chooseVoice([female,male],'mei',{gender:'male'}),male);
+  assert.equal(V.chooseVoice([female,male],'yun',{gender:'female'}),female);
+});
+test('人物動態對話保持人物性別，不混入不同性別的通用錄音',()=>{
+  const h=catalogHarness();h.voice.readPanel({voiceScope:'full',voiceSpeaker:{gender:'male',npc:true},querySelectorAll:()=>[{closest:()=>null,textContent:'獲得 餅乾'}]});
+  assert.equal(h.audio.length,0);assert.equal(h.spoken[0].text,'獲得 餅乾');
+});
 test('叫賣兩段錄音連續播放、拾取朗讀不插隊，關閉語音立即停止',()=>{
   const h=recordedHarness(),states=[];h.voice.listen(s=>states.push(s.speaking));
   h.voice.announceAssets(['intro','limit'],'商品大拍賣，限時十五秒');h.voice.announce('獲得商品');
@@ -81,7 +93,7 @@ test('叫賣第一段失敗朗讀完整句；第二段失敗只讀秒數',()=>{
 test('自動優先台灣中文女聲，尊重指定中文聲音，延遲載入也能更新',()=>{
   assert.equal(V.chooseVoice([en,male,female]),female);assert.equal(V.chooseVoice([female,male],'yun'),male);assert.equal(V.chooseVoice([en]),null);
   assert.equal(V.chooseVoice([{name:'婷婷',lang:'zh-CN'},{name:'美佳',lang:'zh-TW'}]).name,'美佳');
-  const h=harness();h.voices([en,male,female]);h.voice.announce('你好');assert.equal(h.spoken[0].voice,female);assert.equal(h.spoken[0].rate,.9);assert.equal(h.spoken[0].pitch,1.03);
+  const h=harness();h.voices([en,male,female]);h.voice.announce('你好');assert.equal(h.spoken[0].voice,female);assert.equal(h.spoken[0].rate,1);assert.equal(h.spoken[0].pitch,1);
 });
 test('完整故事分段串接不重疊，換頁與停止使舊回呼失效',()=>{
   const h=harness();h.voice.readPanel({voiceScope:'full',querySelectorAll:()=>[{closest:()=>null,textContent:'第一段。第二段。第三段。'}]});

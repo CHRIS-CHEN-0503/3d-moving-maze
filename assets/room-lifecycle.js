@@ -4,6 +4,11 @@
   const baseHandle=mpHandle,baseSend=mpSend,baseLeave=mpLeave;
   let timer=null,pending=null,lastStart='',lastHost=0,lastPulse=0,lastRetry=0,result=null,startPacket=null;
   const seen=new Set(),outbox=[];let serial=0;
+  let readyRequest=null,readySerial=0;
+  function renderReady(){
+    const button=$('mpReady');button.disabled=!!pending||!!readyRequest;
+    if(readyRequest){button.textContent='準備狀態傳送中…';$('mpStatus').textContent='正在等待房主確認…';}
+  }
   const hostId=()=>MP.roster?.[0]?.id;
   const critical=new Set(['start','end','shopend','shift','raceend','twin']);
   function ensureTimer(){if(!timer)timer=setInterval(tick,250);}
@@ -23,6 +28,10 @@
   function tick(){
     const now=performance.now();
     if(!MP.on)return;
+    if(readyRequest&&!MP.host&&!pending){
+      if(now>=readyRequest.deadline){readyRequest=null;mpRenderLobby();renderReady();$('mpStatus').textContent='房主尚未確認，請再按一次準備或檢查連線。';}
+      else if(now>=readyRequest.retryAt){baseSend(readyRequest.packet);readyRequest.retryAt=now+800;}
+    }
     for(let i=outbox.length-1;i>=0;i--){const retry=outbox[i];if(now>=retry.at){if(MP.net)baseSend(retry.m);retry.at=now+400;if(--retry.left<=0)outbox.splice(i,1);}}
     if(!MP.host&&now-lastPulse>1000){lastPulse=now;baseSend({t:'roompresent'});}
     if(MP.host&&!MP.started){
@@ -75,7 +84,11 @@
       return;
     }
     if(m.t==='ready'){
-      if(MP.host&&!MP.started&&!pending){const player=MP.roster.find(r=>r.id===m.f&&!r.bot);if(player){player.ready=m.ready===true;mpRenderLobby();mpBroadcastLobby();}}
+      if(MP.host&&!MP.started&&!pending){const player=MP.roster.find(r=>r.id===m.f&&!r.bot);if(player){
+        if(Number.isSafeInteger(m.readySeq)&&m.readySeq<(player.readySeq||0))return;
+        player.ready=m.ready===true;if(Number.isSafeInteger(m.readySeq))player.readySeq=m.readySeq;
+        mpRenderLobby();mpBroadcastLobby();
+      }}
       return;
     }
     if(m.t==='hello'&&pending){baseSend({t:'full',to:m.f});return;}
@@ -96,7 +109,11 @@
     }
     baseHandle(m);
     if(m.t==='hello'&&MP.host){const p=MP.roster.find(r=>r.id===m.f);if(p)p.seenAt=performance.now();}
-    if(m.t==='lobby'){$('mpReady').disabled=!!pending;ensureTimer();}
+    if(m.t==='lobby'){
+      const me=MP.roster.find(r=>r.id===MP.id);
+      if(readyRequest&&me?.ready===readyRequest.packet.ready&&me.readySeq===readyRequest.packet.readySeq)readyRequest=null;
+      renderReady();ensureTimer();
+    }
     if(m.t==='start'){window.TagRage?.reset();window.ShopChaos?.start();}
   };
   const finishRace=mpEndRace;
@@ -126,12 +143,17 @@
     if(round===1)resetSeries('multi',selectedRoundTotal(),players);
     sendMpRoundStart(players,round);
   };
-  $('mpReady').onclick=()=>{
-    if(MP.host||pending)return;
-    const me=MP.roster.find(r=>r.id===MP.id);if(me)baseSend({t:'ready',ready:!me.ready});
-  };
+  bindActionBtn($('mpReady'),()=>{
+    if(!MP.on||MP.host||MP.started||pending||readyRequest)return;
+    const me=MP.roster.find(r=>r.id===MP.id);if(!me)return;
+    readySerial=Math.max(readySerial,me.readySeq||0)+1;
+    const packet={t:'ready',ready:!me.ready,readySeq:readySerial};
+    readyRequest={packet,retryAt:performance.now()+800,deadline:performance.now()+10000};
+    baseSend(packet);renderReady();ensureTimer();
+  });
   mpLeave=function(){
     clearInterval(timer);timer=null;pending=null;startPacket=null;result=null;lastStart='';seen.clear();outbox.length=0;
+    readyRequest=null;readySerial=0;
     $('roomCountdown').hidden=true;$('mpReady').disabled=false;window.ShopChaos?.stop();baseLeave();
   };
   const connect=mpConnect;

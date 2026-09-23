@@ -22,17 +22,17 @@ function harness(mode='shop'){
   vm.runInContext(mode==='shop'?shop:rage,c);
   return {c,nodes,sent,messages,advance:ms=>time+=ms};
 }
-test('地面黏鼠板顯示物件名稱、紙板及雙膠面，不再使用紫色定身色塊',()=>{
+test('陷阱使用無文字透明圖片與一至四格連續區域，不鋪實色色塊',()=>{
   const h=harness();h.c.window.ShopChaos.start();
-  const boards=h.c.scene.children[0].children.filter(g=>g.children.some(o=>o.userData.label==='黏鼠板'));
+  const boards=h.c.scene.children[0].children.filter(g=>g.userData.trapKind);
   assert.ok(boards.length>0);
   for(const board of boards){
-    assert.equal(board.children[0].material.color.getHex(),0xba874e);
-    const pads=board.children.filter(o=>o.material?.isMeshPhongMaterial);
-    assert.equal(pads.length,2);assert.ok(pads.every(o=>o.material.color.getHex()===0xf3c969));
-    assert.equal(pads[0].material,pads[1].material);assert.equal(pads[0].geometry,pads[1].geometry);
-    assert.ok(board.children.every(o=>o.userData.label!=='定身'));
+    assert.ok(board.children.length>=1&&board.children.length<=4);
+    assert.ok(board.children.every(o=>o.geometry?.type==='PlaneGeometry'&&o.material.map&&o.material.transparent&&!o.userData.label));
+    assert.equal(board.userData.cells.length,board.children.length);
+    for(const c of board.userData.cells)assert.ok(Math.hypot(c.x+24,c.z+24)>=6);
   }
+  assert.ok(boards.some(b=>b.children.length>1));
 });
 test('油漬精確反向十秒、黏板定身五秒，不可由訪客偽造效果',()=>{
   const h=harness();h.c.window.ShopChaos.start();
@@ -42,6 +42,23 @@ test('油漬精確反向十秒、黏板定身五秒，不可由訪客偽造效�
   h.c.mpHandle({t:'chaoseffect',f:'h',sr:1,round:0,trap:1,id:'h',kind:'glue'});assert.equal(h.c.window.ShopChaos.speed('h'),0);
   assert.equal(h.messages.at(-1),'踩到黏鼠板，走不動了！');assert.doesNotMatch(h.messages.at(-1),/定身|秒/);
   h.advance(5000);assert.equal(h.c.window.ShopChaos.speed('h'),1);
+});
+test('擴展格也可觸發陷阱，圖片未載入時不產生隱形傷害',()=>{
+  const h=harness();h.c.window.ShopChaos.start();h.advance(3000);
+  const t=h.c.scene.children[0].children.find(g=>g.userData.cells?.length>1),p=t.userData.cells[1];
+  h.c.G.px=p.x;h.c.G.pz=p.z;h.c.window.ShopChaos.tick(.2);
+  assert.ok(h.sent.some(m=>m.t==='chaoseffect'&&m.kind===t.userData.trapKind));
+  const loading=harness();loading.c.Image=class{constructor(){this.naturalWidth=0;}};loading.c.window.ShopChaos.start();loading.advance(3000);
+  const hidden=loading.c.scene.children[0].children.find(g=>g.userData.trapKind);assert.equal(hidden.visible,false);
+  loading.c.G.px=hidden.position.x;loading.c.G.pz=hidden.position.z;loading.c.window.ShopChaos.tick(.2);
+  assert.equal(loading.sent.some(m=>m.t==='chaoseffect'),false);
+});
+test('擴展範圍不跨牆、不覆蓋商品或問號箱，配置不重疊',()=>{
+  const h=harness();h.c.playerInWall=(x,z)=>Math.abs(x-2)<.4;h.c.G.goods=[{x:8,z:8}];h.c.window.ShopChaos.start();
+  const all=h.c.scene.children[0].children,boards=all.filter(g=>g.userData.trapKind),cells=boards.flatMap(g=>g.userData.cells);
+  assert.equal(new Set(cells.map(c=>c.x+','+c.z)).size,cells.length);
+  for(const b of boards){const signs=new Set(b.userData.cells.map(c=>c.x<2));assert.equal(signs.size,1);}
+  for(const c of cells){assert.ok(Math.hypot(c.x-8,c.z-8)>=2);for(const box of all.filter(g=>g.userData.shopBox!==undefined))assert.ok(Math.hypot(c.x-box.position.x,c.z-box.position.z)>=4);}
 });
 test('陷阱重播不延長效果；新回合重建，離開會釋放場景',()=>{
   const h=harness();h.c.window.ShopChaos.start();const p={t:'chaoseffect',f:'h',sr:1,round:0,trap:0,id:'h',kind:'oil'};

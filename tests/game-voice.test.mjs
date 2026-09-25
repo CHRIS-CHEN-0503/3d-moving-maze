@@ -85,6 +85,15 @@ test('進入遊戲固定使用低沉男聲，錄音失敗仍保留男性備援�
   assert.equal(h.audio[0].src,track.src);h.audio[0].onerror();assert.equal(h.spoken[0].voice,male);
   h.voice.announce('單人遊戲',true);assert.doesNotMatch(h.audio.at(-1).src,/welcome-deep|roles\/male-/);
 });
+test('迷宮變幻沿用入口男聲，回音音檔正常速度，關閉語音停止整段回音',()=>{
+  const pack=require('../assets/voice-pack.js'),track=pack.get('maze.shift.deep'),welcome=pack.get('generated.7bbe2bf45512cd12');
+  assert.equal(track.speaker,welcome.speaker);assert.equal(track.instruction,welcome.instruction);assert.equal(track.gender,'male');assert.equal(track.rate,1);
+  assert.match(track.src,/maze-shift-deep-echo-v1.mp3$/);
+  const h=catalogHarness();h.env.speechSynthesis.getVoices=()=>[female,male];h.voice.refresh();
+  h.voice.announceAsset('maze.shift.deep',track.text,true);assert.equal(h.audio[0].src,track.src);assert.equal(h.instances[0].playbackRate,1);
+  h.audio[0].onerror();assert.equal(h.spoken[0].voice,male);
+  h.voice.announceAsset('maze.shift.deep',track.text,true);h.voice.configure({enabled:false});assert.equal(h.audio.at(-1).paused,true);
+});
 test('叫賣兩段錄音連續播放、拾取朗讀不插隊，關閉語音立即停止',()=>{
   const h=recordedHarness(),states=[];h.voice.listen(s=>states.push(s.speaking));
   h.voice.announceAssets(['intro','limit'],'商品大拍賣，限時十五秒');h.voice.announce('獲得商品');

@@ -16,6 +16,8 @@ const tracks={},overrides={},variants={};
 const welcomeId='generated.7bbe2bf45512cd12';
 tracks[welcomeId]={...base[welcomeId],src:'./assets/voice/roles/welcome-deep-male-v1.mp3',speaker:'uncle_fu',gender:'male',age:'adult',rate:1,instruction:'成熟男性低音旁白，胸腔共鸣深厚，深沉稳重，带有克制的神秘感，像奇幻迷宫的守门人。正常自然语速，咬字清楚，句间短暂停顿。不故意拖慢、不耳语、不阴森恐怖、不夸张喊叫。'};
 overrides[welcomeId]=tracks[welcomeId];
+// Same approved gatekeeper voice; echo is baked offline, not synthesized on phones.
+tracks['maze.shift.deep']={...tracks[welcomeId],text:'迷宮正在變幻。新的道路，即將出現。',category:'event',src:'./assets/voice/roles/maze-shift-deep-echo-v1.mp3'};
 for(const [id,profile] of Object.entries(profiles)){
   tracks[id]={...base[id],...profile,src:'./assets/voice/roles/'+id.replaceAll('.','-')+'.mp3',rate:1};
   overrides[id]=tracks[id];

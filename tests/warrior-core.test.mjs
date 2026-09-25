@@ -6,6 +6,27 @@ const core = createRequire(import.meta.url)('../story/story-core.js');
 const fresh = (seed = 321) => core.newRun({ name: '護行測試', charIdx: 0, seed });
 const atFloor = (run, floor) => ({ ...run, floor, floorsCleared: 99 - floor });
 const rich = (run) => ({ ...run, coins: 1000, bag: Object.fromEntries(Object.keys(run.bag).map(id => [id, 30])) });
+test('confirmed replacement is atomic, preserves contract history and releases a held monster', () => {
+  const original=rich(escort(1));
+  while(!core.warriorOffer(--original.floor,original.seed)){}
+  original.floorsCleared=99-original.floor;
+  const offer=core.warriorOffer(original.floor,original.seed);
+  const held=core.interceptMonster(original,'monster-rehire',3).run;
+  const old=held.warrior.offerId,before=JSON.stringify(held);
+  assert.equal(core.hireWarrior(held,offer.id).ok,false,'implicit replacement is forbidden');
+  assert.equal(core.hireWarrior(held,offer.id,held.revision,'wrong').ok,false);
+  assert.equal(core.hireWarrior(held,offer.id,held.revision-1,old).ok,false);
+  const result=core.hireWarrior(held,offer.id,held.revision,old);
+  assert.equal(result.ok,true);assert.equal(JSON.stringify(held),before);
+  assert.equal(result.run.warrior.offerId,offer.id);assert.equal(result.run.warrior.mode,'escort');
+  assert.equal(result.effect.releasedMonsterId,'monster-rehire');assert.deepEqual(result.run.defeatedMonsters,[]);
+  assert.deepEqual(result.run.hiredWarriors,[old,offer.id]);assert.ok(core.validateSave(result.run));
+  for(const [id,n] of Object.entries(offer.cost))assert.equal(id==='coin'?result.run.coins:result.run.bag[id],(id==='coin'?held.coins:held.bag[id])-n);
+  assert.equal(core.hireWarrior(result.run,offer.id,result.run.revision,offer.id).ok,false);
+  const poor=structuredClone(held);poor.coins=0;for(const id in poor.bag)poor.bag[id]=0;
+  const failure=core.hireWarrior(poor,offer.id,poor.revision,old);
+  assert.equal(failure.ok,false);assert.equal(failure.run,poor);assert.equal(poor.warrior.offerId,old);
+});
 function escort(strength = 1) {
   const run = fresh();
   const hired = core.hireWarrior(run, core.warriorOffer(run.floor, run.seed).id).run;

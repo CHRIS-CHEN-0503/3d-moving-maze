@@ -126,6 +126,7 @@
   }
   function closeDialog() {
     if(pendingDungeonShift)return;
+    pendingWarriorReplacement=null;
     window.GameVoice?.stop(true);
     el('towerOverlay').hidden = true;
     if (active && paused) {
@@ -808,15 +809,31 @@
   function warriorDialog() {
     if(!active||G.shifting||!nearestWarrior||run.status!=='playing')return;
     syncEngine();
+    pendingWarriorReplacement=null;
     const offer=nearestWarrior.offer,affordable=Object.entries(offer.cost).every(([id,count])=>(id==='coin'?run.coins:run.bag[id]||0)>=count);
     const style=V.WARRIOR_STYLES[offer.strength];
     const ranks='<p>'+text(style.name+'：'+style.equipment+'，手持'+style.weapon)+'。</p><div class="tower-ranks" aria-label="強度 '+offer.strength+' 分，最高 5 分">'+Array.from({length:5},(_,i)=>'<span class="'+(i<offer.strength?'filled':'')+'"></span>').join('')+'</div>';
-    dialog('旅途奇遇 · 護衛契約',offer.name,'「付出約定的報酬，我就替你擋住危險。你只管往下走。」','<section class="tower-guard-offer"><div><h3>戰士強度 '+offer.strength+' / 5</h3>'+ranks+'</div><div><h3>聘請報酬</h3><p>'+text(costText(offer.cost))+'</p></div></section>'+warriorRules()+'<p class="tower-copy">'+(run.warrior?'已有一名護衛，待目前契約結束後才能再聘請。':affordable?'只有按下「同意並聘請」才會扣除報酬。':'補給不足，可先向行商購買或探索收集。')+'</p>',action('暫不聘請','close')+action('同意並聘請','hire',offer.id,!!run.warrior||!affordable),{summary:style.name+'，戰士強度 '+offer.strength+' 分。聘請需要 '+costText(offer.cost)+'。'});
+    dialog('旅途奇遇 · 護衛契約',offer.name,'「付出約定的報酬，我就替你擋住危險。你只管往下走。」','<section class="tower-guard-offer"><div><h3>戰士強度 '+offer.strength+' / 5</h3>'+ranks+'</div><div><h3>聘請報酬</h3><p>'+text(costText(offer.cost))+'</p></div></section>'+warriorRules()+'<p class="tower-copy">'+(run.warrior?'目前護衛 '+run.warrior.strength+' / 5 分，可確認解聘後改聘眼前戰士。原報酬不退還。':'只有按下「同意並聘請」才會扣除報酬。')+(!affordable?' 補給不足，可先向行商購買或探索收集。':'')+'</p>',action('暫不聘請','close')+action(run.warrior?'解聘並改聘…':'同意並聘請',run.warrior?'rehire-review':'hire',offer.id,!affordable),{summary:style.name+'，戰士強度 '+offer.strength+' 分。聘請需要 '+costText(offer.cost)+'。'+(run.warrior?'可解聘原護衛後改聘，原報酬不退還。':'')});
   }
-  function hireWarrior(id) {
-    if(!active||!G.running||G.shifting||run.status!=='playing'||!warriorNpc||!warriorNpc.model.visible||warriorNpc.offer.id!==id||Math.hypot(G.px-warriorNpc.x,G.pz-warriorNpc.z)>=2.6||!hasClearPath(G.px,G.pz,warriorNpc.x,warriorNpc.z))return;
+  let pendingWarriorReplacement=null;
+  function canHireWarrior(id) {
+    return active&&G.running&&!G.shifting&&run.status==='playing'&&warriorNpc&&warriorNpc.model.visible&&warriorNpc.offer.id===id&&Math.hypot(G.px-warriorNpc.x,G.pz-warriorNpc.z)<2.6&&hasClearPath(G.px,G.pz,warriorNpc.x,warriorNpc.z);
+  }
+  function reviewWarriorReplacement(id) {
+    if(!canHireWarrior(id)||!run.warrior)return;
     syncEngine();
-    if(!transact(C.hireWarrior(run,id,run.revision)))return;
+    const offer=warriorNpc.offer,guard=run.warrior;
+    pendingWarriorReplacement={id,oldId:guard.offerId,revision:run.revision};
+    const warning='原護衛的報酬不退還，也不能再次聘回。'+(guard.mode==='holding'?' 原護衛正在牽制怪物；解聘後，該怪物會恢復行動！':'');
+    dialog('旅途奇遇 · 護衛契約','要更換護衛嗎？',warning,'<section class="tower-guard-offer"><div><h3>原護衛 '+guard.strength+' / 5 分</h3><p>'+text(warriorStatus())+'</p></div><div><h3>新護衛 '+offer.strength+' / 5 分</h3><p>'+text(offer.name)+'</p><p>新聘費用：'+text(costText(offer.cost))+'</p></div></section>',action('保留原護衛','close')+action('確認解聘並聘請','rehire-confirm',id),{summary:'原護衛 '+guard.strength+' 分，新護衛 '+offer.strength+' 分。新聘需要 '+costText(offer.cost)+'。'+warning});
+  }
+  function hireWarrior(id,replace=false) {
+    if(!canHireWarrior(id))return;
+    const confirmation=pendingWarriorReplacement;
+    if(replace&&(!confirmation||confirmation.id!==id))return;
+    syncEngine();
+    if(!transact(C.hireWarrior(run,id,replace?confirmation.revision:run.revision,replace?confirmation.oldId:null)))return;
+    dismissEscort();
     const model=warriorNpc.model;escort={model,path:[],pathLeft:0};warriorNpc=null;nearestWarrior=null;
     refreshWarriorLabel();closeDialog();updateHud();showToast('護衛開始同行：強度 '+run.warrior.strength+'/5。靠近危險時會自動攔截。',3500);
   }
@@ -1019,6 +1036,8 @@
     if(key==='chest-open'){openChest(id);return;}
     if(key==='use'){useItem(id);return;}
     if(key==='hire'){hireWarrior(id);return;}
+    if(key==='rehire-review'){reviewWarriorReplacement(id);return;}
+    if(key==='rehire-confirm'){hireWarrior(id,true);return;}
     if(key==='buy'||key==='sell'||key==='buy-gear'){
       if(!active||!G.running||!nearest||Math.hypot(G.px-nearest.x,G.pz-nearest.z)>=2.6||!hasClearPath(G.px,G.pz,nearest.x,nearest.z))return;
       const result=key==='buy-gear'?E.buyMerchantGear(run,nearest.id,id,run.revision):E[key==='buy'?'buySupply':'sellSupply'](run,nearest.id,id,1,run.revision);

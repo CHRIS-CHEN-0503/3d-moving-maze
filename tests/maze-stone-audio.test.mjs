@@ -26,6 +26,8 @@ test('變形入口使用石牆聲，其他警報不變，尊重靜音與語音�
   c.G.muted=false;vm.runInContext('AudioEng.sfxShift();AudioEng.stopMusic()',c);assert.equal(played,1);assert.equal(stopped,1);
   const shift=html.slice(html.indexOf('function doShift()'),html.indexOf('/* 迷宮變形時出口搬家'));
   assert.match(shift,/AudioEng\.sfxShift\(\)/);assert.doesNotMatch(shift,/sfxAlarm/);
+  assert.equal((shift.match(/announceAsset\('maze\.shift\.deep'/g)||[]).length,1);
+  assert.match(shift,/showToast\('🌀 新迷宮出現了！道具和食物也重新出現囉',1800,false\)/);
   assert.match(html,/MazeStoneAudio\?\.create\(this.ctx,this.fxGain\)/);
   assert.match(html,/case 'tag':[\s\S]*?AudioEng\.sfxAlarm\(\)/);
 });

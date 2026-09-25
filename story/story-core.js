@@ -391,11 +391,12 @@
     });
   }
 
-  function hireWarrior(run, offerId, expectedRevision) {
+  function hireWarrior(run, offerId, expectedRevision, replaceOfferId = null) {
     return transaction(run, expectedRevision, (next) => {
       const offer = warriorOffer(next.floor, next.seed);
       if (!offer || offer.id !== offerId) return { ok: false, message: '這位戰士不在目前樓層。' };
-      if (next.warrior) return { ok: false, message: '目前已有戰士護行或牽制怪物。' };
+      if (next.warrior && next.warrior.offerId !== replaceOfferId) return { ok: false, message: '目前已有戰士，請先確認解聘並改聘。' };
+      if (replaceOfferId !== null && (!next.warrior || next.warrior.offerId !== replaceOfferId)) return { ok: false, message: '原護衛契約已改變，請重新確認。' };
       if (next.hiredWarriors.includes(offer.id)) return { ok: false, message: '這位戰士已履行過這趟旅程的委託。' };
       if (next.hiredWarriors.length >= 99) return { ok: false, message: '這趟旅程的委託紀錄已滿。' };
       for (const [id, count] of Object.entries(offer.cost)) {
@@ -404,9 +405,10 @@
       for (const [id, count] of Object.entries(offer.cost)) {
         if (id === 'coin') next.coins -= count; else next.bag[id] -= count;
       }
+      const dismissed = next.warrior;
       next.hiredWarriors.push(offer.id);
       next.warrior = { offerId: offer.id, strength: offer.strength, mode: 'escort', targetId: null, remaining: null };
-      return { ok: true, message: `${offer.name}接受委託，將替你迎戰一隻靠近的怪物。`, effect: { hired: true, strength: offer.strength } };
+      return { ok: true, message: `${offer.name}接受委託，將替你迎戰一隻靠近的怪物。`, effect: { hired: true, strength: offer.strength, dismissedOfferId: dismissed?.offerId || null, releasedMonsterId: dismissed?.targetId || null } };
     });
   }
 

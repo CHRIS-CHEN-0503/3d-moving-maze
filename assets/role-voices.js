@@ -708,6 +708,16 @@
       "rate": 1,
       "instruction": "成熟男性低音旁白，胸腔共鸣深厚，深沉稳重，带有克制的神秘感，像奇幻迷宫的守门人。正常自然语速，咬字清楚，句间短暂停顿。不故意拖慢、不耳语、不阴森恐怖、不夸张喊叫。"
     },
+    "maze.shift.deep": {
+      "text": "迷宮正在變幻。新的道路，即將出現。",
+      "category": "event",
+      "src": "./assets/voice/roles/maze-shift-deep-echo-v1.mp3",
+      "speaker": "uncle_fu",
+      "gender": "male",
+      "age": "adult",
+      "rate": 1,
+      "instruction": "成熟男性低音旁白，胸腔共鸣深厚，深沉稳重，带有克制的神秘感，像奇幻迷宫的守门人。正常自然语速，咬字清楚，句间短暂停顿。不故意拖慢、不耳语、不阴森恐怖、不夸张喊叫。"
+    },
     "merchant.tieLing": {
       "src": "./assets/voice/roles/merchant-tieLing.mp3",
       "text": "我是鐵匠鐵嶺。頭盔、球棒和保命補給，都在這裡挑。",

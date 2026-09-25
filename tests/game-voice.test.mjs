@@ -24,7 +24,7 @@ function catalogHarness(speech=true){
   const env={Audio:FakeAudio,MazeVoicePack:require('../assets/voice-pack.js'),Date:{now:()=>now},document:{hidden:false,addEventListener(){}},addEventListener(){},setTimeout(fn){timers.set(++timerId,fn);return timerId;},clearTimeout(id){timers.delete(id);}};
   if(speech){env.speechSynthesis={getVoices:()=>[],addEventListener(){},cancel(){},speak:u=>spoken.push(u)};env.SpeechSynthesisUtterance=class{constructor(text){this.text=text;}};}
   const voice=V.create(env);
-  return {voice,audio,spoken,instances,timers,at:t=>now=t,drain(){let i=0,j=0,limit=100;while(voice.status().speaking&&limit--){if(audio[i])audio[i++].onended();else if(spoken[j])spoken[j++].onend();else break;}assert.ok(limit>0);}};
+  return {voice,audio,spoken,instances,timers,env,at:t=>now=t,drain(){let i=0,j=0,limit=100;while(voice.status().speaking&&limit--){if(audio[i])audio[i++].onended();else if(spoken[j])spoken[j++].onend();else break;}assert.ok(limit>0);}};
 }
 test('連續錄音重用同一播放器，舊音檔的延遲回呼不能結束新音檔',()=>{
   const h=catalogHarness();h.voice.announce('單人遊戲');h.voice.announce('多人遊戲');
@@ -77,6 +77,13 @@ test('角色男聲、女聲與修正版讀音使用專用錄音，正常速度�
 test('人物動態對話保持人物性別，不混入不同性別的通用錄音',()=>{
   const h=catalogHarness();h.voice.readPanel({voiceScope:'full',voiceSpeaker:{gender:'male',npc:true},querySelectorAll:()=>[{closest:()=>null,textContent:'獲得 餅乾'}]});
   assert.equal(h.audio.length,0);assert.equal(h.spoken[0].text,'獲得 餅乾');
+});
+test('進入遊戲固定使用低沉男聲，錄音失敗仍保留男性備援，其他旁白不變',()=>{
+  const pack=require('../assets/voice-pack.js'),text='歡迎來到移動迷宮。請選擇你的冒險。',track=pack.get(pack.plan(text)[0].asset);
+  assert.equal(track.gender,'male');assert.equal(track.speaker,'uncle_fu');assert.equal(track.rate,1);assert.match(track.src,/welcome-deep-male-v1\.mp3$/);
+  const h=catalogHarness();h.env.speechSynthesis.getVoices=()=>[female,male];h.voice.refresh();h.voice.announce(text,true);
+  assert.equal(h.audio[0].src,track.src);h.audio[0].onerror();assert.equal(h.spoken[0].voice,male);
+  h.voice.announce('單人遊戲',true);assert.doesNotMatch(h.audio.at(-1).src,/welcome-deep|roles\/male-/);
 });
 test('叫賣兩段錄音連續播放、拾取朗讀不插隊，關閉語音立即停止',()=>{
   const h=recordedHarness(),states=[];h.voice.listen(s=>states.push(s.speaking));

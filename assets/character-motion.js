@@ -29,13 +29,18 @@
   function weaponPose(weapon, progress) {
     if (!weapon) return;
     const reach = Math.sin(Math.PI * clamp(progress));
-    weapon.position.set(.48 - .18 * reach, .9 + .04 * reach, .18 + .25 * reach);
-    weapon.rotation.set(.25 + 1.35 * reach, -.16 * reach, -.2 + .38 * reach);
+    weapon.position.set(-.48 + .18 * reach, .9 + .04 * reach, .18 + .25 * reach);
+    weapon.rotation.set(.25 + 1.35 * reach, .16 * reach, .2 - .38 * reach);
   }
   function worldWeaponPose(weapon, model, progress, firstPerson = false) {
     if (!weapon || !model) return;
     weaponPose(weapon, progress);
-    weapon.position.applyQuaternion(model.quaternion).add(model.position);
+    if(!firstPerson&&model.userData.armR){
+      // +Z 為正面，人物自己的右側是 -X；握柄固定在真正的右手。
+      model.updateMatrixWorld(true);
+      weapon.position.set(0,-.36,.045);
+      model.userData.armR.localToWorld(weapon.position);
+    }else weapon.position.applyQuaternion(model.quaternion).add(model.position);
     // 第一人稱只抬高畫面中的武器；不移動角色或改變前向判定。
     if (firstPerson) weapon.position.y += .32;
     weapon.quaternion.premultiply(model.quaternion);
@@ -64,8 +69,10 @@
     data.legR.rotation.x = swing + .12 * strike;
     data.armL.rotation.x = swing * .8 - .24 * strike;
     data.armR.rotation.x = -swing * .8 * (1 - strike) - (state.action === 'grab' ? 1.32 : 1.04) * strike;
-    data.armL.rotation.z = -.055 - .035 * breathe * (1 - stride);
-    data.armR.rotation.z = .055 + .035 * breathe * (1 - stride) + .12 * strike;
+    if(data.hasShield)data.armL.rotation.x=-.32+swing*.16-.12*strike;
+    if(data.hasWeapon&&!state.action)data.armR.rotation.x=-.16-swing*.3;
+    data.armL.rotation.z = .055 + .035 * breathe * (1 - stride);
+    data.armR.rotation.z = -.055 - .035 * breathe * (1 - stride) - .12 * strike;
     model.position.y = .012 * (1 + breathe) * (1 - stride) + Math.abs(wave) * .045 * stride;
     model.rotation.x = .045 * stride + .065 * strike;
     model.rotation.z = wave * .025 * stride - .025 * strike;
@@ -124,6 +131,14 @@
       part(new T.BoxGeometry(.1,.22,.1),wood,0,.03,0);
       part(new T.BoxGeometry(.36,.065,.14),accent,0,.17,0);
       part(new T.BoxGeometry(.105,.6,.055),wood,0,.48,0);
+    }
+    if(index===2||index===5){
+      part(new T.BoxGeometry(.22,.045,.24),metal,0,.055,.015);
+      part(new T.BoxGeometry(.21,.025,.03),metal,0,.3,index===2?.205:.09);
+    }else{
+      const gripRing=new T.CylinderGeometry(.058,.058,.025,6);
+      for(const y of [.015,.08])part(gripRing,accent,0,y,0);
+      part(new T.CylinderGeometry(.06,.06,.045,6),metal,0,-.075,0);
     }
     // Remove materials not used by this profession immediately; instantiated mesh materials are disposed with its scene.
     const used = new Set(group.children.map(mesh => mesh.material));

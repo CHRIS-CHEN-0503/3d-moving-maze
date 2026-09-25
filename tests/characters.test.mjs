@@ -98,7 +98,7 @@ function geometryFingerprint(group, includeStyle = false) {
     if (includeStyle) { part.name = object.name; part.color = object.material.color.getHex(); }
     parts.push(part);
   });
-  return JSON.stringify(parts);
+  return JSON.stringify(parts,(key,value)=>key==='uuid'?undefined:value);
 }
 
 test('一到五分戰士有不同幾何、盔甲與武器，分數標記正確且保持低面數',()=>{
@@ -108,6 +108,8 @@ test('一到五分戰士有不同幾何、盔甲與武器，分數標記正確�
     assert.equal(model.userData.strength,rank);assert.equal(model.userData.role,'warrior');
     assert.ok(model.getObjectByName(weapons[rank-1]));assert.ok(model.getObjectByName('rank-'+rank+'-breastplate'));
     assert.equal(model.userData.guardBlade.parent,model.userData.armR);
+    assert.ok(model.userData.armR.position.x<0);assert.ok(model.userData.armL.position.x>0);
+    assert.equal(model.getObjectByName('guard-shield').parent,model.userData.armL);
     let pins=0;model.traverse(o=>{if(o.name.startsWith('rank-pin-'))pins++;});assert.equal(pins,rank);
     assert.ok(summary.meshes<=65,`rank ${rank}: ${summary.meshes} meshes`);assert.ok(summary.triangles<2200);
     assert.ok(summary.size.y<2.65);assert.equal(model.userData.style,characters.WARRIOR_STYLES[rank]);
@@ -174,12 +176,14 @@ test('裝備模型有不同外形與局部掛載點，武器從握柄沿Y伸展�
     assert.deepEqual(model.position.toArray(), [0, 0, 0]);
     assert.equal(model.userData.kind, kind);
     assert.equal(model.userData.mount, characters.GEAR_MOUNTS[kind]);
+    if(kind==='shield')assert.ok(model.userData.mount.position[0]>0);
+    if(['bat','pan','staff'].includes(kind))assert.ok(model.userData.mount.position[0]<0);
     const result = details(model);
-    assert.ok(result.meshes <= 5);
+    assert.ok(result.meshes <= 10,'裝備細節上限十個網格');
     assert.ok(result.triangles < 400);
     if (['bat', 'pan', 'staff'].includes(kind)) {
       assert.ok(result.bounds.max.y <= .82 && result.bounds.max.y >= .7);
-      assert.ok(result.bounds.min.y >= -.04);
+      assert.ok(result.bounds.min.y >= -.08,'鍋柄吊環仍須在握柄附近');
     }
   }
 });

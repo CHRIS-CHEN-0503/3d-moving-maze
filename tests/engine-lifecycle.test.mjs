@@ -205,7 +205,7 @@ test('揮擊模型同層重用、換層完整釋放，沒有舊動畫跨場景�
   const motion = createRequire(import.meta.url)('../assets/character-motion.js'), scene = new THREE.Scene();
   const context = vm.createContext({
     THREE, window: { CharacterMotion: motion }, CharacterMotion: motion, scene,
-    G: { running: true, charIdx: 4 }, AudioEng: { sfxHit() {} }, _texCache: {}, spriteCache: {}, makePickupMarker: {},
+    G: { running: true, charIdx: 4 }, AudioEng: { sfxSwing() {} }, _texCache: {}, spriteCache: {}, makePickupMarker: {},
     requestAnimationFrame() { throw new Error('揮擊不得另建動畫回呼'); },
   });
   const characterStart = html.indexOf('function buildCharacter(cd)'), characterEnd = html.indexOf('\n}', characterStart) + 2;

@@ -777,11 +777,12 @@
     if(!active||paused||G.frozen||!G.running||inDungeon()||attackLeft>0)return;
     if(!run.equipment.weapon){showToast('請先在背包裝備球棒、平底鍋或木杖。');return;}
     attackLeft=.8;
+    AudioEng.sfxSwing();
     if(window.CharacterMotion)window.CharacterMotion.beginAction(playerGroup,'attack',.8);
     const target=monsters.filter(m=>m.alive&&Math.hypot(G.px-m.model.position.x,G.pz-m.model.position.z)<2.8&&hasClearPath(G.px,G.pz,m.model.position.x,m.model.position.z)).sort((a,b)=>Math.hypot(G.px-a.model.position.x,G.pz-a.model.position.z)-Math.hypot(G.px-b.model.position.x,G.pz-b.model.position.z))[0];
     if(!target){showToast('揮擊落空：靠近怪物後再攻擊');return;}
     const result=C.hitMonster(run,target.id,target.strength);if(!result.ok){showToast(result.message);return;}
-    run=result.run;target.cooldown=2;target.windup=0;AudioEng.sfxPickup();questEvent('stun',{monsterId:target.id});
+    run=result.run;target.cooldown=2;target.windup=0;AudioEng.sfxHit();questEvent('stun',{monsterId:target.id});
     const rescue=C.resolveHeldMonster(run,target.id,target.strength);
     if(rescue.ok&&rescue.effect.outcome==='defeat'){run=rescue.run;defeatMonster(target,true);refreshWarriorLabel();}
     else showToast(target.def.name+' 擊暈 '+result.effect.stunSeconds+' 秒 · 強度 −1'+(result.effect.broken.length?' · 武器已損壞':''));

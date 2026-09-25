@@ -65,7 +65,7 @@ function runtime(run) {
     mulberry32:seed=>()=>{seed|=0;seed=seed+0x6D2B79F5|0;let t=Math.imul(seed^seed>>>15,1|seed);t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296;},
     cellToWorld:(x,y)=>({x:x*4,z:y*4}),worldToCell:(x,z)=>({x:Math.max(0,Math.min(G.mazeW-1,Math.round(x/4))),y:Math.max(0,Math.min(G.mazeH-1,Math.round(z/4)))}),
     solveMaze:(x,y,ex=G.mazeW-1,ey=G.mazeH-1)=>[[x,y],[x,Math.min(y+1,G.mazeH-1)],[ex,ey]],
-    playerInWall:()=>false,showToast:message=>messages.push(message),AudioEng:{sfxTick(){},sfxPickup(){}},swingWeapon(){},
+    playerInWall:()=>false,showToast:message=>messages.push(message),AudioEng:{sfxTick(){},sfxPickup(){},sfxSwing(){},sfxHit(){}},swingWeapon(){},
   });
   vm.runInContext(source.replace(/  install\(\);(?=\s*\}\)\(\);\s*$)/,bridge),context,{filename:'tower-mode.js'});
   const api=context.window.__warriorTest;
@@ -239,10 +239,13 @@ test('武器只會擊暈；一分護衛無法因三分怪被擊暈就直接擊�
 test('怪物暈眩期間不能移動或攻擊，且主角空揮不消耗耐久',()=>{
   const run=hiredRun();run.warrior=null;
   const h=runtime(run),monster=positionThreat(h);h.api.replaceMonsters([monster]);
+  const sounds=[];h.context.AudioEng.sfxSwing=()=>sounds.push('swing');h.context.AudioEng.sfxHit=()=>sounds.push('hit');
   h.context.playerInWall=()=>true;
   const durability=h.api.state().run.equipment.weapon.durability;
   h.api.attack();assert.equal(h.api.state().run.equipment.weapon.durability,durability);
+  assert.deepEqual(sounds,['swing']);h.api.attack();assert.deepEqual(sounds,['swing'],'冷卻期間不能重播');
   h.context.playerInWall=()=>false;h.tick(.8);h.api.attack();
+  assert.deepEqual(sounds,['swing','swing','hit']);
   const position={x:monster.model.position.x,z:monster.model.position.z};
   monster.windup=.01;monster.path=[[2,0]];monster.pathLeft=2;
   h.api.updateMonster(monster,.2,h.now());

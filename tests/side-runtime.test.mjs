@@ -24,7 +24,7 @@ const fixtures = new Map();
 
 function runAt(floor, seed) {
   const run = C.newRun({ seed }); run.floor = floor; run.floorsCleared = 99 - floor;
-  run.chronicle = N.newChronicle(floor); return run;
+  run.chronicle = N.newChronicle(floor); run.expedition=D.newExpedition(2); return run;
 }
 function fixture(kind) {
   if (fixtures.has(kind)) return plain(fixtures.get(kind));

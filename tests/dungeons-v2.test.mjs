@@ -73,8 +73,8 @@ test('v1 catalog has the exact 9,900 offer bytes released in v1.22, including al
   assert.equal(hash.digest('hex'), 'cebea53246144b013724d6c29463fa0b42d1c9843d0efcaddaa12c20d73351bf');
 });
 
-test('fresh games use v2 while absent and explicit legacy expedition data stay v1 until descent', () => {
-  assert.equal(C.newRun({ seed: 1 }).expedition.version, 2);
+test('fresh games use latest catalog while legacy expedition data stay unchanged until descent', () => {
+  assert.equal(C.newRun({ seed: 1 }).expedition.version, D.CATALOG_VERSION);
   const old = floorRun(95, 1, 1);
   const expected = D.offer(old);
   for (const absent of [true, false]) {
@@ -86,7 +86,7 @@ test('fresh games use v2 while absent and explicit legacy expedition data stay v
     const lower = C.descend(restored);
     assert.equal(lower.ok, true);
     assert.equal(lower.run.floor, 94);
-    assert.equal(lower.run.expedition.version, 2);
+    assert.equal(lower.run.expedition.version, D.CATALOG_VERSION);
     assert.ok(C.validateSave(lower.run));
   }
 });
@@ -131,7 +131,7 @@ test('v1 active progress resumes unchanged, cannot reroll its reward, and settle
   assert.equal(history[0].catalogVersion, undefined);
   assert.equal(D.offer(settled), null);
   run = C.descend(settled).run;
-  assert.equal(run.expedition.version, 2);
+  assert.equal(run.expedition.version, D.CATALOG_VERSION);
   assert.deepEqual(run.expedition.history, history);
   while (!D.offer(run) && run.floor > 91) run = C.descend(run).run;
   if (!D.offer(run)) {
@@ -142,7 +142,7 @@ test('v1 active progress resumes unchanged, cannot reroll its reward, and settle
   assert.ok(nextOffer);
   run = D.enter(D.discover(run).run, nextOffer.id, { x: 0, y: 0, shiftLeft: 12 }).run;
   run = D.finish(run, 'abandoned').run;
-  assert.equal(run.expedition.history[1].catalogVersion, 2);
+  assert.equal(run.expedition.history[1].catalogVersion, D.CATALOG_VERSION);
   assert.deepEqual(C.validateSave(JSON.stringify(run)).expedition.history, run.expedition.history);
   assert.equal(JSON.stringify(restored), snapshot);
 });
@@ -151,7 +151,7 @@ test('v2 adds six floor-gated stories without changing the seeded 28 percent occ
   const seen = new Set(); let count = 0;
   for (let seed = 1; seed <= 100; seed += 1) for (let floor = 99; floor >= 1; floor -= 1) {
     const old = D.offer({ floor, seed, expedition: D.newExpedition(1) });
-    const offer = D.offer({ floor, seed, expedition: D.newExpedition() });
+    const offer = D.offer({ floor, seed, expedition: D.newExpedition(2) });
     assert.equal(!!offer, !!old);
     if (!offer) continue;
     count += 1; seen.add(offer.kind);

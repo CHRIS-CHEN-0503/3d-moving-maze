@@ -42,7 +42,7 @@ test('browser loading core then narrative, side stories and dungeons has no eage
     vm.runInContext(readFileSync(new URL('../story/' + file, import.meta.url), 'utf8'), context);
   }
   const run = context.TowerCore.newRun({ seed: 1 });
-  assert.equal(run.expedition.version, 2);
+  assert.equal(run.expedition.version, D.CATALOG_VERSION);
   assert.equal(run.chronicle.version, 1);
   assert.equal(context.TowerCore.validateSave(run).floor, 99);
 });

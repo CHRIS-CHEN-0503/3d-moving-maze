@@ -22,6 +22,7 @@
   }
   function panelText(panel){
     if(!panel?.querySelectorAll)return '';
+    if(typeof panel.voiceText==='string')return clean(panel.voiceText);
     const text=node=>clean(node?.innerText||node?.textContent||'');
     const visible=node=>!node.closest('[data-voice-controls],[hidden],.tower-close');
     // 故事正文與日誌保留全文；一般操作介面只讀摘要及主要動作。

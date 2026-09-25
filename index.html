@@ -978,13 +978,14 @@ button:focus-visible,input:focus-visible{outline:3px solid #fff;outline-offset:3
 <script src="./assets/voice-pack.js?v=1.34.0"></script>
 <script src="./assets/game-voice.js?v=1.35.0"></script>
 <script src="./assets/maze-stone-audio.js?v=1.34.2"></script>
+<script src="./assets/combat-audio.js?v=1.35.3"></script>
 <script>
 'use strict';
 /* =====================================================
    3D移動迷宮 — 給小朋友的變形迷宮冒險
    ===================================================== */
 const $=id=>document.getElementById(id);
-const GAME_VERSION='1.35.2';
+const GAME_VERSION='1.35.3';
 
 /* ---------- 設定（後台可調） ---------- */
 const DEFAULT_CFG={teamSize:2,shiftMin:3,itemCount:6,foodCount:4,hungerMin:3,stunSec:3,pingSec:3,smellCells:3,mazeSize:13,musicOn:1,speechOn:1,speechVoice:'',apiUrl:'',roomMax:3,rounds:3,goodsCount:16,shopCollect:1,shopMin:2.5,cartFull:400,views:{fp:1,tp:1,top:1},broker:'wss://broker.emqx.io:8084/mqtt'};
@@ -1215,6 +1216,7 @@ const AudioEng={
    this.fxGain=this.ctx.createGain(); this.fxGain.gain.value=0.8; this.fxGain.connect(this.master);
    this.itemGain=this.ctx.createGain(); this.itemGain.gain.value=0.4; this.itemGain.connect(this.master);
    this.shiftSound=window.MazeStoneAudio?.create(this.ctx,this.fxGain);
+   this.combatSound=window.CombatAudio?.create(this.ctx,this.fxGain);
  },
  resume(){ if(this.ctx&&this.ctx.state==='suspended') this.ctx.resume(); },
  tone(freq,dur,type,gainNode,vol=0.5,slide=0){
@@ -1315,7 +1317,7 @@ const AudioEng={
    const g=this.ctx.createGain(); g.gain.value=0.12;
    src.connect(f); f.connect(g); g.connect(this.musicGain); src.start(t);
  },
- stopMusic(){ this.shiftSound?.stop(); this.playing=false; this.musicRequest=(this.musicRequest||0)+1; if(this.seqTimer){clearInterval(this.seqTimer);this.seqTimer=null;} if(window.ClassicAudio)ClassicAudio.stop(); },
+ stopMusic(){ this.shiftSound?.stop(); this.combatSound?.stop(); this.playing=false; this.musicRequest=(this.musicRequest||0)+1; if(this.seqTimer){clearInterval(this.seqTimer);this.seqTimer=null;} if(window.ClassicAudio)ClassicAudio.stop(); },
  /* --- 道具「使用中」的循環音樂 --- */
  startItemLoop(){
    if(this.itemLoopTimer) return;
@@ -1338,7 +1340,8 @@ const AudioEng={
  sfxWhistle(){ [1568,1760,1976].forEach((f,i)=>setTimeout(()=>this.tone(f,0.22,'square',this.fxGain,0.35),i*110));
    setTimeout(()=>this.tone(2093,0.3,'triangle',this.fxGain,0.3),340); },
  sfxSniff(){ this.noise(0.16,0.35,420); setTimeout(()=>this.noise(0.12,0.3,520),170); },
- sfxHit(){ this.noise(0.12,0.65,600); this.tone(160,0.18,'square',this.fxGain,0.4,-60); },
+ sfxSwing(){ if(this.ctx&&!G.muted)this.combatSound?.play('swing'); },
+ sfxHit(){ if(this.ctx&&!G.muted)this.combatSound?.play('hit'); },
  sfxSteal(){ [784,659,523,659,784,1047].forEach((f,i)=>setTimeout(()=>this.tone(f,0.12,'triangle',this.fxGain,0.4),i*70)); },
  sfxEat(){ this.noise(0.09,0.55,900); setTimeout(()=>this.noise(0.09,0.5,700),110); setTimeout(()=>this.tone(880,0.12,'triangle',this.fxGain,0.35),230); },
  sfxLose(){ [392,330,262,196].forEach((f,i)=>setTimeout(()=>this.tone(f,0.34,'sawtooth',this.fxGain,0.4),i*230)); },
@@ -1382,6 +1385,7 @@ function cancelSceneTransition(){
   sceneEpoch++;
   cancelAnimationFrame(shiftRaf); clearTimeout(shiftDelay); clearInterval(preWarnTimer);
   AudioEng.shiftSound?.stop();
+  AudioEng.combatSound?.stop();
   shiftRaf=shiftDelay=preWarnTimer=0;
   if(wallMesh)wallMesh.position.y=0;
   G.shifting=false; G.preWarned=false;
@@ -2710,7 +2714,7 @@ function updateSkillBtn(){
   $('skillBtn').style.display=on?'block':'none';
 }
 function swingWeapon(){
-  AudioEng.sfxHit();
+  AudioEng.sfxSwing();
   if(!window.CharacterMotion||!playerGroup)return;
   const pose=CharacterMotion.prepare(playerGroup);
   if(!pose.weapon){pose.weapon=CharacterMotion.buildWeapon(THREE,G.charIdx);pose.weaponWorld=true;scene.add(pose.weapon);}
@@ -4305,6 +4309,7 @@ function mpHandle(m){
         MP.itRegenAt=now+15000;
         if(prevIt)MP.hp[prevIt]=Math.min(hpOf(prevIt),hpMaxOf(prevIt)); // 卸下鬼身份後上限可能變小
         MP.hp[m.to]=hpMaxOf(m.to); // 新鬼滿血
+        AudioEng.sfxHit();
         AudioEng.sfxAlarm();
         const pw=TAG_POWERS[MP.itPower];
         announceTag(mpName(m.to),genderOf(m.f)); // 抓到人的鬼是男生→男聲、女生→女聲
@@ -4340,7 +4345,7 @@ function mpHandle(m){
       if(!MP.started||MP.ended||(MP.mode!=='treasure'&&MP.mode!=='tag'))break;
       const ms=(MP.stunSec||3)*1000;
       const atk=MP.roster.find(r=>r.id===m.f), wpn=atk?CHARS[atk.charIdx||0].weapon:'👊';
-      if(m.f!==MP.id)AudioEng.sfxHit();
+      AudioEng.sfxHit();
       if(MP.mode==='tag'){ // 鬼抓人：扣體力，歸零才暈眩；暈眩結束體力恢復
         const nhp=hpOf(m.to)-1;
         MP.hp[m.to]=nhp;
@@ -5033,14 +5038,14 @@ window.addEventListener('beforeunload',e=>{
   if(G.running||MP.started){e.preventDefault();e.returnValue='';}
 });
 window.addEventListener('pagehide',()=>{ if(MP.on)try{mpSend({t:'bye'});}catch(e){} });
-document.addEventListener('visibilitychange',()=>{if(document.hidden)AudioEng.shiftSound?.stop();});
-window.addEventListener('pagehide',()=>AudioEng.shiftSound?.stop());
+document.addEventListener('visibilitychange',()=>{if(document.hidden){AudioEng.shiftSound?.stop();AudioEng.combatSound?.stop();}});
+window.addEventListener('pagehide',()=>{AudioEng.shiftSound?.stop();AudioEng.combatSound?.stop();});
 </script>
 <script src="assets/classic-audio.js"></script>
 <script src="assets/setup-controls.js?v=1.34.0"></script>
 <script src="assets/voice-settings.js?v=1.34.0"></script>
 <script src="assets/capture-core.js"></script>
-<script src="assets/capture-mode.js"></script>
+<script src="assets/capture-mode.js?v=1.35.3"></script>
 <script src="story/story-core.js?v=1.35.1"></script>
 <script src="story/tower-narrative.js"></script>
 <script src="story/tower-side-stories.js"></script>
@@ -5049,7 +5054,7 @@ window.addEventListener('pagehide',()=>AudioEng.shiftSound?.stop());
 <script src="story/tower-encounters.js"></script>
 <script src="story/tower-characters.js?v=1.35.2"></script>
 <script src="story/tower-audio.js"></script>
-<script src="story/tower-mode.js?v=1.35.2"></script>
+<script src="story/tower-mode.js?v=1.35.3"></script>
 <script src="assets/room-lifecycle.js?v=1.34.0"></script>
 <script src="assets/shop-collection-core.js?v=1.31.0"></script>
 <script src="assets/shop-collection.js?v=1.31.0"></script>

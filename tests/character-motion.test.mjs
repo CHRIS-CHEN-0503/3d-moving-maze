@@ -137,7 +137,7 @@ test('六職業揮擊武器有不同幾何，最多七個網格及低於三百�
 });
 
 test('一般揮擊與搶奪不另外排動畫或配置重複武器，完成後隱藏可供重用',()=>{
-  const model=figure(4),scene=new THREE.Scene(),context=vm.createContext({window:{CharacterMotion:motion},CharacterMotion:motion,THREE,playerGroup:model,scene,G:{charIdx:4,view:'tp'},AudioEng:{sfxHit(){}},CH:()=>({skin:0x998877})});
+  const model=figure(4),scene=new THREE.Scene(),context=vm.createContext({window:{CharacterMotion:motion},CharacterMotion:motion,THREE,playerGroup:model,scene,G:{charIdx:4,view:'tp'},AudioEng:{sfxSwing(){}},CH:()=>({skin:0x998877})});
   vm.runInContext(functionSource('swingWeapon')+'\n'+functionSource('swingRob'),context);
   context.swingWeapon();const weapon=model.userData.motion.weapon;
   context.swingWeapon();assert.equal(scene.children.length,1);assert.equal(model.userData.motion.weapon,weapon);
@@ -150,7 +150,7 @@ test('一般揮擊與搶奪不另外排動畫或配置重複武器，完成後�
 test('劇情冷卻與距離維持原規則，打空同樣啟動朝前揮擊',()=>{
   const start=tower.indexOf('  function attack()'),end=tower.indexOf('  function defeatMonster',start);
   const attackSource=tower.slice(start,end),model=figure();
-  const context=vm.createContext({window:{CharacterMotion:motion},playerGroup:model,active:true,paused:false,G:{frozen:false,running:true,px:0,pz:0},run:{equipment:{weapon:{}}},attackLeft:0,monsters:[],inDungeon:()=>false,showToast(){}});
+  const context=vm.createContext({window:{CharacterMotion:motion},AudioEng:{sfxSwing(){}},playerGroup:model,active:true,paused:false,G:{frozen:false,running:true,px:0,pz:0},run:{equipment:{weapon:{}}},attackLeft:0,monsters:[],inDungeon:()=>false,showToast(){}});
   vm.runInContext(attackSource,context);context.attack();
   assert.equal(context.attackLeft,.8);assert.equal(model.userData.motion.duration,.8);
   context.attackLeft=.4;context.attack();assert.equal(context.attackLeft,.4);

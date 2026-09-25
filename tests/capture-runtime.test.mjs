@@ -21,7 +21,7 @@ function room(){
       botPosOf:who=>who===id?{x:c.G.px,z:c.G.pz}:MP.players[who]?{x:MP.players[who].mesh.position.x,z:MP.players[who].mesh.position.z}:null,
       makeTextSprite:()=>new THREE.Group(),bindActionBtn(){},showToast(){},updateAtkBtn(){},swingWeapon(){},disposeSceneObject(){},
       removeWallBox:wb=>{const i=c.G.wallBoxes.indexOf(wb);if(i>=0)c.G.wallBoxes.splice(i,1);},
-      AudioEng:{stopMusic(){},stopItemLoop(){},sfxWin(){},sfxLose(){}},
+      AudioEng:{stopMusic(){},stopItemLoop(){},sfxWin(){},sfxLose(){},sfxHit(){this.hits=(this.hits||0)+1;}},
       mpName:who=>who,escapeHtml:s=>s,seriesSummaryHtml:()=>'',
       applyStun:(who,ms)=>stuns.push([who,ms]),showMPResults:(title,html,rows)=>results.push({title,rows}),
       mpSend:message=>queue.push(JSON.parse(JSON.stringify({...message,f:message.f||id}))),
@@ -38,6 +38,8 @@ function room(){
 test('兩個獨立客戶端：搶旗、敵人擊退、重新拾取、佔領和重播封包不重複計分',()=>{
   const r=room();r.place('p0',0,0);r.tick(4000);assert.equal(r.host.api.speed(),.82);
   r.place('p1',1,0);r.client.api.attack();r.flush();r.tick(200);assert.equal(r.host.api.speed(),1);assert.equal(r.host.c.G.px,-24);assert.equal(r.host.stuns.length,1);
+  assert.equal(r.host.c.AudioEng.hits,1);assert.equal(r.client.c.AudioEng.hits,1);
+  r.tick(1000);assert.equal(r.host.c.AudioEng.hits,1);assert.equal(r.client.c.AudioEng.hits,1,'重送快照不重播命中');
   r.tick(6100);r.place('p1',0,0);r.tick(100);assert.equal(r.client.api.speed(),.82);
   r.place('p1',-24,-24);r.place('p0',0,20);r.tick(100);r.tick(3100);
   assert.equal(r.host.results.length,1);assert.equal(r.client.results.length,1);

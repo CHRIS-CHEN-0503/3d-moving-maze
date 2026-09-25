@@ -62,6 +62,7 @@
       view=JSON.parse(JSON.stringify(m.state));clockOffset=m.at-Date.now();lastHost=performance.now();
       if(view.mazeRound===MP.round&&!G.shifting)for(const w of view.walls||[]){const wb=G.wallBoxes.find(b=>!b.boundary&&b.type===w.type&&b.gx===w.gx&&b.gy===w.gy);if(wb)removeWallBox(wb,true);}
       for(const [id,member] of Object.entries(view.members))if(member.respawn>(applied[id]||0)){
+        AudioEng.sfxHit(); // Only a newly confirmed hit, never a repeated snapshot.
         applied[id]=member.respawn;const cell=spawnCell(MP.order.indexOf(id),G.mazeW),p=cellToWorld(cell.x,cell.y);
         const remaining=Math.max(0,member.stun-(Date.now()+clockOffset));
         if(id===MP.id){G.px=p.x;G.pz=p.z;playerGroup.position.set(p.x,0,p.z);applyStun(id,remaining);showToast('受擊掉旗，回基地休整；恢復後有 3 秒保護');}

@@ -977,13 +977,14 @@ button:focus-visible,input:focus-visible{outline:3px solid #fff;outline-offset:3
 <script src="./assets/role-voices.js?v=1.34.1"></script>
 <script src="./assets/voice-pack.js?v=1.34.0"></script>
 <script src="./assets/game-voice.js?v=1.34.1"></script>
+<script src="./assets/maze-stone-audio.js?v=1.34.2"></script>
 <script>
 'use strict';
 /* =====================================================
    3D移動迷宮 — 給小朋友的變形迷宮冒險
    ===================================================== */
 const $=id=>document.getElementById(id);
-const GAME_VERSION='1.34.1';
+const GAME_VERSION='1.34.2';
 
 /* ---------- 設定（後台可調） ---------- */
 const DEFAULT_CFG={teamSize:2,shiftMin:3,itemCount:6,foodCount:4,hungerMin:3,stunSec:3,pingSec:3,smellCells:3,mazeSize:13,musicOn:1,speechOn:1,speechVoice:'',apiUrl:'',roomMax:3,rounds:3,goodsCount:16,shopCollect:1,shopMin:2.5,cartFull:400,views:{fp:1,tp:1,top:1},broker:'wss://broker.emqx.io:8084/mqtt'};
@@ -1203,7 +1204,7 @@ function renderSingleSeriesResult(won){
    音效引擎（WebAudio 電子音樂 + 特效音）
    ===================================================== */
 const AudioEng={
- ctx:null, master:null, musicGain:null, fxGain:null, itemGain:null,
+ ctx:null, master:null, musicGain:null, fxGain:null, itemGain:null, shiftSound:null,
  seqTimer:null, step:0, playing:false, songIdx:0, musicRequest:0, itemLoopTimer:null,
  init(){
    if(this.ctx) return;
@@ -1213,6 +1214,7 @@ const AudioEng={
    this.musicGain=this.ctx.createGain(); this.musicGain.gain.value=0.32; this.musicGain.connect(this.master);
    this.fxGain=this.ctx.createGain(); this.fxGain.gain.value=0.8; this.fxGain.connect(this.master);
    this.itemGain=this.ctx.createGain(); this.itemGain.gain.value=0.4; this.itemGain.connect(this.master);
+   this.shiftSound=window.MazeStoneAudio?.create(this.ctx,this.fxGain);
  },
  resume(){ if(this.ctx&&this.ctx.state==='suspended') this.ctx.resume(); },
  tone(freq,dur,type,gainNode,vol=0.5,slide=0){
@@ -1313,7 +1315,7 @@ const AudioEng={
    const g=this.ctx.createGain(); g.gain.value=0.12;
    src.connect(f); f.connect(g); g.connect(this.musicGain); src.start(t);
  },
- stopMusic(){ this.playing=false; this.musicRequest=(this.musicRequest||0)+1; if(this.seqTimer){clearInterval(this.seqTimer);this.seqTimer=null;} if(window.ClassicAudio)ClassicAudio.stop(); },
+ stopMusic(){ this.shiftSound?.stop(); this.playing=false; this.musicRequest=(this.musicRequest||0)+1; if(this.seqTimer){clearInterval(this.seqTimer);this.seqTimer=null;} if(window.ClassicAudio)ClassicAudio.stop(); },
  /* --- 道具「使用中」的循環音樂 --- */
  startItemLoop(){
    if(this.itemLoopTimer) return;
@@ -1329,6 +1331,7 @@ const AudioEng={
  sfxUse(){ [523,659,784,1047].forEach((f,i)=>setTimeout(()=>this.tone(f,0.15,'triangle',this.fxGain,0.45),i*80)); },
  sfxBreak(){ this.noise(0.35,0.7,700); this.tone(90,0.3,'sawtooth',this.fxGain,0.5,-40); },
  sfxAlarm(){ this.tone(880,0.28,'square',this.fxGain,0.3); setTimeout(()=>this.tone(660,0.28,'square',this.fxGain,0.3),300); },
+ sfxShift(){ if(this.ctx&&!G.muted)this.shiftSound?.play(); },
  sfxTick(){ this.tone(1200,0.06,'square',this.fxGain,0.25); },
  sfxWin(){ [523,659,784,1047,1319,1568].forEach((f,i)=>setTimeout(()=>this.tone(f,0.3,'triangle',this.fxGain,0.5),i*130)); },
  sfxCoin(){ this.tone(1318,0.08,'square',this.fxGain,0.32); setTimeout(()=>this.tone(1760,0.14,'square',this.fxGain,0.3),80); },
@@ -1374,11 +1377,12 @@ function disposeSceneObject(root){
   });
 }
 
-let sceneEpoch=0,shiftRaf=0,shiftDelay=0,shiftAlarm=0,preWarnTimer=0;
+let sceneEpoch=0,shiftRaf=0,shiftDelay=0,preWarnTimer=0;
 function cancelSceneTransition(){
   sceneEpoch++;
-  cancelAnimationFrame(shiftRaf); clearTimeout(shiftDelay); clearTimeout(shiftAlarm); clearInterval(preWarnTimer);
-  shiftRaf=shiftDelay=shiftAlarm=preWarnTimer=0;
+  cancelAnimationFrame(shiftRaf); clearTimeout(shiftDelay); clearInterval(preWarnTimer);
+  AudioEng.shiftSound?.stop();
+  shiftRaf=shiftDelay=preWarnTimer=0;
   if(wallMesh)wallMesh.position.y=0;
   G.shifting=false; G.preWarned=false;
   $('shiftWarn').style.display='none'; $('preWarn').style.display='none';
@@ -3327,7 +3331,7 @@ function doShift(){
   if(isShop())cancelCheckout('🌀 迷宮變換，結帳中斷了！收銀機也換位置囉');
   G.shifting=true; G.frozen=true;
   $('shiftWarn').style.display='flex';
-  AudioEng.sfxAlarm(); shiftAlarm=setTimeout(()=>{if(!stillCurrent())return;shiftAlarm=0;AudioEng.sfxAlarm();},700);
+  AudioEng.sfxShift();
   // 玩家先吸到目前格子的正中央（避免變換後卡在牆裡）
   const pc=worldToCell(G.px,G.pz);
   const cp=cellToWorld(pc.x,pc.y);
@@ -3877,6 +3881,7 @@ function wireUI(){
   });
   bindActionBtn($('soundToggle'),()=>{
     G.muted=!G.muted; updateSoundBtn();
+    if(G.muted)AudioEng.shiftSound?.stop();
     if(window.TowerMode&&TowerMode.active){TowerMode.soundChanged();if(G.muted)AudioEng.stopItemLoop();return;}
     if(G.muted){AudioEng.stopMusic();AudioEng.stopItemLoop();}
     else if(G.running)AudioEng.startMusic(isShop()?SHOP_THEME.music:LEVELS[G.lvlIdx].music);
@@ -5011,6 +5016,8 @@ window.addEventListener('beforeunload',e=>{
   if(G.running||MP.started){e.preventDefault();e.returnValue='';}
 });
 window.addEventListener('pagehide',()=>{ if(MP.on)try{mpSend({t:'bye'});}catch(e){} });
+document.addEventListener('visibilitychange',()=>{if(document.hidden)AudioEng.shiftSound?.stop();});
+window.addEventListener('pagehide',()=>AudioEng.shiftSound?.stop());
 </script>
 <script src="assets/classic-audio.js"></script>
 <script src="assets/setup-controls.js?v=1.34.0"></script>

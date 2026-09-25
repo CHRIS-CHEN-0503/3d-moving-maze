@@ -23,7 +23,7 @@ const bridge = `window.__warriorTest = {
   approachWarrior() { nearestWarrior=warriorNpc;nearest=null;G.px=warriorNpc.x;G.pz=warriorNpc.z; },
   replaceMonsters(value) { monsters=value; },
   shifted() { wasShifting=true;G.shifting=false; },
-  followNpc,updateWarrior,updateMonster,isHeld,warriorDialog,hireWarrior,trade,
+  followNpc,updateWarrior,updateMonster,isHeld,warriorDialog,hireWarrior,reviewWarriorReplacement,trade,
   restoreWarriorPosition,dialog,closeDialog,save,readSave,attack,
 };`;
 assert.match(source, /  install\(\);\s*\}\)\(\);\s*$/);
@@ -91,6 +91,40 @@ function positionThreat(h,kind='sentinel',id='monster-0',distance=1.4) {
   model.userData.body={position:{}};model.userData.ring={material:{}};
   return {id,kind,def,strength:core.monsterStrength(kind,h.api.state().run.floor),phase:Number(id.split('-').at(-1))||0,hp:60,alive:true,path:[],pathLeft:1,cooldown:0,windup:0,model,cx:0,cy:0,x:distance,z:0};
 }
+
+function replacementRuntime(holding=false) {
+  const run=hiredRun();
+  while(!core.warriorOffer(run.floor,run.seed))run.floor--;
+  run.floorsCleared=99-run.floor;
+  return runtime(holding?core.interceptMonster(run,'monster-0',3).run:run);
+}
+test('換聘先確認；取消保留原護衛，確認後只留下新模型且不重複扣款',()=>{
+  const h=replacementRuntime(),old=h.api.state().escort.model,id=h.api.state().warriorNpc.offer.id;
+  h.api.approachWarrior();h.api.warriorDialog();assert.match(h.nodes.get('towerDialog').innerHTML,/解聘並改聘/);
+  h.api.reviewWarriorReplacement(id);const before=JSON.stringify(h.api.state().run);
+  assert.match(h.nodes.get('towerDialog').innerHTML,/原護衛|新聘費用|不退還/);
+  h.api.closeDialog();h.api.hireWarrior(id,true);assert.equal(JSON.stringify(h.api.state().run),before);
+  h.api.reviewWarriorReplacement(id);h.api.hireWarrior(id,true);
+  assert.equal(h.api.state().run.warrior.offerId,id);assert.notEqual(h.api.state().escort.model,old);
+  assert.equal(h.api.state().warriorNpc,null);
+  const after=JSON.stringify(h.api.state().run);h.api.hireWarrior(id,true);assert.equal(JSON.stringify(h.api.state().run),after);
+});
+test('換聘解除原怪物牽制；存檔失敗不解聘、不扣款、不移除模型',()=>{
+  const h=replacementRuntime(true),id=h.api.state().warriorNpc.offer.id,old=h.api.state().escort.model;
+  h.api.approachWarrior();h.api.reviewWarriorReplacement(id);
+  assert.match(h.nodes.get('towerDialog').innerHTML,/怪物會恢復行動/);
+  const before=JSON.stringify(h.api.state().run),writer=h.context.localStorage.setItem;
+  h.context.localStorage.setItem=()=>{throw Error('full');};h.api.hireWarrior(id,true);
+  assert.equal(JSON.stringify(h.api.state().run),before);assert.equal(h.api.state().escort.model,old);assert.ok(h.api.state().warriorNpc);
+  h.context.localStorage.setItem=writer;h.api.hireWarrior(id,true);
+  assert.equal(h.api.isHeld({id:'monster-0'}),false);assert.equal(h.api.state().run.defeatedMonsters.length,0);
+});
+test('離開新戰士或契約版本改變後，過期確認不能換聘',()=>{
+  const h=replacementRuntime(),id=h.api.state().warriorNpc.offer.id;
+  h.api.approachWarrior();h.api.reviewWarriorReplacement(id);const old=h.api.state().run.warrior.offerId;
+  h.context.G.px+=100;h.api.hireWarrior(id,true);assert.equal(h.api.state().run.warrior.offerId,old);
+  h.api.approachWarrior();h.api.state().run.revision++;h.api.hireWarrior(id,true);assert.equal(h.api.state().run.warrior.offerId,old);
+});
 
 test('護衛通過直角連續轉彎：重新尋路不省略走道中心、不穿牆',()=>{
   const h=runtime(hiredRun()),actor=h.api.state().escort,p=actor.model.position;

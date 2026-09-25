@@ -104,7 +104,7 @@ test('archive and lantern accept unordered goals only once without changing the 
     assert.equal(third.effect.completed, true);
     assert.deepEqual(third.run.expedition.active.progress, [2, 0, 1]);
     assert.equal(D.interact(third.run, 0).ok, false);
-    assert.equal(third.run.hp, 100);
+    assert.equal(third.run.hp, 60);
   }
 });
 
@@ -121,7 +121,7 @@ test('bells enforce the generated order, reset wrong progress, and wear armor fo
   assert.equal(wrong.run.equipment.armor, null);
   assert.deepEqual(wrong.run.expedition.active.progress, []);
   assert.equal(wrong.run.expedition.active.mistakes, 1);
-  assert.equal(wrong.run.hp, 96);
+  assert.equal(wrong.run.hp, 56);
   let current = wrong.run;
   for (const index of offer.order) current = D.interact(current, index).run;
   assert.deepEqual(current.expedition.active.progress, offer.order);

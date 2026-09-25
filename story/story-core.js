@@ -6,7 +6,8 @@
 })(typeof globalThis !== 'undefined' ? globalThis : this, function () {
   'use strict';
 
-  const STATE_VERSION = 1;
+  const STATE_VERSION = 2;
+  const MAX_HP = 60;
   const MAX_COINS = 999999;
   const MAX_STACK = 99;
   // Late lookup keeps the browser's core → narrative → dungeons loading order safe.
@@ -88,7 +89,7 @@
     const opts = options || {};
     const seed = Number.isInteger(opts.seed) && opts.seed > 0 && opts.seed <= 0xffffffff ? opts.seed : ((Date.now() >>> 0) || 1);
     return {
-      stateVersion: STATE_VERSION, mode: 'tower', floor: 99, hp: 100, hunger: 100, coins: 24,
+      stateVersion: STATE_VERSION, mode: 'tower', floor: 99, hp: MAX_HP, hunger: 100, coins: 24,
       bag: { heal: 2, ration: 2, shield: 0, hourglass: 0, bell: 0, map: 1, feather: 0 },
       effects: { shield: 0, freeze: 0, repel: 0, reveal: 0 },
       engine: { shovels: 1, kites: 0, whistles: 0, shovelCooldownMs: 0, skillCooldownMs: 0 },
@@ -198,8 +199,9 @@
   function validateSave(value) {
     let run = value;
     if (typeof run === 'string') { try { run = JSON.parse(run); } catch (_) { return null; } }
-    if (!run || typeof run !== 'object' || Array.isArray(run) || run.stateVersion !== STATE_VERSION || run.mode !== 'tower') return null;
-    if (!validNumber(run.floor, 1, 99, true) || !validNumber(run.hp, 0, 100) || !validNumber(run.hunger, 0, 100) || !validNumber(run.coins, 0, MAX_COINS, true)) return null;
+    if (!run || typeof run !== 'object' || Array.isArray(run) || ![1, STATE_VERSION].includes(run.stateVersion) || run.mode !== 'tower') return null;
+    const legacyHealth = run.stateVersion === 1;
+    if (!validNumber(run.floor, 1, 99, true) || !validNumber(run.hp, 0, legacyHealth ? 100 : MAX_HP) || !validNumber(run.hunger, 0, 100) || !validNumber(run.coins, 0, MAX_COINS, true)) return null;
     if (!validNumber(run.seed, 1, 0xffffffff, true) || !validNumber(run.revision, 0, Number.MAX_SAFE_INTEGER - 1, true) || !validNumber(run.charIdx, 0, 5, true)) return null;
     if (typeof run.name !== 'string' || !run.name.trim() || run.name.length > 24 || !['playing', 'won', 'dead'].includes(run.status)) return null;
     if (!validNumber(run.elapsed, 0, 315360000) || !validNumber(run.floorsCleared, 0, 99, true)) return null;
@@ -272,7 +274,8 @@
     const expedition = dungeonRules().validateExpedition(run.expedition, run.floor, run.seed);
     if (!chronicle || !expedition) return null;
     return {
-      stateVersion: STATE_VERSION, mode: 'tower', floor: run.floor, hp: run.hp, hunger: run.hunger,
+      // Preserve the old health percentage once; subsequent reads are already v2.
+      stateVersion: STATE_VERSION, mode: 'tower', floor: run.floor, hp: legacyHealth ? run.hp * MAX_HP / 100 : run.hp, hunger: run.hunger,
       coins: run.coins, bag, effects, revision: run.revision, seed: run.seed, name: run.name,
       charIdx: run.charIdx, status: run.status, elapsed: run.elapsed, floorsCleared: run.floorsCleared,
       engine, claimed: [...run.claimed], floorElapsed: run.floorElapsed,
@@ -470,10 +473,10 @@
     return transaction(run, expectedRevision, (next) => {
       if (!Object.hasOwn(next.bag, itemId) || next.bag[itemId] < 1) return { ok: false, message: '背包裡沒有這件道具。' };
       if (itemId === 'feather') return { ok: false, message: '復甦羽會在受到致命傷時自動保護你。' };
-      if (itemId === 'heal' && next.hp >= 100) return { ok: false, message: '生命已滿，先把療癒藥留著吧。' };
+      if (itemId === 'heal' && next.hp >= MAX_HP) return { ok: false, message: '生命已滿，先把療癒藥留著吧。' };
       if (itemId === 'ration' && next.hunger >= 100) return { ok: false, message: '飽食度已滿，暫時不需要乾糧。' };
       const effect = { id: itemId };
-      if (itemId === 'heal') { effect.healed = Math.min(35, 100 - next.hp); next.hp += effect.healed; }
+      if (itemId === 'heal') { effect.healed = Math.min(35, MAX_HP - next.hp); next.hp += effect.healed; }
       if (itemId === 'ration') { effect.fed = Math.min(45, 100 - next.hunger); next.hunger += effect.fed; }
       const timed = { shield: ['shield', 25], hourglass: ['freeze', 25], bell: ['repel', 20], map: ['reveal', 18] };
       if (timed[itemId]) {
@@ -517,7 +520,7 @@
     next.hp = Math.max(0, next.hp - damage);
     let revived = false;
     if (next.hp === 0 && next.bag.feather > 0) {
-      next.bag.feather -= 1; next.hp = 50; next.effects.shield = Math.max(5, next.effects.shield); revived = true;
+      next.bag.feather -= 1; next.hp = Math.min(50, MAX_HP); next.effects.shield = Math.max(5, next.effects.shield); revived = true;
     } else if (next.hp === 0) next.status = 'dead';
     return { ok: true, message: revived ? '復甦羽化作光芒，讓你重新站起。' : next.status === 'dead' ? '旅程暫時停在這裡。' : damage === 0 ? '防具擋住了這次攻擊。' : '受到傷害。', effect: { damage, revived, defense, broken, source } };
   }
@@ -570,5 +573,5 @@
     });
   }
 
-  return Object.freeze({ STATE_VERSION, ITEMS, GEAR, MONSTERS, CHAPTERS, OPENING, ENDING, EXCHANGES, floorConfig, newRun, validateSave, buy, sell, exchange, useItem, collect, takeDamage, tickEffects, descend, monsterStrength, warriorOffer, hireWarrior, interceptMonster, createGear, validateGear, gearPrice, equipmentStats, receiveGear, grantGear, equipGear, discardGear, buyGear, effectiveMonsterStrength, hitMonster, resolveHeldMonster, transaction, applyDamage, newAdventure, validateAdventure });
+  return Object.freeze({ STATE_VERSION, MAX_HP, ITEMS, GEAR, MONSTERS, CHAPTERS, OPENING, ENDING, EXCHANGES, floorConfig, newRun, validateSave, buy, sell, exchange, useItem, collect, takeDamage, tickEffects, descend, monsterStrength, warriorOffer, hireWarrior, interceptMonster, createGear, validateGear, gearPrice, equipmentStats, receiveGear, grantGear, equipGear, discardGear, buyGear, effectiveMonsterStrength, hitMonster, resolveHeldMonster, transaction, applyDamage, newAdventure, validateAdventure });
 });

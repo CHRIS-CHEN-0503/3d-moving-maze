@@ -110,7 +110,7 @@ test('three worn armors each lose one durability while only their summed defense
   const hit = C.takeDamage(run, 15, 'monster');
   assert.equal(hit.effect.defense, 9);
   assert.equal(hit.effect.damage, 6);
-  assert.equal(hit.run.hp, 94);
+  assert.equal(hit.run.hp, 54);
   assert.equal(JSON.stringify(run), original);
   for (const slot of ['helmet', 'armor', 'shield']) assert.equal(hit.run.equipment[slot].durability, run.equipment[slot].durability - 1);
   assert.equal(hit.run.equipment.weapon.durability, beforeWeapon);
@@ -136,7 +136,7 @@ test('hunger bypasses all armor and temporary shields without wearing equipment;
   run.effects.shield = 25;
   const hunger = C.takeDamage(run, 3, 'hunger');
   assert.equal(hunger.effect.damage, 3);
-  assert.equal(hunger.run.hp, 97);
+  assert.equal(hunger.run.hp, 57);
   assert.equal(hunger.run.equipment.armor.durability, run.equipment.armor.durability);
   assert.equal(C.takeDamage(run, 0).run.equipment.armor.durability, run.equipment.armor.durability);
   assert.equal(C.takeDamage(run, 10, 'undefined-source').ok, false);
@@ -308,7 +308,7 @@ test('encounter rewards and trap damage can share one atomic revision without st
   });
   assert.equal(result.ok, true);
   assert.equal(result.run.revision, run.revision + 1);
-  assert.equal(result.run.hp, 95);
+  assert.equal(result.run.hp, 55);
   assert.equal(result.run.gearBag.length, 1);
   assert.deepEqual(result.run.adventure.claimed, ['chest-0']);
   assert.deepEqual(run.adventure.claimed, []);

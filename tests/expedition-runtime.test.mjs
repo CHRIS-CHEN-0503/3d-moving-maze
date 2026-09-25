@@ -88,8 +88,8 @@ test('護送者會沿通道跟隨，但隔牆或未跟到出口不能完成',()=
 test('陷阱開箱先確認，防具減傷耗耐久且保存後無法重開',()=>{
   const run=findRun(r=>E.chestOffer(r.floor,r.seed)?.outcome==='trap'),helmet=C.createGear('helmet',99,run.seed,'test-helmet');run.equipment.helmet=helmet;
   const h=harness(run),offer=E.chestOffer(run.floor,run.seed),chest={...h.actor(0,0),offer};h.api.entities({chest});
-  h.api.chestDialog();assert.equal(h.api.state().run.hp,100);assert.equal(h.api.state().run.equipment.helmet.durability,helmet.durability);
-  h.api.openChest(offer.id);assert.equal(h.api.state().run.hp,100-offer.damage+helmet.defense);assert.equal(h.api.state().run.equipment.helmet.durability,helmet.durability-1);assert.equal(chest.model.visible,false);
+  h.api.chestDialog();assert.equal(h.api.state().run.hp,60);assert.equal(h.api.state().run.equipment.helmet.durability,helmet.durability);
+  h.api.openChest(offer.id);assert.equal(h.api.state().run.hp,60-offer.damage+helmet.defense);assert.equal(h.api.state().run.equipment.helmet.durability,helmet.durability-1);assert.equal(chest.model.visible,false);
   h.api.save();const saved=h.api.readSave();assert.ok(saved.adventure.claimed.includes(offer.id));assert.equal(E.openChest(saved,offer.id).ok,false);
 });
 

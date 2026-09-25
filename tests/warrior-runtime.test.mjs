@@ -165,15 +165,15 @@ test('護行者只攔截一隻怪物，且不會隔牆觸發委託',()=>{
   h.context.playerInWall=()=>false;h.api.updateWarrior(.05,h.now());
   assert.equal(h.api.state().run.warrior.mode,'holding');assert.equal(h.api.isHeld(first),true);assert.equal(h.api.isHeld(second),false);
   first.windup=.01;second.windup=.01;h.api.updateMonster(first,.05,h.now());
-  assert.equal(h.api.state().run.hp,100,'牽制中的怪物不可攻擊主角');
-  h.api.updateMonster(second,.05,h.now());assert.equal(h.api.state().run.hp,85,'另一隻怪物仍能攻擊，護衛不是全域無敵');
+  assert.equal(h.api.state().run.hp,60,'牽制中的怪物不可攻擊主角');
+  h.api.updateMonster(second,.05,h.now());assert.equal(h.api.state().run.hp,45,'另一隻怪物仍能攻擊，護衛不是全域無敵');
 });
 
 test('一分戰士牽制三分怪物一分鐘，到期後怪物恢復行動',()=>{
   const h=runtime(hiredRun()),monster=positionThreat(h);h.api.replaceMonsters([monster]);h.api.updateWarrior(.05,h.now());
   assert.equal(h.api.state().run.warrior.remaining,60);
   for(let second=0;second<59;second++)h.tick(1);
-  assert.equal(h.api.state().run.warrior.remaining,1);assert.equal(h.api.state().run.hp,100);
+  assert.equal(h.api.state().run.warrior.remaining,1);assert.equal(h.api.state().run.hp,60);
   h.tick(1);assert.equal(h.api.state().run.warrior,null);assert.equal(h.api.isHeld(monster),false);assert.equal(monster.alive,true);
 });
 
@@ -198,7 +198,7 @@ test('同分持續抵抗但下降後留在原層，不把牽制狀態帶到下�
   const h=runtime(run),monster=positionThreat(h);h.api.replaceMonsters([monster]);h.api.updateWarrior(.05,h.now());
   assert.equal(h.api.state().run.warrior.remaining,null);
   for(let second=0;second<65;second++)h.tick(1);
-  assert.equal(h.api.isHeld(monster),true);assert.equal(h.api.state().run.hp,100);
+  assert.equal(h.api.isHeld(monster),true);assert.equal(h.api.state().run.hp,60);
   h.context.window.TowerMode.reachExit();assert.equal(h.api.state().run.floor,59);assert.equal(h.api.state().run.warrior,null);
 });
 
@@ -249,7 +249,7 @@ test('怪物暈眩期間不能移動或攻擊，且主角空揮不消耗耐久',
   const position={x:monster.model.position.x,z:monster.model.position.z};
   monster.windup=.01;monster.path=[[2,0]];monster.pathLeft=2;
   h.api.updateMonster(monster,.2,h.now());
-  assert.equal(h.api.state().run.hp,100);
+  assert.equal(h.api.state().run.hp,60);
   assert.deepEqual({x:monster.model.position.x,z:monster.model.position.z},position);
   assert.equal(monster.windup,0);assert.equal(monster.path.length,0);
   assert.equal(monster.alive,true);

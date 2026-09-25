@@ -848,12 +848,21 @@
     if(!active||!run?.equipment||typeof playerGroup==='undefined'||!playerGroup||!V)return;
     const signature=Object.values(run.equipment).map(g=>g?g.id:'-').join('|');
     if(signature===gearSignature)return;
-    if(gearVisual){const oldWeapon=gearVisual.userData.weapon;if(oldWeapon?.parent===scene){scene.remove(oldWeapon);disposeSceneObject(oldWeapon);}playerGroup.remove(gearVisual);disposeSceneObject(gearVisual);}
+    if(gearVisual){
+      for(const piece of [gearVisual.userData.weapon,gearVisual.userData.shield])if(piece&&piece.parent!==gearVisual){piece.parent?.remove(piece);disposeSceneObject(piece);}
+      playerGroup.remove(gearVisual);disposeSceneObject(gearVisual);
+    }
     gearVisual=new THREE.Group();gearSignature=signature;
+    playerGroup.userData.hasWeapon=!!run.equipment.weapon;playerGroup.userData.hasShield=!!run.equipment.shield;
+    for(const part of playerGroup.userData.head?.children||[])if(part.name==='hair-crown'||part.name==='hair-fringe')part.visible=!run.equipment.helmet;
     for(const gear of Object.values(run.equipment).filter(Boolean)){
       const model=V.buildGear(gear.kind,{THREE}),mount=V.GEAR_MOUNTS[gear.kind];
       model.position.set(...mount.position);if(mount.rotation)model.rotation.set(...mount.rotation);
       if(gear.slot==='weapon'&&window.CharacterMotion){scene.add(model);window.CharacterMotion.worldWeaponPose(model,playerGroup,1-attackLeft/.8,G.view==='fp');}
+      else if(gear.slot==='shield'&&playerGroup.userData.armL){
+        model.position.set(.065,-.33,.09);model.rotation.set(0,Math.PI/3,0);
+        playerGroup.userData.armL.add(model);gearVisual.userData.shield=model;
+      }
       else gearVisual.add(model);
       if(gear.slot==='weapon')gearVisual.userData.weapon=model;
     }

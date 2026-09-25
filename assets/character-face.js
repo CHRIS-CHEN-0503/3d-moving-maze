@@ -8,6 +8,10 @@
     const mouth=detail(.13,.025,.027,0,-.12,.261);
     const corners=[detail(.023,.045,.027,-.068,-.10,.261),detail(.023,.045,.027,.068,-.10,.261)];
     const face={eyes,brows,mouth,corners,mood:'calm',phase:(model.id%19)*.27};
+    // 微小高光跟著眼睛眨動；共用一組材質／幾何，不使用臉部貼圖。
+    const shineMaterial=new T.MeshBasicMaterial({color:robot?0xe0ffff:0xfff3df});
+    const shineGeometry=new T.BoxGeometry(.021,.025,.009);
+    for(const eye of eyes){const shine=new T.Mesh(shineGeometry,shineMaterial);shine.name='eye-catchlight';shine.position.set(-.014,.021,.029);eye.add(shine);}
     model.userData.face=face;return face;
   }
   function update(model,time,mood='calm'){

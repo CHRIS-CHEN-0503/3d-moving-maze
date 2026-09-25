@@ -49,7 +49,9 @@ for(const kind of ['bat','pan','staff'])test(`${kind} 揮擊全程朝模型 +Z�
       motion.worldWeaponPose(weapon,model,frame/40);weapon.updateMatrixWorld(true);
       const handle=weapon.localToWorld(new THREE.Vector3(0,0,0));
       const tip=weapon.localToWorld(new THREE.Vector3(0,.7,0));
-      assert.ok(forward(handle,model)>.17);
+      const grip=model.userData.armR.localToWorld(new THREE.Vector3(0,-.36,.045));
+      assert.ok(handle.distanceTo(grip)<1e-6,'握柄需貼合右手，不能懸在人物旁');
+      assert.ok(forward(handle,model)>.04);
       assert.ok(forward(tip,model)>forward(handle,model),`${kind} ${direction} ${frame}: 不得往背後轉`);
     }
   }
@@ -66,6 +68,24 @@ test('攻擊與搶奪時，垂於肩膀下方的右手確实抬向正前方',()=
     assert.ok(model.rotation.x>.04,'身體配合向前移重心');
     for(let i=0;i<5;i++)motion.update(model,.1,1+i*.1,0);
     assert.equal(model.userData.motion.action,'');assert.equal(model.userData.motion.strength,0);
+  }
+});
+
+test('六職業的真實左右手一致，轉身與奔跑揮擊時握柄不脫手',()=>{
+  for(let index=0;index<6;index++){
+    const model=figure(index),weapon=motion.buildWeapon(THREE,index),u=model.userData;
+    assert.ok(u.armR.position.x<0&&u.armL.position.x>0,'+Z 正面時右手 -X、左手 +X');
+    assert.ok(u.legR.position.x<0&&u.legL.position.x>0);
+    u.hasWeapon=u.hasShield=true;
+    const budget=meshBudget(model);assert.ok(budget.meshes<55&&budget.triangles<1800,'可玩角色保持輕量');
+    for(let angle=0;angle<8;angle++){
+      model.rotation.y=angle*Math.PI/4;motion.beginAction(model,'attack',.8);
+      for(let frame=0;frame<12;frame++){
+        motion.update(model,1/30,frame/30,1);motion.worldWeaponPose(weapon,model,u.motion.progress);
+        const grip=u.armR.localToWorld(new THREE.Vector3(0,-.36,.045));
+        assert.ok(weapon.position.distanceTo(grip)<1e-6);
+      }
+    }
   }
 });
 
@@ -89,25 +109,27 @@ test('第一人稱抓取手只有抓取時顯示，第三人稱沿用角色的�
   assert.ok(meshBudget(state.grabHand).meshes<=2);
 });
 
-test('第一人稱揮擊抬離畫面下緣，不改武器水平位置、方向或第三人稱姿態',()=>{
+test('第一人稱武器保持畫面右側及可見高度，第三人稱回到實際右手',()=>{
   const model=figure(),weapon=characters.buildGear('staff',{THREE});
   const camera=new THREE.PerspectiveCamera(70,844/390,.1,300);
   camera.position.set(0,1.6,0);camera.lookAt(0,1.6,1);camera.updateMatrixWorld(true);
-  motion.worldWeaponPose(weapon,model,.5);const original=weapon.position.clone(),rotation=weapon.quaternion.clone();
+  motion.worldWeaponPose(weapon,model,.5);const thirdPerson=weapon.position.clone();
+  motion.weaponPose(weapon,.5);const original=weapon.position.clone(),rotation=weapon.quaternion.clone();
   motion.worldWeaponPose(weapon,model,.5,true);weapon.updateMatrixWorld(true);
   assert.equal(weapon.position.x,original.x);assert.equal(weapon.position.z,original.z);
   assert.ok(Math.abs(weapon.position.y-original.y-.32)<1e-9);assert.ok(weapon.quaternion.equals(rotation));
   const tip=weapon.localToWorld(new THREE.Vector3(0,.7,0)).project(camera);
   assert.ok(tip.y>-.7&&tip.y<.3,'武器尖端需留在畫面內，而非藏在下緣');
   assert.ok(Math.abs(tip.x)<.8);
-  motion.worldWeaponPose(weapon,model,.5,false);assert.ok(weapon.position.equals(original));
+  assert.ok(tip.x>0,'人物自己的右手須出現在第一人稱畫面右側');
+  motion.worldWeaponPose(weapon,model,.5,false);assert.ok(weapon.position.equals(thirdPerson));
 });
 
-test('六職業揮擊武器有不同幾何，最多四個網格及低於二百個三角形',()=>{
+test('六職業揮擊武器有不同幾何，最多七個網格及低於三百五十個三角形',()=>{
   const fingerprints=new Set();
   for(let index=0;index<6;index++){
     const weapon=motion.buildWeapon(THREE,index),budget=meshBudget(weapon);
-    assert.ok(budget.meshes<=4);assert.ok(budget.triangles<200);
+    assert.ok(budget.meshes<=7);assert.ok(budget.triangles<350);
     assert.equal(weapon.userData.shaftAxis,'+Y');assert.equal(weapon.visible,false);
     fingerprints.add(JSON.stringify(weapon.children.map(p=>[p.geometry.type,p.geometry.parameters,p.position.toArray()])));
   }
@@ -159,4 +181,23 @@ test('劇情武器只持有一份模型；更新耐久時重用，卸下與換�
   gear.durability=4;context.refreshGear();assert.equal(context.gearVisual.userData.weapon,weapon);assert.ok([...counts.values()].every(n=>n===0));
   context.run.equipment.weapon=null;context.refreshGear();assert.equal(weapon.parent,null);assert.ok([...counts.values()].every(n=>n===1));
   context.run.equipment.weapon={...gear,id:'staff-2'};context.refreshGear();assert.notEqual(context.gearVisual.userData.weapon,weapon);assert.equal(context.gearVisual.userData.weapon.parent,scene);
+});
+
+test('盾牌跟隨真正左臂，換裝與卸下不留下孤立模型或重複釋放',()=>{
+  const model=figure(),scene=new THREE.Scene(),gear={id:'shield-1',slot:'shield',kind:'shield',durability:5};scene.add(model);
+  const context=vm.createContext({THREE,window:{CharacterMotion:motion},V:characters,scene,G:{view:'tp'},playerGroup:model,gearVisual:null,gearSignature:'',attackLeft:0,active:true,run:{equipment:{shield:gear}},_texCache:{},spriteCache:{},makePickupMarker:{}});
+  vm.runInContext(functionSource('disposeSceneObject'),context);
+  const start=tower.indexOf('  function refreshGear()'),end=tower.indexOf('\n  }',start)+4;
+  vm.runInContext(tower.slice(start,end),context);context.refreshGear();
+  const shield=context.gearVisual.userData.shield;assert.equal(shield.parent,model.userData.armL);assert.equal(model.userData.hasShield,true);
+  model.updateMatrixWorld(true);const position=shield.getWorldPosition(new THREE.Vector3());assert.ok(position.x>0);
+  model.userData.armL.rotation.x=-.7;model.updateMatrixWorld(true);assert.notEqual(shield.getWorldPosition(new THREE.Vector3()).z,position.z);
+  const resources=new Map();shield.traverse(o=>{for(const r of [o.geometry,o.material])if(r&&!resources.has(r)){resources.set(r,0);r.addEventListener('dispose',()=>resources.set(r,resources.get(r)+1));}});
+  gear.durability--;context.refreshGear();assert.equal(context.gearVisual.userData.shield,shield);
+  context.run.equipment.shield=null;context.refreshGear();assert.equal(shield.parent,null);assert.equal(model.userData.hasShield,false);
+  assert.ok([...resources.values()].every(n=>n===1));
+  context.run.equipment.helmet={id:'helmet-1',slot:'helmet',kind:'helmet'};context.refreshGear();
+  assert.equal(model.getObjectByName('hair-crown').visible,false,'戴盔時頭髮不能穿出金屬表面');
+  context.run.equipment.helmet=null;context.refreshGear();
+  assert.equal(model.getObjectByName('hair-crown').visible,true,'卸盔恢復原本髮型');
 });

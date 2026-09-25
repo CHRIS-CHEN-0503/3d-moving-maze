@@ -31,13 +31,13 @@
   const GEAR_MOUNTS = Object.freeze({
     helmet: Object.freeze({ position: Object.freeze([0, 1.82, 0]), rotation: Object.freeze([0, 0, 0]) }),
     armor: Object.freeze({ position: Object.freeze([0, .99, 0]), rotation: Object.freeze([0, 0, 0]) }),
-    shield: Object.freeze({ position: Object.freeze([-.48, 1.02, .04]), rotation: Object.freeze([0, -Math.PI / 2, 0]) }),
-    bat: Object.freeze({ position: Object.freeze([.48, .9, .18]), rotation: Object.freeze([.25, 0, -.2]) }),
-    pan: Object.freeze({ position: Object.freeze([.48, .9, .18]), rotation: Object.freeze([.25, 0, -.2]) }),
-    staff: Object.freeze({ position: Object.freeze([.48, .9, .18]), rotation: Object.freeze([.25, 0, -.2]) }),
+    shield: Object.freeze({ position: Object.freeze([.48, 1.02, .04]), rotation: Object.freeze([0, Math.PI / 2, 0]) }),
+    bat: Object.freeze({ position: Object.freeze([-.48, .9, .18]), rotation: Object.freeze([.25, 0, .2]) }),
+    pan: Object.freeze({ position: Object.freeze([-.48, .9, .18]), rotation: Object.freeze([.25, 0, .2]) }),
+    staff: Object.freeze({ position: Object.freeze([-.48, .9, .18]), rotation: Object.freeze([.25, 0, .2]) }),
   });
 
-  function kit(deps) {
+  function kit(deps, rounded=true) {
     const T = deps && deps.THREE;
     if (!T || !T.Group || !T.Mesh || !T.MeshLambertMaterial) throw new TypeError('TowerCharacters 需要 deps.THREE。');
     const materials = new Map(), geometries = new Map();
@@ -47,7 +47,14 @@
     };
     const geometry = (kind, args) => {
       const key = kind + ':' + args.join(',');
-      if (!geometries.has(key)) geometries.set(key, new T[kind](...args));
+      if (!geometries.has(key)) {
+        if(rounded&&kind==='BoxGeometry'&&T.Shape&&Math.min(...args)>=.09){
+          const [w,h,d]=args,b=Math.min(.018,Math.min(...args)*.12),s=new T.Shape();
+          s.moveTo(-w/2+b,-h/2+b);s.lineTo(w/2-b,-h/2+b);s.lineTo(w/2-b,h/2-b);s.lineTo(-w/2+b,h/2-b);s.closePath();
+          const geo=new T.ExtrudeGeometry(s,{depth:d-2*b,bevelEnabled:true,bevelThickness:b,bevelSize:b,bevelSegments:1,steps:1});
+          geo.translate(0,0,-d/2+b);geometries.set(key,geo);
+        }else geometries.set(key,new T[kind](...args));
+      }
       return geometries.get(key);
     };
     function shape(parent, kind, args, color, name, x = 0, y = 0, z = 0) {
@@ -74,13 +81,15 @@
     const eyes=[];
     for (const side of [-1, 1]) eyes.push(k.box(g, [.066, .085, .025], 0x222b34, 'eye', side * .12, headY + .03, .253));
     const limbs = {};
-    for (const [side, suffix] of [[-1, 'L'], [1, 'R']]) {
+    for (const [side, suffix] of [[1, 'L'], [-1, 'R']]) {
       const arm = new k.T.Group(); arm.name = 'arm' + suffix; arm.position.set(side * (width / 2 + .09), bodyY + .24, 0);
       k.box(arm, [.18, .38, .19], shirt, 'sleeve', 0, -.16, 0);
       k.box(arm, [.16, .17, .18], skin, 'hand', 0, -.39, .025); g.add(arm);
+      k.box(arm, [.19, .04, .2], pants, 'tailored-cuff', 0, -.3, .015);
       const leg = new k.T.Group(); leg.name = 'leg' + suffix; leg.position.set(side * width * .25, legHeight, 0);
       k.box(leg, [.21, legHeight - .09, .23], pants, 'trouser', 0, -(legHeight - .09) / 2, 0);
       k.box(leg, [.25, .18, .34], 0x303c43, 'boot', 0, -legHeight + .09, .055); g.add(leg);
+      k.box(leg, [.26, .03, .35], 0x222b34, 'boot-sole', 0, -legHeight + .015, .055);
       limbs['arm' + suffix] = arm; limbs['leg' + suffix] = leg;
     }
     g.userData = { ...limbs, body, head, modelFamily: 'tower-original', frontAxis: '+Z' };
@@ -285,30 +294,51 @@
       const dome = k.sphere(group, [.335, 8, 6], 0xb0bfca, 'helmet-dome', 0, .055, 0); dome.scale.y = .52;
       k.box(group, [.72, .045, .57], 0x647b8e, 'helmet-brim', 0, -.083, .02);
       k.box(group, [.085, .17, .065], 0xc6b37d, 'helmet-noseguard', 0, -.1, .302);
+      for(const side of [-1,1]){
+        k.box(group,[.07,.15,.27],0x7e92a5,'helmet-cheek-plate',side*.3,-.1,-.015);
+        k.sphere(group,[.025,6,4],0xe2d099,'helmet-rivet',side*.22,-.01,.268);
+      }
     } else if (kind === 'armor') {
       k.box(group, [.68, .62, .1], 0xa0b3c2, 'armor-breastplate', 0, 0, .235);
       k.box(group, [.57, .09, .025], 0xd2bd86, 'armor-trim', 0, -.21, .301);
       for (const side of [-1, 1]) k.box(group, [.19, .18, .45], 0x6f889c, 'armor-pauldron', side * .385, .25, 0).rotation.z = side * .12;
       k.box(group, [.1, .31, .03], 0xc0d0d8, 'armor-center-ridge', 0, .04, .308);
+      for(const side of [-1,1]){
+        k.box(group,[.055,.47,.025],0x597487,'armor-side-seam',side*.28,.01,.296);
+        k.box(group,[.2,.14,.08],0x839dad,'armor-waist-plate',side*.15,-.29,.25).rotation.z=-side*.08;
+      }
+      k.box(group,[.12,.1,.04],0xe1c993,'armor-clasp',0,.22,.313);
     } else if (kind === 'shield') {
       k.cylinder(group, [.32, .32, .09, 12], 0x4d7b69, 'shield-board', 0, 0, 0).rotation.x = Math.PI / 2;
       k.torus(group, [.295, .027, 5, 12], 0xc7b688, 'shield-rim', 0, 0, .047);
       k.cylinder(group, [.09, .12, .075, 8], 0xa5b5bd, 'shield-boss', 0, 0, .075).rotation.x = Math.PI / 2;
       k.box(group, [.035, .45, .035], 0x8aa996, 'shield-stripe', 0, 0, .057);
+      for(const side of [-1,1]){
+        k.box(group,[.012,.48,.012],0x8aa996,'shield-plank-seam',side*.13,0,.052);
+        k.sphere(group,[.023,6,4],0xc7b688,'shield-rivet',side*.235,.11,.069);
+      }
+      k.box(group,[.2,.045,.08],0x76543a,'shield-grip',0,0,-.095);
     } else if (kind === 'bat') {
       k.cylinder(group, [.042, .035, .3, 7], 0x946b46, 'bat-grip', 0, .12, 0);
       k.cylinder(group, [.088, .044, .45, 8], 0xc49b67, 'bat-barrel', 0, .485, 0);
       k.cylinder(group, [.047, .047, .065, 7], 0x536773, 'bat-grip-band', 0, .27, 0);
       k.sphere(group, [.087, 8, 4], 0xc49b67, 'bat-cap', 0, .71, 0).scale.y = .35;
+      for(let i=0;i<3;i++)k.cylinder(group,[.043,.043,.025,7],0x604b39,'bat-grip-wrap',0,.06+i*.06,0);
+      k.cylinder(group,[.05,.05,.025,7],0xc49b67,'bat-pommel',0,-.017,0);
     } else if (kind === 'pan') {
       k.box(group, [.056, .36, .05], 0x936749, 'pan-handle', 0, .15, 0);
       k.cylinder(group, [.205, .205, .045, 12], 0x728594, 'pan-bowl', 0, .5, 0).rotation.x = Math.PI / 2;
       k.torus(group, [.185, .025, 5, 12], 0xa5b5be, 'pan-rim', 0, .5, .035);
+      k.cylinder(group,[.159,.159,.008,12],0x3e5361,'pan-cooking-surface',0,.5,.027).rotation.x=Math.PI/2;
+      for(const y of [.31,.355])k.sphere(group,[.018,6,4],0xd5e1e3,'pan-handle-rivet',0,y,.044);
+      k.torus(group,[.027,.012,4,8],0x4b5e66,'pan-hanging-loop',0,-.037,0);
     } else if (kind === 'staff') {
       k.cylinder(group, [.028, .04, .61, 7], 0x8e7752, 'staff-shaft', 0, .275, 0);
       k.cylinder(group, [.043, .043, .07, 7], 0xc1b78a, 'staff-collar', 0, .56, 0);
       k.torus(group, [.088, .028, 5, 10], 0x6d988c, 'staff-crown', 0, .679, 0);
       k.crystal(group, [.059, 0], 0xa5d3c3, 'staff-stone', 0, .677, 0);
+      for(let i=0;i<3;i++)k.cylinder(group,[.039,.039,.025,7],0x5b5347,'staff-grip-wrap',0,.05+i*.055,0);
+      k.cylinder(group,[.041,.041,.04,7],0xb9af86,'staff-foot-cap',0,-.014,0);
     } else throw new RangeError('未知的高塔裝備：' + kind);
     Object.assign(group.userData, { role: 'gear', kind, mount: GEAR_MOUNTS[kind], modelFamily: 'tower-original' });
     return group;
@@ -350,7 +380,7 @@
         for(const side of [-1,1])k.box(g,[.06,.72,.08],s.metal,'white-cape-trim',side*.32,.94,-.34);
       }
     }
-    const shield=new k.T.Group();shield.name='guard-shield';shield.position.set(-.12,-.3,.13);g.userData.armL.add(shield);
+    const shield=new k.T.Group();shield.name='guard-shield';shield.position.set(.12,-.3,.13);g.userData.armL.add(shield);
     if(strength===1||strength===5){
       const radius=strength===5?.34:.28;
       k.cylinder(shield,[radius,radius,.09,10],strength===1?0x99764c:s.metal,'round-shield-'+strength,0,0,0).rotation.x=Math.PI/2;
@@ -370,6 +400,7 @@
       k.crystal(shield,[.13,0],s.cloth,'flame-shield-crest',0,.12,.1);
     }
     const weapon=new k.T.Group();weapon.name='guard-weapon-'+strength;weapon.position.set(0,-.35,.13);g.userData.armR.add(weapon);
+    k.box(shield,[.17,.045,.08],0x5a4536,'guard-shield-grip',0,0,-.08);
     if(strength===1){
       k.cylinder(weapon,[.075,.035,.7,7],0xad8855,'wooden-club',0,.26,0);
       k.cylinder(weapon,[.042,.042,.17,6],0x60534a,'club-grip',0,-.08,0);
@@ -393,7 +424,7 @@
   }
 
   function buildChest(deps) {
-    const k = kit(deps), group = new k.T.Group(); group.name = 'tower-treasure-chest';
+    const k = kit(deps,false), group = new k.T.Group(); group.name = 'tower-treasure-chest';
     const body = k.box(group, [1.06, .53, .7], 0x855c3c, 'chest-body', 0, .285, 0);
     k.box(group, [1.12, .07, .75], 0x4c4540, 'chest-base', 0, .035, 0);
     const lid = new k.T.Group(); lid.name = 'chest-lid-pivot'; lid.position.set(0, .54, -.35); group.add(lid);

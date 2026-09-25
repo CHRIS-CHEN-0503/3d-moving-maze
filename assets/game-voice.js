@@ -63,7 +63,7 @@
           clearLoadTimer();try{audio.pause();}catch(_){}currentAudio=null;failure='recording-unavailable';
           if(entry.group)queue=queue.filter(e=>e.group!==entry.group);
           // Never rematch a failed recording: use device speech once, then continue.
-          queue.unshift(...chunks(entry.text).map(text=>({text,expires:entry.expires,eventGroup:entry.eventGroup,speaker:entry.speaker||track})));next();
+          queue.unshift(...chunks(entry.text).map(text=>({text,expires:entry.expires,eventGroup:entry.eventGroup,speaker:{...track,...entry.speaker}})));next();
         };
         audio.onended=finish;audio.onerror=fallback;
         audio.onplaying=()=>{if(token===generation&&currentAudio===audio)clearLoadTimer();};

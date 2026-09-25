@@ -51,6 +51,16 @@
     }
   },
   "overrides": {
+    "generated.7bbe2bf45512cd12": {
+      "text": "歡迎來到移動迷宮。請選擇你的冒險。",
+      "category": "interface",
+      "src": "./assets/voice/roles/welcome-deep-male-v1.mp3",
+      "speaker": "uncle_fu",
+      "gender": "male",
+      "age": "adult",
+      "rate": 1,
+      "instruction": "成熟男性低音旁白，胸腔共鸣深厚，深沉稳重，带有克制的神秘感，像奇幻迷宫的守门人。正常自然语速，咬字清楚，句间短暂停顿。不故意拖慢、不耳语、不阴森恐怖、不夸张喊叫。"
+    },
     "merchant.tieLing": {
       "src": "./assets/voice/roles/merchant-tieLing.mp3",
       "text": "我是鐵匠鐵嶺。頭盔、球棒和保命補給，都在這裡挑。",
@@ -688,6 +698,16 @@
     }
   },
   "tracks": {
+    "generated.7bbe2bf45512cd12": {
+      "text": "歡迎來到移動迷宮。請選擇你的冒險。",
+      "category": "interface",
+      "src": "./assets/voice/roles/welcome-deep-male-v1.mp3",
+      "speaker": "uncle_fu",
+      "gender": "male",
+      "age": "adult",
+      "rate": 1,
+      "instruction": "成熟男性低音旁白，胸腔共鸣深厚，深沉稳重，带有克制的神秘感，像奇幻迷宫的守门人。正常自然语速，咬字清楚，句间短暂停顿。不故意拖慢、不耳语、不阴森恐怖、不夸张喊叫。"
+    },
     "merchant.tieLing": {
       "src": "./assets/voice/roles/merchant-tieLing.mp3",
       "text": "我是鐵匠鐵嶺。頭盔、球棒和保命補給，都在這裡挑。",

@@ -7,7 +7,7 @@
   'use strict';
   const getCore = () => typeof module === 'object' && module.exports ? require('./story-core.js') : globalThis.TowerCore;
   const getStories = () => typeof module === 'object' && module.exports ? require('./tower-side-stories.js') : globalThis.TowerSideStories;
-  const CATALOG_VERSION = 2;
+  const CATALOG_VERSION = 3;
   const TYPES = Object.freeze({
     archive: Object.freeze({ title: '無聲信庫', description: '被高塔遺忘的信件仍在等待收信人。穿過移動書架，帶回三封未寄出的家書。', objective: '找回三封家書，順序不限。', size: 7, timeLimit: 150, shiftSeconds: 30 }),
     bells: Object.freeze({ title: '逆時鐘室', description: '鐘擺向後擺動，三枚符印維繫著裂隙。依照門上的順序敲響它們；錯誤會觸發陷阱。', objective: '依照提示順序敲響三枚符印。', size: 7, timeLimit: 120, shiftSeconds: 24 }),
@@ -25,15 +25,42 @@
       return ((mixed ^ mixed >>> 14) >>> 0) / 4294967296;
     };
   }
+  // 每個存檔種子只有一張固定行程表：讀檔、跳過裂隙都不能重抽。
+  // 優先輪到尚未出現的種類，並避開最近兩次；新解鎖的故事先補進輪替。
+  let planSeed = null, plan = null;
+  function varietyPlan(seed) {
+    if (seed === planSeed) return plan;
+    const result = {}, counts = {}, recent = [];
+    for (let floor = 95; floor >= 1; floor--) {
+      const random = randomSource(floor, seed);
+      if (random() >= .28) continue;
+      const pool = [...Object.entries(TYPES).map(([kind, spec]) => ({kind, ...spec})), ...getStories().eligible(floor)];
+      const available = pool.filter(spec => !recent.includes(spec.kind));
+      const least = Math.min(...available.map(spec => counts[spec.kind] || 0));
+      const candidates = available.filter(spec => (counts[spec.kind] || 0) === least);
+      const selected = candidates[Math.floor(random() * candidates.length)];
+      result[floor] = selected; counts[selected.kind] = (counts[selected.kind] || 0) + 1;
+      recent.push(selected.kind); if (recent.length > 2) recent.shift();
+    }
+    planSeed = seed; plan = result; return result;
+  }
+  function difficulty(floor, spec) {
+    const tier = Math.min(5, 1 + Math.floor((99 - floor) / 20));
+    const size = spec.size + (tier >= 3 ? 2 : 0);
+    return { tier, size, trapCount: tier, mistakeDamage: 5 + (tier - 1) * 2,
+      timeLimit: Math.round(spec.timeLimit * (size / spec.size) ** 2 * (1 - (tier - 1) * .04)),
+      shiftSeconds: Math.max(14, Math.round(spec.shiftSeconds * (1 - (tier - 1) * .08))) };
+  }
   function rawOffer(floor, seed, catalogVersion = CATALOG_VERSION) {
     if (!validFloor(floor) || !validSeed(seed) || floor > 95) return null;
     const random = randomSource(floor, seed);
     if (random() >= 0.28) return null;
     // Version 1 keeps its original pool, draw count, order, rewards and geometry seed.
-    const stories = catalogVersion === 2 ? getStories() : null;
-    if (catalogVersion === 2 && !stories) return null;
+    const stories = catalogVersion >= 2 ? getStories() : null;
+    if (catalogVersion >= 2 && !stories) return null;
     const pool = [...Object.entries(TYPES).map(([kind, spec]) => ({ kind, ...spec })), ...(stories ? stories.eligible(floor) : [])];
-    const spec = pool[Math.floor(random() * pool.length)], kind = spec.kind;
+    const draw = random();
+    const spec = catalogVersion === 3 ? varietyPlan(seed)[floor] : pool[Math.floor(draw * pool.length)], kind = spec.kind;
     const id = `rift:${floor}:${seed}`, order = [0, 1, 2];
     for (let index = 2; index > 0; index -= 1) {
       const other = Math.floor(random() * (index + 1));
@@ -45,6 +72,11 @@
     const reward = { coins: 22 + Math.floor((99 - floor) / 10) * 3, items: enhanced ? {} : { heal: 1, ration: floor < 40 ? 2 : 1 }, gear: enhanced ? C.createGear(gearKind, floor, seed, id, true) : null };
     // Do not add fields to a v1 offer; saved v1 sessions remain byte-for-byte stable.
     if (catalogVersion === 1) return { id, kind, ...TYPES[kind], order, reward };
+    if (catalogVersion === 3) {
+      const scaled = difficulty(floor, spec);
+      reward.coins += (scaled.tier - 1) * 5;
+      return { id, kind, ...spec, ...scaled, order, reward, catalogVersion };
+    }
     return { id, kind, ...spec, order, reward, catalogVersion };
   }
   function newExpedition(version = CATALOG_VERSION) { return { version, discovered: false, history: [], active: null }; }
@@ -53,15 +85,15 @@
   function validateExpedition(value, floor, seed) {
     if (!validFloor(floor) || !validSeed(seed)) return null;
     if (value === undefined) return newExpedition(1);
-    if (!value || typeof value !== 'object' || Array.isArray(value) || ![1, 2].includes(value.version) || typeof value.discovered !== 'boolean' || !Array.isArray(value.history) || value.history.length > 99) return null;
+    if (!value || typeof value !== 'object' || Array.isArray(value) || ![1, 2, 3].includes(value.version) || typeof value.discovered !== 'boolean' || !Array.isArray(value.history) || value.history.length > 99) return null;
     const history = [], ids = new Set();
     for (const item of value.history) {
       if (!item || !validFloor(item.floor) || item.floor < floor || !['completed', 'abandoned', 'expired'].includes(item.outcome)) return null;
       const version = catalogVersion(item.catalogVersion);
-      if (![1, 2].includes(version) || version > value.version || item.floor === floor && version !== value.version) return null;
+      if (![1, 2, 3].includes(version) || version > value.version || item.floor === floor && version !== value.version) return null;
       const generated = rawOffer(item.floor, seed, version);
       if (!generated || generated.id !== item.id || generated.kind !== item.kind || ids.has(item.id)) return null;
-      ids.add(item.id); history.push({ id: item.id, kind: item.kind, floor: item.floor, outcome: item.outcome, ...(version === 2 ? { catalogVersion: version } : {}) });
+      ids.add(item.id); history.push({ id: item.id, kind: item.kind, floor: item.floor, outcome: item.outcome, ...(version >= 2 ? { catalogVersion: version } : {}) });
     }
     const generated = rawOffer(floor, seed, value.version);
     if (value.discovered && !generated) return null;
@@ -78,14 +110,14 @@
         if ((a.progress.length === 0) !== (a.shiftAtStart === null) || a.progress.length > 1 && a.shiftCount <= a.shiftAtStart) return null;
       }
       if (!a.returnCell || !number(a.returnCell.x, 0, config.size - 1, true) || !number(a.returnCell.y, 0, config.size - 1, true) || !number(a.returnShift, 0, 65)) return null;
-      active = { id: a.id, kind: a.kind, floor, elapsed: a.elapsed, progress: [...a.progress], mistakes: a.mistakes, returnCell: { x: a.returnCell.x, y: a.returnCell.y }, returnShift: a.returnShift, ...(value.version === 2 ? { catalogVersion: 2 } : {}), ...(a.kind === 'stars' ? { shiftCount: a.shiftCount, shiftAtStart: a.shiftAtStart } : {}) };
+      active = { id: a.id, kind: a.kind, floor, elapsed: a.elapsed, progress: [...a.progress], mistakes: a.mistakes, returnCell: { x: a.returnCell.x, y: a.returnCell.y }, returnShift: a.returnShift, ...(value.version >= 2 ? { catalogVersion: value.version } : {}), ...(a.kind === 'stars' ? { shiftCount: a.shiftCount, shiftAtStart: a.shiftAtStart } : {}) };
     }
     return { version: value.version, discovered: value.discovered, history, active };
   }
   function offer(run) {
     if (!run || !validFloor(run.floor) || !validSeed(run.seed)) return null;
     const version = run.expedition ? run.expedition.version : CATALOG_VERSION;
-    if (![1, 2].includes(version)) return null;
+    if (![1, 2, 3].includes(version)) return null;
     const generated = rawOffer(run.floor, run.seed, version);
     if (!generated || run.expedition && (!Array.isArray(run.expedition.history) || run.expedition.history.some(entry => entry.id === generated.id))) return null;
     return generated;
@@ -104,7 +136,7 @@
       const generated = offer(next), config = getCore().floorConfig(next.floor);
       if (!generated || generated.id !== id || !next.expedition.discovered || next.expedition.active) return { ok: false, message: '目前無法進入這道裂隙。' };
       if (!returnPoint || !number(returnPoint.x, 0, config.size - 1, true) || !number(returnPoint.y, 0, config.size - 1, true) || !number(returnPoint.shiftLeft, 0, 65)) return { ok: false, message: '無效的返回位置。' };
-      next.expedition.active = { id, kind: generated.kind, floor: next.floor, elapsed: 0, progress: [], mistakes: 0, returnCell: { x: returnPoint.x, y: returnPoint.y }, returnShift: returnPoint.shiftLeft, ...(next.expedition.version === 2 ? { catalogVersion: 2 } : {}), ...(generated.kind === 'stars' ? { shiftCount: 0, shiftAtStart: null } : {}) };
+      next.expedition.active = { id, kind: generated.kind, floor: next.floor, elapsed: 0, progress: [], mistakes: 0, returnCell: { x: returnPoint.x, y: returnPoint.y }, returnShift: returnPoint.shiftLeft, ...(next.expedition.version >= 2 ? { catalogVersion: next.expedition.version } : {}), ...(generated.kind === 'stars' ? { shiftCount: 0, shiftAtStart: null } : {}) };
       return { ok: true, message: `進入${generated.title}。`, effect: { entered: true, offer: generated } };
     });
   }
@@ -115,7 +147,7 @@
       if (a.progress.length === 3) return { ok: false, message: '目標已完成，請返回裂隙出口。' };
       if (a.kind === 'bells' && generated.order[a.progress.length] !== index) {
         a.progress = []; a.mistakes = Math.min(10000, a.mistakes + 1);
-        const damage = getCore().applyDamage(next, 8, 'trap');
+        const damage = getCore().applyDamage(next, generated.mistakeDamage ? generated.mistakeDamage + 3 : 8, 'trap');
         return { ...damage, message: '符印順序錯誤！鐘聲引發陷阱，進度已重設。', effect: { ...damage.effect, wrongOrder: true, progress: [], completed: false } };
       }
       if (a.progress.includes(index)) return { ok: false, message: '這個目標已經完成。' };
@@ -129,7 +161,7 @@
       if (wrongOrder || wrongChoice) {
         if (a.kind === 'threads') a.progress = [];
         a.mistakes = Math.min(10000, a.mistakes + 1);
-        const damage = getCore().applyDamage(next, 5, 'trap');
+        const damage = getCore().applyDamage(next, generated.mistakeDamage || 5, 'trap');
         return { ...damage, message: step && step.failure || '線索尚未接起來。陷阱被觸動，請重新確認提示。', effect: { ...damage.effect, wrongOrder, wrongChoice, progress: [...a.progress], completed: false } };
       }
       a.progress.push(index);
@@ -170,7 +202,7 @@
         for (const [id, count] of Object.entries(reward.items)) next.bag[id] += count;
       }
       const effect = { outcome, returnCell: { ...a.returnCell }, returnShift: a.returnShift, reward };
-      next.expedition.history.push({ id: a.id, kind: a.kind, floor: a.floor, outcome, ...(next.expedition.version === 2 ? { catalogVersion: 2 } : {}) });
+      next.expedition.history.push({ id: a.id, kind: a.kind, floor: a.floor, outcome, ...(next.expedition.version >= 2 ? { catalogVersion: next.expedition.version } : {}) });
       next.expedition.active = null;
       return { ok: true, message: outcome === 'completed' ? `${generated.title}探索完成，報酬已收下。` : '返回原本樓層，這道裂隙已經關閉。', effect };
     };

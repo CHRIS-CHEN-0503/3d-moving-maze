@@ -976,7 +976,7 @@ button:focus-visible,input:focus-visible{outline:3px solid #fff;outline-offset:3
 <script src="./assets/voice-catalog.js?v=1.33.0"></script>
 <script src="./assets/role-voices.js?v=1.34.1"></script>
 <script src="./assets/voice-pack.js?v=1.34.0"></script>
-<script src="./assets/game-voice.js?v=1.34.1"></script>
+<script src="./assets/game-voice.js?v=1.35.0"></script>
 <script src="./assets/maze-stone-audio.js?v=1.34.2"></script>
 <script>
 'use strict';
@@ -984,7 +984,7 @@ button:focus-visible,input:focus-visible{outline:3px solid #fff;outline-offset:3
    3D移動迷宮 — 給小朋友的變形迷宮冒險
    ===================================================== */
 const $=id=>document.getElementById(id);
-const GAME_VERSION='1.34.2';
+const GAME_VERSION='1.35.0';
 
 /* ---------- 設定（後台可調） ---------- */
 const DEFAULT_CFG={teamSize:2,shiftMin:3,itemCount:6,foodCount:4,hungerMin:3,stunSec:3,pingSec:3,smellCells:3,mazeSize:13,musicOn:1,speechOn:1,speechVoice:'',apiUrl:'',roomMax:3,rounds:3,goodsCount:16,shopCollect:1,shopMin:2.5,cartFull:400,views:{fp:1,tp:1,top:1},broker:'wss://broker.emqx.io:8084/mqtt'};
@@ -2559,7 +2559,7 @@ function updatePlayer(dt,t){
       tagBoost=1.15; // 鬼＝一般玩家的 1.15 倍速
       if(MP.itPower==='speed')tagBoost*=1.12; // 鬼能力：疾風
     }
-    const sp=G.baseSpeed*(jobPerk('speedBonus')||1)*G.hungerMul*G.speedMul*tagBoost*shopSpeed()*mag*(window.CaptureFlag?CaptureFlag.speed():1)*(isShop()&&window.ShopChaos?ShopChaos.speed(MP.id):1);
+    const sp=G.baseSpeed*(jobPerk('speedBonus')||1)*G.hungerMul*G.speedMul*tagBoost*shopSpeed()*mag*(window.CaptureFlag?CaptureFlag.speed():1)*(isShop()&&window.ShopChaos?ShopChaos.speed(MP.id):1)*(window.TowerMode?.movementScale()??1);
     // 相對於相機方向移動（俯視時相機固定朝北）
     const base=(G.view==='top')?Math.PI:G.camYaw+Math.PI;
     const ang=base+Math.atan2(-ix,-iy);
@@ -5027,11 +5027,12 @@ window.addEventListener('pagehide',()=>AudioEng.shiftSound?.stop());
 <script src="story/story-core.js"></script>
 <script src="story/tower-narrative.js"></script>
 <script src="story/tower-side-stories.js"></script>
-<script src="story/tower-dungeons.js"></script>
+<script src="story/tower-dungeons.js?v=1.35.0"></script>
+<script src="story/tower-hazards.js?v=1.35.0"></script>
 <script src="story/tower-encounters.js"></script>
 <script src="story/tower-characters.js"></script>
 <script src="story/tower-audio.js"></script>
-<script src="story/tower-mode.js?v=1.34.0"></script>
+<script src="story/tower-mode.js?v=1.35.0"></script>
 <script src="assets/room-lifecycle.js?v=1.34.0"></script>
 <script src="assets/shop-collection-core.js?v=1.31.0"></script>
 <script src="assets/shop-collection.js?v=1.31.0"></script>

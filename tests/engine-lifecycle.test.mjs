@@ -58,7 +58,7 @@ function lifecycle() {
   const delays = new Map();
   const intervals = new Map();
   const nodes = new Map();
-  const calls = { build: 0, spawn: 0, alarm: 0, tick: 0, maze: 0 };
+  const calls = { build: 0, spawn: 0, shift: 0, stopped: 0, tick: 0, maze: 0 };
   const context = vm.createContext({
     window: {},
     performance: { now: () => now },
@@ -71,7 +71,7 @@ function lifecycle() {
     $: id => { if (!nodes.has(id)) nodes.set(id, { style: {}, textContent: '' }); return nodes.get(id); },
     G: { running: true, frozen: false, shifting: false, wallH: 3, px: 1, pz: 1, lvlIdx: 0, nextShiftAt: 3000 },
     MP: { on: false, host: false }, CFG: { shiftMin: 1 }, LEVELS: [{}],
-    AudioEng: { sfxAlarm: () => calls.alarm++, sfxTick: () => calls.tick++ },
+    AudioEng: { sfxShift: () => calls.shift++, shiftSound: { stop: () => calls.stopped++ }, sfxTick: () => calls.tick++ },
     wallMesh: { position: { y: 0 } }, playerGroup: { position: { set() {} } },
     worldToCell: () => ({ x: 0, y: 0 }), cellToWorld: () => ({ x: 0, z: 0 }),
     genMaze: () => calls.maze++, relocateExit() {}, spawnItems: () => calls.spawn++,
@@ -92,13 +92,14 @@ test('變形降牆途中離開，已排入的舊畫面不重建迷宮或解除�
   const h = lifecycle();
   h.run('doShift()');
   const pendingFrame = [...h.frames.values()][0];
-  const alarm = [...h.delays.values()][0];
+  assert.equal(h.delays.size, 0, '石牆聲不再排入第二次電子警報');
   h.run('cancelSceneTransition()');
   h.context.G.frozen = true;
   h.at(1000);
-  pendingFrame(); alarm();
+  pendingFrame();
   assert.equal(h.calls.build, 0);
-  assert.equal(h.calls.alarm, 1);
+  assert.equal(h.calls.shift, 1);
+  assert.equal(h.calls.stopped, 1);
   assert.equal(h.context.G.frozen, true);
   assert.equal(h.context.wallMesh.position.y, 0);
   assert.equal(h.frames.size + h.delays.size + h.intervals.size, 0);
@@ -127,7 +128,7 @@ test('單次變形完成只建立一次迷宮，解除凍結並重新安排下�
   h.delays.delete(holdEntry[0]);
   h.at(1400); holdEntry[1]();
   h.at(2300); h.frame();
-  assert.deepEqual(h.calls, { build: 1, spawn: 1, alarm: 1, tick: 0, maze: 1 });
+  assert.deepEqual(h.calls, { build: 1, spawn: 1, shift: 1, stopped: 0, tick: 0, maze: 1 });
   assert.equal(h.context.G.frozen, false);
   assert.equal(h.context.G.shifting, false);
   assert.equal(h.context.G.nextShiftAt, 62300);
@@ -138,7 +139,7 @@ test('暫停不觸發變形；預警計時在離開時清除且舊回呼不發�
   const h = lifecycle();
   h.context.G.frozen = true;
   h.at(4000); h.run('updateShiftTimer();doShift()');
-  assert.equal(h.calls.alarm, 0);
+  assert.equal(h.calls.shift, 0);
   assert.equal(h.intervals.size, 0);
   h.context.G.frozen = false;
   h.at(0); h.run('updateShiftTimer()');

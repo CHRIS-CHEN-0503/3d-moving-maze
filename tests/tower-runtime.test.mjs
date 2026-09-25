@@ -87,12 +87,12 @@ test('怪物蓄力攻擊不能穿牆，命中後給予短暫保護避免多怪�
     model: { position: { x: 0, z: 0 }, userData: { body: { position: {} }, ring: { material: {} } } } });
   h.context.playerInWall = () => true;
   h.testApi.updateMonster(monster(), .2, 1000);
-  assert.equal(h.testApi.state().run.hp, 100);
+  assert.equal(h.testApi.state().run.hp, 60);
   h.context.playerInWall = () => false;
   h.testApi.updateMonster(monster(), .2, 1000);
-  assert.equal(h.testApi.state().run.hp, 92);
+  assert.equal(h.testApi.state().run.hp, 52);
   h.testApi.updateMonster(monster(), .2, 1000);
-  assert.equal(h.testApi.state().run.hp, 92);
+  assert.equal(h.testApi.state().run.hp, 52);
 });
 
 test('實際怪物命中使三防具各耗一耐久，最後耐久仍保護這一擊', () => {
@@ -107,7 +107,7 @@ test('實際怪物命中使三防具各耗一耐久，最後耐久仍保護這�
     model:{position:{x:0,z:0},userData:{body:{position:{}},ring:{material:{}}}}};
   const weaponDurability=run.equipment.weapon.durability;
   h.testApi.updateMonster(monster,.2,1000);
-  assert.equal(h.testApi.state().run.hp,94,'15傷害先抵扣三件防禦合計9');
+  assert.equal(h.testApi.state().run.hp,54,'15傷害先抵扣三件防禦合計9');
   for(const slot of ['helmet','armor','shield'])assert.equal(h.testApi.state().run.equipment[slot],null);
   assert.equal(h.testApi.state().run.equipment.weapon.durability,weaponDurability);
   assert.match(h.nodes.get('towerGearStatus').textContent,/盔 — · 甲 — · 盾 —/);
@@ -120,7 +120,7 @@ test('飢餓傷害正確經由例外來源，不消耗防具或受裝備護盾�
   run=core.equipGear(core.grantGear(run,armor).run,armor.id).run;
   run.effects.shield=25;h.testApi.setState({run});h.context.G.satiety=0;
   h.api.tick(.2,1200);
-  assert.equal(h.testApi.state().run.hp,97);
+  assert.equal(h.testApi.state().run.hp,57);
   assert.equal(h.testApi.state().run.equipment.armor.durability,armor.durability);
   assert.equal(h.testApi.state().run.hunger,0);
 });

@@ -15,7 +15,7 @@ test('browser modules expose the same TowerCore contract after dependency loadin
     vm.runInContext(readFileSync(new URL('../story/' + filename, import.meta.url), 'utf8'), context);
   }
   assert.equal(context.TowerCore.floorConfig(99).size, 7);
-  assert.equal(context.TowerCore.newRun({ seed: 1 }).stateVersion, 1);
+  assert.equal(context.TowerCore.newRun({ seed: 1 }).stateVersion, 2);
 });
 
 test('all 99 floors grow toward the bottom while walls change progressively faster', () => {
@@ -138,9 +138,9 @@ test('healing, food and temporary tools are useful without consuming redundant i
   const run = fresh();
   assert.equal(core.useItem(run, 'heal').ok, false);
   assert.equal(core.useItem(run, 'ration').ok, false);
-  const injured = { ...run, hp: 80, hunger: 30 };
+  const injured = { ...run, hp: 40, hunger: 30 };
   const healed = core.useItem(injured, 'heal');
-  assert.equal(healed.run.hp, 100);
+  assert.equal(healed.run.hp, 60);
   assert.equal(healed.effect.healed, 20);
   const fed = core.useItem(healed.run, 'ration');
   assert.equal(fed.run.hunger, 75);

@@ -213,6 +213,6 @@ test('resuming a defeated journey retries with the saved character and pays only
   original.floor = 80; original.floorsCleared = 19; original.hp = 0; original.hunger = 12; original.status = 'dead'; original.claimed = ['s0'];
   const h = harness(original); h.context.TowerMode.open(); h.click('continue');
   assert.match(h.get('towerDialog').innerHTML, /重整後再挑戰/); h.click('retry');
-  assert.equal(h.save().status, 'playing'); assert.equal(h.save().coins, 12); assert.equal(h.save().hp, 100); assert.equal(h.save().hunger, 65); assert.deepEqual(h.save().claimed, ['s0']);
+  assert.equal(h.save().status, 'playing'); assert.equal(h.save().coins, 12); assert.equal(h.save().hp, 60); assert.equal(h.save().hunger, 65); assert.deepEqual(h.save().claimed, ['s0']);
   assert.equal(h.context.G.charIdx, 4, 'Loading a defeated save must restore its original profession'); assert.equal(h.get('playerName').value, '工程師旅人'); assert.ok(h.context.TowerCore.validateSave(h.save()));
 });

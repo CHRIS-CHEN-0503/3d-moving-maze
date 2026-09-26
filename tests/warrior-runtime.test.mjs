@@ -18,13 +18,13 @@ const bridge = `window.__warriorTest = {
     G.mazeW=G.mazeH=floorConfig.size;
     G.exitCell={x:G.mazeW-1,y:G.mazeH-1}; buildWorld();
   },
-  state() { return {run,monsters,traders,loot,warriorNpc,nearestWarrior,escort,paused}; },
+  state() { return {run,monsters,traders,loot,warriorNpc,nearestWarrior,escort,paused,bolts,hurtLeft}; },
   clearScenery() { traders=[];loot=[];nearest=null;nearestWarrior=null;explorer=chest=relic=nearbyEncounter=null; },
   approachWarrior() { nearestWarrior=warriorNpc;nearest=null;G.px=warriorNpc.x;G.pz=warriorNpc.z; },
   replaceMonsters(value) { monsters=value; },
   shifted() { wasShifting=true;G.shifting=false; },
   followNpc,updateWarrior,updateMonster,isHeld,warriorDialog,hireWarrior,reviewWarriorReplacement,trade,
-  restoreWarriorPosition,dialog,closeDialog,save,readSave,attack,
+  restoreWarriorPosition,dialog,closeDialog,save,readSave,attack,updateBolts,clearBolts,launchBolt,defeatMonster,
 };`;
 assert.match(source, /  install\(\);\s*\}\)\(\);\s*$/);
 
@@ -98,6 +98,37 @@ function replacementRuntime(holding=false) {
   run.floorsCleared=99-run.floor;
   return runtime(holding?core.interceptMonster(run,'monster-0',3).run:run);
 }
+
+test('護衛抵擋語音只在開始播一次，近距離間隔碰撞音，擊敗不重複播報',()=>{
+  const h=runtime(hiredRun()),m=positionThreat(h),voices=[],sounds=[];
+  h.context.window.GameVoice={announceAsset:(id)=>voices.push(id)};
+  h.context.AudioEng.sfxGuardBlock=()=>sounds.push('block');h.context.AudioEng.sfxGuardDefeat=()=>sounds.push('defeat');
+  h.api.replaceMonsters([m]);h.api.updateWarrior(.01,h.now());assert.deepEqual(voices,['guard.timed']);
+  for(let i=0;i<10;i++)h.api.updateWarrior(.01,h.now()+100);
+  assert.equal(voices.length,1);assert.equal(sounds.length,1);
+  h.api.updateWarrior(.01,h.now()+1500);assert.equal(sounds.length,2);
+  h.context.G.px=100;h.api.updateWarrior(.01,h.now()+3000);assert.equal(sounds.length,2);
+  h.api.defeatMonster(m,true);h.api.defeatMonster(m,true);assert.deepEqual(voices,['guard.timed','guard.defeat']);assert.equal(sounds.at(-1),'defeat');
+});
+test('晶簇術士54層起出現，先蓄力再發射，彈道撞牆消失與命中受兩秒保護',()=>{
+  assert.ok(!core.floorConfig(55).monsterTypes.includes('shardseer'));assert.ok(core.floorConfig(54).monsterTypes.includes('shardseer'));
+  const run=core.newRun({seed:123});run.floor=54;run.floorsCleared=45;
+  const h=runtime(run),m=positionThreat(h,'shardseer','monster-0',6);h.api.replaceMonsters([m]);
+  h.api.updateMonster(m,.1,h.now());assert.equal(m.windup,1.1);assert.equal(h.api.state().bolts.length,0);
+  h.api.updateMonster(m,1.2,h.now());assert.equal(h.api.state().bolts.length,1);
+  h.context.playerInWall=()=>true;h.api.updateBolts(.1);assert.equal(h.api.state().bolts.length,0);assert.equal(h.api.state().run.hp,60);
+  h.context.playerInWall=()=>false;m.aim={x:0,z:0};h.api.launchBolt(m);h.api.updateBolts(1.2);assert.equal(h.api.state().run.hp,48);assert.equal(h.api.state().bolts.length,0);
+  h.api.launchBolt(m);h.api.updateBolts(1.2);assert.equal(h.api.state().run.hp,48);
+});
+test('遠程鎖定發射前的位置可側移閃避，暈眩清除彈道且最多八發',()=>{
+  const h=runtime(core.newRun({seed:123})),m=positionThreat(h,'shardseer','monster-0',6);h.api.replaceMonsters([m]);
+  m.aim={x:0,z:0};h.api.launchBolt(m);h.context.G.pz=3;h.api.updateBolts(2.3);
+  assert.equal(h.api.state().run.hp,60);assert.equal(h.api.state().bolts.length,0);
+  for(let i=0;i<12;i++)h.api.launchBolt(m);assert.equal(h.api.state().bolts.length,8);
+  h.api.state().run.monsterStuns[m.id]=3;h.api.updateBolts(.1);assert.equal(h.api.state().bolts.length,0);
+  m.windup=.5;h.api.updateMonster(m,.7,h.now());assert.equal(m.windup,0);assert.equal(h.api.state().bolts.length,0);
+  delete h.api.state().run.monsterStuns[m.id];h.api.launchBolt(m);h.api.clearBolts();assert.equal(h.api.state().bolts.length,0);
+});
 test('換聘先確認；取消保留原護衛，確認後只留下新模型且不重複扣款',()=>{
   const h=replacementRuntime(),old=h.api.state().escort.model,id=h.api.state().warriorNpc.offer.id;
   h.api.approachWarrior();h.api.warriorDialog();assert.match(h.nodes.get('towerDialog').innerHTML,/解聘並改聘/);

@@ -43,7 +43,7 @@ test('early floors are safe, occasional monsters are introduced before crowded l
   assert.equal(early.filter((floor) => floor.monsterCount).length, 3);
   assert.equal(core.floorConfig(69).monsterCount, 2);
   assert.equal(core.floorConfig(1).monsterCount, 6);
-  assert.equal(core.floorConfig(1).monsterTypes.length, 4);
+  assert.equal(core.floorConfig(1).monsterTypes.length, 5);
 });
 
 test('ten distinct environments change at 89, 79 and every following ten-floor boundary', () => {

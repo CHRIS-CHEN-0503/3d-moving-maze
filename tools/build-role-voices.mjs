@@ -18,6 +18,9 @@ tracks[welcomeId]={...base[welcomeId],src:'./assets/voice/roles/welcome-deep-mal
 overrides[welcomeId]=tracks[welcomeId];
 // Same approved gatekeeper voice; echo is baked offline, not synthesized on phones.
 tracks['maze.shift.deep']={...tracks[welcomeId],text:'迷宮正在變幻。新的道路，即將出現。',category:'event',src:'./assets/voice/roles/maze-shift-deep-echo-v1.mp3'};
+for(const [key,text] of Object.entries({hold:'我來擋住牠，你先走！',timed:'我只能擋住一會兒，快走！',defeat:'怪物已經打倒了，繼續前進！'})){
+  tracks['guard.'+key]={text,category:'event',src:'./assets/voice/roles/guard-'+key+'-v1.mp3',speaker:'dylan',gender:'male',age:'adult',rate:1,instruction:'成年男性护卫，沉稳可靠，短句清楚有力，正常说话速度，不喊叫，不拖音。'};
+}
 for(const [id,profile] of Object.entries(profiles)){
   tracks[id]={...base[id],...profile,src:'./assets/voice/roles/'+id.replaceAll('.','-')+'.mp3',rate:1};
   overrides[id]=tracks[id];

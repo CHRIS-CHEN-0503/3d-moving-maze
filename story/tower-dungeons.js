@@ -147,7 +147,7 @@
       if (a.progress.length === 3) return { ok: false, message: '目標已完成，請返回裂隙出口。' };
       if (a.kind === 'bells' && generated.order[a.progress.length] !== index) {
         a.progress = []; a.mistakes = Math.min(10000, a.mistakes + 1);
-        const damage = getCore().applyDamage(next, generated.mistakeDamage ? generated.mistakeDamage + 3 : 8, 'trap');
+        const damage = getCore().applyDamage(next, generated.mistakeDamage ? generated.mistakeDamage + 3 : 8, 'trap', details?.invulnerable===true);
         return { ...damage, message: '符印順序錯誤！鐘聲引發陷阱，進度已重設。', effect: { ...damage.effect, wrongOrder: true, progress: [], completed: false } };
       }
       if (a.progress.includes(index)) return { ok: false, message: '這個目標已經完成。' };
@@ -161,7 +161,7 @@
       if (wrongOrder || wrongChoice) {
         if (a.kind === 'threads') a.progress = [];
         a.mistakes = Math.min(10000, a.mistakes + 1);
-        const damage = getCore().applyDamage(next, generated.mistakeDamage || 5, 'trap');
+        const damage = getCore().applyDamage(next, generated.mistakeDamage || 5, 'trap', details?.invulnerable===true);
         return { ...damage, message: step && step.failure || '線索尚未接起來。陷阱被觸動，請重新確認提示。', effect: { ...damage.effect, wrongOrder, wrongChoice, progress: [...a.progress], completed: false } };
       }
       a.progress.push(index);

@@ -14,6 +14,9 @@ test('破風與命中原創波形不同、短促不削波、首尾平滑',()=>{
   }
   assert.notDeepEqual(audio.render('swing'),audio.render('hit'));
 });
+test('受傷、抵擋和消滅音效各自有限長度、不削波且首尾歸零',()=>{
+  for(const kind of ['hurt','block','defeat']){const data=audio.render(kind);assert.ok(data.length<=audio.RATE*.56);assert.equal(data[0],0);assert.equal(data.at(-1),0);assert.ok(data.some(v=>Math.abs(v)>.1));assert.ok(data.every(v=>Number.isFinite(v)&&Math.abs(v)<1));}
+});
 test('兩份音效只合成一次、最多四個聲源、結束和停止確實斷線',()=>{
   let buffers=0;const sources=[],output={};
   const context={createBuffer(c,n,r){buffers++;assert.equal(c,1);assert.equal(r,audio.RATE);return {getChannelData:()=>new Float32Array(n)};},createBufferSource(){const s={connect:o=>assert.equal(o,output),start(){},stop(){this.stopped=true;},disconnect(){this.disconnected=true;}};sources.push(s);return s;}};

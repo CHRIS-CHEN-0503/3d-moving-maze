@@ -13,7 +13,8 @@ const source = await readFile(new URL('../story/tower-mode.js', import.meta.url)
 const bridge = `window.__test = {
   setState(value) { run=value.run;active=true;floorStarted=true;floorConfig=C.floorConfig(run.floor);hurtLeft=0; },
   state() { return {run,paused,shiftLeft,attackLeft,hurtLeft}; },
-  dialog,closeDialog,readSave,save,updateMonster,hasClearPath,
+  dialog,closeDialog,readSave,save,updateMonster,hasClearPath,damage,damageFeedback,
+  setProtection(seconds){hurtLeft=seconds;},
 };`;
 assert.match(source, /  install\(\);\s*\}\)\(\);\s*$/);
 
@@ -93,6 +94,24 @@ test('怪物蓄力攻擊不能穿牆，命中後給予短暫保護避免多怪�
   assert.equal(h.testApi.state().run.hp, 52);
   h.testApi.updateMonster(monster(), .2, 1000);
   assert.equal(h.testApi.state().run.hp, 52);
+});
+
+test('貼身立即受傷並閃紅光，兩秒內跨傷害來源保護；到期才再扣血',()=>{
+  const h=runtime();h.context.G.px=1;
+  const m={id:'touch',path:[],alive:true,strength:1,cooldown:50,pathLeft:1,windup:0,phase:0,kind:'clockmite',def:core.MONSTERS.clockmite,model:{position:{x:0,z:0},userData:{body:{position:{}},ring:{material:{}}}}};
+  h.testApi.updateMonster(m,.01,1000);assert.equal(h.testApi.state().run.hp,52);assert.equal(h.testApi.state().hurtLeft,2);
+  assert.equal(h.nodes.get('towerHurtGlow').style.opacity,'1');
+  h.testApi.damage(20,'trap');assert.equal(h.testApi.state().run.hp,52);
+  h.api.tick(1.99,2990);h.testApi.updateMonster(m,.01,2990);assert.equal(h.testApi.state().run.hp,52);
+  assert.equal(h.nodes.get('towerHurtGlow').style.opacity,'0');
+  h.api.tick(.02,3010);h.testApi.updateMonster(m,.01,3010);assert.equal(h.testApi.state().run.hp,44);
+});
+test('暈眩、隔牆、暫停中的怪物不造成接觸傷害',()=>{
+  const h=runtime();h.context.G.px=1;
+  const m={id:'touch',path:[],alive:true,strength:1,cooldown:0,pathLeft:1,windup:0,phase:0,kind:'clockmite',def:core.MONSTERS.clockmite,model:{position:{x:0,z:0},userData:{body:{position:{}},ring:{material:{}}}}};
+  h.testApi.state().run.monsterStuns.touch=5;h.testApi.updateMonster(m,.1,1000);assert.equal(h.testApi.state().run.hp,60);
+  delete h.testApi.state().run.monsterStuns.touch;h.context.playerInWall=()=>true;h.testApi.updateMonster(m,.1,1000);assert.equal(h.testApi.state().run.hp,60);
+  h.context.playerInWall=()=>false;h.context.G.frozen=true;h.testApi.updateMonster(m,.1,1000);assert.equal(h.testApi.state().run.hp,60);
 });
 
 test('實際怪物命中使三防具各耗一耐久，最後耐久仍保護這一擊', () => {

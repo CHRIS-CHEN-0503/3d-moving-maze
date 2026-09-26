@@ -127,6 +127,12 @@ test('bells enforce the generated order, reset wrong progress, and wear armor fo
   assert.deepEqual(current.expedition.active.progress, offer.order);
   assert.ok(C.validateSave(current));
 });
+test('副本答錯在受傷保護中仍重設進度，但不扣血或消耗防具',()=>{
+  const {run,offer}=entered('bells');
+  const wrong=(offer.order[0]+1)%3,before=run.hp;
+  const result=D.interact(run,wrong,run.revision,{invulnerable:true});
+  assert.equal(result.ok,true);assert.equal(result.effect.protected,true);assert.equal(result.effect.damage,0);assert.equal(result.run.hp,before);assert.equal(result.run.expedition.active.mistakes,1);
+});
 
 test('dungeon clocks cap at the time limit, survive reload, and do not silently leave the dungeon', () => {
   let { run, offer } = entered('lantern');

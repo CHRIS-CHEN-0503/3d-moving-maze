@@ -3,6 +3,15 @@ import assert from 'node:assert/strict';
 import {createRequire} from 'node:module';
 import {readFileSync} from 'node:fs';
 const C=createRequire(import.meta.url)('../story/story-core.js');
+const E=createRequire(import.meta.url)('../story/tower-encounters.js');
+test('無敵時傷害不扣生命、消耗防具或復甦羽；寶箱仍僅能領取一次',()=>{
+  const run=C.newRun({seed:17}),gear=C.createGear('armor',99,17,'a');run.equipment.armor=gear;run.bag.feather=1;
+  const before=JSON.stringify(run),result=C.applyDamage(run,999,'monster',true);assert.equal(result.effect.protected,true);assert.equal(JSON.stringify(run),before);
+  let seed=1,offer;while(seed<10000){offer=E.chestOffer(99,seed);if(offer?.outcome==='trap')break;seed++;}
+  const chestRun=C.newRun({seed}),opened=E.openChest(chestRun,offer.id,chestRun.revision,true);
+  assert.equal(opened.run.hp,60);assert.equal(opened.effect.damage,0);assert.equal(opened.effect.protected,true);
+  assert.equal(E.openChest(opened.run,offer.id,opened.run.revision).ok,false);
+});
 test('劇情生命60，飽食100；療癒和復甦遵守上限',()=>{
   const run=C.newRun({seed:17});assert.equal(C.MAX_HP,60);assert.equal(run.hp,60);assert.equal(run.hunger,100);
   assert.equal(C.useItem(run,'heal').ok,false);assert.equal(run.bag.heal,2);

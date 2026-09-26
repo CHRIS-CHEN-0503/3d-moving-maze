@@ -12,6 +12,8 @@
   let shiftLeft = 65, wasShifting = false, floorConfig = null, saveClock = 0, hudClock = 0;
   let attackLeft = 0, hurtLeft = 0, warning = false, floorStarted = false, saveFailed = false;
   let encounterHold = 0;
+  let hurtFlash = 0, guardClashAt = 0;
+  let bolts = [];
   let mainClue = null, rift = null, dungeonObjects = [], nearbyJourney = null, exploredCells = new Set(), reader = null, sideReader = null;
   let pendingDungeonShift = null;
   let hazards = [], hazardSlow = 1, hazardGrace = 3;
@@ -50,6 +52,7 @@
     hud.id = 'towerHud'; hud.setAttribute('aria-label', '高塔生存狀態');
     hud.innerHTML = '<span class="tower-stat"><small>倒轉高塔</small><b id="towerFloor">99 F</b></span><span class="tower-stat"><small>生命</small><b id="towerHealth">'+C.MAX_HP+' / '+C.MAX_HP+'</b><progress id="towerHp" class="tower-health" max="'+C.MAX_HP+'" value="'+C.MAX_HP+'" aria-label="生命值"></progress></span><span class="tower-stat"><small>銅幣</small><b id="towerCoins">0</b></span><span class="tower-stat"><small>章節</small><b id="towerChapter"></b></span><div id="towerGuardStatus" class="tower-guard-status" hidden></div>';
     el('gameScreen').appendChild(hud);
+    const hurt=document.createElement('div');hurt.id='towerHurtGlow';hurt.setAttribute('aria-hidden','true');el('gameScreen').appendChild(hurt);
     const gearStatus=document.createElement('div');gearStatus.id='towerGearStatus';gearStatus.className='tower-gear-status';hud.appendChild(gearStatus);
     const rail = document.createElement('nav'); rail.id = 'towerActionRail'; rail.setAttribute('aria-label', '劇情操作');
     rail.innerHTML = '<button class="tower-btn" id="towerBagBtn">背包 <small>B</small></button><button class="tower-btn" id="towerJournalBtn">日誌 <small>J</small></button><button class="tower-btn" id="towerAttackBtn">揮擊 <small>X</small></button>';
@@ -202,6 +205,7 @@
     el('hudLvlName').textContent = floorConfig.name; el('hudRound').textContent = instance?'副本':'劇情';
     buildTowerEnvironment(); buildWorld(); gearVisual=null;gearSignature='';refreshGear();encounterHold = 0; soundChanged();
     floorStarted = true; saveClock = 0; attackLeft = 0; hurtLeft = 3; wasShifting = false;
+    clearHurtFeedback();guardClashAt=0;
     save(); updateHud();
     if(instance){dungeonBriefing();return;}
     if(N){
@@ -343,7 +347,7 @@
   }
   function interactDungeon(index,choice) {
     const item=dungeonObjects.find(o=>o.index===index);if(!inDungeon()||!nearEntity(item))return;
-    syncEngine();const result=D.interact(run,index,run.revision,choice===undefined?undefined:{choice});if(!transact(result))return;
+    syncEngine();const result=D.interact(run,index,run.revision,{choice,invulnerable:hurtLeft>0});if(!transact(result))return;
     refreshDungeonObjects();closeDialog();
     if(run.status==='dead'){defeat();return;}
     showToast(result.message||'記憶已經亮起。',3000);
@@ -430,6 +434,7 @@
     return cellPoint(0, 0);
   }
   function buildWorld() {
+    clearBolts();
     hazards=[];hazardSlow=1;hazardGrace=3;
     loot = []; monsters = []; traders = []; nearest = null; warriorNpc = nearestWarrior = escort = null;
     explorer=chest=relic=nearbyEncounter=null;lastSurveyCell='';exitDeclined=false;
@@ -454,7 +459,7 @@
       model.visible = !run.claimed.includes(id); world.add(model); loot.push({ ...point, kind, id, model, icon });
     }
     for (let i = 0; i < floorConfig.monsterCount; i++) {
-      const kind = floorConfig.monsterTypes[i % floorConfig.monsterTypes.length], def = C.MONSTERS[kind];
+      const kind = run.floor<=54&&i===floorConfig.monsterCount-1?'shardseer':floorConfig.monsterTypes[i % floorConfig.monsterTypes.length], def = C.MONSTERS[kind];
       const strength = C.monsterStrength(kind, run.floor), id = 'monster-' + i;
       const point = chooseCell(random, used, Math.min(7, floorConfig.size - 1)), model = monsterModel(kind, strength);
       const alive = !run.defeatedMonsters.includes(id);
@@ -509,6 +514,11 @@
     const mat = new THREE.MeshLambertMaterial({color:tint});
     const body = new THREE.Mesh(type === 0 ? new THREE.SphereGeometry(.65,10,7) : type === 1 ? new THREE.OctahedronGeometry(.68) : new THREE.BoxGeometry(1.1,1.25,.85), mat);
     body.position.y = type === 0 ? .6 : 1; group.add(body);
+    if(kind==='shardseer'){
+      body.scale.set(.75,1.15,.75);
+      for(const x of [-.55,0,.55]){const crystal=new THREE.Mesh(new THREE.OctahedronGeometry(.3),mat);crystal.scale.y=1.6;crystal.position.set(x,2-Math.abs(x)*.3,0);group.add(crystal);}
+      const staff=new THREE.Mesh(new THREE.CylinderGeometry(.055,.07,1.7,6),mat);staff.position.set(-.85,1,0);group.add(staff);
+    }
     if (type === 1) for (const side of [-1,1]) { const wing = new THREE.Mesh(new THREE.ConeGeometry(.55,.9,3),mat); wing.rotation.z=side*1.3;wing.position.set(side*.7,1,0);group.add(wing); }
     if (type === 3) { body.scale.set(.8,.55,1.5); for (const x of [-.35,.35]) for (const z of [-.4,.4]) { const leg=new THREE.Mesh(new THREE.BoxGeometry(.2,.55,.2),mat);leg.position.set(x,.35,z);group.add(leg); } }
     for (const side of [-1,1]) { const eye = new THREE.Mesh(new THREE.BoxGeometry(.14,.16,.1),new THREE.MeshBasicMaterial({color:0xfff4c0}));eye.position.set(side*.22,1,.49);group.add(eye); }
@@ -570,6 +580,7 @@
     if(guard.mode==='holding') {
       const target=monsters.find(m=>m.alive&&isHeld(m));
       if(target){const q=target.model.position;const offset=playerInWall(q.x+.65,q.z,.28)?-.45:.65;p.set(q.x+offset,0,q.z);escort.model.rotation.y=-Math.PI/2;escort.model.userData.guardBlade.rotation.x=Math.sin(now*.008)*.35;}
+      if(target&&!(run.monsterStuns[target.id]>0)&&now>=guardClashAt&&Math.hypot(G.px-p.x,G.pz-p.z)<12&&hasClearPath(p.x,p.z,G.px,G.pz)){AudioEng.sfxGuardBlock?.();guardClashAt=now+1400;}
       return;
     }
     const safe=nearest||run.effects.repel>0||now<G.invisUntil;
@@ -579,7 +590,7 @@
       if(result.ok) {
         run=result.run;target.windup=0;target.path=[];target.cooldown=2;
         if(result.effect.outcome==='defeat')defeatMonster(target,true);
-        else showToast('戰士已攔住 '+target.def.name+'：'+(result.effect.seconds===null?'持續牽制，你可繼續前進':Math.ceil(result.effect.seconds/60)+' 分鐘，趁現在前進！'),3500);
+        else {showToast('戰士已攔住 '+target.def.name+'：'+(result.effect.seconds===null?'持續牽制，你可繼續前進':Math.ceil(result.effect.seconds/60)+' 分鐘，趁現在前進！'),3500,false);guardFeedback(result.effect.seconds===null?'hold':'timed');}
         refreshWarriorLabel();save();updateHud();return;
       }
     }
@@ -668,6 +679,7 @@
   }
   function tick(dt, now) {
     if (!active || !floorStarted) return;
+    if(G.shifting)clearBolts();
     if (wasShifting && !G.shifting) {
       wasShifting = false;
       hazardGrace=3;hazardSlow=1;
@@ -685,6 +697,7 @@
     if(ticked.effect && ticked.effect.warriorReleased){dismissEscort();showToast('護衛已盡力撤退，怪物將恢復追擊！',3500);save();}
     if (run.effects.freeze<=0) shiftLeft -= dt;
     attackLeft=Math.max(0,attackLeft-dt);hurtLeft=Math.max(0,hurtLeft-dt);
+    hurtFlash=Math.max(0,hurtFlash-dt);el('towerHurtGlow').style.opacity=String(hurtFlash/.65);
     if(gearVisual?.userData.weapon){
       if(window.CharacterMotion)window.CharacterMotion.worldWeaponPose(gearVisual.userData.weapon,playerGroup,1-attackLeft/.8,G.view==='fp');
       else gearVisual.userData.weapon.rotation.x=.25+Math.sin((.8-attackLeft)/.8*Math.PI)*1.35;
@@ -716,6 +729,7 @@
     updateJourneyNearby();
     updateWarrior(dt,now);
     for(const monster of monsters) updateMonster(monster,dt,now);
+    updateBolts(dt);
     const threat=!nearest&&run.effects.repel<=0&&!(now<G.invisUntil)&&monsters.some(m=>m.alive&&!isHeld(m)&&!(run.monsterStuns[m.id]>0)&&Math.hypot(G.px-m.model.position.x,G.pz-m.model.position.z)<m.def.sight&&(m.path.length>0||m.windup>0));
     if(threat&&encounterHold===0)window.GameVoice?.announceAsset('alert.monster','小心，附近有怪物。留意地上的紅圈，準備閃避，或請護衛攔住牠。',true);
     encounterHold=threat?4:Math.max(0,encounterHold-dt);
@@ -734,7 +748,7 @@
     return true;
   }
   function updateMonster(m,dt,now) {
-    if(!m.alive)return;
+    if(!m.alive||paused||G.frozen||G.shifting||!G.running||run.status!=='playing')return;
     const stunned=(run.monsterStuns[m.id]||0)>0;
     const questTarget=run.adventure?.quest?.status==='active'&&run.adventure.quest.target===m.id;
     if(m.stunLabel!==stunned||m.questLabel!==questTarget){const old=m.model.userData.tag;if(old){m.model.remove(old);disposeSceneObject(old);const tag=strengthTag((questTarget?'委託目標・':'')+m.def.name+(stunned?'（暈）':''),C.effectiveMonsterStrength(run,m.id,m.strength));tag.position.y=2.35;m.model.add(tag);m.model.userData.tag=tag;}
@@ -744,13 +758,28 @@
     if(stunned){m.windup=0;m.path=[];m.cooldown=2;m.model.userData.ring.material.opacity=.25+.12*Math.sin(now*.01);return;}
     if(isHeld(m)){m.windup=0;m.path=[];m.cooldown=2;m.model.userData.ring.material.opacity=.65;return;}
     const p=m.model.position, distance=Math.hypot(G.px-p.x,G.pz-p.z);
+    // Physical contact is dangerous even during windup/recovery or invisibility.
+    // Stunned and guard-held monsters returned above; walls still block contact.
+    if(distance<1.15&&hasClearPath(p.x,p.z,G.px,G.pz))damage(m.def.damage||12);
+    if(run.status!=='playing')return;
     const safe=traders.some(n=>Math.hypot(G.px-n.x,G.pz-n.z)<2.6&&hasClearPath(G.px,G.pz,n.x,n.z));
     const repelled=run.effects.repel>0||safe||now<G.invisUntil;
     m.cooldown=Math.max(0,m.cooldown-dt);m.pathLeft-=dt;
     m.model.userData.body.position.y=(m.kind==='clockmite' ? .6 : 1)+Math.sin(now*.004+m.phase)*.1;
     m.model.userData.ring.material.opacity=m.windup>0?.9:.35;
-    if(m.windup>0){m.windup-=dt;if(m.windup<=0){if(!repelled&&distance<2.05&&hasClearPath(p.x,p.z,G.px,G.pz))damage(m.def.damage||12);m.cooldown=2.3;}return;}
-    if(!repelled&&distance<1.85&&m.cooldown<=0&&hasClearPath(p.x,p.z,G.px,G.pz)){m.windup=.8;return;}
+    if(m.def.ranged){
+      if(repelled){m.windup=0;m.aim=null;}
+      else if(m.windup>0){
+        m.windup-=dt;
+        if(m.windup<=0){if(m.aim&&hasClearPath(p.x,p.z,m.aim.x,m.aim.z))launchBolt(m);m.aim=null;m.cooldown=3.4;}
+        return;
+      }else if(distance<=9&&m.cooldown<=0&&hasClearPath(p.x,p.z,G.px,G.pz)){
+        m.aim={x:G.px,z:G.pz};m.windup=1.1;m.model.rotation.y=Math.atan2(G.px-p.x,G.pz-p.z);return;
+      }
+      if(!repelled&&distance<=7)return;
+    }
+    if(!m.def.ranged&&m.windup>0){m.windup-=dt;if(m.windup<=0){if(!repelled&&distance<2.05&&hasClearPath(p.x,p.z,G.px,G.pz))damage(m.def.damage||12);m.cooldown=2.3;}return;}
+    if(!m.def.ranged&&!repelled&&distance<1.85&&m.cooldown<=0&&hasClearPath(p.x,p.z,G.px,G.pz)){m.windup=.8;return;}
     if(distance>22)return;
     if(m.pathLeft<=0){
       m.pathLeft=.8+m.phase*.1;
@@ -769,9 +798,45 @@
   }
   function damage(amount,source='monster',message='') {
     if(hurtLeft>0||paused||run.status!=='playing')return;
-    const result=C.takeDamage(run,amount,source);if(!result.ok)return;run=result.run;hurtLeft=1.5;refreshGear();
+    const result=C.takeDamage(run,amount,source);if(!result.ok)return;run=result.run;
+    if(result.effect.damage===0){hurtLeft=2;refreshGear();save();return;}
+    damageFeedback(result.effect);refreshGear();
     showToast(result.effect&&result.effect.revived?'復甦羽亮起，你重新站了起來。':(message||'受到 '+result.effect.damage+' 點傷害，留意紅圈預警')+(result.effect.broken.length?' · 裝備已損壞':''),1800,result.effect.revived?'使用 復甦羽':(message||'受到攻擊')+(result.effect.broken.length?'，裝備已損壞':''));
     if(run.hp<=0||run.status==='dead')defeat();else save();updateHud();
+  }
+  function clearHurtFeedback(){hurtFlash=0;el('towerHurtGlow').style.opacity='0';}
+  function clearBolts(){for(const b of bolts){world?.remove(b.model);disposeSceneObject(b.model);}bolts=[];}
+  function launchBolt(m){
+    if(bolts.length>=8||!world)return;
+    const p=m.model.position,dx=m.aim.x-p.x,dz=m.aim.z-p.z,len=Math.hypot(dx,dz);if(len<.01)return;
+    const model=new THREE.Mesh(new THREE.OctahedronGeometry(.22),new THREE.MeshBasicMaterial({color:0x84f1ff}));
+    model.position.set(p.x,1,p.z);world.add(model);bolts.push({model,owner:m.id,vx:dx/len*5,vz:dz/len*5,left:2.2,damage:m.def.damage});AudioEng.sfxSwing();
+  }
+  function updateBolts(dt){
+    if(paused||G.frozen||G.shifting||!G.running||run.status!=='playing')return;
+    for(let i=bolts.length-1;i>=0;i--){
+      const b=bolts[i],owner=monsters.find(m=>m.id===b.owner),p=b.model.position;
+      let remove=!owner?.alive||isHeld(owner)||(run.monsterStuns[b.owner]||0)>0;
+      const steps=Math.max(1,Math.ceil(Math.hypot(b.vx,b.vz)*dt/.18)),step=dt/steps;
+      for(let j=0;j<steps&&!remove;j++){
+        const nx=p.x+b.vx*step,nz=p.z+b.vz*step;
+        if(playerInWall(nx,nz,.18)){remove=true;break;}
+        p.x=nx;p.z=nz;b.left-=step;
+        if(Math.hypot(G.px-p.x,G.pz-p.z)<.8&&hasClearPath(p.x,p.z,G.px,G.pz)){damage(b.damage);remove=true;}
+        if(b.left<=0)remove=true;
+      }
+      if(remove){world?.remove(b.model);disposeSceneObject(b.model);bolts.splice(i,1);}
+    }
+  }
+  function damageFeedback(effect){
+    if(!(effect?.damage>0))return;
+    hurtLeft=2;hurtFlash=.65;el('towerHurtGlow').style.opacity='1';AudioEng.sfxHurt?.();
+  }
+  function guardFeedback(kind){
+    const line={hold:'我來擋住牠，你先走！',timed:'我只能擋住一會兒，快走！',defeat:'怪物已經打倒了，繼續前進！'}[kind];
+    if(kind==='defeat')AudioEng.sfxGuardDefeat?.();else AudioEng.sfxGuardBlock?.();
+    guardClashAt=performance.now()+1400;encounterHold=4;
+    window.GameVoice?.announceAsset('guard.'+kind,line,true);
   }
   function attack() {
     if(!active||paused||G.frozen||!G.running||inDungeon()||attackLeft>0)return;
@@ -797,7 +862,8 @@
     let reward=false;
     if(!run.claimed.includes(id)){const result=C.collect(run,'coin',12);if(result.ok){run=result.run;run.claimed.push(id);reward=true;}}
     questEvent('defeat',{monsterId:id});
-    showToast((byWarrior?'護衛瞬間擊敗 ':'擊退 ')+target.def.name+(byWarrior?'，剩餘強度 '+run.warrior.strength+'/5':'')+(reward?' · +12 銅幣':''));save();
+    showToast((byWarrior?'護衛瞬間擊敗 ':'擊退 ')+target.def.name+(byWarrior?'，剩餘強度 '+(run.warrior?.strength||0)+'/5':'')+(reward?' · +12 銅幣':''),1800,false);
+    if(byWarrior)guardFeedback('defeat');save();
   }
   function costText(cost) { return Object.entries(cost).map(([id,count])=>C.ITEMS[id].name+' × '+count).join(' ＋ '); }
   function warriorStatus() {
@@ -843,7 +909,7 @@
     const previous=run,previousHunger=G.satiety;
     run=result.run;G.satiety=run.hunger;
     if(!save()){run=previous;G.satiety=previousHunger;showToast('未能保存，這次操作尚未生效。請保持分頁開啟並重試。',4000);return false;}
-    refreshGear();updateHud();return true;
+    damageFeedback(result.effect);refreshGear();updateHud();return true;
   }
   function refreshGear() {
     if(!active||!run?.equipment||typeof playerGroup==='undefined'||!playerGroup||!V)return;
@@ -915,7 +981,7 @@
   }
   function openChest(id) {
     if(!chest||!chest.model.visible||Math.hypot(G.px-chest.x,G.pz-chest.z)>=2.6||!hasClearPath(G.px,G.pz,chest.x,chest.z))return;
-    const result=E.openChest(run,id,run.revision);if(!transact(result))return;
+    const result=E.openChest(run,id,run.revision,hurtLeft>0);if(!transact(result))return;
     chest.model.visible=false;nearbyEncounter=null;
     if(run.status==='dead'){defeat();return;}
     const copy=result.effect.outcome==='gear'?result.effect.gear.name+' · '+gearDescription(result.effect.gear)+'，已放入裝備行囊。':'陷阱造成 '+result.effect.damage+' 點傷害。'+(result.effect.revived?'復甦羽保護了你。':'防具已按命中消耗耐久。');
@@ -999,6 +1065,8 @@
     window.GameVoice?.stop(true);
     if(window.TowerAudio)window.TowerAudio.stop();
     active=false;floorStarted=false;paused=false;
+    clearBolts();
+    clearHurtFeedback();hurtLeft=0;guardClashAt=0;
     document.body.classList.remove('story-active','tower-danger');el('towerOverlay').hidden=true;
     AudioEng.stopMusic();AudioEng.stopItemLoop();switchScreen('titleScreen');
   }

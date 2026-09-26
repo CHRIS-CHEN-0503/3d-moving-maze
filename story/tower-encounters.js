@@ -116,12 +116,12 @@
     const kind = GEAR_KINDS[Math.floor(random() * GEAR_KINDS.length)];
     return { id, outcome: 'gear', damage: 0, gear: C.createGear(kind, floor, seed, id, true) };
   }
-  function openChest(run, chestId, expectedRevision) {
+  function openChest(run, chestId, expectedRevision, invulnerable = false) {
     return transaction(run, expectedRevision, next => {
       const C = core(), offer = chestOffer(next.floor, next.seed);
       if (!offer || offer.id !== chestId) return { ok: false, message: '這個樓層沒有這只寶箱。' };
       if (next.adventure.claimed.includes(offer.id)) return { ok: false, message: '寶箱已經開啟。' };
-      const result = offer.outcome === 'gear' ? C.receiveGear(next, offer.gear) : C.applyDamage(next, offer.damage, 'trap');
+      const result = offer.outcome === 'gear' ? C.receiveGear(next, offer.gear) : C.applyDamage(next, offer.damage, 'trap', invulnerable);
       if (!result.ok) return result;
       next.adventure.claimed.push(offer.id);
       return { ok: true, message: offer.outcome === 'gear' ? '寶箱中藏著強化裝備。' : '寶箱觸發陷阱！', effect: { ...result.effect, outcome: offer.outcome, gear: offer.gear, damage: offer.outcome === 'trap' ? result.effect.damage : 0 } };

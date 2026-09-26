@@ -34,6 +34,7 @@
   });
 
   const MONSTERS = Object.freeze({
+    shardseer: Object.freeze({id:'shardseer',name:'晶簇術士',strength:3,description:'先蓄力再射出晶光彈；側移閃避或躲到牆後，擊暈可中斷施法。',speed:1.45,damage:12,sight:11,color:0x63dbe9,shape:'caster',ranged:true}),
     clockmite: Object.freeze({ id: 'clockmite', name: '齒輪遊蟲', strength: 1, description: '緩慢巡邏的發條生物，靠近才會追逐；轉入岔路就能甩開。', speed: 1.25, damage: 8, sight: 7, color: 0xdba65f, shape: 'beetle' }),
     sentinel: Object.freeze({ id: 'sentinel', name: '石甲守衛', strength: 3, description: '腳步沉重、接觸傷害高，留意它把守的通道。', speed: 1.6, damage: 15, sight: 8, color: 0x839cae, shape: 'golem' }),
     wisp: Object.freeze({ id: 'wisp', name: '迷光幽靈', strength: 2, description: '在岔路間快速游移的幽光；驅怪鈴可以讓它遠離。', speed: 2.35, damage: 10, sight: 10, color: 0xa6a0ff, shape: 'wisp' }),
@@ -73,6 +74,7 @@
       monsterTypes = ['clockmite', 'sentinel'];
       if (floor <= 54) monsterTypes.push('wisp');
       if (floor <= 24) monsterTypes.push('hound');
+      if (floor <= 54) monsterTypes.push('shardseer');
       monsterCount = Math.min(6, 2 + Math.floor((69 - floor) / 14));
     }
     return {
@@ -503,8 +505,9 @@
     });
   }
 
-  function applyDamage(next, amount, source = 'monster') {
+  function applyDamage(next, amount, source = 'monster', invulnerable = false) {
     if (!validNumber(amount, 0, 10000) || !['monster', 'trap', 'hunger'].includes(source)) return { ok: false, message: '無效的傷害數值或來源。' };
+    if(invulnerable===true)return {ok:true,message:'受傷保護中。',effect:{damage:0,revived:false,defense:0,broken:[],source,protected:true}};
     const defense = source === 'hunger' ? 0 : equipmentStats(next).defense;
     const reduced = Math.max(0, amount - defense);
     const damage = source === 'hunger' ? amount : reduced === 0 ? 0 : next.effects.shield > 0 ? Math.max(1, Math.round(reduced * 0.35)) : reduced;

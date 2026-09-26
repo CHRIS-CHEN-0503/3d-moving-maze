@@ -718,6 +718,36 @@
       "rate": 1,
       "instruction": "成熟男性低音旁白，胸腔共鸣深厚，深沉稳重，带有克制的神秘感，像奇幻迷宫的守门人。正常自然语速，咬字清楚，句间短暂停顿。不故意拖慢、不耳语、不阴森恐怖、不夸张喊叫。"
     },
+    "guard.hold": {
+      "text": "我來擋住牠，你先走！",
+      "category": "event",
+      "src": "./assets/voice/roles/guard-hold-v1.mp3",
+      "speaker": "dylan",
+      "gender": "male",
+      "age": "adult",
+      "rate": 1,
+      "instruction": "成年男性护卫，沉稳可靠，短句清楚有力，正常说话速度，不喊叫，不拖音。"
+    },
+    "guard.timed": {
+      "text": "我只能擋住一會兒，快走！",
+      "category": "event",
+      "src": "./assets/voice/roles/guard-timed-v1.mp3",
+      "speaker": "dylan",
+      "gender": "male",
+      "age": "adult",
+      "rate": 1,
+      "instruction": "成年男性护卫，沉稳可靠，短句清楚有力，正常说话速度，不喊叫，不拖音。"
+    },
+    "guard.defeat": {
+      "text": "怪物已經打倒了，繼續前進！",
+      "category": "event",
+      "src": "./assets/voice/roles/guard-defeat-v1.mp3",
+      "speaker": "dylan",
+      "gender": "male",
+      "age": "adult",
+      "rate": 1,
+      "instruction": "成年男性护卫，沉稳可靠，短句清楚有力，正常说话速度，不喊叫，不拖音。"
+    },
     "merchant.tieLing": {
       "src": "./assets/voice/roles/merchant-tieLing.mp3",
       "text": "我是鐵匠鐵嶺。頭盔、球棒和保命補給，都在這裡挑。",

@@ -9,7 +9,7 @@
   let world = null, loot = [], monsters = [], traders = [], nearest = null;
   let warriorNpc = null, nearestWarrior = null, escort = null;
   let explorer = null, chest = null, relic = null, nearbyEncounter = null, lastSurveyCell = '', gearVisual = null, gearSignature = '', exitDeclined = false;
-  let shiftLeft = 65, wasShifting = false, floorConfig = null, saveClock = 0, hudClock = 0;
+  let shiftLeft = C.floorConfig(99).shiftSeconds, wasShifting = false, floorConfig = null, saveClock = 0, hudClock = 0;
   let attackLeft = 0, hurtLeft = 0, warning = false, floorStarted = false, saveFailed = false;
   let encounterHold = 0;
   let hurtFlash = 0, guardClashAt = 0;

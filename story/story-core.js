@@ -78,7 +78,7 @@
       monsterCount = Math.min(6, 2 + Math.floor((69 - floor) / 14));
     }
     return {
-      floor, size: chapter.size, shiftSeconds: Math.round((65 - depth * 47 / 98) * 10) / 10,
+      floor, size: chapter.size, shiftSeconds: 150 - depth,
       themeIndex: chapter.themeIndex, environmentId: chapter.id, chapter: chapter.chapter, name: chapter.name,
       monsterTypes, monsterCount, count: monsterCount,
       merchant: floor === 99 || floor === chapter.high || floor % 5 === 0,

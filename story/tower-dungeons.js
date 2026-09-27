@@ -109,7 +109,7 @@
         if (!number(a.shiftCount, 0, maxObservedShifts(a, generated), true) || !(a.shiftAtStart === null || number(a.shiftAtStart, 0, a.shiftCount, true))) return null;
         if ((a.progress.length === 0) !== (a.shiftAtStart === null) || a.progress.length > 1 && a.shiftCount <= a.shiftAtStart) return null;
       }
-      if (!a.returnCell || !number(a.returnCell.x, 0, config.size - 1, true) || !number(a.returnCell.y, 0, config.size - 1, true) || !number(a.returnShift, 0, 65)) return null;
+      if (!a.returnCell || !number(a.returnCell.x, 0, config.size - 1, true) || !number(a.returnCell.y, 0, config.size - 1, true) || !number(a.returnShift, 0, config.shiftSeconds)) return null;
       active = { id: a.id, kind: a.kind, floor, elapsed: a.elapsed, progress: [...a.progress], mistakes: a.mistakes, returnCell: { x: a.returnCell.x, y: a.returnCell.y }, returnShift: a.returnShift, ...(value.version >= 2 ? { catalogVersion: value.version } : {}), ...(a.kind === 'stars' ? { shiftCount: a.shiftCount, shiftAtStart: a.shiftAtStart } : {}) };
     }
     return { version: value.version, discovered: value.discovered, history, active };
@@ -135,7 +135,7 @@
     return getCore().transaction(run, expectedRevision, next => {
       const generated = offer(next), config = getCore().floorConfig(next.floor);
       if (!generated || generated.id !== id || !next.expedition.discovered || next.expedition.active) return { ok: false, message: '目前無法進入這道裂隙。' };
-      if (!returnPoint || !number(returnPoint.x, 0, config.size - 1, true) || !number(returnPoint.y, 0, config.size - 1, true) || !number(returnPoint.shiftLeft, 0, 65)) return { ok: false, message: '無效的返回位置。' };
+      if (!returnPoint || !number(returnPoint.x, 0, config.size - 1, true) || !number(returnPoint.y, 0, config.size - 1, true) || !number(returnPoint.shiftLeft, 0, config.shiftSeconds)) return { ok: false, message: '無效的返回位置。' };
       next.expedition.active = { id, kind: generated.kind, floor: next.floor, elapsed: 0, progress: [], mistakes: 0, returnCell: { x: returnPoint.x, y: returnPoint.y }, returnShift: returnPoint.shiftLeft, ...(next.expedition.version >= 2 ? { catalogVersion: next.expedition.version } : {}), ...(generated.kind === 'stars' ? { shiftCount: 0, shiftAtStart: null } : {}) };
       return { ok: true, message: `進入${generated.title}。`, effect: { entered: true, offer: generated } };
     });

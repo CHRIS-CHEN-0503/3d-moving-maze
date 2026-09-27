@@ -80,7 +80,7 @@ test('discovery persists and entering requires the matching discovered rift and 
   assert.equal(C.validateSave(JSON.stringify(discovered.run)).expedition.discovered, true);
   assert.equal(D.discover(discovered.run).ok, false);
   assert.equal(D.enter(discovered.run, 'other-rift', point).ok, false);
-  for (const bad of [{ x: -1, y: 2, shiftLeft: 1 }, { x: 7, y: 2, shiftLeft: 1 }, { x: 1.5, y: 2, shiftLeft: 1 }, { x: 1, y: 2, shiftLeft: 66 }, { x: 1, y: 2, shiftLeft: NaN }]) assert.equal(D.enter(discovered.run, offer.id, bad).ok, false);
+  for (const bad of [{ x: -1, y: 2, shiftLeft: 1 }, { x: 7, y: 2, shiftLeft: 1 }, { x: 1.5, y: 2, shiftLeft: 1 }, { x: 1, y: 2, shiftLeft: C.floorConfig(run.floor).shiftSeconds + 1 }, { x: 1, y: 2, shiftLeft: NaN }]) assert.equal(D.enter(discovered.run, offer.id, bad).ok, false);
   const result = D.enter(discovered.run, offer.id, { ...point, shiftLeft: 65 });
   assert.equal(result.ok, true);
   assert.deepEqual(result.run.expedition.active.returnCell, { x: 1, y: 2 });
@@ -88,6 +88,37 @@ test('discovery persists and entering requires the matching discovered rift and 
   assert.equal(D.enter(result.run, offer.id, point).ok, false);
   assert.equal(C.descend(result.run).ok, false);
   assert.equal(D.offer(result.run).id, offer.id);
+});
+
+test('all dungeon catalog versions preserve new floor timers and accept legacy remaining time', () => {
+  for (const floor of [95, 39, 35, 30, 1]) {
+    const { run } = fixture(undefined, undefined, floor);
+    const maximum = C.floorConfig(floor).shiftSeconds;
+    const legacyRemaining = Math.round((65 - (99 - floor) * 47 / 98) * 10) / 10;
+    for (const version of [1, 2, 3]) {
+      run.expedition = D.newExpedition(version);
+      const discovered = D.discover(run);
+      assert.equal(discovered.ok, true);
+      const offer = D.offer(discovered.run);
+      for (const shiftLeft of [0, 0.25, legacyRemaining, maximum]) {
+        const result = D.enter(discovered.run, offer.id, { x: 1, y: 2, shiftLeft });
+        assert.equal(result.ok, true, `floor ${floor}, catalog ${version}, timer ${shiftLeft}`);
+        const saved = C.validateSave(JSON.stringify(result.run));
+        assert.ok(saved);
+        assert.equal(saved.expedition.active.returnShift, shiftLeft);
+        const returned = D.finish(saved, 'abandoned');
+        assert.equal(returned.ok, true);
+        assert.equal(returned.effect.returnShift, shiftLeft);
+        assert.deepEqual(returned.run.bag, run.bag);
+        for (const invalid of [-1, maximum + 0.01, Infinity, NaN]) {
+          const corrupt = structuredClone(result.run);
+          corrupt.expedition.active.returnShift = invalid;
+          assert.equal(C.validateSave(corrupt), null);
+          assert.equal(D.enter(discovered.run, offer.id, { x: 1, y: 2, shiftLeft: invalid }).ok, false);
+        }
+      }
+    }
+  }
 });
 
 test('archive and lantern accept unordered goals only once without changing the input run', () => {
@@ -265,7 +296,7 @@ test('expedition save validation deeply clones data and rejects invalid identity
   assert.equal(advanced.expedition.active.returnCell.x, 1);
   const invalid = [
     { ...advanced.expedition, discovered: false },
-    ...[{ id: 'rift:95:999999' }, { kind: 'archive' }, { floor: 94 }, { elapsed: -1 }, { elapsed: offer.timeLimit + 1 }, { progress: [offer.order[0], offer.order[0]] }, { progress: [offer.order[1]] }, { mistakes: -1 }, { returnCell: { x: 7, y: 0 } }, { returnShift: 66 }].map(change => ({ ...advanced.expedition, active: { ...advanced.expedition.active, ...change } })),
+    ...[{ id: 'rift:95:999999' }, { kind: 'archive' }, { floor: 94 }, { elapsed: -1 }, { elapsed: offer.timeLimit + 1 }, { progress: [offer.order[0], offer.order[0]] }, { progress: [offer.order[1]] }, { mistakes: -1 }, { returnCell: { x: 7, y: 0 } }, { returnShift: C.floorConfig(advanced.floor).shiftSeconds + 1 }].map(change => ({ ...advanced.expedition, active: { ...advanced.expedition.active, ...change } })),
   ];
   for (const expedition of invalid) assert.equal(C.validateSave({ ...advanced, expedition }), null);
   const finished = D.finish(advanced, 'abandoned').run;

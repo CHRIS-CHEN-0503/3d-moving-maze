@@ -42,6 +42,31 @@ function runtime() {
   return { context, api: context.window.TowerMode, testApi: context.window.__test, nodes, storage, messages, at: value => { now = value; } };
 }
 
+test('主線倒數與顯示套用 150 減下降層數，不再受舊 65 秒上限影響', () => {
+  for (const [floor, seconds] of [[99, 150], [39, 90], [35, 86], [30, 81], [1, 52]]) {
+    const h = runtime();
+    const run = core.newRun({ seed: 123 });
+    run.floor = floor; run.floorsCleared = 99 - floor;
+    h.testApi.setState({ run });
+    h.api.scheduleShift(); h.api.updateShift();
+    assert.equal(h.testApi.state().shiftLeft, seconds);
+    assert.equal(h.nodes.get('shiftCountdown').textContent, seconds + '秒');
+    let shifts = 0;
+    h.context.doShift = () => { shifts += 1; h.context.G.shifting = true; };
+    for (let elapsed = 1; elapsed < seconds; elapsed += 1) {
+      h.at(1000 + elapsed * 1000); h.api.tick(1, 1000 + elapsed * 1000); h.api.updateShift();
+      assert.equal(shifts, 0);
+      assert.equal(h.testApi.state().shiftLeft, seconds - elapsed);
+    }
+    assert.equal(h.nodes.get('shiftCountdown').textContent, '1秒');
+    h.api.tick(1, 1000 + seconds * 1000); h.api.updateShift();
+    assert.equal(shifts, 1);
+    assert.equal(h.nodes.get('shiftCountdown').textContent, '0秒');
+    h.api.updateShift(); assert.equal(shifts, 1);
+    h.api.scheduleShift(); assert.equal(h.testApi.state().shiftLeft, seconds);
+  }
+});
+
 test('背包對話真正暫停劇情與原道具時限，恢復時保留剩餘秒數', () => {
   const h = runtime();
   h.testApi.state().run.monsterStuns['monster-0']=12;

@@ -21,19 +21,23 @@ test('browser modules expose the same TowerCore contract after dependency loadin
 test('all 99 floors grow toward the bottom while walls change progressively faster', () => {
   let previous = core.floorConfig(99);
   assert.equal(previous.size, 7);
-  assert.equal(previous.shiftSeconds, 65);
+  assert.equal(previous.shiftSeconds, 150);
   for (let floor = 98; floor >= 1; floor -= 1) {
     const current = core.floorConfig(floor);
     assert.ok(current.size >= previous.size && current.size <= 19);
     assert.equal(current.size % 2, 1);
-    assert.ok(current.shiftSeconds < previous.shiftSeconds);
+    assert.equal(current.shiftSeconds, 150 - (99 - floor));
+    assert.equal(current.shiftSeconds, previous.shiftSeconds - 1);
     assert.ok(current.monsterCount <= 6);
     assert.ok(current.themeIndex >= 0 && current.themeIndex <= 5);
     assert.ok(current.monsterTypes.every((id) => Object.hasOwn(core.MONSTERS, id)));
     previous = current;
   }
   assert.equal(previous.size, 19);
-  assert.equal(previous.shiftSeconds, 18);
+  assert.equal(previous.shiftSeconds, 52);
+  assert.equal(core.floorConfig(39).shiftSeconds, 90);
+  assert.equal(core.floorConfig(35).shiftSeconds, 86);
+  assert.equal(core.floorConfig(30).shiftSeconds, 81);
   for (const invalid of [0, 100, 1.5, NaN, '50']) assert.throws(() => core.floorConfig(invalid), RangeError);
 });
 

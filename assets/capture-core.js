@@ -2,9 +2,9 @@
 (function(root,factory){const api=factory();if(typeof module==='object'&&module.exports)module.exports=api;root.CaptureCore=api;})(globalThis,function(){
   'use strict';
   const near=(a,b,r)=>!!a&&!!b&&Number.isFinite(a.x)&&Number.isFinite(a.z)&&Math.hypot(a.x-b.x,a.z-b.z)<=r;
-  function create(roster,center,bases,now=0){
+  function create(roster,center,bases,now=0,duration=300000){
     if(!Array.isArray(roster)||roster.length<4||roster.length>10||roster.length%2||new Set(roster.map(p=>p.id)).size!==roster.length)throw Error('兩隊各需 2～5 位玩家');
-    return {members:Object.fromEntries(roster.map((p,i)=>[p.id,{team:i%2,points:0,hits:0,passes:0,cool:0,stun:0,safe:now+3000,respawn:0,offline:false}])),center:{...center},bases,flag:{...center,holder:null,returnAt:0,lock:0},channel:null,winner:null,rev:0};
+    return {members:Object.fromEntries(roster.map((p,i)=>[p.id,{team:i%2,points:0,hits:0,passes:0,cool:0,stun:0,safe:now+3000,respawn:0,offline:false}])),center:{...center},bases,flag:{...center,holder:null,returnAt:0,lock:0},channel:null,winner:null,rev:0,deadline:now+Math.max(120000,Math.min(600000,Number(duration)||300000)),overtime:false};
   }
   function drop(s,id,positions,now){if(s.flag.holder!==id)return false;const pos=positions[id]||s.center;s.flag={x:pos.x,z:pos.z,holder:null,returnAt:now+20000,lock:now+1000};s.channel=null;s.rev++;return true;}
   function ready(p,now){return p&&!p.offline&&now>=p.stun;}
@@ -21,6 +21,7 @@
   }
   function disconnect(s,id,positions,now){const p=s.members[id];if(!p||p.offline)return;drop(s,id,positions,now);p.offline=true;s.rev++;}
   function tick(s,positions,now,clear=()=>true){
+    timeout(s,now);
     if(s.winner!==null)return;
     const f=s.flag;
     if(f.holder&&(!ready(s.members[f.holder],now)||!positions[f.holder]))drop(s,f.holder,positions,now);
@@ -38,5 +39,10 @@
     if(!s.channel||s.channel.id!==id){s.channel={id,since:now};s.rev++;}
     else if(now-s.channel.since>=3000){s.winner=team;s.members[id].points+=500;for(const member of Object.values(s.members))if(member.team===team)member.points+=1000;s.rev++;}
   }
-  return Object.freeze({create,attack,pass,tick,drop,disconnect,near});
+  function timeout(s,now){
+    if(s.winner!==null||!Number.isFinite(s.deadline)||now<s.deadline)return;
+    if(!s.overtime&&s.flag.holder){s.overtime=true;s.deadline+=30000;s.rev++;}
+    if(now>=s.deadline){s.winner=-1;s.channel=null;s.rev++;}
+  }
+  return Object.freeze({create,attack,pass,tick,drop,disconnect,near,timeout});
 });

@@ -53,3 +53,15 @@ test('規則白名單拒絕技術網址、限制數值且至少保留一種視�
   assert.equal(r.teamSize,2);assert.equal(r.mazeSize,13);assert.equal(r.itemCount,3);assert.equal(r.broker,undefined);assert.equal(r.apiUrl,undefined);assert.ok(r.views.tp);
   assert.ok(R.visible('ctf').includes('teamSize'));assert.ok(!R.visible('classic').includes('teamSize'));assert.ok(!R.visible('ctf').includes('foodCount'));assert.ok(R.visible('race').includes('hungerMin'));
 });
+test('奪旗到時無人持旗直接平手，持旗只延長一次 30 秒',()=>{
+  const s=make();C.timeout(s,300000);assert.equal(s.winner,-1);assert.ok(Object.values(s.members).every(m=>m.points===0));
+  const carrying=make();carrying.flag.holder='p0';C.timeout(carrying,300000);
+  assert.equal(carrying.overtime,true);assert.equal(carrying.deadline,330000);assert.equal(carrying.winner,null);
+  C.timeout(carrying,329999);assert.equal(carrying.winner,null);C.timeout(carrying,330000);assert.equal(carrying.winner,-1);
+  const late=make();late.flag.holder='p0';C.timeout(late,400000);assert.equal(late.winner,-1,'背景恢復不能重新送 30 秒');
+});
+test('延長期間仍能正常完成佔領；房主設定限時有上下限',()=>{
+  const s=make();s.flag.holder='p0';const p={p0:{x:20,z:0}};
+  C.tick(s,p,300000);C.tick(s,p,303000);assert.equal(s.winner,0);assert.equal(s.members.p0.points,1500);
+  assert.equal(C.create(roster(4),{},[],0,1).deadline,120000);assert.equal(C.create(roster(4),{},[],0,1e9).deadline,600000);
+});

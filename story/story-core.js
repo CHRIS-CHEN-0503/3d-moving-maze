@@ -28,7 +28,7 @@
     shield: Object.freeze({ id: 'shield', name: '星紋護盾', description: '25 秒內受到的傷害減少 65%。', buyPrice: 18, sellPrice: 8, color: '#70bfff' }),
     hourglass: Object.freeze({ id: 'hourglass', name: '定牆沙漏', description: '暫停迷宮變形 25 秒。', buyPrice: 20, sellPrice: 9, color: '#ffd36f' }),
     bell: Object.freeze({ id: 'bell', name: '驅怪鈴', description: '讓怪物退避 20 秒。', buyPrice: 18, sellPrice: 8, color: '#bda2ff' }),
-    map: Object.freeze({ id: 'map', name: '回聲地圖', description: '顯示出口方向與路線 18 秒。', buyPrice: 12, sellPrice: 5, color: '#6de5d7' }),
+    map: Object.freeze({ id: 'map', name: '魔法地圖', description: '完整揭露當下迷宮直到變形，之後重新探索；出口路線額外指引 18 秒。', buyPrice: 12, sellPrice: 5, color: '#6de5d7' }),
     feather: Object.freeze({ id: 'feather', name: '復甦羽', description: '受到致命傷時自動消耗，恢復 50 點生命。', buyPrice: 45, sellPrice: 20, color: '#fff1bb' }),
     coin: Object.freeze({ id: 'coin', name: '銅幣', description: '與塔中的冒險者購買物資。', buyPrice: null, sellPrice: null, color: '#efc05e' }),
   });
@@ -230,6 +230,11 @@
     for (const id of ['shovelCooldownMs', 'skillCooldownMs']) {
       if (!validNumber(run.engine[id], 0, 600000)) return null;
       engine[id] = run.engine[id];
+    }
+    // Optional exploration checkpoint; old saves remain valid. A changed layout rejects it at runtime.
+    const map = run.engine.mapKnowledge;
+    if (map && validNumber(map.w, 1, 25, true) && validNumber(map.h, 1, 25, true) && typeof map.key === 'string' && /^[a-f0-9]{1,8}$/.test(map.key) && typeof map.revealed === 'boolean' && typeof map.seen === 'string' && map.seen.length === map.w * map.h && !/[^01]/.test(map.seen)) {
+      engine.mapKnowledge = { w: map.w, h: map.h, key: map.key, seen: map.seen, revealed: map.revealed };
     }
     if (!Array.isArray(run.claimed) || run.claimed.length > 128 || run.claimed.some((id) => typeof id !== 'string' || id.length < 1 || id.length > 80) || new Set(run.claimed).size !== run.claimed.length) return null;
     if (!validNumber(run.floorElapsed, 0, 315360000)) return null;

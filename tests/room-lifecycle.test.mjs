@@ -2,11 +2,13 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import vm from 'node:vm';
 import {readFileSync} from 'node:fs';
+import {createRequire} from 'node:module';
+const GameplayRules=createRequire(import.meta.url)('../assets/gameplay-rules.js');
 const src=readFileSync(new URL('../assets/room-lifecycle.js',import.meta.url),'utf8');
 function room(){
   let time=100000;const packets=[],peers=[];
   function peer(id,host){
-    const nodes=new Map(),ends=[],starts=[];
+    const nodes=new Map(),ends=[],starts=[],contacts=[];
     const MP={on:true,id,host,net:{},mode:'shop',seriesRound:1,order:['h','g'],roster:[{id:'h',name:'主'},{id:'g',name:'客',ready:true}],started:false,ended:false,roundMs:10000};
     const G={roundEndsAt:0,running:false},SERIES={kind:'multi',current:0,total:2};
     const $=id=>{if(!nodes.has(id))nodes.set(id,{style:{},hidden:true,textContent:'',onclick(){}});return nodes.get(id);};
@@ -14,13 +16,14 @@ function room(){
       setInterval:()=>1,clearInterval(){},AudioEng:{stopMusic(){},stopItemLoop(){}},
       mpSend:m=>packets.push(JSON.parse(JSON.stringify({...m,f:m.f||id}))),
       mpHandle:m=>{if(m.t==='start'){MP.started=true;MP.ended=false;MP.seriesRound=m.seriesRound||1;G.running=true;G.roundEndsAt=time+10000;starts.push(m);}
-        if(['shopend','end'].includes(m.t)&&MP.started&&!MP.ended){MP.started=false;MP.ended=true;ends.push(m);}
+        if(['shopend','end','twin'].includes(m.t)&&MP.started&&!MP.ended){MP.started=false;MP.ended=true;ends.push(m);}
+        if(['hit','tag','rob'].includes(m.t))contacts.push(m);
         if(m.t==='lobby'&&!host)MP.roster=m.players;
         if(m.t==='bye')MP.roster=MP.roster.filter(r=>r.id!==m.f);},
-      bindActionBtn:(node,fn)=>node.onclick=fn,
+      bindActionBtn:(node,fn)=>node.onclick=fn,showToast(){},
       mpLeave(){MP.on=false;},mpConnect:async()=>{},mpRenderLobby(){},mpBroadcastLobby(){packets.push(JSON.parse(JSON.stringify({t:'lobby',f:id,players:MP.roster})));},mpLobbyPlan:()=>({ready:MP.roster.filter(r=>r.id!=='h').every(r=>r.ready)&&MP.roster.length===2}),
       mpRoundPlayers:()=>MP.roster,mpEndRace(){MP.started=false;MP.ended=true;ends.push('race');},showMPResults(){},resetSeries(){},selectedRoundTotal:()=>2,sendMpRoundStart(){}});
-    vm.runInContext(src,c);const p={c,nodes,ends,starts};peers.push(p);return p;
+    vm.runInContext(src,c);const p={c,nodes,ends,starts,contacts};peers.push(p);return p;
   }
   const host=peer('h',true),guest=peer('g',false);
   const flush=()=>{let limit=100;while(packets.length&&limit--){const p=packets.shift();for(const peer of peers)peer.c.mpHandle(p);}assert.ok(limit>0);};
@@ -63,4 +66,30 @@ test('準備確認逾時解鎖重試；離開清除待送狀態',()=>{
   const r=room();r.guest.nodes.get('mpReady').onclick();r.packets.length=0;r.advance(10001);
   assert.equal(r.guest.nodes.get('mpReady').disabled,false);assert.match(r.guest.nodes.get('mpStatus').textContent,/再按一次/);
   r.guest.nodes.get('mpReady').onclick();r.guest.c.mpLeave();r.packets.length=0;r.advance(1000);assert.equal(r.packets.some(m=>m.t==='ready'),false);
+});
+test('尋寶無人持有時到期平手；結果遺失會補送且拒絕偽造超時',()=>{
+  const r=room();for(const p of [r.host,r.guest]){p.c.MP.mode='treasure';p.c.MP.treasure={holder:null};}
+  r.start();r.advance(5000);r.flush();r.guest.c.mpHandle({t:'twin',timeout:true,f:'g',sr:1});assert.equal(r.guest.ends.length,0);
+  r.advance(10000);assert.equal(r.host.ends[0].timeout,true);r.packets.length=0;r.advance(1100);r.flush();
+  assert.equal(r.guest.ends.length,1);assert.equal(r.guest.ends[0].winner,null);r.advance(1100);r.flush();assert.equal(r.guest.ends.length,1);
+});
+test('尋寶持有者獲一次 30 秒延長，心跳同步訪客且不提前結束',()=>{
+  const r=room();for(const p of [r.host,r.guest]){p.c.MP.mode='treasure';p.c.MP.treasure={holder:'g'};}
+  r.start();r.advance(5000);r.flush();r.advance(10000);r.flush();
+  assert.equal(r.host.ends.length,0);assert.equal(r.guest.c.MP.duelOvertime,true);assert.equal(r.guest.c.G.roundEndsAt,r.host.c.G.roundEndsAt);
+  for(let i=0;i<29;i++){r.advance(1000);r.flush();}assert.equal(r.host.ends.length,0);
+  r.advance(1000);r.flush();assert.equal(r.host.ends.length,1);assert.equal(r.guest.ends.length,1);
+});
+test('命中由房主裁定，隔牆拒絕；接收端位置落後仍套用同一結果且重送不重複',()=>{
+  const r=room(),wall={minX:-.2,maxX:.2,minZ:-2,maxZ:2};
+  for(const p of [r.host,r.guest]){
+    p.c.window.GameplayRules=p.c.GameplayRules=GameplayRules;p.c.MP.mode='treasure';p.c.G.wallBoxes=[wall];
+    p.c.botPosOf=id=>({x:id==='h'?-.8:.8,z:0});
+  }
+  r.start();r.advance(5000);r.flush();r.guest.c.mpSend({t:'hit',to:'h',sr:1});r.flush();
+  assert.equal(r.host.contacts.length,0);assert.equal(r.guest.contacts.length,0);
+  r.host.c.G.wallBoxes=[];r.guest.c.botPosOf=()=>null;r.guest.c.mpSend({t:'hit',to:'h',sr:1});r.flush();
+  assert.equal(r.host.contacts.length,1);assert.equal(r.guest.contacts.length,1);assert.equal(r.guest.contacts[0].f,'g');
+  r.advance(500);r.flush();assert.equal(r.host.contacts.length,1);assert.equal(r.guest.contacts.length,1);
+  r.guest.c.mpHandle({t:'contact',f:'g',sr:1,event:{t:'hit',f:'g',to:'h'}});assert.equal(r.guest.contacts.length,1);
 });

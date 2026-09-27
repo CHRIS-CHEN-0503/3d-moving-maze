@@ -488,7 +488,7 @@ body.story-active #towerActionRail {
   #hudInfo { font-size: 13px; gap: 5px 10px; padding: 7px 10px; max-width: calc(100% - 120px); }
   #hudInfo .inline-ui-icon { width: 18px; height: 18px; }
   #minimap { width: 104px; height: 104px; }
-  #minimapWrap.big #minimap { width: 114px; height: 114px; }
+  #minimapWrap.big #minimap { width: 160px; height: 160px; }
   #hudRightBtns { bottom: calc(9px + env(safe-area-inset-bottom)); gap: 6px; }
   .round-btn { width: 44px; height: 44px; border-radius: 12px; }
   #towerTalkBtn { right:calc(100% + 104px); }
@@ -559,7 +559,7 @@ body.story-active #towerActionRail {
 
 @media (orientation: landscape) and (max-height: 370px) {
   #minimap { width: 84px; height: 84px; }
-  #minimapWrap.big #minimap { width: 92px; height: 92px; }
+  #minimapWrap.big #minimap { width: 132px; height: 132px; }
   #hudRightBtns { gap: 4px; bottom: calc(6px + env(safe-area-inset-bottom)); }
   .round-btn { width: 40px; height: 40px; }
   .round-btn .bl { bottom: 3px; }

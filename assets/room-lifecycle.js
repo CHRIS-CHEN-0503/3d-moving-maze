@@ -10,11 +10,11 @@
     if(readyRequest){button.textContent='準備狀態傳送中…';$('mpStatus').textContent='正在等待房主確認…';}
   }
   const hostId=()=>MP.roster?.[0]?.id;
-  const critical=new Set(['start','end','shopend','shift','raceend','twin']);
+  const critical=new Set(['start','end','shopend','shift','raceend','twin','contact']);
   function ensureTimer(){if(!timer)timer=setInterval(tick,250);}
   function sendLocal(message){
     const m={...message,f:MP.id,sr:MP.seriesRound,mid:MP.id+':'+Date.now()+':'+(++serial)};
-    mpHandle(m);if(MP.net){baseSend(m);if(['chaoseffect','chaosloot','chaosuse','ragewall','salesync'].includes(m.t))outbox.push({m,left:3,at:performance.now()+400});}return m;
+    mpHandle(m);if(MP.net){baseSend(m);if(['chaoseffect','chaosloot','chaosuse','ragewall','salesync','contact'].includes(m.t))outbox.push({m,left:3,at:performance.now()+400});}return m;
   }
   function abort(reason){
     pending=null;startPacket=null;result=null;$('roomCountdown').hidden=true;
@@ -43,7 +43,7 @@
       $('roomCountdown').textContent=left?'準備出發 · '+left:'出發！';
       if(!left){const packet=pending;pending=null;$('roomCountdown').hidden=true;
         lastStart=packet.session;lastHost=now;window.TagRage?.reset();baseHandle(packet);
-        if(['shop','tag'].includes(MP.mode))G.roundEndsAt=now+Math.max(0,packet.launchAt+packet.roundMs-Date.now());
+        if(['shop','tag','treasure'].includes(MP.mode))G.roundEndsAt=now+Math.max(0,packet.launchAt+packet.roundMs-Date.now());
         window.ShopChaos?.start();
       }
     }
@@ -52,12 +52,16 @@
       if(startPacket&&now-lastRetry>800&&Date.now()<startPacket.launchAt+5000){lastRetry=now;if(MP.net)baseSend(startPacket);}
       if(MP.started&&!MP.ended){
         if(['shop','tag'].includes(MP.mode)&&now>=G.roundEndsAt){
-          mpSend(MP.mode==='shop'?{t:'shopend',carts:MP.carts,banked:MP.banked,shopBonus:MP.shopBonus}:{t:'end',loser:MP.taggedId});
+          mpSend(MP.mode==='shop'?{t:'shopend',carts:MP.carts,banked:MP.banked,shopBonus:MP.shopBonus}:{t:'end',loser:MP.taggedId,catches:MP.tagCatches});
+        }
+        if(MP.mode==='treasure'&&now>=G.roundEndsAt){
+          if(!MP.duelOvertime&&MP.treasure?.holder){MP.duelOvertime=true;G.roundEndsAt+=30000;showToast('有人帶著寶藏！最後延長 30 秒，帶到出口才算勝利。',3000);}
+          if(now>=G.roundEndsAt)mpSend({t:'twin',timeout:true,winner:null});
         }
       }
       if(now-lastPulse>1000){lastPulse=now;
         if(result&&MP.net)baseSend(result);
-        else if(MP.started)baseSend({t:'roompulse',sr:MP.seriesRound,left:Math.max(0,G.roundEndsAt-now)});
+        else if(MP.started)baseSend({t:'roompulse',sr:MP.seriesRound,left:Math.max(0,G.roundEndsAt-now),overtime:!!MP.duelOvertime});
         else if(!pending)mpBroadcastLobby();
       }
     }else if((MP.started||pending)&&now-lastHost>15000)abort('房主連線逾時。');
@@ -79,8 +83,15 @@
     if(m.t==='roompresent'){const p=MP.roster.find(r=>r.id===m.f);if(p)p.seenAt=performance.now();return;}
     if(m.t==='lobby'&&owner&&m.f!==owner)return;
     if(['start','end','shopend','shift','raceend','roompulse'].includes(m.t)&&owner&&m.f!==owner)return;
+    if(m.t==='twin'&&m.timeout&&m.f!==owner)return;
     if(m.t==='roompulse'){
-      if(m.sr===MP.seriesRound){lastHost=performance.now();if(MP.started&&['tag','shop'].includes(MP.mode)&&Number.isFinite(m.left))G.roundEndsAt=Math.min(G.roundEndsAt,performance.now()+m.left);}
+      if(m.sr===MP.seriesRound){
+        lastHost=performance.now();
+        if(MP.started&&['tag','shop','treasure'].includes(MP.mode)&&Number.isFinite(m.left)&&m.left>=0){
+          if(MP.mode==='treasure'&&m.overtime===true&&!MP.duelOvertime){MP.duelOvertime=true;G.roundEndsAt=performance.now()+Math.min(30000,m.left);showToast('尋寶進入最後 30 秒延長賽！',2400);}
+          else G.roundEndsAt=Math.min(G.roundEndsAt,performance.now()+m.left);
+        }
+      }
       return;
     }
     if(m.t==='ready'){
@@ -97,6 +108,20 @@
     if(m.t==='bye'&&m.f===owner&&!MP.host){abort('房主已離開。');return;}
     if(m.mid){if(seen.has(m.mid))return;seen.add(m.mid);if(seen.size>500)seen.delete(seen.values().next().value);}
     if(m.f===owner)lastHost=performance.now();
+    // Only the host checks moving positions. Peers apply that decision, not their later interpolated poses.
+    if(window.GameplayRules&&['hit','tag','rob'].includes(m.t)){
+      if(!MP.host||!MP.started||MP.ended||G.shifting||Number(m.sr||1)!==MP.seriesRound)return;
+      const validMode=m.t==='rob'?MP.mode==='shop':m.t==='tag'?MP.mode==='tag':['tag','treasure'].includes(MP.mode);
+      if(!validMode||m.f===m.to||!MP.roster.some(p=>p.id===m.f)||!MP.roster.some(p=>p.id===m.to))return;
+      if(m.t==='tag'&&m.f!==MP.taggedId)return;
+      if(!GameplayRules.contact(botPosOf(m.f),botPosOf(m.to),G.wallBoxes,m.t==='rob'?SHOP_ROB_RANGE+.6:2.6))return;
+      if(m.t==='rob'&&isCheckingOut(m.to))return;
+      mpSend({t:'contact',event:{...m,contactApproved:true}});return;
+    }
+    if(m.t==='contact'){
+      if(m.f!==owner||!MP.started||MP.ended||m.sr!==MP.seriesRound||!m.event||!['hit','tag','rob'].includes(m.event.t))return;
+      baseHandle({...m.event,contactApproved:true});return;
+    }
     if(m.t==='start'){
       if(MP.started||m.session&&lastStart===m.session)return;
       if(MP.host&&MP.net&&!mpLobbyPlan().ready)return;

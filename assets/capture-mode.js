@@ -20,7 +20,7 @@
   function start(owner){
     stop();ensureUI();hostId=owner;lastHost=performance.now();finished=false;applied={};lastRev=-1;lastSend=0;clockOffset=0;
     const mid=G.mazeW>>1,center=cellToWorld(mid,mid),bases=[cellToWorld(0,0),cellToWorld(G.mazeW-1,0)];
-    state=MP.host?CaptureCore.create(MP.roster,center,bases,Date.now()):null;
+    state=MP.host?CaptureCore.create(MP.roster,center,bases,Date.now(),(matchRules().duelMin||5)*60000):null;
     if(state){state.walls=[];state.mazeRound=MP.round;}scored=new Set();
     view=state?JSON.parse(JSON.stringify(state)):CaptureCore.create(MP.roster,center,bases,Date.now());
     mazeRound=MP.round;root=new THREE.Group();scene.add(root);
@@ -90,6 +90,7 @@
   function pass(){if(!on()||view?.flag.holder!==MP.id||G.frozen||performance.now()<G.stunnedUntil)return;const to=target(true,6);if(to)mpSend({t:'ctfpass',to});else showToast('需要 6 公尺內、沒有牆阻擋的隊友');}
   function frame(dt,now){
     if(!on()||!view)return;
+    if(MP.host&&state){CaptureCore.timeout(state,Date.now());if(state.winner!==null){broadcast(now);return;}}
     if(!MP.host&&now-lastHost>12000){abort('房主連線中斷，本輪不計分');return;}
     if(MP.host&&state&&G.shifting&&state.channel){state.channel=null;state.rev++;}
     if(MP.host&&state&&G.shifting)broadcast(now);
@@ -114,6 +115,7 @@
     }
     const f=view.flag,p=f.holder?botPosOf(f.holder):f;if(p){flag.position.set(p.x,f.holder?2.2:.25+Math.sin(now*.003)*.1,p.z);flag.rotation.y=now*.001;}
     const my=view.members[MP.id],carrier=f.holder?mpName(f.holder):'中央／掉落位置';
+    if(Number.isFinite(view.deadline))$('hudTime').textContent=(view.overtime?'延長 ':'')+fmtTime(Math.max(0,(view.deadline-Date.now()-clockOffset)/1000));
     const channel=view.channel?Math.max(0,3-(Date.now()+clockOffset-view.channel.since)/1000).toFixed(1):null;
     hud.textContent=names[my.team]+' · '+(channel?'基地佔領 '+channel+' 秒':f.holder===MP.id?'持旗中 · 前往'+names[1-my.team]+'基地':f.holder?carrier+' 持旗':'搶取金色旗幟')+' · 敵人在基地內會中斷佔領';
     relay.hidden=f.holder!==MP.id||G.frozen||now<G.stunnedUntil;
@@ -126,7 +128,7 @@
     const results=MP.roster.map(r=>({...r,win:view.members[r.id].team===won,points:view.members[r.id].points}));
     const teamSummary=names.map((name,team)=>{const members=MP.roster.filter(r=>view.members[r.id].team===team),wins=(SERIES.stats[members[0].id]?.wins||0)+(team===won?1:0),points=members.reduce((sum,r)=>sum+(SERIES.stats[r.id]?.points||0)+view.members[r.id].points,0);return '<strong>'+name+'：'+wins+' 勝／'+points+' 分</strong>';}).join(' · ');
     const details='<p>'+teamSummary+'</p>'+MP.roster.map(r=>{const m=view.members[r.id];return '<div>'+names[m.team]+' · '+escapeHtml(r.name)+' — 擊退 '+m.hits+'／接力 '+m.passes+'／'+m.points+' 分</div>';}).join('');
-    showMPResults(names[won]+'奪旗成功',details,results);updateAtkBtn();
+    showMPResults(won===-1?'奪旗平手｜時間到':names[won]+'奪旗成功',details,results);updateAtkBtn();
   }
   function abort(message){clearInterval(pulse);pulse=null;finished=true;MP.ended=true;MP.started=false;G.running=false;G.frozen=true;hud.hidden=true;relay.hidden=true;AudioEng.stopMusic();$('mpResultTitle').textContent='合作賽中止';$('mpResultBody').textContent=message;$('mpSeriesState').textContent='保留先前完成的輪次；請返回選單重新組隊。';$('mpSeriesSummary').innerHTML=seriesSummaryHtml();$('mpNextRound').style.display='none';$('mpResult').style.display='flex';}
   function leave(id){if(!on())return;if(id===hostId){abort('房主已離開，本輪不計分');return;}if(state){CaptureCore.disconnect(state,id,positions(),Date.now());broadcast(performance.now());}}

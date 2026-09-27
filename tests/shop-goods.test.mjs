@@ -11,7 +11,7 @@ function functionSource(name){
   throw new Error('Unclosed function: '+name);
 }
 function setup(){
-  const context=vm.createContext({MP:{carts:{},cartList:{},banked:{}},Math});
+  const context=vm.createContext({MP:{carts:{},cartList:{},banked:{}},Math,matchRules:()=>({unpaidRate:100})});
   const defs=html.slice(html.indexOf('const GOODS=['),html.indexOf('const CHECKOUT_MS='));
   vm.runInContext(defs+';this.goods=GOODS;'+['pickGood','cartAdd','shopTotal'].map(functionSource).join('\n'),context);
   return context;

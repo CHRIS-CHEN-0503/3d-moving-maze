@@ -3,6 +3,9 @@
   'use strict';
   const FIELDS=Object.freeze({
     mazeSize:{label:'迷宮大小',value:13,choices:[11,13,15,19,25]},
+    magicMap:{label:'魔法地圖（探索迷霧）',value:0,choices:[0,1],labels:{0:'關閉：維持完整地圖',1:'開啟：探索後才顯示'},modes:['classic','treasure','tag','ctf']},
+    duelMin:{label:'尋寶／奪旗時間（分鐘）',value:5,min:2,max:10,step:1,modes:['treasure','ctf']},
+    unpaidRate:{label:'未結帳商品計分',value:100,choices:[100,50],labels:{100:'原規則：全額計分',50:'挑戰：只計一半'},modes:['shop']},
     teamSize:{label:'每隊人數',value:2,choices:[2,3,4,5],modes:['ctf']},
     shiftMin:{label:'迷宮變換間隔（分鐘）',value:3,min:.5,max:10,step:.5},
     itemCount:{label:'每次出現的道具',value:6,min:3,max:12,step:1},

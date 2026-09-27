@@ -14,7 +14,7 @@ function room(){
     for(const r of roster)if(r.id!==id)MP.players[r.id]={mesh:new THREE.Group(),lastSeen:time,tx:0,tz:0};
     const c=vm.createContext({THREE,CaptureCore,MP,window:{addEventListener(){}},document:{createElement:node},scene:new THREE.Scene(),playerGroup:new THREE.Group(),
       G:{mazeW:13,mazeH:13,cell:4,wallBoxes:[],items:[],px:-24,pz:-24,stunnedUntil:0,atkCoolUntil:0},SERIES:{stats:{}},
-      Date:{now:()=>time},performance:{now:()=>time},console,
+      Date:{now:()=>time},performance:{now:()=>time},console,matchRules:()=>({duelMin:5}),fmtTime:seconds=>String(Math.ceil(seconds)),
       setInterval:fn=>{intervals.set(1,fn);return 1;},clearInterval:id=>intervals.delete(id),
       $:key=>{if(!nodes.has(key))nodes.set(key,node());return nodes.get(key);},
       cellToWorld:(x,y)=>({x:(x-6)*4,z:(y-6)*4}),worldToCell:(x,z)=>({x:Math.round(x/4+6),y:Math.round(z/4+6)}),
@@ -63,4 +63,10 @@ test('隊友敲牆同步到兩端，拒絕外牆與前一輪牆壁訊息',()=>{
   r.place('p1',-24,-24);r.host.c.G.wallBoxes.push({...wall});r.client.c.G.wallBoxes.push({...wall});
   r.client.api.wall(wall);r.flush();assert.equal(r.host.c.G.wallBoxes.length,0);assert.equal(r.client.c.G.wallBoxes.length,0);
   r.host.c.G.wallBoxes.push({...wall});r.host.api.handle({t:'ctfwall',f:'p1',round:99,wall});r.flush();assert.equal(r.host.c.G.wallBoxes.length,1);
+});
+test('兩端奪旗超時平手只結算一次，換牆期間也準時收尾',()=>{
+  const r=room();r.host.c.G.shifting=true;r.tick(300000);
+  assert.equal(r.host.results.length,1);assert.equal(r.client.results.length,1);
+  assert.match(r.host.results[0].title,/平手/);assert.ok(r.host.results[0].rows.every(p=>!p.win));
+  assert.equal(r.host.intervals.size,0);r.tick(1000);assert.equal(r.client.results.length,1);
 });

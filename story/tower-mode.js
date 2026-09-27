@@ -151,6 +151,7 @@
     const now = paused ? pauseAt : performance.now();
     run.hunger = G.satiety;
     run.engine = { shovels: G.shovels, kites: G.kites, whistles: G.whistles, shovelCooldownMs: Math.max(0, G.shovelRechargeAt - now), skillCooldownMs: Math.max(0, G.skillCoolUntil - now) };
+    if(window.MagicMap)run.engine.mapKnowledge=MagicMap.snapshot(G.hWalls,G.vWalls);
   }
   function save() {
     if (!run) return false;
@@ -170,7 +171,7 @@
   }
   function open(silent=false) {
     const saved = readSave();
-    dialog('全新單人長篇冒險', '倒轉高塔・第 99 層', '你在陌生的召喚陣中醒來。塔頂只有一扇向下的門。每下一層，空間更大，牆壁的心跳也更快。與同樣受困的冒險者交易，帶著補給活著走到第一層。', '<div class="tower-story-cover" role="img" aria-label="被召喚到雲上高塔的冒險者"></div><p class="tower-copy">單人故事 · 沿用原本職業與操作 · 每層自動保存（繼續時回到該層入口）</p>',
+    dialog('全新單人長篇冒險', '倒轉高塔・第 99 層', '你在陌生的召喚陣中醒來。塔頂只有一扇向下的門。每下一層，空間更大，牆壁的心跳也更快。與同樣受困的冒險者交易，帶著補給活著走到第一層。', '<div class="tower-story-cover" role="img" aria-label="被召喚到雲上高塔的冒險者"></div><p class="tower-copy">單人故事 · 沿用原本職業與操作 · 每層自動保存（繼續時回到該層入口）</p><p class="tower-copy">魔法地圖固定開啟：探索才顯示道路；拾取地圖可揭露當下迷宮，變形後重新探索。</p>',
       (saved && saved.status !== 'won' ? action('繼續：第 ' + saved.floor + ' 層', 'continue') : saved&&N?action('回顧已完成故事','story-archive'):'') + action(saved ? '重新開始故事' : '建立主角', 'new') + action('回首頁', 'close'),{silent});
   }
   function beginNew() {
@@ -199,6 +200,7 @@
       G.shovels = run.engine.shovels; G.kites = run.engine.kites; G.whistles = run.engine.whistles;
       G.shovelRechargeAt = run.engine.shovelCooldownMs ? performance.now() + run.engine.shovelCooldownMs : 0;
       G.skillCoolUntil = run.engine.skillCooldownMs ? performance.now() + run.engine.skillCooldownMs : 0;
+      window.MagicMap?.restore(run.engine.mapKnowledge,G.hWalls,G.vWalls);
     }
     if (run.charIdx === 4 && !G.shovels && !G.shovelRechargeAt) G.shovelRechargeAt = performance.now() + shovelCdMs();
     updateShovelBtn(); updateKiteBtn(); updateWhistleBtn();
@@ -220,7 +222,7 @@
   }
   function floorFacts() {
     const counts=itemConfig();
-    return '<p class="tower-copy">本層 '+floorConfig.size+' × '+floorConfig.size+' · 物資 '+counts.total+' 件 · 每 '+floorConfig.shiftSeconds+' 秒變形</p><p class="tower-copy">左側移動 · 右側看四周 · 背包 B · 互動 R · 故事日誌 J</p>';
+    return '<p class="tower-copy">本層 '+floorConfig.size+' × '+floorConfig.size+' · 物資 '+counts.total+' 件 · 每 '+floorConfig.shiftSeconds+' 秒變形</p><p class="tower-copy">魔法地圖固定開啟：探索才會顯示道路。每次迷宮額外 '+(floorConfig.size<=11?1:2)+' 張，不占物資數量；拾取後完整揭露，變形後重新探索。</p><p class="tower-copy">左側移動 · 右側看四周 · 背包 B · 互動 R · 故事日誌 J</p>';
   }
   function prose(paragraphs) { return '<div class="tower-prose">'+paragraphs.map(p=>'<p>'+text(p)+'</p>').join('')+'</div>'; }
   function echoCards(entries) { return entries.map(e=>'<aside class="tower-story-echo"><small>旅途回聲 · '+text(e.title)+'</small><p>'+text(e.text)+'</p></aside>').join(''); }
@@ -441,9 +443,9 @@
     world = new THREE.Group(); scene.add(world);
     mainClue=rift=nearbyJourney=null;dungeonObjects=[];exploredCells=new Set();
     const random = mulberry32(floorSeed() ^ 0x712da), used = new Set(['0,0', G.exitCell.x + ',' + G.exitCell.y]);
-    if(inDungeon()){buildDungeonWorld(random,used);buildHazards(used);return;}
     const originalPickups = [...(G.items||[]), ...(G.foods||[])];
     for(const item of originalPickups){const c=worldToCell(item.x,item.z);used.add(c.x+','+c.y);}
+    if(inDungeon()){buildDungeonWorld(random,used);buildHazards(used);return;}
     for (const offer of E.merchantOffers(run.floor,run.seed)) {
       const point = chooseCell(random, used);
       const model = V.buildMerchant(offer.id,{THREE,CHARS,buildCharacter});model.position.set(point.x,0,point.z);
@@ -653,7 +655,7 @@
     el('towerGuardStatus').textContent = warriorStatus();
     el('towerGearStatus').textContent=Object.entries(run.equipment).map(([slot,gear])=>({helmet:'盔',armor:'甲',shield:'盾',weapon:'武'}[slot])+' '+(gear?gear.durability:'—')).join(' · ');
     el('towerAttackBtn').disabled = attackLeft > 0 || !run.equipment.weapon; el('towerAttackBtn').textContent = !run.equipment.weapon?'需裝備武器':attackLeft > 0 ? '擊暈 ' + attackLeft.toFixed(1) : '擊暈 X';
-    const effects = Object.entries(run.effects).filter(([,v])=>v>0).map(([k,v])=>({shield:'護盾',freeze:'定牆',repel:'驅怪',reveal:'回聲地圖'}[k])+' '+Math.ceil(v)+'秒');
+    const effects = Object.entries(run.effects).filter(([,v])=>v>0).map(([k,v])=>({shield:'護盾',freeze:'定牆',repel:'驅怪',reveal:'出口路線'}[k])+' '+Math.ceil(v)+'秒');
     el('towerObjective').textContent = nearestWarrior ? '戰士 '+nearestWarrior.offer.strength+'/5 · '+costText(nearestWarrior.offer.cost)+' · 點「聘請」查看契約' : effects.length ? effects.join(' · ') : nearest ? nearest.name + '：靠近後可購買／出售補給' : '找到金色傳送門，前往' + (run.floor > 1 ? '第 ' + (run.floor - 1) + ' 層' : '塔外');
     const q=run.adventure.quest;
     if(nearbyEncounter)el('towerObjective').textContent=nearbyEncounter===chest?'封印寶箱 · 可能藏著強化裝備，也可能是陷阱':explorerName()+' · 對話查看委託';
@@ -1013,7 +1015,7 @@
     if(!transact(C.useItem(run,id)))return;
     const mul=CH().itemDurMul||1;for(const key of Object.keys(run.effects))if(run.effects[key]>before[key])run.effects[key]*=mul;
     if(id==='ration'&&CH().foodMul)G.satiety=run.hunger=Math.min(100,run.hunger+45*(CH().foodMul-1));
-    if(id==='map'){const p=worldToCell(G.px,G.pz);G.solutionPath=solveMaze(p.x,p.y);G.mapUntil=performance.now()+run.effects.reveal*1000;}
+    if(id==='map'){window.MagicMap?.reveal();const p=worldToCell(G.px,G.pz);G.solutionPath=solveMaze(p.x,p.y);G.mapUntil=performance.now()+run.effects.reveal*1000;}
     save();inventory(true);window.GameVoice?.announce('使用 '+C.ITEMS[id].name,true);
   }
   function reachExit(confirmed=false) {

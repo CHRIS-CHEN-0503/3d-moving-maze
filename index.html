@@ -215,7 +215,7 @@ button:focus-visible,input:focus-visible{outline:3px solid #fff;outline-offset:3
   width:120px;height:120px;border-radius:14px;border:3px solid rgba(255,255,255,.75);
   background:rgba(10,8,30,.78);display:block;transition:width .2s,height .2s;
 }
-#minimapWrap.big #minimap{width:144px;height:144px;} /* 特大以上地圖用：1.2 倍 */
+#minimapWrap.big #minimap{width:192px;height:192px;} /* 放大 1.6 倍，保留右手操作空間 */
 #mapSizeBtn{
   position:absolute;top:-6px;left:-6px;width:28px;height:28px;border-radius:50%;
   border:2px solid rgba(255,255,255,.8);background:rgba(30,24,70,.85);color:#fff;
@@ -613,7 +613,7 @@ button:focus-visible,input:focus-visible{outline:3px solid #fff;outline-offset:3
 }
 @media(prefers-reduced-motion:reduce){.flow-panel{animation:none}.home-action{transition:none}}
 </style>
-<link rel="stylesheet" href="assets/game-polish.css?v=1.35.5">
+<link rel="stylesheet" href="assets/game-polish.css?v=1.36.0">
 <link rel="stylesheet" href="assets/play-controls.css?v=1.32.0">
 </head>
 <body>
@@ -924,7 +924,7 @@ button:focus-visible,input:focus-visible{outline:3px solid #fff;outline-offset:3
     <div>🎁 道具（每次變形會重新出現）：</div>
     <div style="padding-left:14px;">
       ⚡ 加速藥水：跑得更快<br>🚀 強力加速：跑超級快<br>⛏️ 鐵鍬：敲破一面牆（按右下角按鈕；最多帶 1 把，工程師用掉 45 秒後自動補充，特大以上地圖 35 秒）<br>
-      🗺️ 魔法地圖：顯示通往出口的路線<br>🧭 指南針：箭頭指向出口<br>👻 穿牆斗篷：可以穿過牆壁<br>
+      🗺️ 魔法地圖：顯示通往出口的路線；開啟探索迷霧時，拾取會完整揭露當下迷宮，變形後重新探索。小圖額外 1 張、中大圖額外 2 張，不占設定的道具數量。劇情固定開啟，其他模式可於開局前選擇，搶購不適用。<br>🧭 指南針：箭頭指向出口<br>👻 穿牆斗篷：可以穿過牆壁<br>
       ⏱️ 時間寶石：時間倒退 15 秒<br>⭐ 幸運星：分數 +100<br>
       😜 調皮鬼（鬼抓人／尋寶限定）：吃到就把<b>所有人</b>隨機傳送到別的地方（自己也會被傳走！）<br>
       📣 集合口哨（鬼抓人／尋寶限定）：<b>全場只有一個</b>，存起來按按鈕（電腦 G）把<b>所有人叫到你身邊</b>；有人拿著還沒用掉，迷宮變換也不會再出現
@@ -952,7 +952,8 @@ button:focus-visible,input:focus-visible{outline:3px solid #fff;outline-offset:3
     </div>
     <div>👥 <b>多人連線</b>（2～5 人，房主可選人數上限，視角可自由切換）：標題按「多人連線」，房主建房間唸房號給朋友加入。🏁 比賽搶終點：從不同角落出發搶中間的傳送門；👹 鬼抓人：被抓到就換你當鬼，時間到還是鬼就輸了；💎 尋寶：搶寶藏帶出口；🛒 搶購：比誰的購物車金額多（大地圖人數不足電腦會補位（最多補到房間上限））。</div>
 <section class="help-coop"><h4>搶購：五樣商品蒐集與？道具箱</h4><p>開始前可選擇開啟「五樣商品蒐集任務」。每輪所有玩家共用隨機五樣商品，<b>可以分次結帳</b>；每樣至少一件完成結帳後，額外獲得 <b>300 分，每輪限一次</b>。畫面左上顯示「待找／車上／已結帳」，點商品圖可聽名稱。車上的商品被搶走就不算，已結帳進度不會丟失。目標商品持續補貨，變形不重設任務。總分＝已結帳金額＋車上金額＋蒐集獎勵。</p><p>開場沒有道具。靠近藍色金蓋的 <b>？道具箱</b>，隨機取得加速（5 秒）、油漬（反向 10 秒）、黏鼠板（定身 5 秒）、泡沫（減速 6 秒）或雞蛋。最多攜帶三個，依取得順序點右側道具鈕使用，間隔 5 秒。滿了不會吃掉道具箱；結帳中不能使用。放置的陷阱 1.5 秒後生效，也可能害到自己。</p><p><b>雞蛋</b>朝角色面向投擲，最遠 10 公尺，牆壁可阻擋；命中對手會以大片蛋液遮擋視線 10 秒，臉上也會留下蛋黃與蛋白，操作鈕與計時仍可見，雞蛋不會偷走商品。電腦受擊短暫停頓 1.5 秒。超市本身也有地面陷阱及加速踏板，開場和每次變形後重排，前 2.5 秒不觸發。道具箱也會重新出現，已取得的道具仍保留。</p><p><b>臨時大拍賣</b>：開場和每次變形後，隨機出現一次紅金色攤位；同款商品六件，由所有人共享。小圖 15 秒、中圖 20 秒、大圖 25 秒，店員會叫賣；小地圖的紅金方框是攤位。靠近自動拿貨，每 1.4 秒最多一件，記得完成結帳，也可算入蒐集任務。賣完或限時結束就收攤。</p></section>
-    <div>🗺️ 點右上角小地圖可以放大成全螢幕；小地圖左上角的 ⤢ 鈕可以切換 1.2 倍大小（特大地圖好用）。</div>
+    <div>🗺️ 點右上角小地圖可以放大成全螢幕；左上角的 ⤢ 鈕切換較大尺寸，依螢幕空間顯示為 192／160／132 像素。</div>
+    <section class="help-coop"><h4>對戰時間與計分</h4><p>尋寶與合作奪旗可在開始前選擇 2～10 分鐘，預設 5 分鐘。時間到若有人持寶／持旗，延長一次 30 秒；仍未完成則本輪平手、不計勝場。沒有持有者時直接平手。</p><p>鬼抓人每次成功抓捕另加 50 分，每輪最多加 1000 分；勝負仍以時間到誰是鬼決定。搶購預設車上商品全額計分，也可選擇「未結帳只計一半」；已結帳與蒐集獎勵不折減。攻擊和搶奪必須靠近，而且不能隔著實牆。</p></section>
     <section class="help-coop"><h4>合作奪旗｜2 對 2～5 對 5</h4><p>玩家依加入順序交錯分成蒼藍隊、琥珀隊，缺額由電腦補位。中央搶到金旗後，送到<strong>對方基地</strong>守住 3 秒獲勝。敵人站在基地範圍內會中斷佔領。</p><p>持旗速度減少 18%，可按「接力傳旗」或 R，傳給 6 公尺內、沒有牆壁阻擋的隊友。X 攻擊只會擊退敌隊，命中讓對手掉旗並回基地休整 3 秒，之後有 3 秒保護。掉落的旗 20 秒沒人撿會回中央。</p><p>小地圖標示雙方基地、隊友與旗幟。鐵鍬可幫全隊開路；指南針與魔法地圖會指向旗幟或目標基地。勝隊每人 1000 分、送旗者再加 500 分、擊退 +75、幸運星 +100、時間寶石 +150；接力次數另列，不重複刷分。可選 1～10 輪，最後統計隊伍與個人。</p></section>
     <button class="m-close" id="helpClose" style="display:block;margin:10px auto 0;">知道了！</button>
   </div>
@@ -972,7 +973,10 @@ button:focus-visible,input:focus-visible{outline:3px solid #fff;outline-offset:3
 <script src="./assets/maze-atmosphere.js"></script>
 <script src="./assets/pickup-objects.js"></script>
 <script src="./assets/native-symbols.js"></script>
-<script src="./assets/game-rules.js?v=1.31.0"></script>
+<script src="./assets/game-rules.js?v=1.36.0"></script>
+<script src="./assets/gameplay-rules.js?v=1.36.0"></script>
+<script src="./assets/magic-map.js?v=1.36.0"></script>
+<script src="./assets/maze-materials.js?v=1.36.0"></script>
 <script src="./assets/voice-catalog.js?v=1.33.0"></script>
 <script src="./assets/role-voices.js?v=1.35.5"></script>
 <script src="./assets/voice-pack.js?v=1.34.0"></script>
@@ -985,10 +989,10 @@ button:focus-visible,input:focus-visible{outline:3px solid #fff;outline-offset:3
    3D移動迷宮 — 給小朋友的變形迷宮冒險
    ===================================================== */
 const $=id=>document.getElementById(id);
-const GAME_VERSION='1.35.5';
+const GAME_VERSION='1.36.0';
 
 /* ---------- 設定（後台可調） ---------- */
-const DEFAULT_CFG={teamSize:2,shiftMin:3,itemCount:6,foodCount:4,hungerMin:3,stunSec:3,pingSec:3,smellCells:3,mazeSize:13,musicOn:1,speechOn:1,speechVoice:'',apiUrl:'',roomMax:3,rounds:3,goodsCount:16,shopCollect:1,shopMin:2.5,cartFull:400,views:{fp:1,tp:1,top:1},broker:'wss://broker.emqx.io:8084/mqtt'};
+const DEFAULT_CFG={teamSize:2,shiftMin:3,itemCount:6,foodCount:4,hungerMin:3,stunSec:3,pingSec:3,smellCells:3,mazeSize:13,magicMap:0,duelMin:5,unpaidRate:100,musicOn:1,speechOn:1,speechVoice:'',apiUrl:'',roomMax:3,rounds:3,goodsCount:16,shopCollect:1,shopMin:2.5,cartFull:400,views:{fp:1,tp:1,top:1},broker:'wss://broker.emqx.io:8084/mqtt'};
 let CFG={...DEFAULT_CFG};
 try{const s=JSON.parse(localStorage.getItem('maze3d_cfg')||'{}');CFG={...DEFAULT_CFG,...GameRules.normalize(s),musicOn:s.musicOn===0?0:1,speechOn:s.speechOn===0?0:1,speechVoice:typeof s.speechVoice==='string'?s.speechVoice.slice(0,300):'',rounds:Math.max(1,Math.min(10,Number(s.rounds)||3))};}catch(e){}
 window.GameVoice?.configure({enabled:!!CFG.speechOn,voice:CFG.speechVoice});
@@ -1434,6 +1438,8 @@ function setSeed(seed){RNG=(seed==null)?Math.random:mulberry32(seed);}
    ===================================================== */
 function genMaze(fromX,fromY){
   const W=G.mazeW,H=G.mazeH;
+  globalThis.MagicMap?.reset(W,H);
+  G.mapUntil=0;G.solutionPath=null;
   // hWalls[y][x]: (x,y) 與 (x,y+1) 之間的牆； vWalls[y][x]: (x,y) 與 (x+1,y) 之間的牆
   const hW=Array.from({length:H-1},()=>Array(W).fill(true));
   const vW=Array.from({length:H},()=>Array(W-1).fill(true));
@@ -1516,7 +1522,8 @@ function buildWalls(theme){
 
   const geo=new THREE.BoxGeometry(1,h,1);
   const tower=window.TowerMode&&TowerMode.active?TowerMode.atmosphereStyle():null;
-  const mat=new THREE.MeshLambertMaterial({color:tower?tower.palette.wall:theme.wall3d||theme.wall,map:makeTex(theme.wallTex||'brick')});
+  const materialKind=tower?.style==='ice'?'ice':tower?.style==='books'?'books':theme.wallTex||'brick';
+  const mat=new THREE.MeshLambertMaterial({color:tower?tower.palette.wall:theme.wall3d||theme.wall,map:makeTex(materialKind)});
   wallMesh=new THREE.InstancedMesh(geo,mat,mats.length);
   const m=new THREE.Matrix4(),s=new V3(),p=new V3(),q=new THREE.Quaternion();
   mats.forEach((w,i)=>{
@@ -1651,8 +1658,8 @@ function buildExit(){
 const _texCache={};
 function makeTex(kind){
   if(_texCache[kind])return _texCache[kind];
-  const cv=document.createElement('canvas');cv.width=cv.height=128;
-  const c=cv.getContext('2d');
+  const cv=document.createElement('canvas');cv.width=cv.height=256;
+  const c=cv.getContext('2d');c.scale(2,2);
   c.fillStyle='#ffffff';c.fillRect(0,0,128,128);
   const speck=(n,vmin,vspan,size,alpha)=>{for(let i=0;i<n;i++){
     const v=(vmin+Math.random()*vspan)|0;
@@ -1713,9 +1720,11 @@ function makeTex(kind){
     for(let i=0;i<7;i++){let x=Math.random()*128,y=Math.random()*128;c.beginPath();c.moveTo(x,y);
       for(let k=0;k<5;k++){x+=(Math.random()-0.5)*36;y+=(Math.random()-0.5)*36;c.lineTo(x,y);}c.stroke();}
   }
+  c.setTransform(1,0,0,1,0,0);
   const tex=new THREE.CanvasTexture(cv);
   tex.wrapS=tex.wrapT=THREE.RepeatWrapping;
   _texCache[kind]=tex;
+  window.MazeMaterials?.enhance(cv,tex,kind);
   return tex;
 }
 
@@ -2088,11 +2097,12 @@ function pickItemType(exclude){
 }
 function spawnItems(){
   // 劇情的同層物資只生成一次；變形保留原位置、種類及已拾取狀態。
-  if(window.TowerMode&&TowerMode.active&&TowerMode.preserveFloorPickups&&TowerMode.preserveFloorPickups())return;
+  if(window.TowerMode&&TowerMode.active&&TowerMode.preserveFloorPickups&&TowerMode.preserveFloorPickups()){spawnMagicMaps();return;}
   if(itemGroup){disposeSceneObject(itemGroup);scene.remove(itemGroup);}
   itemGroup=new THREE.Group(); G.items=[];
   // 集合口哨全場只有一個：還有人拿著沒用掉，這輪就不再出現
   const spawnExcl=new Set();
+  if(magicMapEnabled())spawnExcl.add('map');
   if(MP.whistleHolder)spawnExcl.add('whistle');
   const pc=worldToCell(G.px,G.pz);
   const used=MP.on?new Set([G.exitCell.x+','+G.exitCell.y])
@@ -2179,6 +2189,24 @@ function spawnItems(){
     }
   }
   scene.add(itemGroup);
+  spawnMagicMaps();
+}
+function magicMapEnabled(){return !!window.MagicMap?.enabled(!!window.TowerMode?.active,isShop()?'shop':MP.on?MP.mode:'classic',matchRules());}
+function spawnMagicMaps(){
+  if(!magicMapEnabled()||!itemGroup)return;
+  const old=G.items.filter(it=>it.magicMap);
+  for(const it of old){itemGroup.remove(it.sprite);itemGroup.remove(it.marker);disposeSceneObject(it.sprite);disposeSceneObject(it.marker);}
+  G.items=G.items.filter(it=>!it.magicMap);
+  const used=new Set([G.exitCell.x+','+G.exitCell.y,...(window.TowerMode?.active?TowerMode.reservedCells():[])]);
+  if(!MP.on){const pc=worldToCell(G.px,G.pz);used.add(pc.x+','+pc.y);}
+  for(const it of [...G.items,...G.foods]){const c=worldToCell(it.x,it.z);used.add(c.x+','+c.y);}
+  for(const c of G.startCells||[{x:0,y:0}])used.add(c.x+','+c.y);
+  const cells=[];for(let y=0;y<G.mazeH;y++)for(let x=0;x<G.mazeW;x++)if(!used.has(x+','+y))cells.push({x,y});
+  for(let i=0;i<MagicMap.count(G.mazeW)&&cells.length;i++){
+    const c=cells.splice(Math.floor(RNG()*cells.length),1)[0],p=cellToWorld(c.x,c.y),type=ITEM_TYPES.find(t=>t.id==='map');
+    const sprite=makeEmojiSprite(type.emoji,1.5),marker=makePickupMarker(0x6ee7e0,'魔法地圖');sprite.position.set(p.x,1.2,p.z);marker.position.set(p.x,0,p.z);itemGroup.add(sprite,marker);
+    G.items.push({type,sprite,marker,x:p.x,z:p.z,taken:false,magicMap:true});
+  }
 }
 function pickFoodType(){
   const tot=FOOD_TYPES.reduce((a,b)=>a+b.weight,0);
@@ -2246,7 +2274,11 @@ function applyItem(it){
     else G.shovels++;
     updateShovelBtn();
   }
-  else if(t.id==='map'){ AudioEng.sfxUse(); const pc=worldToCell(G.px,G.pz); G.solutionPath=solveMaze(pc.x,pc.y); G.mapUntil=performance.now()+dur*1000; addEffect('map','🗺️地圖',dur); }
+  else if(t.id==='map'){
+    AudioEng.sfxUse(); const pc=worldToCell(G.px,G.pz); G.solutionPath=solveMaze(pc.x,pc.y); G.mapUntil=performance.now()+dur*1000;
+    if(magicMapEnabled()){MagicMap.reveal();showToast('魔法地圖展開了！本次迷宮完整顯示，變形後重新探索。',2400,false);}
+    addEffect('map','🗺️出口路線',dur);
+  }
   else if(t.id==='compass'){ AudioEng.sfxUse(); G.compassUntil=performance.now()+dur*1000; $('compassHud').style.display='block'; addEffect('compass','🧭指南針',dur); }
   else if(t.id==='ghost'){ AudioEng.sfxUse(); G.ghostUntil=performance.now()+dur*1000; setGhostLook(true); addEffect('ghost','👻穿牆',dur); }
   else if(t.id==='timegem'){ AudioEng.sfxUse(); G.timeOffset+=15; }
@@ -2612,7 +2644,7 @@ function updatePlayer(dt,t){
     if(it.taken)continue;
     if((it.x-G.px)**2+(it.z-G.pz)**2<1.3){
       it.taken=true; it.sprite.visible=false; it.marker.visible=false; applyItem(it);
-      if(window.TowerMode&&TowerMode.active)TowerMode.collectedOriginal('item-'+ii);
+      if(window.TowerMode&&TowerMode.active&&!it.magicMap)TowerMode.collectedOriginal('item-'+ii);
       if(MP.on)mpSend({t:'take',kind:'item',i:ii,round:MP.round});
     }
   }
@@ -2682,7 +2714,7 @@ function doAttack(){
     const pl=MP.players[id];
     if(!pl.mesh||now-pl.lastSeen>6000)continue;
     const d=(pl.mesh.position.x-G.px)**2+(pl.mesh.position.z-G.pz)**2;
-    if(d<bd){bd=d;best=id;}
+    if(d<bd&&(!window.GameplayRules||GameplayRules.clear({x:G.px,z:G.pz},{x:pl.mesh.position.x,z:pl.mesh.position.z},G.wallBoxes))){bd=d;best=id;}
   }
   if(best){
     if(meIt)mpSend({t:'tag',to:best,pw:randPower()}); // 鬼打中人＝抓到！
@@ -2974,6 +3006,10 @@ function drawMap(cv,big){
   }
   if(window.CaptureFlag)CaptureFlag.map(ctx,big,pad,cw,ch);
   if(window.ShopSale)ShopSale.map(ctx,big,pad,cw,ch);
+  if(magicMapEnabled()){
+    const p=worldToCell(G.px,G.pz);
+    MagicMap.mask(ctx,{w:W,h:H,x:p.x,y:p.y,hWalls:G.hWalls,vWalls:G.vWalls,pad,cw,ch});
+  }
   // 玩家（帶方向的三角形）
   const PX=pad+(G.px/G.cell+(W-1)/2)*cw+cw*0.5;
   const PZ=pad+(G.pz/G.cell+(H-1)/2)*ch+ch*0.5;
@@ -3096,7 +3132,7 @@ function cartAdd(id,gi){
   MP.carts[id]=(MP.carts[id]||0)+g.price;
 }
 function fromMyBot(id){ return !!(MP.host&&MP.bots&&MP.bots.some(b=>b.id===id)); }
-function shopTotal(id){ return (MP.banked[id]||0)+(MP.carts[id]||0)+(MP.shopBonus?.[id]||0); }   // 已結帳＋還在車上＋蒐集獎勵
+function shopTotal(id){ return (MP.banked[id]||0)+Math.floor((MP.carts[id]||0)*(matchRules().unpaidRate??100)/100)+(MP.shopBonus?.[id]||0); }
 function isCheckingOut(id){ return performance.now()<(id===MP.id?G.coUntil:(MP.coUntil[id]||0)); }
 /* 離最近的收銀機多遠 */
 function nearRegister(x,z){
@@ -3169,7 +3205,7 @@ function robTarget(){
     const pl=MP.players[id];
     if(!pl.mesh||now-pl.lastSeen>6000)continue;
     const d=(pl.mesh.position.x-G.px)**2+(pl.mesh.position.z-G.pz)**2;
-    if(d<bd){bd=d;best=id;}
+    if(d<bd&&(!window.GameplayRules||GameplayRules.clear({x:G.px,z:G.pz},{x:pl.mesh.position.x,z:pl.mesh.position.z},G.wallBoxes))){bd=d;best=id;}
   }
   return best;
 }
@@ -3402,7 +3438,9 @@ function doShift(){
               G.mapUntil=performance.now()+CH().pathOnShift*1000;
               addEffect('catpath','🐱出口路線',CH().pathOnShift);
             }
-            showToast('🌀 新迷宮出現了！道具和食物也重新出現囉',1800,false);
+            if(window.TowerMode?.active)showToast('新的道路出現了！魔法地圖需要重新探索，原有物資不會重生。',2200,false);
+            else if(window.MagicMap&&magicMapEnabled())showToast('新的道路出現了！重新探索，或找一張魔法地圖。',2200,false);
+            else showToast('🌀 新迷宮出現了！道具和食物也重新出現囉',1800,false);
           }
         };
         animUp();
@@ -3966,7 +4004,7 @@ function launchGame(){
     MP.mode=mode; MP.roster=[me,...bots];
     const order=MP.roster.map(r=>r.id);
     mpHandle({t:'start',f:MP.id,seed:(Math.random()*2**31)|0,mode,lvl:G.lvlIdx,size:CFG.mazeSize,
-      shiftMs:CFG.shiftMin*60000,hungerMin:CFG.hungerMin,roundMs:(mode==='shop'?(CFG.shopMin||2.5)*60000:150000),
+      shiftMs:CFG.shiftMin*60000,hungerMin:CFG.hungerMin,roundMs:(mode==='shop'?(CFG.shopMin||2.5)*60000:['treasure','ctf'].includes(mode)?(CFG.duelMin||5)*60000:150000),
       stunSec:CFG.stunSec,pingSec:CFG.pingSec,rules:GameRules.normalize(CFG),
       seriesKind:'single',seriesRound:SERIES.current+1,seriesTotal:SERIES.total,
       order,players:MP.roster,itpw:mode==='tag'?randPower():null,
@@ -4219,7 +4257,8 @@ function mpHandle(m){
       MP.rules=GameRules.normalize(m.rules||{});
       MP.started=true; MP.ended=false; MP.endSent=false;
       MP.seed=m.seed; MP.mode=m.mode; MP.size=m.size; MP.shiftMs=m.shiftMs;
-      MP.hungerMin=m.hungerMin; MP.roundMs=m.roundMs;
+      MP.hungerMin=m.hungerMin; MP.roundMs=m.roundMs; MP.tagCatches={}; MP.duelOvertime=false;
+      if(['treasure','ctf'].includes(MP.mode))G.roundEndsAt=now+Math.max(120000,Math.min(600000,Number(m.roundMs)||300000));
       MP.order=m.order; MP.roster=m.players; MP.round=0;
       MP.fillBots=m.fillBots===true;
       MP.taggedId=m.it||null; MP.itPower=m.itpw||null; MP.tagImmuneUntil=0;
@@ -4305,8 +4344,10 @@ function mpHandle(m){
       break;
     case 'tag':
       if(MP.mode!=='tag'||MP.ended)break;
+      if(window.GameplayRules&&!m.contactApproved&&(m.f!==MP.taggedId||!GameplayRules.contact(botPosOf(m.f),botPosOf(m.to),G.wallBoxes,2.6)))break;
       {
         const prevIt=MP.taggedId;
+        MP.tagCatches=MP.tagCatches||{};if(prevIt&&prevIt!==m.to)MP.tagCatches[prevIt]=Math.min(20,(MP.tagCatches[prevIt]||0)+1);
         MP.prevIt=prevIt; MP.prevItUntil=now+6000; // 剛卸任的人 6 秒內電腦鬼不會再抓（防止兩隻電腦互抓乒乓）
         MP.taggedId=m.to; MP.itPower=m.pw||randPower(); MP.tagImmuneUntil=now+3000;
         MP.itRegenAt=now+15000;
@@ -4334,7 +4375,7 @@ function mpHandle(m){
       }
       break;
     case 'end':
-      if(MP.mode==='tag'&&MP.started&&!MP.ended)mpTagEnd(m.loser);
+      if(MP.mode==='tag'&&MP.started&&!MP.ended)mpTagEnd(m.loser,m.catches);
       break;
     case 'tres':
       if(!MP.started||MP.mode!=='treasure')break;
@@ -4346,6 +4387,7 @@ function mpHandle(m){
       break;
     case 'hit':{
       if(!MP.started||MP.ended||(MP.mode!=='treasure'&&MP.mode!=='tag'))break;
+      if(window.GameplayRules&&!m.contactApproved&&!GameplayRules.contact(botPosOf(m.f),botPosOf(m.to),G.wallBoxes,2.6))break;
       const ms=(MP.stunSec||3)*1000;
       const atk=MP.roster.find(r=>r.id===m.f), wpn=atk?CHARS[atk.charIdx||0].weapon:'👊';
       AudioEng.sfxHit();
@@ -4378,6 +4420,7 @@ function mpHandle(m){
       break;
     case 'rob':{
       if(!MP.started||MP.mode!=='shop'||MP.ended)break;
+      if(window.GameplayRules&&!m.contactApproved&&!GameplayRules.contact(botPosOf(m.f),botPosOf(m.to),G.wallBoxes,SHOP_ROB_RANGE+.6))break;
       const lst=MP.cartList[m.to]||[];
       let k=(lst[m.idx]===m.gi)?m.idx:lst.indexOf(m.gi);
       if(k<0)break;                       // 已經被別人搶走了，忽略
@@ -4430,7 +4473,7 @@ function mpHandle(m){
       const win=rows[0];
       if(win&&win.id===MP.id)AudioEng.sfxWin(); else AudioEng.sfxLose();
       const medals=['🥇','🥈','🥉'];
-      let html='';
+      let html=matchRules().unpaidRate===50?'<p>挑戰規則：車上未結帳商品只計一半，已結帳與蒐集獎勵全額計分。</p>':'';
       rows.forEach((r,i)=>{
         html+=`<div>第 ${i+1} 名 · ${escapeHtml(r.name)} — <b>$${r.v}</b>`
           +`<span style="font-size:.8rem;color:#8be9fd;">（已結帳 $${r.b} · 蒐集 +${MP.shopBonus?.[r.id]||0}）</span>`
@@ -4456,6 +4499,7 @@ function mpHandle(m){
       break;}
     case 'twin':
       if(!MP.started||MP.mode!=='treasure'||MP.ended)break;
+      if(m.timeout&&m.f!==MP.roster[0]?.id)break;
       MP.ended=true; G.frozen=true;
       AudioEng.stopMusic(); AudioEng.stopItemLoop();
       if(m.winner===MP.id)AudioEng.sfxWin(); else AudioEng.sfxLose();
@@ -4463,10 +4507,10 @@ function mpHandle(m){
       {
         let html='';
         MP.roster.forEach(r=>{
-          html+=r.id===m.winner?`<div>🏆💎 ${escapeHtml(r.name)} — 把寶藏帶出迷宮！</div>`
+          html+=m.timeout?`<div>${escapeHtml(r.name)} — 時間到，尚未帶出寶藏</div>`:r.id===m.winner?`<div>🏆💎 ${escapeHtml(r.name)} — 把寶藏帶出迷宮！</div>`
                                :`<div>😿 ${escapeHtml(r.name)} — 差一點點</div>`;
         });
-        showMPResults('💎 尋寶結果',html,MP.roster.map(r=>({id:r.id,name:r.name,charIdx:r.charIdx||0,win:r.id===m.winner,points:r.id===m.winner?1000:0})));
+        showMPResults(m.timeout?'尋寶平手｜時間到':'💎 尋寶結果',html,MP.roster.map(r=>({id:r.id,name:r.name,charIdx:r.charIdx||0,win:!m.timeout&&r.id===m.winner,points:!m.timeout&&r.id===m.winner?1000:0})));
       }
       break;
     case 'bye':
@@ -4605,12 +4649,13 @@ function mpFrame(dt){
     }
   }
   // 鬼抓人：電腦 AI（房主端模擬）
+  if(MP.mode==='treasure'&&MP.started&&!MP.ended)$('hudTime').textContent=(MP.duelOvertime?'延長 ':'')+fmtTime(Math.max(0,(G.roundEndsAt-now)/1000));
   if(MP.mode==='tag'&&MP.started&&MP.host&&MP.bots&&!G.frozen)botSimTag(dt,now);
   // 鬼抓人倒數 + 時間到（房主宣布結果）
   if(MP.mode==='tag'&&MP.started){
     const left=Math.max(0,(G.roundEndsAt-now)/1000);
     $('hudTime').textContent='⏳'+fmtTime(left);
-    if(MP.host&&left<=0&&!MP.endSent){MP.endSent=true;mpSend({t:'end',loser:MP.taggedId});}
+    if(MP.host&&left<=0&&!MP.endSent){MP.endSent=true;mpSend({t:'end',loser:MP.taggedId,catches:MP.tagCatches});}
   }
   // 比賽：第一名抵達後 20 秒收場
   if(MP.mode==='race'&&MP.raceEndAt&&now>MP.raceEndAt)mpEndRace();
@@ -4655,6 +4700,7 @@ function botTryRob(b,now){
     if(r.id===b.id)continue;
     const q=botPosOf(r.id); if(!q)continue;
     if((q.x-b.x)**2+(q.z-b.z)**2>SHOP_ROB_RANGE*SHOP_ROB_RANGE)continue;
+    if(window.GameplayRules&&!GameplayRules.clear(b,q,G.wallBoxes))continue;
     if(isCheckingOut(r.id))continue;             // 人家在結帳，不能搶
     const lst=MP.cartList[r.id]||[];
     if(!lst.length)continue;
@@ -4761,9 +4807,9 @@ function botSimTag(dt,now){
         for(const r of MP.roster){
           if(!valid(r.id))continue;
           const p2=botPosOf(r.id); if(!p2)continue;
-          if((p2.x-b.x)**2+(p2.z-b.z)**2<1.9*1.9){
+          if((p2.x-b.x)**2+(p2.z-b.z)**2<1.9*1.9&&(!window.GameplayRules||GameplayRules.clear(b,p2,G.wallBoxes))){
             b.atkAt=now+750; MP.tagImmuneUntil=now+3000;
-            mpSend({t:'tag',to:r.id,pw:randPower()});
+            mpSend({t:'tag',f:b.id,to:r.id,pw:randPower()});
             break;
           }
         }
@@ -4804,7 +4850,7 @@ function botSim(dt,now){
       const ep=cellToWorld(G.exitCell.x,G.exitCell.y);
       if((ep.x-b.x)**2+(ep.z-b.z)**2<2.0)mpSend({t:'twin',winner:b.id});
     }else if(b._hpos&&now>(b.atkAt||0)){ // 搶奪
-      if((b._hpos.x-b.x)**2+(b._hpos.z-b.z)**2<2.4){b.atkAt=now+2400;mpSend({t:'hit',f:b.id,to:hid,steal:true});}
+      if((b._hpos.x-b.x)**2+(b._hpos.z-b.z)**2<2.4&&(!window.GameplayRules||GameplayRules.clear(b,b._hpos,G.wallBoxes))){b.atkAt=now+2400;mpSend({t:'hit',f:b.id,to:hid,steal:true});}
     }
   }
 }
@@ -4869,15 +4915,15 @@ function mpEndRace(){
   });
   showMPResults('🏁 比賽結果',html,results);
 }
-function mpTagEnd(loser){
+function mpTagEnd(loser,catches=MP.tagCatches||{}){
   MP.ended=true; G.frozen=true; AudioEng.stopMusic(); AudioEng.stopItemLoop();
   mpUpdateTagVisuals();
   let html='';
+  const caught=id=>Math.max(0,Math.min(20,Math.floor(Number(catches?.[id])||0)));
   MP.roster.forEach(r=>{
-    html+=r.id===loser?`<div>👹 ${escapeHtml(r.name)} — 時間到還是鬼，輸了！</div>`
-                      :`<div>🏆 ${escapeHtml(r.name)} — 成功逃脫！</div>`;
+    html+=`<div>${escapeHtml(r.name)} — ${r.id===loser?'時間到還是鬼':'成功逃脫'} · 抓捕 ${caught(r.id)} 次（+${caught(r.id)*50} 分）</div>`;
   });
-  showMPResults('👹 鬼抓人結果',html,MP.roster.map(r=>({id:r.id,name:r.name,charIdx:r.charIdx||0,win:r.id!==loser,points:r.id!==loser?1000:0})));
+  showMPResults('👹 鬼抓人結果',html,MP.roster.map(r=>({id:r.id,name:r.name,charIdx:r.charIdx||0,win:r.id!==loser,points:(r.id!==loser?1000:0)+caught(r.id)*50})));
 }
 function showMPResults(title,html,results=[]){
   const final=recordSeriesRound(results);
@@ -4966,7 +5012,7 @@ function confirmMultiplayerExit(){
 function sendMpRoundStart(players,seriesRound){
   const order=players.map(r=>r.id),tagPool=players.map(r=>r.id);
   mpSend({t:'start',seed:(Math.random()*2**31)|0,mode:MP.mode,lvl:G.lvlIdx,size:CFG.mazeSize,
-    shiftMs:CFG.shiftMin*60000,hungerMin:CFG.hungerMin,roundMs:(MP.mode==='shop'?(CFG.shopMin||2.5)*60000:150000),
+    shiftMs:CFG.shiftMin*60000,hungerMin:CFG.hungerMin,roundMs:(MP.mode==='shop'?(CFG.shopMin||2.5)*60000:['treasure','ctf'].includes(MP.mode)?(CFG.duelMin||5)*60000:150000),
     stunSec:CFG.stunSec,pingSec:CFG.pingSec,rules:GameRules.normalize(CFG),seriesKind:'multi',seriesRound,seriesTotal:SERIES.total,
     order,players,fillBots:MP.fillBots,itpw:MP.mode==='tag'?randPower():null,
     it:MP.mode==='tag'?tagPool[Math.floor(Math.random()*tagPool.length)]:null});
@@ -5045,11 +5091,11 @@ document.addEventListener('visibilitychange',()=>{if(document.hidden){AudioEng.s
 window.addEventListener('pagehide',()=>{AudioEng.shiftSound?.stop();AudioEng.combatSound?.stop();});
 </script>
 <script src="assets/classic-audio.js"></script>
-<script src="assets/setup-controls.js?v=1.34.0"></script>
+<script src="assets/setup-controls.js?v=1.36.0"></script>
 <script src="assets/voice-settings.js?v=1.34.0"></script>
-<script src="assets/capture-core.js"></script>
-<script src="assets/capture-mode.js?v=1.35.3"></script>
-<script src="story/story-core.js?v=1.35.5"></script>
+<script src="assets/capture-core.js?v=1.36.0"></script>
+<script src="assets/capture-mode.js?v=1.36.0"></script>
+<script src="story/story-core.js?v=1.36.0"></script>
 <script src="story/tower-narrative.js"></script>
 <script src="story/tower-side-stories.js"></script>
 <script src="story/tower-dungeons.js?v=1.35.5"></script>
@@ -5057,8 +5103,8 @@ window.addEventListener('pagehide',()=>{AudioEng.shiftSound?.stop();AudioEng.com
 <script src="story/tower-encounters.js?v=1.35.5"></script>
 <script src="story/tower-characters.js?v=1.35.2"></script>
 <script src="story/tower-audio.js"></script>
-<script src="story/tower-mode.js?v=1.35.5"></script>
-<script src="assets/room-lifecycle.js?v=1.34.0"></script>
+<script src="story/tower-mode.js?v=1.36.0"></script>
+<script src="assets/room-lifecycle.js?v=1.36.0"></script>
 <script src="assets/shop-collection-core.js?v=1.31.0"></script>
 <script src="assets/shop-collection.js?v=1.31.0"></script>
 <script src="assets/shop-chaos.js?v=1.34.0"></script>

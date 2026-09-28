@@ -119,6 +119,7 @@
     const passives=Object.values(PASSIVES).filter(s=>s.job===profession&&!s.unique).map(s=>s.id),first=hash(seed,identity+':passives')%passives.length,second=(first+1+hash(seed,identity+':passives2')%(passives.length-1))%passives.length;
     return {skills:sets[hash(seed,identity+':skills')%sets.length],passives:[passives[first],passives[second]]};
   }
+  function reorderSkills(run,id,order,revision=run.revision){return C().transaction(run,revision,n=>{const a=actor(n,id);if(!a||!Array.isArray(order)||order.length!==a.skills.length||new Set(order).size!==order.length||!order.every(k=>a.skills.includes(k)))return {ok:false,message:'只能排列這位人物已擁有的技能。'};a.skills=[...order];return {ok:true};});}
   function makeActor(run,id,profession){
     const draw=draft(run.seed,profession,id==='hero'?'hero':profession),j=JOBS[profession],head={heavy:'heavy_helm',light:'light_hood',robe:'rune_crown'}[j.armor],body={heavy:'heavy_armor',light:'light_armor',robe:'robe'}[j.armor];
     const make=kind=>C().createGear(kind,run.floor,run.seed,id+':starter:'+kind);
@@ -310,5 +311,5 @@
     return {removedTraps:[...value.removedTraps],version:1,active:value.active,level:value.level,xp:value.xp,heroHp:value.heroHp,switchLeft:value.switchLeft,actors,enemy,growth};
   }
   function validEquipment(run){if(!enabled(run))return true;const seen=new Set();for(const g of allGear(run)){if(seen.has(g.id))return false;seen.add(g.id);}const e=run.equipment,j=job(run);return Object.values(e).filter(Boolean).every(g=>GEAR[g.kind]?.jobs.includes(j))&&!(GEAR[e.weapon?.kind]?.hands===2&&e.shield);}
-  return Object.freeze({JOBS,GEAR,SKILLS,PASSIVES,SLOTS,scale,state,enabled,ids,job,level,actor,maxHp,hp,equipment,pv,teamPassive,buff,setBuff,draft,preview,enable,addMember,removeMember,sync,setHp,switchActor,followerRecords,allGear,canEquip,equip,unequip,stats,wear,durabilityWarnings,hurt,heal,gainXp,strike,cast,food,speed,inflict,hungerScale,toolSpent,rescueChoice,tick,advance,validate,validEquipment,roll});
+  return Object.freeze({JOBS,GEAR,SKILLS,PASSIVES,SLOTS,scale,state,enabled,ids,job,level,actor,maxHp,hp,equipment,pv,teamPassive,buff,setBuff,draft,reorderSkills,preview,enable,addMember,removeMember,sync,setHp,switchActor,followerRecords,allGear,canEquip,equip,unequip,stats,wear,durabilityWarnings,hurt,heal,gainXp,strike,cast,food,speed,inflict,hungerScale,toolSpent,rescueChoice,tick,advance,validate,validEquipment,roll});
 });

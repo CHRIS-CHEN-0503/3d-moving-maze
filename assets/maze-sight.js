@@ -4,8 +4,10 @@
   function reset(){restore();if(layer){layer.parent?.remove(layer);const materials=new Set(),geometries=new Set();layer.traverse(o=>{if(o.geometry)geometries.add(o.geometry);if(o.material)materials.add(o.material);});materials.forEach(m=>m.dispose());geometries.forEach(g=>g.dispose());}state=layer=source=frame=null;batches=[];last=0;revealed=false;}
   function build(f){if(layer){layer.parent?.remove(layer);const mats=new Set(),geos=new Set();layer.traverse(o=>{if(o.geometry)geos.add(o.geometry);if(o.material)mats.add(o.material);});mats.forEach(m=>m.dispose());geos.forEach(g=>g.dispose());}const T=f.T,g=f.g,n=2*g.mazeW*g.mazeH+4;layer=new T.Group();layer.name='maze-sight-layer';layer.visible=false;f.scene.add(layer);batches=[];
     const mesh=(geo,mat,count)=>{const m=new T.InstancedMesh(geo,mat,count);m.frustumCulled=false;m.count=0;layer.add(m);return m;};
-    liveWalls=mesh(f.wall.geometry.clone(),f.wall.material.clone(),n);memoryWalls=mesh(new T.BoxGeometry(1,g.wallH,1),new T.MeshBasicMaterial({color:0x354552}),n);
-    fog=mesh(new T.PlaneGeometry(g.cell,g.cell),new T.MeshBasicMaterial({color:0x091321,side:T.DoubleSide}),g.mazeW*g.mazeH);shade=mesh(new T.PlaneGeometry(g.cell,g.cell),new T.MeshBasicMaterial({color:0x182631,side:T.DoubleSide}),g.mazeW*g.mazeH);
+    liveWalls=mesh(f.wall.geometry.clone(),f.wall.material.clone(),n);
+    // Remembered terrain is a quiet floor plan, not a second full-height grey maze.
+    memoryWalls=mesh(new T.BoxGeometry(1,.08,1),new T.MeshBasicMaterial({color:0x354553,fog:false}),n);
+    fog=mesh(new T.PlaneGeometry(g.cell,g.cell),new T.MeshBasicMaterial({color:0x091321,side:T.DoubleSide,fog:false}),g.mazeW*g.mazeH);shade=mesh(new T.PlaneGeometry(g.cell,g.cell),new T.MeshBasicMaterial({color:0x14212e,side:T.DoubleSide,fog:false}),g.mazeW*g.mazeH);
     for(const parent of [f.atmosphere?.wallRoot,f.atmosphere?.floorRoot])for(const src of parent?.children||[])if(src.isInstancedMesh)batches.push({src,mesh:mesh(src.geometry.clone(),src.material.clone(),src.count),wall:parent===f.atmosphere.wallRoot});source=f.wall;
   }
   function xy(x,z){const g=frame.g;return {x:x/g.cell+g.mazeW/2,y:z/g.cell+g.mazeH/2};}
@@ -17,9 +19,9 @@
     C.update(state,a.x,a.y,g.hWalls,g.vWalls,f.radius);const magic=!!root.MagicMap?.isRevealed();if(magic&&!revealed)C.reveal(state,g.hWalls,g.vWalls);revealed=magic;
     const T=f.T,m=new T.Matrix4(),q=new T.Quaternion(),p=new T.Vector3(),s=new T.Vector3(),counts={live:0,memory:0,fog:0,shade:0};
     const put=(mesh,key,x,y,z,sx,sz)=>{p.set(x,y,z);s.set(sx,1,sz);m.compose(p,q,s);mesh.setMatrixAt(counts[key]++,m);};
-    for(const b of g.wallBoxes){const show=b.boundary||(b.type==='h'?(cellVisible(b.gx,b.gy)||cellVisible(b.gx,b.gy+1)):(cellVisible(b.gx,b.gy)||cellVisible(b.gx+1,b.gy)));if(show)put(liveWalls,'live',(b.minX+b.maxX)/2,g.wallH/2,(b.minZ+b.maxZ)/2,b.maxX-b.minX,b.maxZ-b.minZ);}
-    for(let y=0;y<state.h-1;y++)for(let x=0;x<state.w;x++)if(state.horizontal[y*state.w+x]===1&&!cellVisible(x,y)&&!cellVisible(x,y+1))put(memoryWalls,'memory',(x+.5-state.w/2)*g.cell,g.wallH/2,(y+1-state.h/2)*g.cell,g.cell+g.wallT,g.wallT);
-    for(let y=0;y<state.h;y++)for(let x=0;x<state.w-1;x++)if(state.vertical[y*(state.w-1)+x]===1&&!cellVisible(x,y)&&!cellVisible(x+1,y))put(memoryWalls,'memory',(x+1-state.w/2)*g.cell,g.wallH/2,(y+.5-state.h/2)*g.cell,g.wallT,g.cell+g.wallT);
+    for(const b of g.wallBoxes){const exists=b.boundary||(b.type==='h'?g.hWalls[b.gy]?.[b.gx]:g.vWalls[b.gy]?.[b.gx]);const show=exists&&(b.boundary||(b.type==='h'?(cellVisible(b.gx,b.gy)||cellVisible(b.gx,b.gy+1)):(cellVisible(b.gx,b.gy)||cellVisible(b.gx+1,b.gy))));if(show)put(liveWalls,'live',(b.minX+b.maxX)/2,g.wallH/2,(b.minZ+b.maxZ)/2,b.maxX-b.minX,b.maxZ-b.minZ);}
+    for(let y=0;y<state.h-1;y++)for(let x=0;x<state.w;x++)if(state.horizontal[y*state.w+x]===1&&!cellVisible(x,y)&&!cellVisible(x,y+1))put(memoryWalls,'memory',(x+.5-state.w/2)*g.cell,.1,(y+1-state.h/2)*g.cell,g.cell+g.wallT,.12);
+    for(let y=0;y<state.h;y++)for(let x=0;x<state.w-1;x++)if(state.vertical[y*(state.w-1)+x]===1&&!cellVisible(x,y)&&!cellVisible(x+1,y))put(memoryWalls,'memory',(x+1-state.w/2)*g.cell,.1,(y+.5-state.h/2)*g.cell,.12,g.cell+g.wallT);
     for(let y=0;y<state.h;y++)for(let x=0;x<state.w;x++)if(!cellVisible(x,y)){const wx=(x+.5-state.w/2)*g.cell,wz=(y+.5-state.h/2)*g.cell;m.makeRotationX(-Math.PI/2);m.setPosition(wx,.045,wz);if(!state.seen[y*state.w+x])fog.setMatrixAt(counts.fog++,m);else shade.setMatrixAt(counts.shade++,m);}
     for(const [mesh,key]of [[liveWalls,'live'],[memoryWalls,'memory'],[fog,'fog'],[shade,'shade']]){mesh.count=counts[key];mesh.instanceMatrix.needsUpdate=true;}
     const tint=new T.Color();

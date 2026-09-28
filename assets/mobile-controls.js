@@ -2,7 +2,7 @@
   'use strict';
   const screen=$('gameScreen'),toggle=$('actionsToggle');
   const open=value=>{screen.classList.toggle('actions-open',value);toggle.setAttribute('aria-expanded',String(value));};
-  bindActionBtn(toggle,()=>open(!screen.classList.contains('actions-open')));
+  bindActionBtn(toggle,()=>{if(window.BattleDock?.openSettings()){open(false);return;}open(!screen.classList.contains('actions-open'));});
   $('lookZone').addEventListener('touchstart',()=>open(false),{passive:true});
   $('lookZone').addEventListener('mousedown',()=>open(false));
   screen.addEventListener('click',e=>{if(e.target.closest('button')&&e.target.closest('button')!==toggle)open(false);});

@@ -311,7 +311,7 @@
     }
     function hud(){if(!enabled())return;
       const status=document.getElementById('towerGuardStatus');if(status){status.hidden=false;let button=status.querySelector('.party-status');if(!button){status.innerHTML='<button class="party-status" type="button"></button>';button=status.firstChild;button.onclick=()=>panel();}button.textContent=P.PROFESSIONS[modern()?H.job(r()):r().party.profession].name+' · 隊伍 '+(r().party.members.length+1)+'/4'+(r().party.members.some(m=>m.hp<=0)?' · 同伴需要休息':'');}
-      const attack=document.getElementById('towerAttackBtn');if(attack&&live()&&!ctx.inDungeon()){const cd=modern()?H.actor(r()).attack:skillLeft;attack.disabled=cd>0;attack.textContent=(r().equipment.weapon?'揮擊':'徒手')+(cd>0?' '+cd.toFixed(1):' X');}
+      const attack=document.getElementById('towerAttackBtn');if(attack&&live()&&!ctx.inDungeon()){const cd=modern()?H.actor(r()).attack:skillLeft;attack.disabled=cd>0;const label=r().equipment.weapon?'揮擊':'徒手';if(window.BattleDock)BattleDock.attackLabel(label,cd);else attack.textContent=label+(cd>0?' '+cd.toFixed(1):' X');}
       if(modern())heroes.hud();
       const skillButton=document.getElementById('towerProfessionBtn');if(skillButton){skillButton.hidden=!live()||modern();skillButton.disabled=r().party.cooldown>0||ctx.paused();skillButton.textContent=r().party.cooldown>0?'準備 '+Math.ceil(r().party.cooldown)+'秒':P.PROFESSIONS[r().party.profession].skill+' C';}
       const talk=document.getElementById('towerTalkBtn');if(near&&live()&&talk){talk.disabled=false;talk.hidden=ctx.paused();talk.ariaLabel=near.kind==='camp'?'營地料理（R）':near.kind==='boss'?'操作機關（R）':near.kind==='site'?'探索機關（R）':'邀請同伴（R）';}

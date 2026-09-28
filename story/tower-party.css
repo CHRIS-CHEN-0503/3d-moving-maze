@@ -63,10 +63,21 @@ body.story-active #towerHud {width:max-content;max-width:calc(100% - 126px - env
 body.tower-danger #towerHud #towerHealth {color:#ffaaa0}
 body.tower-danger #towerHud #towerHp::-webkit-progress-value {background:#ed8576}
 body.tower-danger #towerHud #towerHp::-moz-progress-bar {background:#ed8576}
-body.story-active:has(#towerHud[data-expanded="true"]) #effectChips {top:calc(226px + env(safe-area-inset-top))}
+#towerLeftHud {display:contents}
+body.story-active #hudTop {z-index:21}
+body.story-active #towerLeftHud {display:flex;flex-direction:column;align-items:flex-start;gap:7px;width:max-content;max-width:calc(100% - 126px);pointer-events:none}
+body.story-active #towerLeftHud #hudInfo {max-width:100%;box-sizing:border-box}
+body.story-active #towerLeftHud #towerHud {position:static;max-width:100%;box-sizing:border-box}
+body.story-active #towerLeftHud #effectChips {position:static;align-items:flex-start;max-width:100%}
+body:not(.story-active) #heroTeamBar {display:none!important}
 @media(max-height:540px) {
   body.story-active #towerHud {top:calc(52px + env(safe-area-inset-top));padding:2px 4px 2px 8px}
   #towerHud .tower-hud-summary {gap:9px}
   #towerHudToggle {width:36px;height:36px}
-  body.story-active:has(#towerHud[data-expanded="true"]) #effectChips {top:calc(204px + env(safe-area-inset-top))}
+  body.story-active #towerLeftHud {gap:5px}
+}
+@media(max-height:360px) {
+  #towerHudDetails {padding-top:4px;padding-bottom:3px;margin-top:2px}
+  #towerHud .party-status {min-height:26px;padding:2px 0}
+  #towerHud .tower-gear-status,#towerLightStatus {padding-top:2px}
 }

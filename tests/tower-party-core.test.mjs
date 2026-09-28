@@ -58,7 +58,20 @@ test('profession abilities require resources and persist cooldown; reductions do
   let r=P.skill(fresh()).run;assert.equal(C.takeDamage(r,10).run.hp,55);assert.equal(C.takeDamage(r,10,'hunger').run.hp,50);
 });
 test('all floors keep timing formula and bounded deterministic nine-monster roster',()=>{
-  const kinds=new Set();for(let f=99;f>=1;f--){const r=floor(fresh(),f),spec=P.monsterSpecs(r);assert.ok(spec.length<=6);assert.equal(C.floorConfig(f).shiftSeconds,150-(99-f));assert.deepEqual(spec,P.monsterSpecs(r));spec.forEach(m=>kinds.add(m.kind));if(f>84)assert.equal(spec.length,0);}assert.equal(Object.keys(P.defs()).length,9);assert.ok([...Object.keys(P.MONSTERS)].every(k=>kinds.has(k)));
+  const kinds=new Set();for(let f=99;f>=1;f--){const r=floor(fresh(),f),spec=P.monsterSpecs(r),config=C.floorConfig(f,r.seed);assert.equal(spec.length,config.monsterCount);assert.ok(spec.length>=config.monsterMin&&spec.length<=config.monsterMax);assert.equal(config.shiftSeconds,150-(99-f));assert.deepEqual(spec,P.monsterSpecs(r));spec.forEach(m=>{kinds.add(m.kind);assert.equal(m.strength,Math.min(5,m.def.strength+config.monsterStrengthBonus));if(f>=90)assert.equal(m.strength,1);});}assert.equal(Object.keys(P.defs()).length,9);assert.ok([...Object.keys(P.defs())].every(k=>kinds.has(k)));
+});
+test('enemy population survives saving, defeats and maze changes without rerolling',()=>{
+  for(const f of [99,97,89,69,59,39,1]){
+    const r=floor(fresh(),f),before=P.monsterSpecs(r);r.defeatedMonsters.push(before[0].id);if(before.length>1)r.party.health[before.at(-1).id]=1;
+    const restored=C.validateSave(JSON.stringify(r));assert.ok(restored);assert.deepEqual(P.monsterSpecs(restored),before);
+    assert.ok(restored.defeatedMonsters.includes(before[0].id));if(before.length>1)assert.equal(restored.party.health[before.at(-1).id],1);
+  }
+});
+test('legacy party combat saves accept the expanded eleven-monster population',()=>{
+  const seed=Array.from({length:100},(_,i)=>i+1).find(s=>C.floorConfig(1,s).monsterCount===11);assert.ok(seed);
+  let r=floor(P.enable(C.newRun({seed}),'swordsman').run,1);
+  const roster=P.monsterSpecs(r);for(const m of roster){const hit=P.strike(r,m.id);assert.ok(hit.ok);r=hit.run;}
+  assert.equal(Object.keys(r.party.health).length,11);assert.ok(C.validateSave(JSON.stringify(r)));
 });
 test('90/80 maze bosses need telegraphed cycles and two seals; rewards are idempotent',()=>{
   for(const f of [90,80]){let r=floor(fresh(),f);assert.equal(P.canDescend(r),false);r=P.bossAction(r,0).run;assert.equal(P.bossPhase(r),'warning');assert.equal(P.bossAction(r,0).ok,false);r=C.tickEffects(r,9).run;assert.equal(P.bossPhase(r),'rest');

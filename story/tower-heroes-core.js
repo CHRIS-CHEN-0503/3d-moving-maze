@@ -288,11 +288,11 @@
       if(!num(a.attack,0,5)||!num(a.hurt,0,2)||!num(a.tool,0,90)||!num(a.autoLeft,0,180)||!num(a.roll,0,Number.MAX_SAFE_INTEGER-1,true)||typeof a.autoRescue!=='boolean')return null;
       if(!Array.isArray(a.buffs)||a.buffs.length>BUFFS.length||new Set(a.buffs.map(b=>b.id)).size!==a.buffs.length||!a.buffs.every(b=>BUFFS.includes(b.id)&&num(b.left,0,600)&&num(b.power,0,100)))return null;
       let gear=null;if(id!==value.active){if(!a.equipment||Object.keys(a.equipment).length!==4)return null;gear={};for(const slot of SLOTS){const g=a.equipment[slot];if(g===null)gear[slot]=null;else{const v=C().validateGear(g),d=GEAR[v?.kind];if(!v||v.slot!==slot||!d?.jobs.includes(profession))return null;gear[slot]=v;}}if(GEAR[gear.weapon?.kind]?.hands===2&&gear.shield)return null;}else if(a.equipment!==null)return null;
-      const p=a.pending;if(p&&(!a.skills.includes(p.id)||!SKILLS[p.id].attack||!num(p.left,0,3)||!num(p.damage,0,100)||typeof p.worn!=='boolean'||!Array.isArray(p.targets)||p.targets.length>6||new Set(p.targets).size!==p.targets.length||!p.targets.every(t=>/^monster-[0-5]$/.test(t))))return null;
+      const p=a.pending;if(p&&(!a.skills.includes(p.id)||!SKILLS[p.id].attack||!num(p.left,0,3)||!num(p.damage,0,100)||typeof p.worn!=='boolean'||!Array.isArray(p.targets)||p.targets.length>C().MAX_MONSTERS||new Set(p.targets).size!==p.targets.length||!p.targets.every(C().validMonsterId)))return null;
       actors[id]={skills:[...a.skills],passives:[...a.passives],equipment:gear,cooldowns:{...a.cooldowns},buffs:a.buffs.map(b=>({id:b.id,left:b.left,power:b.power})),attack:a.attack,hurt:a.hurt,tool:a.tool,autoLeft:a.autoLeft,autoRescue:a.autoRescue,roll:a.roll,pending:p?clone(p):null};
     }
-    if(!value.enemy||Array.isArray(value.enemy)||Object.keys(value.enemy).length>6)return null;
-    const enemy={};for(const[k,e]of Object.entries(value.enemy)){if(!/^monster-[0-5]$/.test(k)||!e||Object.keys(e).some(key=>!['slow','slowPower','blind','weak','mark','tauntLeft','tauntId'].includes(key))||Object.entries(e).some(([key,v])=>key==='tauntId'?!expected.includes(v):!num(v,0,60)))return null;enemy[k]={...e};}
+    if(!value.enemy||Array.isArray(value.enemy)||Object.keys(value.enemy).length>C().MAX_MONSTERS)return null;
+    const enemy={};for(const[k,e]of Object.entries(value.enemy)){if(!C().validMonsterId(k)||!e||Object.keys(e).some(key=>!['slow','slowPower','blind','weak','mark','tauntLeft','tauntId'].includes(key))||Object.entries(e).some(([key,v])=>key==='tauntId'?!expected.includes(v):!num(v,0,60)))return null;enemy[k]={...e};}
     if(!Array.isArray(value.removedTraps)||value.removedTraps.length>30||!value.removedTraps.every(s=>typeof s==='string'&&s.length<100))return null;
     return {removedTraps:[...value.removedTraps],version:1,active:value.active,level:value.level,xp:value.xp,heroHp:value.heroHp,switchLeft:value.switchLeft,actors,enemy};
   }

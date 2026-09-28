@@ -4,6 +4,20 @@ import {createRequire} from 'node:module';
 const require=createRequire(import.meta.url),C=require('../story/story-core.js'),P=require('../story/tower-party-core.js'),H=require('../story/tower-heroes-core.js'),N=require('../story/tower-narrative.js'),D=require('../story/tower-dungeons.js');
 const fresh=(job='swordsman',seed=31415)=>H.enable(P.enable(C.newRun({seed,name:'遠征者'}),job).run).run;
 function floor(r,f){r.floor=f;r.floorsCleared=99-f;r.chronicle=N.newChronicle(f);r.expedition=D.newExpedition();r.claimed=[];r.defeatedMonsters=[];r.monsterStuns={};P.advance(r);return r;}
+test('all eleven enemies can retain damage, poise, effects and one area-skill hit after reload',()=>{
+  const seed=Array.from({length:500},(_,i)=>i+1).find(s=>C.floorConfig(1,s).monsterCount===11&&H.draft(s,'swordsman','hero').skills.includes('whirlwind'));
+  assert.ok(seed);let r=floor(fresh('swordsman',seed),1);const roster=P.monsterSpecs(r);assert.equal(roster.length,11);
+  const durability=r.equipment.weapon.durability;r=H.cast(r,'whirlwind').run;
+  for(const monster of roster){const hit=H.strike(r,monster.id,{skillId:'whirlwind'});assert.ok(hit.ok,monster.id);r=hit.run;assert.ok(hit.effect.hp>0);r.party.poise[monster.id]=3;H.state(r).enemy[monster.id]={slow:4,slowPower:.3};assert.ok(C.validateSave(JSON.stringify(r)),monster.id);}
+  assert.equal(H.actor(r).pending.targets.length,11);assert.equal(Object.keys(r.party.health).length,11);assert.equal(r.equipment.weapon.durability,durability-1);
+  const saved=C.validateSave(JSON.stringify(r));assert.deepEqual(saved,r);assert.equal(H.strike(saved,'monster-10',{skillId:'whirlwind'}).ok,false,'A saved cast cannot hit the same target twice');
+  for(const id of ['monster-11','monster-01','monster--1','monster-1.5','__proto__']){
+    assert.equal(C.validMonsterId(id),false);
+    for(const field of ['health','poise']){const bad=structuredClone(r);bad.party[field]={[id]:1};assert.equal(C.validateSave(bad),null);}
+    const bad=structuredClone(r);bad.party.loadouts.enemy={[id]:{slow:1}};assert.equal(C.validateSave(bad),null);
+    const pending=structuredClone(r);H.actor(pending).pending.targets=[id];assert.equal(C.validateSave(pending),null);
+  }
+});
 test('six professions, 36 actives, 18 passives and 17 distinct pieces',()=>{assert.equal(Object.keys(H.GEAR).length,17);for(const job of Object.keys(H.JOBS)){const skills=Object.values(H.SKILLS).filter(s=>s.job===job);assert.equal(skills.length,6);assert.equal(Object.values(H.PASSIVES).filter(s=>s.job===job).length,3);assert.equal(skills.filter(s=>s.attack).length,['mage','swordsman'].includes(job)?3:2);skills.forEach(s=>assert.equal(s.power.length,5));}});
 test('random loadouts are legal, stable and survive JSON without rerolls',()=>{for(const job of Object.keys(H.JOBS))for(let seed=1;seed<150;seed++){const r=fresh(job,seed),a=H.actor(r);assert.equal(a.skills.length,3);assert.equal(a.passives.length,2);assert.ok(a.skills.some(s=>H.SKILLS[s].attack));assert.deepEqual(C.validateSave(JSON.stringify(r)),r);assert.deepEqual(H.draft(seed,job,'hero').skills,a.skills);}});
 test('switch preserves separate health, gear, hurt time and skill cooldowns',()=>{let r=fresh('mage');r=P.recruit(r,P.recruitOffer(r).id).run;const id=r.party.members[0].id;H.setHp(r,'hero',22);H.actor(r).cooldowns[H.actor(r).skills[0]]=7;H.actor(r).hurt=1.5;const weapon=r.equipment.weapon.id;r=H.switchActor(r,id,r.revision).run;assert.equal(r.hp,34);assert.notEqual(r.equipment.weapon.id,weapon);assert.equal(H.switchActor(r,'hero').ok,false);H.tick(r,1);r=H.switchActor(r,'hero').run;assert.equal(r.hp,22);assert.equal(r.equipment.weapon.id,weapon);assert.equal(H.actor(r).hurt,.5);assert.equal(H.actor(r).cooldowns[H.actor(r).skills[0]],6);assert.deepEqual(C.validateSave(r),r);assert.equal(H.followerRecords(r).length,1);});

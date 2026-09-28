@@ -8,6 +8,8 @@
 
   const STATE_VERSION = 2;
   const MAX_HP = 60;
+  const MAX_MONSTERS = 11; // Largest main-tower map: 19×19, population 7..11.
+  const validMonsterId = id => typeof id === 'string' && /^monster-(0|[1-9]\d*)$/.test(id) && Number(id.slice(8)) < MAX_MONSTERS;
   const MAX_COINS = 999999;
   const MAX_STACK = 99;
   // Late lookup keeps the browser's core → narrative → dungeons loading order safe.
@@ -66,25 +68,30 @@
     Object.freeze({ id: 'map_for_bell', name: '巡路人的交換', give: Object.freeze({ map: 1, ration: 1 }), receive: Object.freeze({ bell: 1 }) }),
   ]);
 
-  function floorConfig(floor) {
+  function floorConfig(floor, seed = 1) {
     if (!Number.isInteger(floor) || floor < 1 || floor > 99) throw new RangeError('樓層必須是 1 至 99 的整數。');
+    if (!Number.isInteger(seed) || seed < 1 || seed > 0xffffffff) throw new RangeError('無效的旅程種子。');
     const chapter = CHAPTERS.find((entry) => floor <= entry.high && floor >= entry.low);
     const depth = 99 - floor;
-    let monsterTypes = [];
-    let monsterCount = 0;
-    if (floor <= 84 && floor >= 70 && floor % 5 === 0) {
-      monsterTypes = ['clockmite']; monsterCount = 1;
-    } else if (floor < 70) {
-      monsterTypes = ['clockmite', 'sentinel'];
+    // Roll once per journey/floor, never per render, maze shift or reload.
+    const sizeStep = (chapter.size - 7) / 2;
+    const monsterMin = 1 + sizeStep, monsterMax = 5 + sizeStep;
+    let roll = (seed ^ Math.imul(floor, 0x9e3779b9)) >>> 0;
+    roll = Math.imul(roll ^ roll >>> 16, 0x21f0aaad);
+    roll = Math.imul(roll ^ roll >>> 15, 0x735a2d97);
+    const monsterCount = monsterMin + ((roll ^ roll >>> 15) >>> 0) % (monsterMax - monsterMin + 1);
+    const monsterTypes = ['clockmite'];
+    if (floor < 70) {
+      monsterTypes.push('sentinel');
       if (floor <= 54) monsterTypes.push('wisp');
       if (floor <= 24) monsterTypes.push('hound');
       if (floor <= 54) monsterTypes.push('shardseer');
-      monsterCount = Math.min(6, 2 + Math.floor((69 - floor) / 14));
     }
     return {
       floor, size: chapter.size, shiftSeconds: 150 - depth,
       themeIndex: chapter.themeIndex, environmentId: chapter.id, chapter: chapter.chapter, name: chapter.name,
-      monsterTypes, monsterCount, count: monsterCount,
+      monsterTypes, monsterCount, count: monsterCount, monsterMin, monsterMax,
+      monsterStrengthBonus: Math.floor(depth / 25),
       merchant: floor === 99 || floor === chapter.high || floor % 5 === 0,
       rewardCoins: 6 + Math.floor(depth / 12), narrative: floor === chapter.high ? chapter.narrative : '',
       floorTitle: `第 ${floor} 層 · ${chapter.name}`,
@@ -174,8 +181,7 @@
 
   function monsterStrength(kind, floor) {
     if (!Object.hasOwn(MONSTERS, kind)) throw new RangeError('找不到這種怪物。');
-    floorConfig(floor);
-    return Math.min(5, MONSTERS[kind].strength + (floor <= 19 ? 1 : 0));
+    return Math.min(5, MONSTERS[kind].strength + floorConfig(floor).monsterStrengthBonus);
   }
 
   function warriorOffer(floor, seed) {
@@ -598,5 +604,5 @@
     });
   }
 
-  return Object.freeze({ STATE_VERSION, MAX_HP, ITEMS, GEAR, MONSTERS, CHAPTERS, OPENING, ENDING, EXCHANGES, floorConfig, newRun, validateSave, buy, sell, exchange, useItem, collect, takeDamage, tickEffects, descend, monsterStrength, warriorOffer, hireWarrior, interceptMonster, createGear, validateGear, gearPrice, equipmentStats, receiveGear, grantGear, equipGear, discardGear, buyGear, effectiveMonsterStrength, hitMonster, resolveHeldMonster, transaction, applyDamage, newAdventure, validateAdventure });
+  return Object.freeze({ STATE_VERSION, MAX_HP, MAX_MONSTERS, validMonsterId, ITEMS, GEAR, MONSTERS, CHAPTERS, OPENING, ENDING, EXCHANGES, floorConfig, newRun, validateSave, buy, sell, exchange, useItem, collect, takeDamage, tickEffects, descend, monsterStrength, warriorOffer, hireWarrior, interceptMonster, createGear, validateGear, gearPrice, equipmentStats, receiveGear, grantGear, equipGear, discardGear, buyGear, effectiveMonsterStrength, hitMonster, resolveHeldMonster, transaction, applyDamage, newAdventure, validateAdventure });
 });

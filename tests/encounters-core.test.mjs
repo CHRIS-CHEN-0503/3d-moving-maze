@@ -1,7 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createRequire } from 'node:module';
-import { createHash } from 'node:crypto';
 const require = createRequire(import.meta.url);
 const C = require('../story/story-core.js');
 const E = require('../story/tower-encounters.js');
@@ -109,23 +108,23 @@ test('五位探索者都能給出七種委託，不把任務綁定角色',()=>{
   for(const [id,types] of Object.entries(seen))assert.deepEqual([...types].sort(),[...E.QUEST_TYPES].sort(),id);
 });
 
-test('加入身分前後出現率與原任務抽選完全相同，不消耗原本的隨機序列',()=>{
-  // Verified using the pre-identity HEAD core and encounter sources in an isolated VM, with legal strength 5.
+test('身分查詢不改出現率及任務抽選，增加怪物也不改探索者的出現率',()=>{
   const fixtures=[
-    {floor:99,count:405,sha256:'439a2dfdc2f04c1b2933e14e3be6a13f45b4168f2fc935922567bdba2d801eb4'},
-    {floor:60,count:390,sha256:'48fec897071b2fc87a0764774d08d1071feb669205ceac6051158e5551177a2b'},
-    {floor:1,count:368,sha256:'0a4992b06602bc467c057f63564bdc1ac6496b1742d8635e64d2114c6afe76cc'},
+    {floor:99,count:405},
+    {floor:60,count:390},
+    {floor:1,count:368},
   ];
   for(const fixture of fixtures){
-    const rows=[];let count=0;
+    let count=0;
     for(let seed=1;seed<=2000;seed++){
       const run=runAt(fixture.floor,seed);
       if(fixture.floor!==99){run.hiredWarriors=['fixture'];run.warrior={offerId:'fixture',strength:5,mode:'escort',targetId:null,remaining:null};}
+      const before=E.explorerOffer(run);
       E.explorerIdentity(run.floor,run.seed);E.explorerIdentity(run.floor,run.seed);
       const offer=E.explorerOffer(run);if(offer)count++;
-      rows.push([seed,offer?[offer.type,offer.target,offer.goal]:null]);
+      assert.deepEqual(offer,before);
     }
-    assert.equal(count,fixture.count);assert.equal(createHash('sha256').update(JSON.stringify(rows)).digest('hex'),fixture.sha256);
+    assert.equal(count,fixture.count);
   }
 });
 
@@ -154,11 +153,22 @@ test('強化寶箱背包已滿時不吞裝備、不消耗開箱機會',()=>{
   assert.equal(result.ok,false);assert.deepEqual(result.run,before);assert.equal(result.run.adventure.claimed.length,0);
 });
 
-test('不存在怪物的樓層不會提供戰鬥委託，已接受委託不因庫存改變重抽',()=>{
-  for(let seed=1;seed<400;seed++){const offer=E.explorerOffer(runAt(99,seed));if(offer)assert.ok(!['defeat','stun'].includes(offer.type));}
+test('清完怪物不會再提供戰鬥委託，已接受委託不因庫存改變重抽',()=>{
+  for(let seed=1;seed<400;seed++){const run=runAt(99,seed);run.defeatedMonsters=Array.from({length:C.floorConfig(99,seed).monsterCount},(_,i)=>`monster-${i}`);const offer=E.explorerOffer(run);if(offer)assert.ok(!['defeat','stun'].includes(offer.type));}
   const accepted=questRun('survey'),offer=E.explorerOffer(accepted);accepted.bag.heal=90;accepted.equipment.weapon=null;
   assert.deepEqual(E.explorerOffer(accepted),offer);assert.equal(E.acceptQuest(accepted,offer.id).ok,false);
   const pending=findRun(r=>!!E.explorerOffer(r));const before=clone(pending);assert.equal(E.acceptQuest(pending,'forged').ok,false);assert.deepEqual(pending,before);
+});
+
+test('隊伍戰鬥委託只指向實際抽出的存活怪物，清場後不再提供',()=>{
+  const P=require('../story/tower-party-core.js'),seen=new Set();
+  for(const floor of [99,89,69,39])for(let seed=1;seed<=200;seed++){
+    let run=P.enable(runAt(floor,seed),'swordsman').run;const roster=P.monsterSpecs(run),target=roster.at(-1).id;
+    run.defeatedMonsters=roster.slice(0,-1).map(m=>m.id);
+    const offer=E.explorerOffer(run);if(offer&&['defeat','stun'].includes(offer.type)){assert.equal(offer.target,target);seen.add(offer.type);}
+    run.defeatedMonsters.push(target);const empty=E.explorerOffer(run);if(empty)assert.ok(!['defeat','stun'].includes(empty.type));
+  }
+  assert.deepEqual([...seen].sort(),['defeat','stun']);
 });
 
 test('探索三格必須不同且在地圖內，重複事件不能刷進度或領兩次報酬',()=>{

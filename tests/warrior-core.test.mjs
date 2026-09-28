@@ -73,13 +73,11 @@ test('offers are deterministic, occasional, depth-bound, and always teach at flo
   for (const seed of [0, -1, Infinity, 0x100000000, '1']) assert.throws(() => core.warriorOffer(99, seed), RangeError);
 });
 
-test('monster ratings are 1..5 and stronger variants occur only below floor 20', () => {
+test('monster ratings are 1..5 and rise every 25 descended floors', () => {
   const bases = { clockmite: 1, sentinel: 3, wisp: 2, hound: 4 };
   for (const [kind, strength] of Object.entries(bases)) {
     assert.equal(core.MONSTERS[kind].strength, strength);
-    assert.equal(core.monsterStrength(kind, 20), strength);
-    assert.equal(core.monsterStrength(kind, 19), Math.min(5, strength + 1));
-    for (let floor = 99; floor >= 1; floor -= 1) assert.ok(core.monsterStrength(kind, floor) >= 1 && core.monsterStrength(kind, floor) <= 5);
+    for (let floor = 99; floor >= 1; floor -= 1) assert.equal(core.monsterStrength(kind, floor), Math.min(5,strength+Math.floor((99-floor)/25)));
   }
   for (const kind of ['unknown', '__proto__', 'constructor']) assert.throws(() => core.monsterStrength(kind, 50), RangeError);
   assert.throws(() => core.monsterStrength('hound', 0), RangeError);

@@ -152,11 +152,14 @@
     if (!adventure) return null;
     if (adventure.quest) return describeQuest(adventure.quest, run);
     if (adventure.claimed.includes(`abandoned:${run.floor}`)) return null;
-    const config = C.floorConfig(run.floor), alive = Array.from({ length: config.monsterCount }, (_, i) => ({ id: `monster-${i}`, kind: config.monsterTypes[i % config.monsterTypes.length] })).filter(m => !run.defeatedMonsters.includes(m.id));
+    const config = C.floorConfig(run.floor,run.seed);
+    const party = run.party ? (typeof module === 'object' && module.exports ? require('./tower-party-core.js') : globalThis.TowerPartyCore) : null;
+    const roster = party ? party.monsterSpecs(run) : Array.from({length:config.monsterCount},(_,i)=>({id:`monster-${i}`,kind:run.floor<=54&&i===config.monsterCount-1?'shardseer':config.monsterTypes[i%config.monsterTypes.length]}));
+    const alive = roster.filter(m => !run.defeatedMonsters.includes(m.id));
     const donations = DONATIONS.filter(id => run.bag[id] > 0);
     const candidates = ['escort', 'relic', 'survey', 'shift'];
     if (donations.length) candidates.push('donate');
-    const defeatable = run.warrior && run.warrior.mode === 'escort' ? alive.find(m => C.monsterStrength(m.kind, run.floor) < run.warrior.strength) : null;
+    const defeatable = party ? alive[0] : run.warrior && run.warrior.mode === 'escort' ? alive.find(m => C.monsterStrength(m.kind, run.floor) < run.warrior.strength) : null;
     if (defeatable) candidates.push('defeat');
     if (alive.length && run.equipment && run.equipment.weapon) candidates.push('stun');
     const type = candidates[Math.floor(random() * candidates.length)], target = type === 'defeat' ? defeatable.id : type === 'stun' ? alive[0].id : type === 'donate' ? donations[Math.floor(random() * donations.length)] : type === 'relic' ? `relic:${run.floor}:${run.seed}` : type === 'escort' ? 'exit' : type === 'survey' ? 'cells' : 'walls';

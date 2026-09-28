@@ -89,7 +89,8 @@ function hiredRun(strength=1,floor=60) {
 function positionThreat(h,kind='sentinel',id='monster-0',distance=1.4) {
   const def=core.MONSTERS[kind],model=new h.context.THREE.Group();model.position.set(distance,0,0);
   model.userData.body={position:{}};model.userData.ring={material:{}};
-  return {id,kind,def,strength:core.monsterStrength(kind,h.api.state().run.floor),phase:Number(id.split('-').at(-1))||0,hp:60,alive:true,path:[],pathLeft:1,cooldown:0,windup:0,model,cx:0,cy:0,x:distance,z:0};
+  // Fixed combat ratings isolate guard comparisons from the floor difficulty curve.
+  return {id,kind,def,strength:Math.min(5,def.strength+(h.api.state().run.floor<=19?1:0)),phase:Number(id.split('-').at(-1))||0,hp:60,alive:true,path:[],pathLeft:1,cooldown:0,windup:0,model,cx:0,cy:0,x:distance,z:0};
 }
 
 function replacementRuntime(holding=false) {

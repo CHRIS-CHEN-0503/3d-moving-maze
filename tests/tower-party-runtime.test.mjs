@@ -16,7 +16,8 @@ function harness(floor=84,options={}){
     run:()=>run,paused:()=>paused,inDungeon:()=>false,world:()=>world,monsters:()=>monsters,traders:()=>[],player:()=>player,
     clear:()=>!wall,followClear:options.followClear,cell:(cx,cy)=>({cx,cy,x:cx*4,z:cy*4}),worldToCell:(x,z)=>({x:Math.round(x/4),y:Math.round(z/4)}),chooseCell:()=>({cx:nextCell,cy:0,x:nextCell++*4,z:0}),makeText:()=>new T.Group(),follow:(a,dt,speed,stop,target)=>{followTargets.push(target);return false;},dispose:()=>{},damage:()=>{},bind:()=>{},swing:()=>swings++,
   });
-  const spec=P.monsterSpecs(run)[0];if(spec){const model=ui.monsterModel(spec.kind,spec.strength)||new T.Group();if(!model.userData.body)model.userData.body=new T.Group();model.position.set(0,0,2);monsters=[{...spec,model,alive:true,windup:0,cooldown:2}];}
+  // Early-floor non-combat fixtures keep enemies outside the camp; combat tests use 84F.
+  const spec=P.monsterSpecs(run)[0];if(spec){const model=ui.monsterModel(spec.kind,spec.strength)||new T.Group();if(!model.userData.body)model.userData.body=new T.Group();model.position.set(0,0,floor>84?24:2);monsters=[{...spec,model,alive:true,windup:0,cooldown:2}];}
   ui.build(()=>.5,new Set());
   return {ui,G,player,world,monsters,messages,followTargets,get run(){return run;},set run(value){run=value;},get dialog(){return dialog;},get swings(){return swings;},get hits(){return hits;},set paused(v){paused=v;},set failSave(v){failSave=v;},set wall(v){wall=v;}};
 }

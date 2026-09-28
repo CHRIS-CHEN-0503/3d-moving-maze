@@ -28,7 +28,7 @@ test('all 99 floors grow toward the bottom while walls change progressively fast
     assert.equal(current.size % 2, 1);
     assert.equal(current.shiftSeconds, 150 - (99 - floor));
     assert.equal(current.shiftSeconds, previous.shiftSeconds - 1);
-    assert.ok(current.monsterCount <= 6);
+    assert.ok(current.monsterCount >= current.monsterMin && current.monsterCount <= current.monsterMax);
     assert.ok(current.themeIndex >= 0 && current.themeIndex <= 5);
     assert.ok(current.monsterTypes.every((id) => Object.hasOwn(core.MONSTERS, id)));
     previous = current;
@@ -41,13 +41,20 @@ test('all 99 floors grow toward the bottom while walls change progressively fast
   for (const invalid of [0, 100, 1.5, NaN, '50']) assert.throws(() => core.floorConfig(invalid), RangeError);
 });
 
-test('early floors are safe, occasional monsters are introduced before crowded lower floors', () => {
-  for (let floor = 99; floor >= 85; floor -= 1) assert.equal(core.floorConfig(floor).monsterCount, 0);
-  const early = Array.from({ length: 15 }, (_, index) => core.floorConfig(84 - index));
-  assert.equal(early.filter((floor) => floor.monsterCount).length, 3);
-  assert.equal(core.floorConfig(69).monsterCount, 2);
-  assert.equal(core.floorConfig(1).monsterCount, 6);
+test('every map size step adds one to both monster population bounds', () => {
+  const observed=new Map();
+  for(let floor=99;floor>=1;floor--)for(let seed=1;seed<=80;seed++){
+    const config=core.floorConfig(floor,seed),min=1+(config.size-7)/2,max=min+4;
+    assert.equal(config.monsterMin,min);assert.equal(config.monsterMax,max);
+    assert.ok(config.monsterCount>=min&&config.monsterCount<=max);
+    assert.deepEqual(config,core.floorConfig(floor,seed),'Reloading does not reroll the population');
+    if(!observed.has(config.size))observed.set(config.size,new Set());observed.get(config.size).add(config.monsterCount);
+  }
+  for(const [size,counts]of observed)assert.deepEqual([...counts].sort((a,b)=>a-b),Array.from({length:5},(_,i)=>i+1+(size-7)/2));
+  assert.equal(core.floorConfig(1).monsterMax,core.MAX_MONSTERS);
+  assert.deepEqual(core.floorConfig(99).monsterTypes,['clockmite']);
   assert.equal(core.floorConfig(1).monsterTypes.length, 5);
+  for(const seed of [0,-1,NaN,1.5,'1',0x100000000])assert.throws(()=>core.floorConfig(99,seed),RangeError);
 });
 
 test('ten distinct environments change at 89, 79 and every following ten-floor boundary', () => {

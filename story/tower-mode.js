@@ -132,10 +132,14 @@
   }
 
   function install() {
+    const leftHud = document.createElement('div');leftHud.id='towerLeftHud';
+    const topHud=el('hudTop'),topInfo=el('hudInfo');
+    if(topHud&&topInfo){topHud.prepend(leftHud);leftHud.appendChild(topInfo);}
+    else el('gameScreen').appendChild(leftHud);
     const hud = document.createElement('section');
     hud.id = 'towerHud'; hud.setAttribute('aria-label', '高塔生存狀態');
     hud.innerHTML = '<div class="tower-hud-summary"><span class="tower-stat tower-floor-stat"><small>樓層</small><b id="towerFloor">99 F</b></span><span class="tower-hud-health"><span class="tower-stat"><small>生命</small><b id="towerHealth">'+C.MAX_HP+' / '+C.MAX_HP+'</b></span><progress id="towerHp" class="tower-health" max="'+C.MAX_HP+'" value="'+C.MAX_HP+'" aria-label="生命值"></progress></span><button type="button" id="towerHudToggle" aria-controls="towerHudDetails" aria-expanded="false" aria-label="展開生存資訊"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg></button></div><div id="towerHudDetails" hidden><div class="tower-hud-meta"><span id="towerChapter"></span><span class="tower-stat"><small>銅幣</small><b id="towerCoins">0</b></span></div><div id="towerGuardStatus" class="tower-guard-status" hidden></div></div>';
-    el('gameScreen').appendChild(hud);
+    leftHud.appendChild(hud);
     const hurt=document.createElement('div');hurt.id='towerHurtGlow';hurt.setAttribute('aria-hidden','true');el('gameScreen').appendChild(hurt);
     const gearStatus=document.createElement('div');gearStatus.id='towerGearStatus';gearStatus.className='tower-gear-status';el('towerHudDetails').appendChild(gearStatus);
     let hudExpanded=false;try{hudExpanded=localStorage.getItem('maze3d_tower_hud_expanded')==='1';}catch(_){}
@@ -203,6 +207,8 @@
         bind:bindActionBtn,action,dialog,transact,toast:showToast,audio:AudioEng,close:closeDialog,trade});
       lightingUI.install();
     }
+    // Keep every left-side layer in normal flow; opening details pushes rows down.
+    const effects=el('effectChips');if(effects)leftHud.appendChild(effects);
   }
   function action(label, key, item, disabled) {
     return '<button class="tower-btn" data-tower="' + key + '"' + (item ? ' data-item="' + text(item) + '"' : '') + (disabled ? ' disabled' : '') + '>' + text(label) + '</button>';
@@ -310,7 +316,7 @@
     objectiveHint?.suspend();
     pendingDungeonShift=null;closeDialog(); floorStarted = false; reader=null;sideReader=null;
     lightingUI?.reset();
-    floorConfig = C.floorConfig(run.floor);
+    floorConfig = C.floorConfig(run.floor,run.seed);
     const instance=dungeonOffer();
     if(instance)floorConfig={...floorConfig,size:instance.size,name:instance.title,shiftSeconds:instance.shiftSeconds,monsterCount:0,narrative:'',environmentId:sideStory(instance.kind)?.environmentId||{archive:'library',bells:'echo',lantern:'furnace'}[instance.kind]};
     const settings = { mazeSize: CFG.mazeSize, itemCount: CFG.itemCount, foodCount: CFG.foodCount };

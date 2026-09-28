@@ -60,7 +60,7 @@
     for(const m of value.members){if(!m||!value.joined.includes(m.id)||!own(PROFESSIONS,m.profession)||!num(m.level,1,5,true)||!num(m.hp,0,memberMax(m))||!num(m.cooldown,0,30)||!num(m.hurtLeft,0,2))return null;members.push({id:m.id,profession:m.profession,level:m.level,hp:m.hp,cooldown:m.cooldown,hurtLeft:m.hurtLeft});}
     if(!Array.isArray(value.buffs)||value.buffs.length>2||new Set(value.buffs.map(b=>b?.id)).size!==value.buffs.length||!value.buffs.every(b=>b&&own(BUFFS,b.id)&&num(b.floors,1,3,true)))return null;
     for(const k of ['cooldown','guardLeft','trapWard','slowLeft'])if(!num(value[k],0,30))return null;
-    const dict=(v,max)=>v&&typeof v==='object'&&!Array.isArray(v)&&Object.keys(v).length<=6&&Object.keys(v).every(id=>/^monster-[0-5]$/.test(id)&&!defeated.includes(id)&&num(v[id],0,max));
+    const dict=(v,max)=>v&&typeof v==='object'&&!Array.isArray(v)&&Object.keys(v).length<=C().MAX_MONSTERS&&Object.keys(v).every(id=>C().validMonsterId(id)&&!defeated.includes(id)&&num(v[id],0,max));
     if(!dict(value.health,200)||!dict(value.poise,5))return null;
     const boss=X().validateBoss(value.boss,floor,value.journey===undefined),journey=X().validateJourney(value.journey,floor);
     if(value.light!==undefined&&!L())return null; // Never silently discard saved fuel if a script failed to load.
@@ -119,10 +119,9 @@
   });}
   function defs(){return {...C().MONSTERS,...MONSTERS};}
   function monsterSpecs(run){
-    const f=run.floor;if(f>84)return [];
-    const count=f>=70?(f%5===0||f%7===0?1:0):C().floorConfig(f).monsterCount;
-    const pool=f>=70?['mushroom','crab','moth']:['mushroom','crab','moth','flower',...C().floorConfig(f).monsterTypes];
-    return Array.from({length:count},(_,i)=>{const kind=pool[hash(run.seed,`monster:${f}:${i}`)%pool.length],def=defs()[kind],strength=Math.min(5,def.strength+(f<=19?1:0));return {id:`monster-${i}`,kind,def,strength,maxHp:18+strength*8+Math.floor((99-f)/8)};});
+    const f=run.floor,config=C().floorConfig(f,run.seed),count=config.monsterCount;
+    const pool=f>=90?['mushroom','clockmite']:f>=70?['mushroom','crab','moth','clockmite']:['mushroom','crab','moth','flower',...config.monsterTypes];
+    return Array.from({length:count},(_,i)=>{const kind=pool[hash(run.seed,`monster:${f}:${i}`)%pool.length],def=defs()[kind],strength=Math.min(5,def.strength+config.monsterStrengthBonus);return {id:`monster-${i}`,kind,def,strength,maxHp:18+strength*8+Math.floor((99-f)/8)};});
   }
   function strike(run,id,options={},revision){if(run.party?.loadouts)return H().strike(run,id,options,revision);return transact(run,revision,(n,p)=>{
     const spec=monsterSpecs(n).find(m=>m.id===id);if(!spec||n.defeatedMonsters.includes(id))return {ok:false,message:'這隻怪物已經倒下了。'};

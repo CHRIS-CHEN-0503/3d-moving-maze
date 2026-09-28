@@ -1,0 +1,22 @@
+.party-glyph {width:54px;height:54px;fill:none;stroke:currentColor;stroke-width:2.3;stroke-linecap:round;stroke-linejoin:round;flex:none}
+.party-food {width:70px;height:52px;display:block;margin:0 auto 5px;filter:drop-shadow(0 3px 3px #0005)}
+.party-professions .tower-item {background:linear-gradient(140deg,#213748,#122434);border-color:#81b7b63b}
+.party-professions .tower-item h3 {color:#f5deb0;font-size:20px}
+.party-professions .tower-btn {border-color:#94c8c7aa}
+.party-stocks {display:flex;flex-wrap:wrap;gap:10px;margin:14px 0 20px;padding:12px;border:1px solid #9ec4ce33;border-radius:12px;background:#0b1d28}
+.party-stocks span {flex:1;min-width:85px;text-align:center;color:#d3e7e6;font-size:14px}
+.party-stocks .party-food {width:44px;height:34px}
+.party-recipe .tower-btn {margin-top:4px}
+.party-status {font:inherit;font-size:13px;color:#eddbad;border:0;background:transparent;cursor:pointer;padding:3px 0;text-align:left}
+.party-status:hover {color:#fff4cf;text-decoration:underline}
+.party-invite {display:flex;align-items:center;gap:18px;margin:18px 0}
+#towerProfessionBtn {color:#d1f2e0;border-color:#81b8a299;max-width:120px;white-space:normal;font-size:13px;background:#173b3c}
+#towerProfessionBtn[hidden] {display:none!important}
+@media(max-height:540px) {
+  .party-professions {grid-template-columns:repeat(3,minmax(0,1fr))}
+  .party-professions .tower-item {gap:6px;padding:10px}
+  .party-professions .tower-item p {font-size:14px}
+  .party-glyph {width:38px;height:38px}
+  #towerProfessionBtn {position:absolute;left:0;bottom:56px;min-width:100px}
+}
+@media(max-width:600px) and (orientation:portrait) {.party-professions {grid-template-columns:repeat(2,minmax(0,1fr))}}

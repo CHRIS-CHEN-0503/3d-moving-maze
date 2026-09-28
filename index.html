@@ -615,6 +615,7 @@ button:focus-visible,input:focus-visible{outline:3px solid #fff;outline-offset:3
 </style>
 <link rel="stylesheet" href="assets/game-polish.css?v=1.36.0">
 <link rel="stylesheet" href="assets/play-controls.css?v=1.32.0">
+<link rel="stylesheet" href="story/tower-party.css?v=1.37.0">
 </head>
 <body>
 
@@ -989,7 +990,7 @@ button:focus-visible,input:focus-visible{outline:3px solid #fff;outline-offset:3
    3D移動迷宮 — 給小朋友的變形迷宮冒險
    ===================================================== */
 const $=id=>document.getElementById(id);
-const GAME_VERSION='1.36.1';
+const GAME_VERSION='1.37.0';
 
 /* ---------- 設定（後台可調） ---------- */
 const DEFAULT_CFG={teamSize:2,shiftMin:3,itemCount:6,foodCount:4,hungerMin:3,stunSec:3,pingSec:3,smellCells:3,mazeSize:13,magicMap:0,duelMin:5,unpaidRate:100,musicOn:1,speechOn:1,speechVoice:'',apiUrl:'',roomMax:3,rounds:3,goodsCount:16,shopCollect:1,shopMin:2.5,cartFull:400,views:{fp:1,tp:1,top:1},broker:'wss://broker.emqx.io:8084/mqtt'};
@@ -1111,7 +1112,7 @@ function loadSpeed(load){
   return SHOP_SPEED_MUL;
 }
 function shopSpeed(){ return isShop()?loadSpeed(cartLoad(MP.id)):1; }
-function jobPerk(key){ return isShop()?undefined:CH()[key]; } // 搶購模式大家能力一樣
+function jobPerk(key){ return isShop()||window.TowerMode?.partyActive?undefined:CH()[key]; } // 新劇情職業不疊加舊外觀能力
 /* 把第 i 個商品放到某格（補貨也共用；房主決定位置後廣播，大家畫面一致） */
 function placeGood(i,gi,cx,cy){
   const old=G.goods[i];
@@ -2450,7 +2451,7 @@ function shovelCap(){
 }
 /* 有「鐵鍬工具箱」的人（工程師，或當鬼抽到鐵鍬能力）用掉後 45 秒自動補充 */
 function hasShovelKit(){
-  if(isShop())return false;
+  if(isShop()||window.TowerMode?.partyActive)return false;
   return CH().id==='robot'||(MP.on&&MP.mode==='tag'&&MP.taggedId===MP.id&&MP.itPower==='shovel');
 }
 /* 鐵鍬補充時間：特大(19×19)以上的地圖比較大，縮短成 35 秒 */
@@ -2731,6 +2732,7 @@ function myInvisSecs(){
   return (own||ghost)?5:0;
 }
 function useSkill(){
+  if(window.TowerMode?.partyActive){TowerMode.useProfessionSkill();return;}
   const now=performance.now();
   const secs=myInvisSecs();
   if(!secs||now<G.skillCoolUntil||G.frozen||now<G.stunnedUntil||MP.ended)return;
@@ -3432,7 +3434,7 @@ function doShift(){
               const c=worldToCell(b.x,b.z), wp=cellToWorld(c.x,c.y);
               b.x=wp.x; b.z=wp.z; b.path=null;
             }
-            if(CH().pathOnShift){ // 尋路貓：變形後自動看見出口路線
+            if(!window.TowerMode?.partyActive&&CH().pathOnShift){ // 一般版尋路貓：變形後自動看見出口路線
               const pc2=worldToCell(G.px,G.pz);
               G.solutionPath=solveMaze(pc2.x,pc2.y);
               G.mapUntil=performance.now()+CH().pathOnShift*1000;
@@ -3606,6 +3608,7 @@ function beginEntryFlow(mode){
   $('profileError').textContent='';
   requestLandscapeLock();
   setFlowPanel('profilePanel');
+  updatePreview();
 }
 function continueToSetup(){
   const name=($('playerName').value||'').trim();
@@ -3687,7 +3690,7 @@ function updatePreview(){
   previewChar=buildCharacter(CHARS[G.charIdx]);
   previewScene.add(previewChar);
   const c=CHARS[G.charIdx];
-  $('charDesc').innerHTML=`<b>${c.job}</b><br>${c.desc}<br><span style="color:#ffd76a;">能力：${c.abilText}</span>`;
+  $('charDesc').innerHTML=entryMode==='story'?`<b>冒險者外觀</b><br>${c.desc}<br><span style="color:#ffd76a;">下一步選擇新職業，外觀不影響能力。</span>`:`<b>${c.job}</b><br>${c.desc}<br><span style="color:#ffd76a;">能力：${c.abilText}</span>`;
 }
 
 /* =====================================================
@@ -5095,7 +5098,7 @@ window.addEventListener('pagehide',()=>{AudioEng.shiftSound?.stop();AudioEng.com
 <script src="assets/voice-settings.js?v=1.34.0"></script>
 <script src="assets/capture-core.js?v=1.36.0"></script>
 <script src="assets/capture-mode.js?v=1.36.0"></script>
-<script src="story/story-core.js?v=1.36.1"></script>
+<script src="story/story-core.js?v=1.37.0"></script>
 <script src="story/tower-narrative.js"></script>
 <script src="story/tower-side-stories.js"></script>
 <script src="story/tower-dungeons.js?v=1.36.1"></script>
@@ -5103,7 +5106,9 @@ window.addEventListener('pagehide',()=>{AudioEng.shiftSound?.stop();AudioEng.com
 <script src="story/tower-encounters.js?v=1.35.5"></script>
 <script src="story/tower-characters.js?v=1.35.2"></script>
 <script src="story/tower-audio.js"></script>
-<script src="story/tower-mode.js?v=1.36.1"></script>
+<script src="story/tower-party-core.js?v=1.37.0"></script>
+<script src="story/tower-party-runtime.js?v=1.37.0"></script>
+<script src="story/tower-mode.js?v=1.37.0"></script>
 <script src="assets/room-lifecycle.js?v=1.36.0"></script>
 <script src="assets/shop-collection-core.js?v=1.31.0"></script>
 <script src="assets/shop-collection.js?v=1.31.0"></script>

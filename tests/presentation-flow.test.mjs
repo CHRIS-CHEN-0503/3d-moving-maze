@@ -80,6 +80,7 @@ function harness() {
     startSingleSeries: () => calls.starts++, useShovel: () => calls.shovel++, doAttack: () => calls.attack++,
     useKite: noop, useWhistle: noop, doRob: noop, startCheckout: noop, useSkill: noop,
     selectedRoundTotal: () => 8, saveCfg: noop, allowedViews: () => ['tp', 'fp', 'top'],
+    updatePreview: noop,
     openMultiplayerRoom: noop, updateSoundBtn: noop, showToast: noop, renderLeaderboard: noop,
     mpLeave: noop, sizeBigMap: noop, drawMap: noop, isShop: () => false,
     addEventListener: (type, fn) => { if (!events.has(type)) events.set(type, []); events.get(type).push(fn); },

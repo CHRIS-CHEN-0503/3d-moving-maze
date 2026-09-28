@@ -150,7 +150,7 @@ test('一般揮擊與搶奪不另外排動畫或配置重複武器，完成後�
 test('劇情冷卻與距離維持原規則，打空同樣啟動朝前揮擊',()=>{
   const start=tower.indexOf('  function attack()'),end=tower.indexOf('  function defeatMonster',start);
   const attackSource=tower.slice(start,end),model=figure();
-  const context=vm.createContext({window:{CharacterMotion:motion},AudioEng:{sfxSwing(){}},playerGroup:model,active:true,paused:false,G:{frozen:false,running:true,px:0,pz:0},run:{equipment:{weapon:{}}},attackLeft:0,monsters:[],inDungeon:()=>false,showToast(){}});
+  const context=vm.createContext({window:{CharacterMotion:motion},partyUI:null,AudioEng:{sfxSwing(){}},playerGroup:model,active:true,paused:false,G:{frozen:false,running:true,px:0,pz:0},run:{equipment:{weapon:{}}},attackLeft:0,monsters:[],inDungeon:()=>false,showToast(){}});
   vm.runInContext(attackSource,context);context.attack();
   assert.equal(context.attackLeft,.8);assert.equal(model.userData.motion.duration,.8);
   context.attackLeft=.4;context.attack();assert.equal(context.attackLeft,.4);

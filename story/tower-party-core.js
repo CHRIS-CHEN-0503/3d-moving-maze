@@ -1,0 +1,161 @@
+/* Original tower expedition rules. No rendering, timers or network side effects. */
+(function(root,factory){const api=factory();if(typeof module==='object'&&module.exports)module.exports=api;if(root)root.TowerPartyCore=api;})(typeof globalThis!=='undefined'?globalThis:this,function(){
+  'use strict';
+  const C=()=>typeof module==='object'&&module.exports?require('./story-core.js'):globalThis.TowerCore;
+  const own=(o,k)=>Object.hasOwn(o,k), num=(v,a,b,int=false)=>Number.isFinite(v)&&v>=a&&v<=b&&(!int||Number.isInteger(v));
+  const PROFESSIONS=Object.freeze({
+    swordsman:{name:'劍士',person:'蒼衡',gender:'male',color:0x5594c1,skill:'守護架勢',description:'近戰傷害較高。技能：六秒內減傷一半；劍士隊友會替你攔下近身怪物。',cooldown:20},
+    mage:{name:'術士',person:'露彌',gender:'female',color:0xb196e8,skill:'震盪結界',description:'技能：擊退附近怪物的攻勢，使牠們短暫暈眩。隊友會在安全距離施法。',cooldown:22},
+    scout:{name:'鎖匠',person:'巧栗',gender:'female',color:0x68bead,skill:'探路之眼',description:'技能：顯示出口路線十八秒，獲得六秒陷阱保護。隊中有鎖匠時，陷阱傷害減少四分之一。',cooldown:25},
+    chef:{name:'廚師',person:'禾谷',gender:'male',color:0xe6ac65,skill:'隨手料理',description:'烹飪一次可做兩份。技能：用一份根莖恢復飽食度，照顧整支隊伍。',cooldown:25},
+    healer:{name:'療癒師',person:'澄音',gender:'female',color:0x88c69f,skill:'草藥療癒',description:'技能：消耗一份香草恢復生命。隊友在你受重傷時也會使用香草救援。',cooldown:25},
+    smith:{name:'裝備師',person:'砧岳',gender:'male',color:0xbf936e,skill:'應急修補',description:'技能：用一份硬殼修復手上的裝備。隊中有裝備師時，營地修理費減半。',cooldown:25},
+  });
+  const INGREDIENTS=Object.freeze({root:'甜根莖',mushroom:'月傘菇',herb:'香草',nectar:'花蜜',meat:'蟹肉',shell:'硬殼'});
+  const RECIPES=Object.freeze({
+    stew:{name:'根莖菇菇燉鍋',cost:{root:2,mushroom:1},hp:8,hunger:35},
+    broth:{name:'香草暖湯',cost:{herb:2,root:1},hp:24,hunger:15},
+    skewer:{name:'蜜烤菇串',cost:{nectar:1,mushroom:2},hp:0,hunger:35,buff:'focus'},
+    crab:{name:'香煎蟹肉',cost:{meat:2,herb:1},hp:10,hunger:40,buff:'guard'},
+    soup:{name:'蜜根熱湯',cost:{root:2,nectar:1},hp:16,hunger:30},
+    bento:{name:'旅人飯盒',cost:{root:2,meat:1},hp:0,hunger:55,team:10},
+    salad:{name:'發光香草沙拉',cost:{herb:1,mushroom:1},hp:12,hunger:20,buff:'trail'},
+    feast:{name:'團聚大餐',cost:{root:2,mushroom:2,meat:2,nectar:1},hp:25,hunger:60,team:35},
+  });
+  const BUFFS=Object.freeze({focus:'專注：攻擊 +3',guard:'暖胃：受到傷害 -2',trail:'輕盈：陷阱傷害減半'});
+  const MONSTERS=Object.freeze({
+    mushroom:{id:'mushroom',name:'蒲傘菇',strength:1,speed:1.05,damage:6,sight:7,color:0xcf95bc,shape:'mushroom',description:'傘蓋膨脹時準備噴孢子；拉開距離，避免短暫緩速。',drop:{mushroom:2}},
+    crab:{id:'crab',name:'岩殼蟹',strength:2,speed:1.2,damage:10,sight:8,color:0xc28c62,shape:'crab',description:'正面硬殼擋下部分傷害；趁牠攻擊後，繞到側面出手。',drop:{meat:2,shell:1}},
+    moth:{id:'moth',name:'蜜囊蛾',strength:2,speed:1.9,damage:7,sight:9,color:0xdfcc79,shape:'moth',description:'振翅時發出警訊，附近怪物會暫時更容易發現你。',drop:{nectar:2}},
+    flower:{id:'flower',name:'蔓嘴花',strength:3,speed:0,damage:10,sight:10,color:0x96bb70,shape:'flower',ranged:true,description:'根留在原地，蓄力後吐出種子；利用牆壁擋住飛行物。',drop:{herb:2,root:1}},
+  });
+  const BOSS_FLOORS=Object.freeze({90:{name:'甦醒石陣',description:'高塔封住了樓梯。避開浮起的石陣，在震動平息時解除兩座封印。'},80:{name:'吞光庭園',description:'轉動兩座光鏡，讓光指向旁邊的金色根芽。小心週期甦醒的藤蔓。'}});
+  function hash(seed,text){let h=seed>>>0;for(const c of String(text))h=Math.imul(h^c.charCodeAt(0),16777619)>>>0;return h;}
+  const emptyStock=keys=>Object.fromEntries(Object.keys(keys).map(k=>[k,0]));
+  const has=(run,job)=>run.party&&(run.party.profession===job||run.party.members.some(m=>m.profession===job&&m.hp>0));
+  const memberMax=m=>28+m.level*6;
+  function newBoss(floor){return own(BOSS_FLOORS,floor)?{floor,clock:0,started:false,done:false,seals:[false,false],angles:[0,0]}:null;}
+  function enable(run,profession){
+    const next=C().validateSave(run);if(!next||!own(PROFESSIONS,profession)||next.party)return {ok:false,run,message:'請選擇有效的冒險職業。'};
+    const guard=next.warrior;
+    next.party={version:1,profession,members:[],joined:[],ingredients:{root:3,mushroom:2,herb:2,nectar:0,meat:0,shell:1},meals:emptyStock(RECIPES),buffs:[],cooldown:0,guardLeft:0,trapWard:0,slowLeft:0,health:{},poise:{},boss:newBoss(next.floor)};
+    if(guard){const m={id:guard.id,profession:'swordsman',level:guard.strength,hp:28+guard.strength*6,cooldown:0,hurtLeft:0};next.party.members.push(m);next.party.joined.push(m.id);}
+    next.warrior=null;next.revision++;
+    return {ok:true,run:next,message:guard?'原有護衛已成為劍士隊友，不必重新支付費用。':'冒險職業已選定。'};
+  }
+  function validate(value,floor,defeated){
+    if(!value||value.version!==1||!own(PROFESSIONS,value.profession))return null;
+    const stock=(v,defs)=>v&&typeof v==='object'&&!Array.isArray(v)&&Object.keys(v).length===Object.keys(defs).length&&Object.keys(defs).every(k=>num(v[k],0,99,true));
+    if(!stock(value.ingredients,INGREDIENTS)||!stock(value.meals,RECIPES))return null;
+    if(!Array.isArray(value.joined)||value.joined.length>100||new Set(value.joined).size!==value.joined.length||!value.joined.every(id=>typeof id==='string'&&id.length>0&&id.length<=80))return null;
+    if(!Array.isArray(value.members)||value.members.length>3||new Set(value.members.map(m=>m?.id)).size!==value.members.length)return null;
+    const members=[];
+    for(const m of value.members){if(!m||!value.joined.includes(m.id)||!own(PROFESSIONS,m.profession)||!num(m.level,1,5,true)||!num(m.hp,0,memberMax(m))||!num(m.cooldown,0,30)||!num(m.hurtLeft,0,2))return null;members.push({id:m.id,profession:m.profession,level:m.level,hp:m.hp,cooldown:m.cooldown,hurtLeft:m.hurtLeft});}
+    if(!Array.isArray(value.buffs)||value.buffs.length>2||new Set(value.buffs.map(b=>b?.id)).size!==value.buffs.length||!value.buffs.every(b=>b&&own(BUFFS,b.id)&&num(b.floors,1,3,true)))return null;
+    for(const k of ['cooldown','guardLeft','trapWard','slowLeft'])if(!num(value[k],0,30))return null;
+    const dict=(v,max)=>v&&typeof v==='object'&&!Array.isArray(v)&&Object.keys(v).length<=6&&Object.keys(v).every(id=>/^monster-[0-5]$/.test(id)&&!defeated.includes(id)&&num(v[id],0,max));
+    if(!dict(value.health,200)||!dict(value.poise,5))return null;
+    let boss=null;
+    if(own(BOSS_FLOORS,floor)){
+      const b=value.boss;if(!b||b.floor!==floor||!num(b.clock,0,315360000)||typeof b.started!=='boolean'||typeof b.done!=='boolean'||!Array.isArray(b.seals)||b.seals.length!==2||!b.seals.every(x=>typeof x==='boolean')||!Array.isArray(b.angles)||b.angles.length!==2||!b.angles.every(x=>num(x,0,3,true))||b.done!==b.seals.every(Boolean)||b.done&&!b.started)return null;
+      boss={floor,clock:b.clock,started:b.started,done:b.done,seals:[...b.seals],angles:[...b.angles]};
+    }else if(value.boss!==null)return null;
+    return {version:1,profession:value.profession,members,joined:[...value.joined],ingredients:{...value.ingredients},meals:{...value.meals},buffs:value.buffs.map(b=>({...b})),cooldown:value.cooldown,guardLeft:value.guardLeft,trapWard:value.trapWard,slowLeft:value.slowLeft,health:{...value.health},poise:{...value.poise},boss};
+  }
+  function transact(run,revision,fn){return C().transaction(run,revision,next=>!next.party?{ok:false,message:'尚未選擇冒險職業。'}:fn(next,next.party));}
+  function recruitOffer(run){
+    const h=hash(run.seed,`recruit:${run.floor}`), early=[99,97,95,93,91,89];
+    if(!early.includes(run.floor)&&h%100>=45)return null;
+    const jobs=Object.keys(PROFESSIONS),job=jobs[early.includes(run.floor)?early.indexOf(run.floor):h%6],level=Math.min(5,1+Math.floor((99-run.floor)/22));
+    return {id:`companion:${run.floor}:${run.seed}`,profession:job,level,price:8+level*4};
+  }
+  function recruit(run,id,revision){return transact(run,revision,(n,p)=>{
+    const offer=recruitOffer(n);if(!offer||offer.id!==id||p.joined.includes(id))return {ok:false,message:'這位旅人已經離開，或已受過你的邀請。'};
+    if(p.members.length>=3)return {ok:false,message:'四人隊伍已滿，請先在隊伍頁面與一位同伴道別。'};
+    if(p.members.some(m=>m.profession===offer.profession))return {ok:false,message:'隊伍已有這個職業的同伴，留個位置給不同專長的旅人吧。'};
+    if(n.coins<offer.price)return {ok:false,message:'銅幣不足，先探索其他通道吧。'};
+    n.coins-=offer.price;p.members.push({id,profession:offer.profession,level:offer.level,hp:28+offer.level*6,cooldown:0,hurtLeft:0});p.joined.push(id);
+    return {ok:true,message:`${PROFESSIONS[offer.profession].person}加入隊伍。`};
+  });}
+  function dismiss(run,id,revision){return transact(run,revision,(n,p)=>{const m=p.members.find(m=>m.id===id);if(!m)return {ok:false,message:'這位同伴不在隊伍中。'};p.members=p.members.filter(m=>m.id!==id);return {ok:true,message:`與${PROFESSIONS[m.profession].person}道別了。`};});}
+  function gather(run,source,id,revision){return transact(run,revision,(n,p)=>{
+    if(!/^s\d{1,2}$/.test(source)||!own(INGREDIENTS,id)||n.claimed.includes(source))return {ok:false,message:'這份材料已經採集過了。'};
+    if(p.ingredients[id]>=99)return {ok:false,message:'材料袋已滿。'};p.ingredients[id]++;n.claimed.push(source);return {ok:true,message:`獲得${INGREDIENTS[id]}。`};
+  });}
+  function cook(run,id,revision){return transact(run,revision,(n,p)=>{
+    if(!own(RECIPES,id))return {ok:false,message:'沒有這份食譜。'};const r=RECIPES[id],amount=has(n,'chef')?2:1;
+    if(p.meals[id]+amount>99)return {ok:false,message:'料理盒已滿。'};
+    if(Object.entries(r.cost).some(([k,v])=>p.ingredients[k]<v))return {ok:false,message:'食材還不夠，再去找找吧。'};
+    for(const[k,v]of Object.entries(r.cost))p.ingredients[k]-=v;p.meals[id]+=amount;return {ok:true,message:`完成${r.name}，共${amount}份。`};
+  });}
+  function eat(run,id,revision){return transact(run,revision,(n,p)=>{
+    if(!own(RECIPES,id)||!p.meals[id])return {ok:false,message:'料理盒裡沒有這道料理。'};const r=RECIPES[id];
+    n.hp=Math.min(C().MAX_HP,n.hp+r.hp);n.hunger=Math.min(100,n.hunger+r.hunger);if(r.team)p.members.forEach(m=>m.hp=Math.min(memberMax(m),m.hp+r.team));
+    if(r.buff){p.buffs=p.buffs.filter(b=>b.id!==r.buff);p.buffs.push({id:r.buff,floors:3});if(p.buffs.length>2)p.buffs.shift();}
+    p.meals[id]--;return {ok:true,message:`享用${r.name}。`};
+  });}
+  function camp(run,action,revision){return transact(run,revision,(n,p)=>{
+    if(action==='rest'){
+      if(!p.members.some(m=>m.hp<memberMax(m)))return {ok:false,message:'同伴們的狀態很好。'};
+      if(n.bag.ration<1)return {ok:false,message:'休息需要一份乾糧。'};n.bag.ration--;p.members.forEach(m=>m.hp=memberMax(m));return {ok:true,message:'大家分享乾糧，恢復了精神。'};
+    }
+    if(action!=='repair')return {ok:false,message:'未知的營地服務。'};
+    const cost=has(n,'smith')?3:6;if(n.coins<cost)return {ok:false,message:'修理費不足。'};
+    const gear=Object.values(n.equipment).filter(Boolean);if(!gear.some(g=>g.durability<g.maxDurability))return {ok:false,message:'穿戴的裝備不需要修理。'};
+    n.coins-=cost;gear.forEach(g=>g.durability=Math.min(g.maxDurability,g.durability+4));return {ok:true,message:'已修補穿戴中的裝備。'};
+  });}
+  function defs(){return {...C().MONSTERS,...MONSTERS};}
+  function monsterSpecs(run){
+    const f=run.floor;if(f>84)return [];
+    const count=f>=70?(f%5===0||f%7===0?1:0):C().floorConfig(f).monsterCount;
+    const pool=f>=70?['mushroom','crab','moth']:['mushroom','crab','moth','flower',...C().floorConfig(f).monsterTypes];
+    return Array.from({length:count},(_,i)=>{const kind=pool[hash(run.seed,`monster:${f}:${i}`)%pool.length],def=defs()[kind],strength=Math.min(5,def.strength+(f<=19?1:0));return {id:`monster-${i}`,kind,def,strength,maxHp:18+strength*8+Math.floor((99-f)/8)};});
+  }
+  function strike(run,id,options={},revision){return transact(run,revision,(n,p)=>{
+    const spec=monsterSpecs(n).find(m=>m.id===id);if(!spec||n.defeatedMonsters.includes(id))return {ok:false,message:'這隻怪物已經倒下了。'};
+    const member=options.memberId?p.members.find(m=>m.id===options.memberId&&m.hp>0):null;
+    if(options.memberId&&(!member||member.cooldown>0))return {ok:false,message:'同伴正在調整呼吸。'};
+    const w=n.equipment.weapon;let damage=member?6+member.level*2+(member.profession==='mage'?3:0):(w?{bat:15,pan:13,staff:11}[w.kind]+w.bonus*2:7)+(p.profession==='swordsman'?4:0);
+    damage+=p.buffs.some(b=>b.id==='focus')?3:0;
+    if(spec.kind==='crab'&&options.front===true)damage=Math.max(1,Math.round(damage*.55));
+    if(member)member.cooldown=member.profession==='mage'?3:1.8;
+    let broken=null;if(!member&&w){w.durability--;if(w.durability===0){broken=w;n.equipment.weapon=null;}}
+    const hp=Math.max(0,(p.health[id]??spec.maxHp)-damage);p.health[id]=hp;
+    let stunned=false;if(!member&&w&&!p.poise[id]){n.monsterStuns[id]=Math.min(2,.7+w.bonus*.3);p.poise[id]=4;stunned=true;}
+    const drops={};if(hp===0){n.defeatedMonsters.push(id);delete p.health[id];delete p.poise[id];delete n.monsterStuns[id];n.coins=Math.min(999999,n.coins+8+spec.strength*2);Object.assign(drops,MONSTERS[spec.kind]?.drop||{shell:1});for(const[k,v]of Object.entries(drops))p.ingredients[k]=Math.min(99,p.ingredients[k]+v);}
+    return {ok:true,message:hp===0?`擊敗${spec.def.name}。${Object.keys(drops).map(k=>`獲得${INGREDIENTS[k]}`).join('，')}。`:`命中${spec.def.name}。`,effect:{target:'monster',damage,hp,dead:hp===0,broken,stunned,drops}};
+  });}
+  function hurtMember(run,id,amount,revision){return transact(run,revision,(n,p)=>{
+    const m=p.members.find(x=>x.id===id);if(!m||m.hp<=0||!num(amount,0,100))return {ok:false,message:'無效的隊友傷害。'};
+    if(m.hurtLeft>0)return {ok:true,message:'',effect:{target:'companion',damage:0}};const damage=Math.max(1,amount-m.level);m.hp=Math.max(0,m.hp-damage);m.hurtLeft=2;return {ok:true,message:m.hp===0?`${PROFESSIONS[m.profession].person}需要休息！帶他回營地或分享料理。`:'劍士擋下了攻擊。',effect:{target:'companion',damage,down:m.hp===0}};
+  });}
+  function skill(run,revision){return transact(run,revision,(n,p)=>{
+    if(p.cooldown>0)return {ok:false,message:'技能還在準備中。'};const j=p.profession;
+    if(j==='chef'){if(!p.ingredients.root)return {ok:false,message:'需要一份甜根莖。'};if(n.hunger>=100)return {ok:false,message:'肚子還很飽。'};p.ingredients.root--;n.hunger=Math.min(100,n.hunger+25);}
+    if(j==='healer'){if(!p.ingredients.herb)return {ok:false,message:'需要一份香草。'};if(n.hp>=C().MAX_HP)return {ok:false,message:'生命已滿。'};p.ingredients.herb--;n.hp=Math.min(C().MAX_HP,n.hp+20);}
+    if(j==='smith'){const gear=Object.values(n.equipment).filter(g=>g&&g.durability<g.maxDurability);if(!gear.length)return {ok:false,message:'沒有需要修補的裝備。'};if(!p.ingredients.shell)return {ok:false,message:'需要一份硬殼。'};p.ingredients.shell--;gear.forEach(g=>g.durability=Math.min(g.maxDurability,g.durability+3));}
+    if(j==='swordsman')p.guardLeft=6;
+    if(j==='scout'){p.trapWard=6;n.effects.reveal=Math.max(18,n.effects.reveal);}
+    p.cooldown=PROFESSIONS[j].cooldown;return {ok:true,message:PROFESSIONS[j].skill,effect:{skill:j}};
+  });}
+  function reduceDamage(run,amount,source){const p=run.party;if(!p||source==='hunger')return amount;if(source==='trap'&&p.trapWard>0)return 0;let result=Math.max(0,amount-(p.buffs.some(b=>b.id==='guard')?2:0));if(p.guardLeft>0)result*=.5;if(source==='trap'&&p.buffs.some(b=>b.id==='trail'))result*=.5;if(source==='trap'&&has(run,'scout'))result*=.75;return Math.ceil(result);}
+  function tick(next,dt){const p=next.party;if(!p)return;for(const k of ['cooldown','guardLeft','trapWard','slowLeft'])p[k]=Math.max(0,p[k]-dt);if(next.expedition.active)return;
+    for(const m of p.members){m.cooldown=Math.max(0,m.cooldown-dt);m.hurtLeft=Math.max(0,m.hurtLeft-dt);}
+    for(const k of Object.keys(p.poise)){p.poise[k]=Math.max(0,p.poise[k]-dt);if(!p.poise[k])delete p.poise[k];}
+    if(p.boss?.started&&!p.boss.done)p.boss.clock+=dt;
+  }
+  function advance(next){if(!next.party)return;const p=next.party;p.health={};p.poise={};p.boss=newBoss(next.floor);p.buffs=p.buffs.map(b=>({...b,floors:b.floors-1})).filter(b=>b.floors>0);p.slowLeft=0;}
+  const canDescend=run=>!run.party?.boss||run.party.boss.done;
+  const bossPhase=run=>!run.party?.boss?.started?'idle':run.party.boss.done?'done':run.party.boss.clock%14<3?'warning':run.party.boss.clock%14<6?'strike':'rest';
+  const mirrorTarget=(run,index)=>1+hash(run.seed,`mirror:${index}`)%3;
+  function bossAction(run,index,revision){return transact(run,revision,(n,p)=>{
+    const b=p.boss;if(!b||!num(index,0,1,true)||b.done)return {ok:false,message:'封印已經安靜下來。'};
+    if(!b.started){b.started=true;return {ok:true,message:BOSS_FLOORS[n.floor].description};}
+    if(b.seals[index])return {ok:false,message:'這座機關已經解開。'};
+    if(b.clock<8||bossPhase(n)!=='rest')return {ok:false,message:'先離開發光的地面，等震動平息再試。'};
+    if(n.floor===80){b.angles[index]=(b.angles[index]+1)%4;b.seals[index]=b.angles[index]===mirrorTarget(n,index);}else b.seals[index]=true;
+    b.done=b.seals.every(Boolean);if(b.done){n.coins=Math.min(999999,n.coins+35);p.ingredients.shell=Math.min(99,p.ingredients.shell+3);}
+    return {ok:true,message:b.done?'迷宮的心跳平息了。出口封印解除，獲得三十五枚銅幣與硬殼。':b.seals[index]?'一座封印解除了。':'光鏡轉了一個方向。'};
+  });}
+  return Object.freeze({PROFESSIONS,INGREDIENTS,RECIPES,BUFFS,MONSTERS,BOSS_FLOORS,enable,validate,has,memberMax,recruitOffer,recruit,dismiss,gather,cook,eat,camp,defs,monsterSpecs,strike,hurtMember,skill,reduceDamage,tick,advance,canDescend,bossPhase,mirrorTarget,bossAction});
+});

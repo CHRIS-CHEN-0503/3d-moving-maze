@@ -5,7 +5,7 @@
   const E = window.TowerEncounters, V = window.TowerCharacters;
   const N = window.TowerNarrative, D = window.TowerDungeons, S = window.TowerSideStories;
   const P = window.TowerPartyCore;
-  let partyUI = null, pendingProfession = null, upgradingProfession = false;
+  let partyUI = null, lightingUI = null, lightingRig = null, pendingProfession = null, upgradingProfession = false;
   const SAVE = 'maze3d_tower_v1';
   let run = null, active = false, paused = false, pauseAt = 0, modalFocus = null;
   let world = null, loot = [], monsters = [], traders = [], nearest = null;
@@ -108,6 +108,7 @@
       if (event.code === 'KeyR') trade();
       if (event.code === 'KeyX') attack();
       if (event.code === 'KeyJ') journal();
+      if (event.code === 'KeyL') lightingUI?.panel();
     });
     document.addEventListener('visibilitychange', () => {
       if (document.hidden && active && !paused && !G.shifting && run.status === 'playing') pauseMenu();
@@ -121,6 +122,12 @@
         close:closeDialog,refreshGear,hurt:()=>hurtLeft>0,passage:openExplorationPassage,
         bind:bindActionBtn,swing:()=>{attackLeft=.8;window.CharacterMotion?.beginAction(playerGroup,'attack',.8);}});
       partyUI.install();
+    }
+    if(window.TowerLighting&&window.TowerLightingRuntime){
+      lightingUI=window.TowerLightingRuntime.create({THREE,G,run:()=>run,active:()=>active,world:()=>world,traders:()=>traders,player:()=>playerGroup,camera:()=>camera,dispose:disposeSceneObject,inDungeon,
+        environment:()=>({id:floorConfig.environmentId,rig:lightingRig}),clear:hasClearPath,cell:cellPoint,chooseCell,marker:makePickupMarker,
+        bind:bindActionBtn,action,dialog,transact,toast:showToast,audio:AudioEng,close:closeDialog,trade});
+      lightingUI.install();
     }
   }
   function action(label, key, item, disabled) {
@@ -184,6 +191,7 @@
       const raw=localStorage.getItem(SAVE);let previous=null;
       try{previous=raw?JSON.parse(raw):null;}catch(_){}
       if(run.party?.journey&&previous?.party&&!previous.party.journey&&C.validateSave(previous))localStorage.setItem(SAVE+'_before_expedition2',raw);
+      if(run.party?.light&&previous?.party&&previous.party.light===undefined&&C.validateSave(previous))localStorage.setItem(SAVE+'_before_lighting',raw);
       localStorage.setItem(SAVE, JSON.stringify(run)); return true;
     }
     catch (_) { if (!saveFailed) { saveFailed = true; showToast('瀏覽器無法保存進度，請保持此分頁開啟。', 4000); } return false; }
@@ -192,13 +200,14 @@
   function itemConfig() { return inDungeon()?{itemCount:0,foodCount:0,storyCount:0,total:0}:E.floorLootCounts(floorConfig.size); }
   function preserveFloorPickups() { return active && floorStarted; }
   function reservedCells() {
-    return floorStarted?[...traders,...loot,...dungeonObjects,...hazards,...(partyUI?.reserved()||[]),...[warriorNpc,explorer,chest,relic,mainClue,rift].filter(Boolean)].map(item=>item.cx+','+item.cy):[];
+    return floorStarted?[...traders,...loot,...dungeonObjects,...hazards,...(partyUI?.reserved()||[]),...(lightingUI?.reserved()||[]),...[warriorNpc,explorer,chest,relic,mainClue,rift].filter(Boolean)].map(item=>item.cx+','+item.cy):[];
   }
   function collectedOriginal(id) {
     if (!active || !run || inDungeon() || run.claimed.includes(id)) return;
     run.claimed.push(id); questEvent('collect',{id}); save();
   }
   function open(silent=false) {
+    if(P&&(!window.TowerLighting||!window.TowerLightingRuntime)){dialog('載入尚未完成','照明工具尚未載入','請重新整理網頁後再繼續。既有旅程不會被覆寫。','',action('回首頁','close'));return;}
     const saved = readSave();
     dialog('單人長篇冒險 · 高塔遠征', '倒轉高塔・第 99 層', '你在陌生的召喚陣中醒來。塔頂只有一扇向下的門。與同樣受困的旅人組隊、討伐怪物、採集食材，在移動的迷宮裡煮一頓熱飯，再一起尋找回家的路。', '<div class="tower-story-cover" role="img" aria-label="被召喚到雲上高塔的冒險者"></div><p class="tower-copy">六種職業 · 四人隊伍 · 八道料理 · 十座章末迷宮機關 · 職業探索與鍛造。第 90 至 10 層的整十樓層及第 1 層，各有專屬挑戰。</p><p class="tower-copy">沿用原本移動操作 · 每層自動保存（續玩回到當層入口） · 魔法地圖變形後重新探索。</p>',
       (saved && saved.status !== 'won' ? action('繼續：第 ' + saved.floor + ' 層', 'continue') : saved&&N?action('回顧已完成故事','story-archive'):'') + action(saved ? '重新開始故事' : '建立主角', 'new') + action('回首頁', 'close'),{silent});
@@ -222,6 +231,7 @@
   }
   function loadFloor(intro) {
     pendingDungeonShift=null;closeDialog(); floorStarted = false; reader=null;sideReader=null;
+    lightingUI?.reset();
     floorConfig = C.floorConfig(run.floor);
     const instance=dungeonOffer();
     if(instance)floorConfig={...floorConfig,size:instance.size,name:instance.title,shiftSeconds:instance.shiftSeconds,monsterCount:0,narrative:'',environmentId:sideStory(instance.kind)?.environmentId||{archive:'library',bells:'echo',lantern:'furnace'}[instance.kind]};
@@ -426,6 +436,13 @@
     envGroup.add(new THREE.HemisphereLight(0xd6edff, 0x5f5366, 0.85));
     envGroup.add(new THREE.AmbientLight(0xffffff, 0.42));
     const sun = new THREE.DirectionalLight(0xffe4b3, 0.8); sun.position.set(-15, 28, 14); envGroup.add(sun);
+    lightingRig=null;
+    if(run.party?.light&&window.TowerLighting){
+      const light=window.TowerLighting.profile(floorConfig.environmentId);
+      scene.background.setHex(light.sky);scene.fog.color.setHex(light.sky);
+      envGroup.children[0].intensity=light.hemi;envGroup.children[1].intensity=light.ambient;sun.intensity=light.sun;
+      lightingRig={fog:scene.fog};
+    }
     wallMesh.material.color.setHex(wall);
     floorMesh.material.color.setHex(ground);
     const span = G.mazeW * G.cell;
@@ -488,7 +505,7 @@
     const random = mulberry32(floorSeed() ^ 0x712da), used = new Set(['0,0', G.exitCell.x + ',' + G.exitCell.y]);
     const originalPickups = [...(G.items||[]), ...(G.foods||[])];
     for(const item of originalPickups){const c=worldToCell(item.x,item.z);used.add(c.x+','+c.y);}
-    if(inDungeon()){buildDungeonWorld(random,used);buildHazards(used);return;}
+    if(inDungeon()){buildDungeonWorld(random,used);lightingUI?.build(random,used);buildHazards(used);return;}
     for (const offer of E.merchantOffers(run.floor,run.seed)) {
       const point = chooseCell(random, used);
       const model = V.buildMerchant(offer.id,{THREE,CHARS,buildCharacter});model.position.set(point.x,0,point.z);
@@ -524,6 +541,7 @@
     model.visible=!!(run.adventure.quest&&run.adventure.quest.type==='relic'&&run.adventure.quest.status==='active');world.add(model);relic={...point,model};
     buildJourneyWorld(random,used);
     partyUI?.build(random,used);
+    lightingUI?.build(random,used);
     buildHazards(used);
   }
   function buildHazards(used) {
@@ -712,6 +730,7 @@
     el('towerTalkBtn').hidden=paused||!G.running||el('towerTalkBtn').disabled;
     document.body.classList.toggle('tower-danger',run.hp<=C.MAX_HP*.25);
     partyUI?.hud();
+    lightingUI?.hud();
   }
   function saveDungeonShift() {
     if(!inDungeon()||run.expedition.active.kind!=='stars'||!D.observeShift)return;
@@ -744,6 +763,7 @@
     if (paused || !G.running || G.frozen || G.shifting || run.status !== 'playing') return;
     run.hunger = G.satiety;
     const ticked = C.tickEffects(run, dt); run = ticked.run || ticked;
+    lightingUI?.tick(dt);
     if(ticked.effect && ticked.effect.warriorReleased){dismissEscort();showToast('護衛已盡力撤退，怪物將恢復追擊！',3500);save();}
     if (run.effects.freeze<=0) shiftLeft -= dt;
     attackLeft=Math.max(0,attackLeft-dt);hurtLeft=Math.max(0,hurtLeft-dt);
@@ -1048,7 +1068,7 @@
   function inventory(quiet=false) {
     if(!active||G.shifting||run.status!=='playing')return;
     syncEngine();
-    const cards=Object.entries(C.ITEMS).filter(([id])=>id!=='coin').map(([id,item])=>'<article class="tower-item"><h3>'+text(item.name)+' <span>×'+(run.bag[id]||0)+'</span></h3><p>'+text(item.description||item.desc||'高塔冒險補給')+'</p>'+action(id==='feather'?'瀕死自動使用':'使用','use',id,!run.bag[id]||id==='feather')+'</article>').join('');
+    const cards=(run.party&&lightingUI?'<article class="tower-item"><h3>照明工具</h3><p>火把五分鐘 · 日光術十分鐘</p>'+action('照明與製作','light-panel')+'</article>':'')+Object.entries(C.ITEMS).filter(([id])=>id!=='coin').map(([id,item])=>'<article class="tower-item"><h3>'+text(item.name)+' <span>×'+(run.bag[id]||0)+'</span></h3><p>'+text(item.description||item.desc||'高塔冒險補給')+'</p>'+action(id==='feather'?'瀕死自動使用':'使用','use',id,!run.bag[id]||id==='feather')+'</article>').join('');
     const stats=C.equipmentStats(run),worn=Object.values(run.equipment).filter(Boolean).map(g=>gearCard(g,true)).join(''),stored=run.gearBag.map(g=>gearCard(g)).join('');
     if(run.party){
       const body='<section class="tower-guard-summary"><h3>防禦 '+stats.defense+' · 強化 +'+stats.bonus+'</h3><p>武器可直接討伐怪物，命中消耗一點耐久；短暫暈眩後，怪物會有四秒抗暈期。三件防具受擊各消耗一點耐久。武器損壞後仍可徒手攻擊。</p></section><h3>穿戴中</h3><div class="tower-grid">'+(worn||'<p>尚未穿戴裝備。</p>')+'</div><h3>裝備行囊 '+run.gearBag.length+'/24</h3><div class="tower-grid">'+stored+'</div><h3>生存補給</h3><div class="tower-grid">'+cards+'</div>';
@@ -1064,9 +1084,9 @@
     if(nearestWarrior){warriorDialog();return;}
     if(!active||G.shifting||!nearest||run.status!=='playing')return;
     syncEngine();
-    const cards=nearest.offer.supplies.map(id=>{const item=C.ITEMS[id];return '<article class="tower-item"><h3>'+text(item.name)+'</h3><p>'+text(item.description)+' · 持有 '+run.bag[id]+'</p>'+action('買 '+item.buyPrice+' 幣','buy',id)+action('賣出','sell',id,!run.bag[id])+'</article>';}).join('');
+    const cards=(lightingUI?.merchantCard(nearest.id)||'')+nearest.offer.supplies.map(id=>{const item=C.ITEMS[id];return '<article class="tower-item"><h3>'+text(item.name)+'</h3><p>'+text(item.description)+' · 持有 '+run.bag[id]+'</p>'+action('買 '+item.buyPrice+' 幣','buy',id)+action('賣出','sell',id,!run.bag[id])+'</article>';}).join('');
     const gear=nearest.offer.gear.map(({kind,gear,price})=>'<article class="tower-item tower-gear-card"><h3>'+text(gear.name)+'</h3><p>'+text(gearDescription(gear))+'</p>'+action(run.adventure.claimed.includes('stock:'+run.floor+':'+nearest.id+':'+kind)?'本層已售出':'購買 '+price+' 幣','buy-gear',kind,run.adventure.claimed.includes('stock:'+run.floor+':'+nearest.id+':'+kind)||run.coins<price)+'</article>').join('');
-    const stockVoice='出售：'+[...nearest.offer.gear.map(g=>gearSpeech(g.gear)),...nearest.offer.supplies.map(id=>C.ITEMS[id].name)].join('、')+'。選擇物品購買或賣出。';
+    const stockVoice='出售：'+[...nearest.offer.gear.map(g=>gearSpeech(g.gear)),...nearest.offer.supplies.map(id=>C.ITEMS[id].name),...(run.party?.light?['火把']:[])].join('、')+'。選擇物品購買或賣出。';
     const voiceSummary=nearest.name+'。'+stockVoice;
     dialog(nearest.name+' · 行商營地','專門裝備與補給','每位商人固定專賣一種防具與一種武器。剩餘銅幣 '+run.coins,'<p class="tower-copy">'+text(nearest.offer.greeting||'')+'</p><div class="tower-grid">'+gear+cards+'</div><p class="tower-copy">買到的裝備放入行囊，請在背包選擇「裝備」；每件本層限一件，讀檔不會補貨。</p>',action('整理裝備','bag')+action('結束交易','close'),{silent:quiet===true,summary:voiceSummary,asset:'merchant.'+nearest.id,afterText:stockVoice+'。整理裝備。結束交易。'});
   }
@@ -1129,6 +1149,7 @@
     if(window.TowerAudio)window.TowerAudio.stop();
     active=false;floorStarted=false;paused=false;
     partyUI?.reset();
+    lightingUI?.reset();
     clearBolts();
     clearHurtFeedback();hurtLeft=0;guardClashAt=0;
     document.body.classList.remove('story-active','tower-danger');el('towerOverlay').hidden=true;
@@ -1141,6 +1162,7 @@
       if(upgradingProfession){try{localStorage.setItem(SAVE+'_before_party',JSON.stringify(pendingProfession));}catch(_){showToast('無法保存升級前的備份，尚未改動舊旅程。請先騰出瀏覽器儲存空間。');return;}}
       const previous=run;run=result.run;floorStarted=false;if(!save()){run=previous;return;}pendingProfession=null;upgradingProfession=false;enter();return;}
     if(partyUI?.handle(key,id))return;
+    if(lightingUI?.handle(key,id))return;
     if(key==='close'){closeDialog();return;}
     if(key==='new'){if(readSave()){dialog('重新開始確認','展開另一段高塔旅程？','開始新故事後會取代目前的高塔存檔。','',action('保留目前進度','menu')+action('重新建立主角','new-confirm'));}else handleAction('new-confirm');return;}
     if(key==='menu'){open();return;}
@@ -1192,6 +1214,6 @@
     }
   }
   function movementScale(){if(!active||paused||G.shifting)return 1;const traits=run.party?window.TowerExpedition.traits(run):{speed:1,grip:0};return Math.min(1,hazardSlow+(traits.grip>0?.15:0))*(run.party?.slowLeft>0?(traits.grip>0?.8:.6):1)*traits.speed;}
-  window.TowerMode = { get active(){return active;}, get paused(){return paused;}, get partyActive(){return active&&!!run?.party;}, useProfessionSkill:()=>partyUI?.skill(), movementScale, open, beginNew, tick, floorSeed, atmosphereStyle, scheduleShift, updateShift, reachExit, defeat, requestQuit, canCollectOriginal, collectedOriginal, itemConfig, reservedCells, preserveFloorPickups, soundChanged, mapMarkers };
+  window.TowerMode = { get active(){return active;}, get paused(){return paused;}, get partyActive(){return active&&!!run?.party;}, lightRadius:()=>active?lightingUI?.radius():null, useProfessionSkill:()=>partyUI?.skill(), movementScale, open, beginNew, tick, floorSeed, atmosphereStyle, scheduleShift, updateShift, reachExit, defeat, requestQuit, canCollectOriginal, collectedOriginal, itemConfig, reservedCells, preserveFloorPickups, soundChanged, mapMarkers };
   install();
 })();

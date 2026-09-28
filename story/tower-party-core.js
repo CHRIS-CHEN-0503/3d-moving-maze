@@ -3,10 +3,11 @@
   'use strict';
   const C=()=>typeof module==='object'&&module.exports?require('./story-core.js'):globalThis.TowerCore;
   const X=()=>typeof module==='object'&&module.exports?require('./tower-expedition-core.js'):globalThis.TowerExpedition;
+  const L=()=>typeof module==='object'&&module.exports?require('./tower-lighting-core.js'):globalThis.TowerLighting;
   const own=(o,k)=>Object.hasOwn(o,k), num=(v,a,b,int=false)=>Number.isFinite(v)&&v>=a&&v<=b&&(!int||Number.isInteger(v));
   const PROFESSIONS=Object.freeze({
     swordsman:{name:'劍士',person:'蒼衡',gender:'male',color:0x5594c1,skill:'守護架勢',description:'近戰傷害較高。技能：六秒內減傷一半；劍士隊友會替你攔下近身怪物。',cooldown:20},
-    mage:{name:'術士',person:'露彌',gender:'female',color:0xb196e8,skill:'震盪結界',description:'技能：擊退附近怪物的攻勢，使牠們短暫暈眩。隊友會在安全距離施法。',cooldown:22},
+    mage:{name:'術士',person:'露彌',gender:'female',color:0xb196e8,skill:'震盪結界',description:'技能：擊退附近怪物，使牠們短暫暈眩。另可在照明工具中施放十分鐘的日光術；術士隊友也能協助照明。',cooldown:22},
     scout:{name:'斥候',person:'巧栗',gender:'female',color:0x68bead,skill:'探路之眼',description:'探路與避險專家。技能：顯示出口路線十八秒，獲得六秒陷阱保護。隊中有斥候時，陷阱傷害減少四分之一。',cooldown:25},
     chef:{name:'廚師',person:'禾谷',gender:'male',color:0xe6ac65,skill:'隨手料理',description:'烹飪一次可做兩份。技能：用一份根莖恢復飽食度，照顧整支隊伍。',cooldown:25},
     healer:{name:'療癒師',person:'澄音',gender:'female',color:0x88c69f,skill:'草藥療癒',description:'技能：消耗一份香草恢復生命。隊友在你受重傷時也會使用香草救援。',cooldown:25},
@@ -40,6 +41,7 @@
     const next=C().validateSave(run);if(!next||!own(PROFESSIONS,profession)||next.party)return {ok:false,run,message:'請選擇有效的冒險職業。'};
     const guard=next.warrior;
     next.party={version:1,profession,members:[],joined:[],ingredients:{root:3,mushroom:2,herb:2,nectar:0,meat:0,shell:1},meals:emptyStock(RECIPES),buffs:[],cooldown:0,guardLeft:0,trapWard:0,slowLeft:0,health:{},poise:{},boss:newBoss(next.floor),journey:X().newJourney(next.floor)};
+    if(L())next.party.light=L().newState();
     if(guard){const m={id:guard.offerId,profession:'swordsman',level:guard.strength,hp:28+guard.strength*6,cooldown:0,hurtLeft:0};next.party.members.push(m);next.party.joined.push(m.id);}
     next.warrior=null;next.revision++;
     return {ok:true,run:next,message:guard?'原有護衛已成為劍士隊友，不必重新支付費用。':'冒險職業已選定。'};
@@ -60,8 +62,10 @@
     const dict=(v,max)=>v&&typeof v==='object'&&!Array.isArray(v)&&Object.keys(v).length<=6&&Object.keys(v).every(id=>/^monster-[0-5]$/.test(id)&&!defeated.includes(id)&&num(v[id],0,max));
     if(!dict(value.health,200)||!dict(value.poise,5))return null;
     const boss=X().validateBoss(value.boss,floor,value.journey===undefined),journey=X().validateJourney(value.journey,floor);
-    if(boss===undefined||!journey)return null;
-    return {version:1,profession:value.profession,members,joined:[...value.joined],ingredients:{...value.ingredients},meals:{...value.meals},buffs:value.buffs.map(b=>({...b})),cooldown:value.cooldown,guardLeft:value.guardLeft,trapWard:value.trapWard,slowLeft:value.slowLeft,health:{...value.health},poise:{...value.poise},boss,journey};
+    if(value.light!==undefined&&!L())return null; // Never silently discard saved fuel if a script failed to load.
+    const light=L()?.validate(value.light,floor);
+    if(boss===undefined||!journey||L()&&!light)return null;
+    return {version:1,profession:value.profession,members,joined:[...value.joined],ingredients:{...value.ingredients},meals:{...value.meals},buffs:value.buffs.map(b=>({...b})),cooldown:value.cooldown,guardLeft:value.guardLeft,trapWard:value.trapWard,slowLeft:value.slowLeft,health:{...value.health},poise:{...value.poise},boss,journey,...(light?{light}:{})};
   }
   function transact(run,revision,fn){return C().transaction(run,revision,next=>!next.party?{ok:false,message:'尚未選擇冒險職業。'}:fn(next,next.party));}
   function recruitOffer(run){
@@ -140,12 +144,12 @@
     p.cooldown=PROFESSIONS[j].cooldown;return {ok:true,message:PROFESSIONS[j].skill,effect:{skill:j}};
   });}
   function reduceDamage(run,amount,source){const p=run.party;if(!p||source==='hunger')return amount;if(source==='trap'&&p.trapWard>0)return 0;let result=Math.max(0,amount-(p.buffs.some(b=>b.id==='guard')?2:0)-(source==='trap'?X().traits(run).grip:0));if(p.guardLeft>0)result*=.5;if(source==='trap'&&p.buffs.some(b=>b.id==='trail'))result*=.5;if(source==='trap'&&has(run,'scout'))result*=.75;return Math.ceil(result);}
-  function tick(next,dt){const p=next.party;if(!p)return;for(const k of ['cooldown','guardLeft','trapWard','slowLeft'])p[k]=Math.max(0,p[k]-dt);if(next.expedition.active)return;
+  function tick(next,dt){const p=next.party;if(!p)return;L()?.tick(next,dt);for(const k of ['cooldown','guardLeft','trapWard','slowLeft'])p[k]=Math.max(0,p[k]-dt);if(next.expedition.active)return;
     for(const m of p.members){m.cooldown=Math.max(0,m.cooldown-dt);m.hurtLeft=Math.max(0,m.hurtLeft-dt);}
     for(const k of Object.keys(p.poise)){p.poise[k]=Math.max(0,p.poise[k]-dt);if(!p.poise[k])delete p.poise[k];}
     if(p.boss?.started&&!p.boss.done)p.boss.clock+=dt;
   }
-  function advance(next){if(!next.party)return;const p=next.party;p.health={};p.poise={};p.boss=newBoss(next.floor);p.journey={...X().newJourney(next.floor),scrap:p.journey?.scrap||0};p.buffs=p.buffs.map(b=>({...b,floors:b.floors-1})).filter(b=>b.floors>0);p.slowLeft=0;}
+  function advance(next){if(!next.party)return;L()?.advance(next);const p=next.party;p.health={};p.poise={};p.boss=newBoss(next.floor);p.journey={...X().newJourney(next.floor),scrap:p.journey?.scrap||0};p.buffs=p.buffs.map(b=>({...b,floors:b.floors-1})).filter(b=>b.floors>0);p.slowLeft=0;}
   const canDescend=run=>!run.party?.boss||run.party.boss.done;
   const bossPhase=run=>X().phase(run),mirrorTarget=(run,index)=>X().target(run,index),bossAction=(run,index,revision)=>X().bossAction(run,index,revision);
   return Object.freeze({PROFESSIONS,INGREDIENTS,RECIPES,BUFFS,MONSTERS,BOSS_FLOORS,enable,validate,has,memberMax,recruitOffer,recruit,dismiss,gather,cook,eat,camp,defs,monsterSpecs,strike,hurtMember,skill,reduceDamage,tick,advance,canDescend,bossPhase,mirrorTarget,bossAction});

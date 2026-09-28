@@ -4,6 +4,13 @@ import vm from 'node:vm';
 
 const html = await readFile(new URL('../index.html', import.meta.url), 'utf8');
 
+for(const asset of ['tower-lighting-core','tower-lighting-runtime']){
+  new vm.Script(await readFile(new URL(`../story/${asset}.js`,import.meta.url),'utf8'),{filename:asset+'.js'});
+  assert.ok(html.includes(`src="story/${asset}.js?v=`),`缺少照明模組：${asset}`);
+}
+assert.ok(html.indexOf('src="story/tower-lighting-core.js')<html.indexOf('src="story/tower-party-core.js'),'照明規則必須先於隊伍規則載入');
+assert.ok(html.indexOf('src="story/tower-lighting-runtime.js')<html.indexOf('src="story/tower-mode.js'),'照明畫面必須先於劇情引擎載入');
+
 for (const asset of ['pickup-objects','native-symbols','room-lifecycle','shop-collection-core','shop-collection','shop-chaos','shop-sale','tag-rage','mobile-controls','magic-map','maze-materials','gameplay-rules']) {
   new vm.Script(await readFile(new URL(`../assets/${asset}.js`, import.meta.url), 'utf8'), {filename:asset+'.js'});
   assert.match(html, new RegExp(`src="(?:\\./)?assets/${asset}\\.js(?:\\?v=[\\d.]+)?"`), `缺少遊戲模組：${asset}`);

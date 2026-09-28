@@ -6,16 +6,16 @@
   const TORCH_SECONDS=300,DAYLIGHT_SECONDS=600,DAYLIGHT_COOLDOWN=600,TORCH_PRICE=4,SHOP_STOCK=3;
   const SHOPS=['tieLing','jinHe','lanZhou'];
   const PROFILES=Object.freeze(Object.fromEntries(Object.entries({
-    summoning:{name:'雲間石燈',style:'rune',color:0x9be5f5,sky:0x637e94,ambient:.46,hemi:.62,sun:.55,radius:9},
-    garden:{name:'花園燈籠',style:'lantern',color:0xffd88a,sky:0x76958b,ambient:.5,hemi:.65,sun:.6,radius:10},
-    roots:{name:'螢光菌叢',style:'fungus',color:0xa2e6a6,sky:0x263d38,ambient:.28,hemi:.4,sun:.3,radius:6},
-    echo:{name:'共鳴晶簇',style:'crystal',color:0x90d5ff,sky:0x242e47,ambient:.27,hemi:.4,sun:.27,radius:6},
-    library:{name:'閱讀燈籠',style:'lantern',color:0xffcc83,sky:0x393442,ambient:.29,hemi:.4,sun:.28,radius:6.5},
-    mist:{name:'引路水燈',style:'rune',color:0x88e8dc,sky:0x30484f,ambient:.3,hemi:.43,sun:.28,radius:6},
-    frost:{name:'冰脈晶石',style:'crystal',color:0xb3e8ff,sky:0x415e70,ambient:.35,hemi:.5,sun:.4,radius:7},
-    clockwork:{name:'工坊爐燈',style:'brazier',color:0xffc27d,sky:0x3d3631,ambient:.29,hemi:.4,sun:.3,radius:6.5},
-    furnace:{name:'熔火石爐',style:'brazier',color:0xff9f66,sky:0x55352d,ambient:.35,hemi:.45,sun:.35,radius:7.5},
-    heart:{name:'歸途符燈',style:'rune',color:0xd5c4ff,sky:0x2d334b,ambient:.28,hemi:.42,sun:.3,radius:6.5},
+    summoning:{name:'雲間石燈',style:'rune',color:0x9be5f5,sky:0x090f1b,ambient:.035,hemi:.075,sun:.045,radius:3.2},
+    garden:{name:'花園燈籠',style:'lantern',color:0xffd88a,sky:0x0b1412,ambient:.04,hemi:.08,sun:.045,radius:3.4},
+    roots:{name:'螢光菌叢',style:'fungus',color:0xa2e6a6,sky:0x080f0d,ambient:.022,hemi:.05,sun:.018,radius:2.8},
+    echo:{name:'共鳴晶簇',style:'crystal',color:0x90d5ff,sky:0x090c17,ambient:.025,hemi:.05,sun:.02,radius:2.8},
+    library:{name:'閱讀燈籠',style:'lantern',color:0xffcc83,sky:0x100c14,ambient:.027,hemi:.055,sun:.022,radius:3},
+    mist:{name:'引路水燈',style:'rune',color:0x88e8dc,sky:0x091114,ambient:.025,hemi:.055,sun:.02,radius:2.8},
+    frost:{name:'冰脈晶石',style:'crystal',color:0xb3e8ff,sky:0x0b111c,ambient:.035,hemi:.07,sun:.035,radius:3.2},
+    clockwork:{name:'工坊爐燈',style:'brazier',color:0xffc27d,sky:0x110e0c,ambient:.028,hemi:.055,sun:.025,radius:3},
+    furnace:{name:'熔火石爐',style:'brazier',color:0xff9f66,sky:0x160d0b,ambient:.035,hemi:.055,sun:.025,radius:3.2},
+    heart:{name:'歸途符燈',style:'rune',color:0xd5c4ff,sky:0x0c0d18,ambient:.025,hemi:.05,sun:.02,radius:2.8},
   }).map(([id,p])=>[id,Object.freeze(p)])));
   const profile=id=>Object.hasOwn(PROFILES,id)?PROFILES[id]:PROFILES.echo;
   const supplyCount=size=>size<=9?1:size<=13?2:3;

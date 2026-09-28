@@ -3,14 +3,16 @@ import assert from 'node:assert/strict';
 import {readFile,mkdir,writeFile} from 'node:fs/promises';
 import {createRequire} from 'node:module';
 const require=createRequire(import.meta.url),{chromium}=require(process.env.PLAYWRIGHT_MODULE||'playwright');
-const base=process.env.MAZE_QA_URL||'http://127.0.0.1:8795',out='.agent-run/lighting-qa';
+const base=process.env.MAZE_QA_URL||'http://127.0.0.1:8795',out='.agent-run/darkness-qa';
 if(!/^http:\/\/127\.0\.0\.1:\d+$/.test(base))throw Error('Local QA only.');
 const source=await readFile(new URL('../story/tower-mode.js',import.meta.url),'utf8');
 const bridge=`window.__lightQA={
- setup(floor=99,job='scout'){run=P.enable(C.newRun({seed:31415,name:'照明測試'}),job).run;run.floor=floor;run.floorsCleared=99-floor;run.chronicle=N.newChronicle(floor);P.advance(run);run.coins=100;enter();closeDialog();G.frozen=true;updateCamera(1);},
+ setup(floor=99,job='scout'){run=P.enable(C.newRun({seed:31415,name:'照明測試'}),job).run;run.floor=floor;run.floorsCleared=99-floor;run.chronicle=N.newChronicle(floor);P.advance(run);run.coins=100;enter();closeDialog();G.frozen=true;G.view='tp';updateCamera(1);lightingUI.updateVisual(0,true);},
  state:()=>({run,active,paused,range:lightingUI.radius(),camera:camera.position.toArray(),fog:{near:scene.fog.near,far:scene.fog.far},render:renderer.info.render,lights:(()=>{const a=[];scene.traverse(o=>{if(o.isPointLight)a.push({name:o.name,intensity:o.intensity,shadow:o.castShadow});});return a;})()}),
- move(x,z){G.px=x;G.pz=z;playerGroup.position.set(x,0,z);lightingUI.updateVisual(0,true);updateCamera(1);renderer.render(scene,camera);},
- remote(){const sources=lightingUI.reserved().filter(p=>!p.id?.startsWith('light-supply'));let best=null,score=-1;for(let y=1;y<G.mazeH;y++)for(let x=1;x<G.mazeW;x++){const p=cellToWorld(x,y),d=Math.min(...sources.map(s=>Math.hypot(s.x-p.x,s.z-p.z)));if(d>score){score=d;best=p;}}this.move(best.x,best.z);return score;},
+ move(x,z){G.px=x;G.pz=z;playerGroup.position.set(x,0,z);updateCamera(1);lightingUI.updateVisual(0,true);renderer.render(scene,camera);},
+ luminance(){renderer.render(scene,camera);const canvas=document.createElement('canvas');canvas.width=96;canvas.height=48;const ctx=canvas.getContext('2d');ctx.drawImage(renderer.domElement,0,0,96,48);const pixels=ctx.getImageData(16,12,64,28).data;let sum=0,bright=0;for(let i=0;i<pixels.length;i+=4){const v=.2126*pixels[i]+.7152*pixels[i+1]+.0722*pixels[i+2];sum+=v;if(v>45)bright++;}return {mean:sum/(pixels.length/4),bright:bright/(pixels.length/4)};},
+ light(mode){run.party.light.daylight=mode==='daylight'?600:0;run.party.light.cooldown=run.party.light.daylight;run.party.light.lit=mode==='torch';run.party.light.fuel=mode==='torch'?300:0;lightingUI.updateVisual(0,true);lightingUI.hud();updateTopMask();},
+ remote(){const sources=lightingUI.reserved().filter(p=>!p.id?.startsWith('light-supply'));let best=null,score=-1;for(let y=1;y<G.mazeH;y++)for(let x=1;x<G.mazeW;x++){if(Math.abs(x-G.exitCell.x)+Math.abs(y-G.exitCell.y)<2)continue;const p=cellToWorld(x,y),d=Math.min(...sources.map(s=>Math.hypot(s.x-p.x,s.z-p.z)));if(d>score){score=d;best=p;}}this.move(best.x,best.z);return score;},
  supplies:()=>lightingUI.reserved().filter(p=>p.id?.startsWith('light-supply')).map(p=>({id:p.id,x:p.x,z:p.z,visible:p.model.visible})),
  gather(){const p=lightingUI.reserved().find(p=>p.id?.startsWith('light-supply')&&p.model.visible);if(!p)return false;this.move(p.x,p.z);lightingUI.tick(0);return p.id;},
  merchant(){const m=traders[0];this.move(m.x,m.z);nearest=m;nearbyEncounter=nearbyJourney=nearestWarrior=null;partyUI.reset();trade();return m.id;},
@@ -23,7 +25,7 @@ const bridge=`window.__lightQA={
  rebuild(){loadFloor(false);closeDialog();G.frozen=true;},
  dungeon(){let offer=D.offer(run);if(!offer)return false;run=D.discover(run).run;run=D.enter(run,offer.id,{x:0,y:0,shiftLeft:100}).run;loadFloor(false);closeDialog();G.frozen=true;return true;},
  leaveDungeon(){const result=D.finish(run,'abandoned',run.revision);if(!result.ok)throw Error(result.message);run=result.run;loadFloor(false);closeDialog();G.frozen=true;},
- view(v){G.view=v;updateCamera(1);lightingUI.updateVisual(0,true);updateTopMask();renderer.render(scene,camera);},
+ view(v){G.view=v;playerGroup.visible=v!=='fp';updateCamera(1);if(gearVisual?.userData.weapon)window.CharacterMotion?.worldWeaponPose(gearVisual.userData.weapon,playerGroup,1,v==='fp');lightingUI.updateVisual(0,true);updateTopMask();renderer.render(scene,camera);},
  failSave(on){if(on){this.setItem=Storage.prototype.setItem;Storage.prototype.setItem=function(k,v){if(k===SAVE||k===SAVE+'_before_lighting')throw Error('QA quota');return __lightQA.setItem.call(this,k,v);};}else Storage.prototype.setItem=this.setItem;},
  stop,rawGroup:()=>world.getObjectByName('tower-lighting')
 };`;
@@ -65,15 +67,21 @@ try{
   assert.ok((await state()).run.party.light.daylight>599);assert.equal((await state()).run.party.cooldown,0);
   await page.evaluate(()=>__lightQA.elapse(599));assert.ok((await state()).run.party.light.daylight>0);await page.evaluate(()=>__lightQA.elapse(2));assert.equal((await state()).run.party.light.daylight,0);
   for(const floor of [99,89,79,69,59,49,39,29,19,9]){
-    await page.evaluate(f=>__lightQA.setup(f,'mage'),floor);const camp=(await state()).range;assert.ok(camp>=11);
+    await page.evaluate(f=>__lightQA.setup(f,'mage'),floor);const camp=(await state()).range;assert.ok(camp>=9);
     await page.screenshot({path:out+'/region-'+floor+'-camp.png'});
-    await page.evaluate(()=>__lightQA.remote());await page.screenshot({path:out+'/region-'+floor+'-unlit.png'});const unlit=await state();
-    await click('#towerLightBtn');await click('[data-tower="light-torch"]');await page.screenshot({path:out+'/region-'+floor+'-torch.png'});const torch=await state();
-    await click('#towerLightBtn');await click('[data-tower="light-daylight"]');await page.screenshot({path:out+'/region-'+floor+'-daylight.png'});const sun=await state();
+    await page.evaluate(()=>__lightQA.remote());await page.screenshot({path:out+'/region-'+floor+'-unlit.png'});const unlit={...await state(),luminance:await page.evaluate(()=>__lightQA.luminance())};
+    await click('#towerLightBtn');await click('[data-tower="light-torch"]');await page.screenshot({path:out+'/region-'+floor+'-torch.png'});const torch={...await state(),luminance:await page.evaluate(()=>__lightQA.luminance())};
+    await click('#towerLightBtn');await click('[data-tower="light-daylight"]');await page.screenshot({path:out+'/region-'+floor+'-daylight.png'});const sun={...await state(),luminance:await page.evaluate(()=>__lightQA.luminance())};
     assert.ok(sun.camera.every(Number.isFinite));assert.ok(sun.range>torch.range&&torch.range>=unlit.range);assert.equal(sun.lights.filter(l=>l.name.startsWith('tower-light-slot')).length,3);assert.ok(sun.lights.every(l=>!l.shadow));
-    results.push({floor,camp,unlit:unlit.range,torch:torch.range,daylight:sun.range,pointLights:sun.lights,drawCalls:sun.render.calls,triangles:sun.render.triangles});
+    assert.ok(torch.luminance.mean>unlit.luminance.mean*1.6,JSON.stringify({floor,unlit:unlit.luminance,torch:torch.luminance}));
+    assert.ok(sun.luminance.mean>unlit.luminance.mean*2,JSON.stringify({floor,unlit:unlit.luminance,daylight:sun.luminance}));
+    results.push({floor,camp,unlit:unlit.range,torch:torch.range,daylight:sun.range,luminance:{unlit:unlit.luminance,torch:torch.luminance,daylight:sun.luminance},pointLights:sun.lights,drawCalls:sun.render.calls,triangles:sun.render.triangles});
   }
-  for(const view of ['fp','tp','top']){await page.evaluate(v=>__lightQA.view(v),view);await page.screenshot({path:out+'/view-'+view+'.png'});}
+  for(const view of ['fp','tp','top'])for(const mode of ['none','torch','daylight']){
+    await page.evaluate(({view,mode})=>{__lightQA.light(mode);__lightQA.view(view);},{view,mode});await page.screenshot({path:out+'/view-'+view+'-'+mode+'.png'});
+    const s=await state();assert.ok(s.camera.every(Number.isFinite));assert.ok(s.fog.far>s.fog.near);
+    if(view==='top')assert.match(await page.locator('#topMask').evaluate(el=>el.style.background),/radial-gradient/);
+  }
   for(const viewport of [{width:667,height:375},{width:844,height:390},{width:1280,height:800}]){
     await page.setViewportSize(viewport);await page.locator('#towerHudToggle').tap();await page.locator('#towerHudToggle').tap();const bounds=await page.locator('#towerHud').boundingBox();assert.ok(bounds.width<=290&&bounds.height<=52&&bounds.x>=0&&bounds.x+bounds.width<viewport.width,JSON.stringify(bounds));
   }

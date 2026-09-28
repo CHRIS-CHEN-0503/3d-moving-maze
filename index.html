@@ -615,7 +615,7 @@ button:focus-visible,input:focus-visible{outline:3px solid #fff;outline-offset:3
 </style>
 <link rel="stylesheet" href="assets/game-polish.css?v=1.36.0">
 <link rel="stylesheet" href="assets/play-controls.css?v=1.32.0">
-<link rel="stylesheet" href="story/tower-party.css?v=1.38.0">
+<link rel="stylesheet" href="story/tower-party.css?v=1.38.1">
 </head>
 <body>
 
@@ -990,7 +990,7 @@ button:focus-visible,input:focus-visible{outline:3px solid #fff;outline-offset:3
    3D移動迷宮 — 給小朋友的變形迷宮冒險
    ===================================================== */
 const $=id=>document.getElementById(id);
-const GAME_VERSION='1.38.0';
+const GAME_VERSION='1.38.1';
 
 /* ---------- 設定（後台可調） ---------- */
 const DEFAULT_CFG={teamSize:2,shiftMin:3,itemCount:6,foodCount:4,hungerMin:3,stunSec:3,pingSec:3,smellCells:3,mazeSize:13,magicMap:0,duelMin:5,unpaidRate:100,musicOn:1,speechOn:1,speechVoice:'',apiUrl:'',roomMax:3,rounds:3,goodsCount:16,shopCollect:1,shopMin:2.5,cartFull:400,views:{fp:1,tp:1,top:1},broker:'wss://broker.emqx.io:8084/mqtt'};
@@ -5108,8 +5108,8 @@ window.addEventListener('pagehide',()=>{AudioEng.shiftSound?.stop();AudioEng.com
 <script src="story/tower-audio.js"></script>
 <script src="story/tower-expedition-core.js?v=1.38.0"></script>
 <script src="story/tower-party-core.js?v=1.38.0"></script>
-<script src="story/tower-party-runtime.js?v=1.38.0"></script>
-<script src="story/tower-mode.js?v=1.38.0"></script>
+<script src="story/tower-party-runtime.js?v=1.38.1"></script>
+<script src="story/tower-mode.js?v=1.38.1"></script>
 <script src="assets/room-lifecycle.js?v=1.36.0"></script>
 <script src="assets/shop-collection-core.js?v=1.31.0"></script>
 <script src="assets/shop-collection.js?v=1.31.0"></script>

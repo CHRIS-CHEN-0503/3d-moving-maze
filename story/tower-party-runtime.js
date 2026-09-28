@@ -95,8 +95,19 @@
       const site=X.siteOffer(r());if(site){let p=ctx.chooseCell(random,used);if(['swordsman','scout'].includes(site.job)&&ctx.passage)for(let i=0;i<8&&!ctx.passage(p,true);i++)p=ctx.chooseCell(random,used);const model=siteModel(site.job);model.position.set(p.x,0,p.z);group.add(model);const station={...p,kind:'site',offer:site,model};stations.push(station);if(r().party.journey.site.done&&['swordsman','scout'].includes(site.job))ctx.passage?.(station);}
       syncActors();const specs=P.monsterSpecs(r());for(const m of ctx.monsters()){healthBar(m.model,0xef9e81);m.partyMaxHp=specs.find(s=>s.id===m.id)?.maxHp||1;}
     }
+    function companionSpawn(){
+      const origin={x:ctx.G.px,z:ctx.G.pz};
+      // Use the same body clearance as walking, not the thinner interaction ray.
+      // Entry cells border two outer walls: the previous 1.5 m offset put a
+      // 0.28 m follower inside their collision boxes and stuck on the next step.
+      for(const radius of [1.25,.85,.45])for(let i=0;i<8;i++){
+        const angle=actors.length*2.1+i*Math.PI/4+(ctx.player()?.rotation.y||0)+Math.PI,p={x:origin.x+Math.sin(angle)*radius,z:origin.z+Math.cos(angle)*radius};
+        if((ctx.followClear?ctx.followClear(origin,p):clear(p))&&actors.every(a=>Math.hypot(a.model.position.x-p.x,a.model.position.z-p.z)>.55))return p;
+      }
+      return origin;
+    }
     function syncActors(){if(!live()||!group)return;for(const a of actors)if(!r().party.members.some(m=>m.id===a.id)){group.remove(a.model);ctx.dispose(a.model);}actors=actors.filter(a=>r().party.members.some(m=>m.id===a.id));
-      for(const m of r().party.members)if(!actors.some(a=>a.id===m.id)){const model=memberModel(m.profession,m.level);model.position.set(ctx.G.px,0,ctx.G.pz);for(let i=0;i<8;i++){const angle=actors.length*2.1+i*Math.PI/4+(ctx.player()?.rotation.y||0)+Math.PI,p={x:ctx.G.px+Math.sin(angle)*1.5,z:ctx.G.pz+Math.cos(angle)*1.5};if(clear(p)){model.position.set(p.x,0,p.z);break;}}label(model,P.PROFESSIONS[m.profession].name+' · '+P.PROFESSIONS[m.profession].person);healthBar(model,0x8cd2bd,2.35);group.add(model);actors.push({id:m.id,model,path:[],pathLeft:0});}
+      for(const m of r().party.members)if(!actors.some(a=>a.id===m.id)){const model=memberModel(m.profession,m.level),p=companionSpawn();model.position.set(p.x,0,p.z);model.userData.companionId=m.id;label(model,P.PROFESSIONS[m.profession].name+' · '+P.PROFESSIONS[m.profession].person);healthBar(model,0x8cd2bd,2.35);group.add(model);actors.push({id:m.id,model,path:[],pathLeft:0});}
     }
     function safeCamp(){return live()&&(stations.some(s=>s.kind==='camp'&&distance(s)<2.8&&clear(s))||ctx.traders().some(s=>distance(s)<2.8&&clear(s)))&&!ctx.monsters().some(m=>m.alive&&distance(m.model.position)<4&&clear(m.model.position));}
     function forgePanel(quiet=false){if(!enabled())return;pendingForge=pendingDismantle=null;const run=r(),safe=safeCamp();

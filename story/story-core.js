@@ -13,6 +13,7 @@
   // Late lookup keeps the browser's core → narrative → dungeons loading order safe.
   const narrativeRules = () => typeof module === 'object' && module.exports ? require('./tower-narrative.js') : globalThis.TowerNarrative;
   const dungeonRules = () => typeof module === 'object' && module.exports ? require('./tower-dungeons.js') : globalThis.TowerDungeons;
+  const partyRules = () => typeof module === 'object' && module.exports ? require('./tower-party-core.js') : globalThis.TowerPartyCore;
   const GEAR = Object.freeze({
     helmet: Object.freeze({ kind: 'helmet', slot: 'helmet', name: '頭盔', defense: 2, stunSeconds: 0, buyPrice: 14 }),
     armor: Object.freeze({ kind: 'armor', slot: 'armor', name: '盔甲', defense: 4, stunSeconds: 0, buyPrice: 22 }),
@@ -280,6 +281,8 @@
     const chronicle = narrativeRules().validateChronicle(run.chronicle, run.floor);
     const expedition = dungeonRules().validateExpedition(run.expedition, run.floor, run.seed);
     if (!chronicle || !expedition) return null;
+    const party = run.party === undefined ? undefined : partyRules()?.validate(run.party, run.floor, defeatedMonsters);
+    if (run.party !== undefined && !party) return null;
     return {
       // Preserve the old health percentage once; subsequent reads are already v2.
       stateVersion: STATE_VERSION, mode: 'tower', floor: run.floor, hp: legacyHealth ? run.hp * MAX_HP / 100 : run.hp, hunger: run.hunger,
@@ -288,7 +291,7 @@
       engine, claimed: [...run.claimed], floorElapsed: run.floorElapsed,
       warrior, hiredWarriors: [...hiredWarriors], defeatedMonsters: [...defeatedMonsters],
       equipment, gearBag, monsterStuns, adventure,
-      chronicle, expedition,
+      chronicle, expedition, ...(party ? { party } : {}),
     };
   }
 
@@ -513,6 +516,7 @@
   function applyDamage(next, amount, source = 'monster', invulnerable = false) {
     if (!validNumber(amount, 0, 10000) || !['monster', 'trap', 'hunger'].includes(source)) return { ok: false, message: '無效的傷害數值或來源。' };
     if(invulnerable===true)return {ok:true,message:'受傷保護中。',effect:{damage:0,revived:false,defense:0,broken:[],source,protected:true}};
+    if (next.party) amount = partyRules().reduceDamage(next, amount, source);
     const defense = source === 'hunger' ? 0 : equipmentStats(next).defense;
     const reduced = Math.max(0, amount - defense);
     const damage = source === 'hunger' ? amount : reduced === 0 ? 0 : next.effects.shield > 0 ? Math.max(1, Math.round(reduced * 0.35)) : reduced;
@@ -547,6 +551,7 @@
         }
       next.elapsed += seconds;
       next.floorElapsed += seconds;
+      if (next.party) partyRules().tick(next, seconds);
       if (!next.expedition.active && next.warrior && next.warrior.mode === 'holding' && next.warrior.remaining !== null) {
         next.warrior.remaining = Math.max(0, next.warrior.remaining - seconds);
         if (next.warrior.remaining === 0) {
@@ -562,6 +567,7 @@
   function descend(run, expectedRevision) {
     return transaction(run, expectedRevision, (next) => {
       if (next.expedition.active) return { ok: false, message: '請先離開裂隙副本，再繼續往下探索。' };
+      if (next.party && !partyRules().canDescend(next)) return { ok: false, message: '迷宮封印尚未解除，請先完成本層的迷宮挑戰。' };
       if (!narrativeRules().canDescend(next)) return { ok: false, message: '章末之門尚未開啟，請先找到本章主線印記。' };
       if (next.floor === 1 && next.chronicle.ending === null) return { ok: false, message: '請先在塔心選擇高塔的未來，再踏出歸途之門。' };
       next.coins = Math.min(MAX_COINS, next.coins + floorConfig(next.floor).rewardCoins);
@@ -576,6 +582,7 @@
         return { ok: true, message: ENDING.text, effect: { ending: true } };
       }
       next.floor -= 1;
+      if (next.party) partyRules().advance(next);
       next.expedition.version = dungeonRules().CATALOG_VERSION;
       return { ok: true, message: `抵達第 ${next.floor} 層。`, effect: { floor: next.floor } };
     });

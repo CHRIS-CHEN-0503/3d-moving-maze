@@ -107,7 +107,7 @@ test('story menu routes new players through the existing character creation flow
   assert.match(h.get('towerDialog').innerHTML, /建立主角/);
   h.click('new');
   assert.equal(h.context.entryFlow, 'story');
-  assert.equal(h.get('profileTitle').textContent, '建立高塔主角');
+  assert.equal(h.get('profileTitle').textContent, '高塔主角 · 先選外觀');
   assert.equal(h.context.TowerMode.active, false);
 });
 

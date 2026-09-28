@@ -9,6 +9,7 @@ test('six professions upgrade once and preserve paid guard as one of three compa
   let old=C.newRun({seed:31415});old=C.hireWarrior(old,C.warriorOffer(99,old.seed).id).run;
   const before=JSON.stringify(old),next=P.enable(old,'chef');assert.equal(next.ok,true);assert.equal(JSON.stringify(old),before);
   assert.equal(next.run.party.members.length,1);assert.equal(next.run.party.members[0].profession,'swordsman');assert.equal(next.run.party.members[0].level,old.warrior.strength);assert.equal(next.run.warrior,null);
+  assert.equal(next.run.party.members[0].id,old.warrior.offerId);assert.ok(C.validateSave(JSON.stringify(next.run)));
   for(const key of ['hp','coins','bag','equipment','chronicle','expedition','floor'])assert.deepEqual(next.run[key],old[key]);
   assert.equal(P.enable(next.run,'mage').ok,false);assert.equal(C.newRun().party,undefined);
 });

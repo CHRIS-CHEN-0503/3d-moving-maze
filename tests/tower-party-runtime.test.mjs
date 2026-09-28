@@ -9,7 +9,7 @@ function harness(floor=84){
   let run=P.enable(C.newRun({seed:31415}),'swordsman').run;run.floor=floor;run.floorsCleared=99-floor;run.chronicle=N.newChronicle(floor);P.advance(run);
   let paused=false,failSave=false,wall=false,swings=0,hits=0,world=new T.Group(),monsters=[],messages=[],dialog=null,followTargets=[];
   const player=new T.Group(),G={px:0,pz:0,running:true,shifting:false};
-  const context=vm.createContext({TowerPartyCore:P,TowerCharacters:V,document:{getElementById:()=>null}});vm.runInContext(source,context);
+  const context=vm.createContext({TowerPartyCore:P,TowerExpedition:require('../story/tower-expedition-core.js'),TowerCharacters:V,document:{getElementById:()=>null}});vm.runInContext(source,context);
   let nextCell=1;
   const ui=context.TowerPartyRuntime.create({THREE:T,G,core:C,text:String,action:(label,key,id,disabled)=>`${label}|${key}|${id}|${disabled}`,dialog:(...args)=>dialog=args,
     transact:result=>{if(!result.ok||failSave)return false;run=result.run;return true;},save:()=>!failSave,toast:message=>messages.push(message),audio:{sfxHit:()=>hits++,sfxSwing(){},sfxUse(){},sfxGuardBlock(){}},quest(){},
@@ -48,4 +48,26 @@ test('floor transitions invalidate old boss interactions before rebuilding the s
   const h=harness(90),station=h.ui.reserved().find(s=>s.kind==='boss');h.G.px=station.x;h.G.pz=station.z;h.ui.tick(.01,100);assert.ok(h.ui.nearby);
   h.run.floor=89;h.run.floorsCleared=10;h.run.chronicle=N.newChronicle(89);P.advance(h.run);
   assert.equal(h.ui.live(),false);assert.equal(h.ui.nearby,null);assert.equal(h.ui.markers().length,0);assert.equal(h.ui.reserved().length,0);assert.doesNotThrow(()=>h.ui.hud());assert.equal(h.ui.interact(),false);
+});
+test('all chapter stations have bounded native geometry and scale their warning to the true damage radius',()=>{
+  const X=require('../story/tower-expedition-core.js');
+  for(const floor of Object.keys(X.BOSSES).map(Number)){const h=harness(floor),bosses=h.ui.reserved().filter(x=>x.kind==='boss');assert.equal(bosses.length,X.BOSSES[floor].count);
+    h.run.party.boss.started=true;h.run.party.boss.clock=X.BOSSES[floor].warning+.1;h.ui.tick(.01,100);
+    for(const s of bosses){let meshes=0,triangles=0;s.model.traverse(o=>{assert.ok(!o.isLight);if(o.isMesh){meshes++;triangles+=(o.geometry.index?.count||o.geometry.attributes.position.count)/3;assert.equal(o.material.map,null);}});assert.ok(meshes<32,`${floor}: ${meshes}`);assert.ok(triangles<5000,`${floor}: ${triangles}`);assert.equal(s.model.children.find(o=>o.name==='boss-warning').scale.x,X.danger(h.run,s.index).radius);}
+  }
+});
+test('forge confirmations cannot spend from afar, through a wall, twice, or when durable save fails',()=>{
+  const h=harness(99);h.run.party.journey.scrap=30;h.run.coins=100;const id=h.run.equipment.weapon.id,key='durable|'+id;
+  h.ui.handle('party-forge-confirm',key);assert.equal(h.run.party.journey.scrap,30);
+  h.G.px=40;h.ui.handle('party-forge-ask',key);h.ui.handle('party-forge-confirm',key);assert.equal(h.run.party.journey.scrap,30);
+  h.G.px=0;h.wall=true;h.ui.handle('party-forge-ask',key);h.wall=false;h.ui.handle('party-forge-confirm',key);assert.equal(h.run.party.journey.scrap,30);
+  h.ui.handle('party-forge-ask',key);h.failSave=true;h.ui.handle('party-forge-confirm',key);assert.equal(h.run.party.journey.scrap,30);
+  h.failSave=false;h.ui.handle('party-forge-confirm',key);assert.equal(h.run.equipment.weapon.forge.level,1);h.ui.handle('party-forge-confirm',key);assert.equal(h.run.equipment.weapon.forge.level,1);
+  h.ui.handle('party-dismantle-ask',id);h.ui.handle('party-forge');h.ui.handle('party-dismantle',id);assert.ok(h.run.equipment.weapon);
+});
+test('ordinary exploration advances only nearby while running and persists completion without another reward',()=>{
+  const h=harness(99),s=h.ui.reserved().find(x=>x.kind==='site');h.G.px=s.x;h.G.pz=s.z;h.ui.tick(.01,0);
+  h.ui.handle('party-explore-work',s.offer.id);h.ui.tick(4,100);assert.equal(h.run.party.journey.site.progress,4);h.paused=true;h.ui.tick(4,200);assert.equal(h.run.party.journey.site.progress,4);
+  h.paused=false;h.wall=true;h.ui.tick(4,300);assert.equal(h.run.party.journey.site.progress,4);h.wall=false;h.ui.handle('party-explore-work',s.offer.id);h.ui.tick(8,400);assert.equal(h.run.party.journey.site.done,true);
+  const coins=h.run.coins;h.ui.handle('party-explore-work',s.offer.id);h.ui.tick(12,500);assert.equal(h.run.coins,coins);assert.ok(C.validateSave(h.run));
 });

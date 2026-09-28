@@ -2,8 +2,8 @@
 (function(root){
   'use strict';
   function create(ctx){
-    const P=root.TowerPartyCore,T=ctx.THREE,V=root.TowerCharacters;
-    let actors=[],stations=[],near=null,offer=null,group=null,pulse=0,uiClock=0,skillLeft=0,guardVoiceLeft=0,worldFloor=null,worldSeed=null;
+    const P=root.TowerPartyCore,X=root.TowerExpedition,T=ctx.THREE,V=root.TowerCharacters;
+    let actors=[],stations=[],near=null,offer=null,group=null,pulse=0,uiClock=0,skillLeft=0,guardVoiceLeft=0,worldFloor=null,worldSeed=null,working=null,pendingForge=null,pendingDismantle=null;
     const r=()=>ctx.run(), enabled=()=>!!r()?.party, live=()=>enabled()&&!ctx.inDungeon()&&worldFloor===r().floor&&worldSeed===r().seed;
     const esc=ctx.text,act=ctx.action;
     const distance=p=>Math.hypot(ctx.G.px-p.x,ctx.G.pz-p.z);
@@ -50,23 +50,70 @@
       model.userData.body=body;model.userData.ring=ring(model,.92,0xe28476);model.userData.ring.material.transparent=true;model.userData.tag=label(model,def.name+' · '+strength+'/5');return model;
     }
     function stationModel(kind,index){const model=new T.Group();
-      if(kind==='camp'){part(model,new T.CylinderGeometry(.6,.8,.16,8),0x657785,0,.08,0);for(let i=0;i<3;i++){const log=box(model,.9,.12,.12,0xc3a27b,0,.2,0);log.rotation.y=i*2;}const pot=part(model,new T.SphereGeometry(.44,10,7,0,Math.PI*2,0,Math.PI/2),0x859da8,0,.65,0);pot.rotation.z=Math.PI;label(model,'旅人營地',1.7);}
-      else {part(model,new T.CylinderGeometry(.55,.65,.45,8),0x6e8593,0,.23,0);const crown=part(model,new T.OctahedronGeometry(.48),0x97dddb,0,1.15,0);crown.name='seal';if(r().floor===80){const beam=box(model,.09,.07,1.15,0xf6dfa0,0,.9,.75);crown.add(beam);crown.userData.beam=beam;const angle=P.mirrorTarget(r(),index)*Math.PI/2;ball(model,.18,0xffce64,Math.sin(angle)*1.25,.15,Math.cos(angle)*1.25);}label(model,(r().floor===80?'光鏡':'封印')+' '+(index+1),2);const warningRing=ring(model,1.5,0xe5bd6b);warningRing.name='boss-warning';
-        for(let i=0;i<4;i++){const angle=i*Math.PI/2,arm=new T.Group();arm.name='boss-arm';arm.position.set(Math.sin(angle)*1.25,0,Math.cos(angle)*1.25);if(r().floor===90){box(arm,.65,1.1,.42,0x879fae,0,.55,0);box(arm,.45,.12,.45,0xb8cfcc,0,1.08,0);}else{const vine=part(arm,new T.ConeGeometry(.27,1.3,6),0x6b9d71,0,.65,0);vine.rotation.z=.25;ball(arm,.16,0xd7b46c,0,1.2,0);}arm.scale.y=.08;model.add(arm);}
+      if(kind==='camp'){part(model,new T.CylinderGeometry(.6,.8,.16,8),0x657785,0,.08,0);for(let i=0;i<3;i++){const log=box(model,.9,.12,.12,0xc3a27b,0,.2,0);log.rotation.y=i*2;}const pot=part(model,new T.SphereGeometry(.44,10,7,0,Math.PI*2,0,Math.PI/2),0x859da8,0,.65,0);pot.rotation.z=Math.PI;label(model,'旅人營地',1.7);return model;}
+      const d=X.BOSSES[r().floor],type=d.kind;
+      part(model,new T.CylinderGeometry(.58,.7,.4,8),0x6e8593,0,.2,0);
+      const seal=new T.Group();seal.name='seal';seal.position.y=1.2;model.add(seal);
+      const turner=['mirror','reverse','gear'].includes(type)||type==='heart'&&index===1;
+      if(turner){
+        if(type==='gear'){const wheel=part(seal,new T.TorusGeometry(.48,.12,5,12),d.color);wheel.rotation.x=Math.PI/2;for(let i=0;i<6;i++)box(seal,.17,.17,.17,d.color,Math.sin(i*Math.PI/3)*.56,0,Math.cos(i*Math.PI/3)*.56);}
+        else box(seal,.75,.9,.12,d.color,0,0,0);
+        box(seal,.07,.06,1.15,0xffefb0,0,0,.67);
+        const angle=X.target(r(),index)*Math.PI/2;ball(model,.18,0xffcc69,Math.sin(angle)*1.28,.17,Math.cos(angle)*1.28);
+      }else if(type==='tide'||type==='steam'){part(seal,new T.TorusGeometry(.35,.07,4,10),d.color);box(seal,.7,.08,.1,d.color,0,0,0);}
+      else if(type==='frost'){const bowl=part(seal,new T.SphereGeometry(.4,8,6,0,Math.PI*2,0,Math.PI/2),0x6f8c9d);bowl.rotation.z=Math.PI;part(seal,new T.ConeGeometry(.22,.65,6),0xffbf75,0,.3,0);}
+      else part(seal,new T.OctahedronGeometry(.42),d.color);
+      label(model,(type==='pulse'?'浮標':type==='frost'?'暖爐':type==='tide'?'水閘':type==='steam'?'壓力閥':type==='chase'?'定錨器':turner?'光針':'封印')+' '+(index+1),2.2);
+      const warning=ring(model,1,d.color);warning.name='boss-warning';
+      if(['tide','pulse'].includes(type)){const water=part(model,new T.CylinderGeometry(1,1,.045,24),0x548da3,0,.045,0);water.name='boss-water';water.material.transparent=true;water.material.opacity=.32;water.material.depthWrite=false;}
+      for(let i=0;i<4;i++){
+        const angle=i*Math.PI/2,arm=new T.Group();arm.name='boss-arm';arm.userData.angle=angle;arm.position.set(Math.sin(angle)*1.35,0,Math.cos(angle)*1.35);
+        if(type==='chase'||type==='stone'){box(arm,type==='chase'?1.1:.65,1.25,.28,d.color,0,.63,0);arm.rotation.y=angle;}
+        else if(type==='mirror'){part(arm,new T.ConeGeometry(.23,1.25,6),0x6b9d71,0,.63,0);}
+        else if(type==='steam'){part(arm,new T.CylinderGeometry(.13,.2,.55,6),0x88705e,0,.27,0);ball(arm,.25,0xd8ccbb,0,.75,0);ball(arm,.3,0xd8ccbb,0,1.05,0);}
+        else if(type==='frost'){part(arm,new T.ConeGeometry(.24,1.35,5),0xcbeff1,0,.67,0);}
+        else if(type==='gear'){const wheel=part(arm,new T.TorusGeometry(.45,.1,4,10),d.color,0,.48,0);box(arm,1,.1,.1,d.color,0,.48,0);wheel.name='gear-wheel';}
+        else if(type==='tide'||type==='pulse'){box(arm,.7,.12,.25,0xaee8e6,0,.1,0);arm.rotation.y=angle;}
+        else{const blade=box(arm,.15,1.4,.45,d.color,0,.7,0);blade.rotation.z=.35;}
+        arm.scale.y=.08;model.add(arm);
       }
       return model;
     }
-    function reset(){actors=[];stations=[];near=null;offer=null;group=null;pulse=0;skillLeft=0;guardVoiceLeft=0;worldFloor=null;worldSeed=null;}
+    function siteModel(job){const model=new T.Group(),c=P.PROFESSIONS[job].color;
+      if(['swordsman','scout'].includes(job)){for(const s of [-1,1])box(model,.25,1.55,.32,0x98a6aa,s*.55,.78,0);box(model,1.35,.23,.38,0xb6c0b8,0,1.55,0);box(model,.85,1.1,.2,c,0,.65,0);}
+      else if(job==='mage'){part(model,new T.OctahedronGeometry(.48),c,0,.9,0);const circle=ring(model,.7,c);circle.position.y=.35;}
+      else if(job==='chef'){box(model,1,.55,.8,0x9a7658,0,.3,0);for(let i=0;i<4;i++)part(model,new T.ConeGeometry(.1,.28,5),0xdcc8a1,(i%2-.5)*.7,.7,(Math.floor(i/2)-.5)*.5);}
+      else if(job==='healer'){part(model,new T.CylinderGeometry(.7,.75,.3,10),0x829cac,0,.15,0);part(model,new T.CylinderGeometry(.6,.6,.06,10),0x85b5b5,0,.32,0);ball(model,.2,c,0,.7,0);}
+      else{box(model,1,.55,.65,0x8e9b9f,0,.4,0);const gear=part(model,new T.TorusGeometry(.32,.12,4,10),c,0,.9,0);gear.rotation.x=Math.PI/2;box(model,.7,.1,.1,0xd8b179,0,.9,0);}
+      label(model,X.SITES[job].name,2);ring(model,.95,c);return model;
+    }
+    function reset(){actors=[];stations=[];near=null;offer=null;group=null;pulse=0;skillLeft=0;guardVoiceLeft=0;worldFloor=null;worldSeed=null;working=null;pendingForge=pendingDismantle=null;}
     function build(random,used){reset();worldFloor=r()?.floor;worldSeed=r()?.seed;if(!live())return;group=new T.Group();ctx.world().add(group);
       const p=ctx.cell(0,0),camp={...p,kind:'camp',model:stationModel('camp')};camp.model.position.set(p.x,0,p.z);group.add(camp.model);stations.push(camp);
       offer=P.recruitOffer(r());if(offer&&!r().party.joined.includes(offer.id)){const p=ctx.chooseCell(random,used),model=memberModel(offer.profession,offer.level);model.position.set(p.x,0,p.z);label(model,P.PROFESSIONS[offer.profession].person+' · '+P.PROFESSIONS[offer.profession].name);group.add(model);stations.push({...p,kind:'recruit',model});}
-      if(r().party.boss)for(let index=0;index<2;index++){const p=ctx.chooseCell(random,used,4),model=stationModel('boss',index);model.position.set(p.x,0,p.z);group.add(model);stations.push({...p,kind:'boss',index,model});}
+      if(r().party.boss)for(let index=0;index<r().party.boss.seals.length;index++){const p=ctx.chooseCell(random,used,4),model=stationModel('boss',index);model.position.set(p.x,0,p.z);group.add(model);stations.push({...p,kind:'boss',index,model});}
+      const site=X.siteOffer(r());if(site){let p=ctx.chooseCell(random,used);if(['swordsman','scout'].includes(site.job)&&ctx.passage)for(let i=0;i<8&&!ctx.passage(p,true);i++)p=ctx.chooseCell(random,used);const model=siteModel(site.job);model.position.set(p.x,0,p.z);group.add(model);const station={...p,kind:'site',offer:site,model};stations.push(station);if(r().party.journey.site.done&&['swordsman','scout'].includes(site.job))ctx.passage?.(station);}
       syncActors();const specs=P.monsterSpecs(r());for(const m of ctx.monsters()){healthBar(m.model,0xef9e81);m.partyMaxHp=specs.find(s=>s.id===m.id)?.maxHp||1;}
     }
     function syncActors(){if(!live()||!group)return;for(const a of actors)if(!r().party.members.some(m=>m.id===a.id)){group.remove(a.model);ctx.dispose(a.model);}actors=actors.filter(a=>r().party.members.some(m=>m.id===a.id));
       for(const m of r().party.members)if(!actors.some(a=>a.id===m.id)){const model=memberModel(m.profession,m.level);model.position.set(ctx.G.px,0,ctx.G.pz);for(let i=0;i<8;i++){const angle=actors.length*2.1+i*Math.PI/4+(ctx.player()?.rotation.y||0)+Math.PI,p={x:ctx.G.px+Math.sin(angle)*1.5,z:ctx.G.pz+Math.cos(angle)*1.5};if(clear(p)){model.position.set(p.x,0,p.z);break;}}label(model,P.PROFESSIONS[m.profession].name+' · '+P.PROFESSIONS[m.profession].person);healthBar(model,0x8cd2bd,2.35);group.add(model);actors.push({id:m.id,model,path:[],pathLeft:0});}
     }
     function safeCamp(){return live()&&(stations.some(s=>s.kind==='camp'&&distance(s)<2.8&&clear(s))||ctx.traders().some(s=>distance(s)<2.8&&clear(s)))&&!ctx.monsters().some(m=>m.alive&&distance(m.model.position)<4&&clear(m.model.position));}
+    function forgePanel(quiet=false){if(!enabled())return;pendingForge=pendingDismantle=null;const run=r(),safe=safeCamp();
+      const body='<div class="tower-grid party-forge-grid">'+X.allGear(run).map(g=>{
+        const level=(g.forge?.level||0)+1,parts=level*3,coins=level*(P.has(run,'smith')?4:8);
+        const choices=g.forge?[g.forge.trait]:Object.keys(X.TRAITS).filter(t=>t!=='grip'||g.slot!=='weapon');
+        return '<article class="tower-item"><h3>'+esc(g.name)+(run.equipment[g.slot]?.id===g.id?' · 穿戴中':'')+'</h3><p>耐久 '+g.durability+'/'+g.maxDurability+' · '+(g.forge?X.TRAITS[g.forge.trait].name+' '+g.forge.level+'/2':'尚未鍛造')+'</p><div class="party-forge-traits">'+
+          choices.map(t=>'<section><b>'+esc(X.TRAITS[t].name)+'</b><p>'+esc(X.TRAITS[t].description)+'</p>'+act(level>2?'已達上限':(g.forge?'升級':'選擇')+X.TRAITS[t].name+' · '+parts+' 零件／'+coins+' 幣','party-forge-ask',t+'|'+g.id,!safe||level>2||run.party.journey.scrap<parts||run.coins<coins)+'</section>').join('')+'</div>'+
+          act('拆解 · 回收 '+X.salvageValue(g)+' 零件','party-dismantle-ask',g.id,!safe)+'</article>';
+      }).join('')+'</div>';
+      ctx.dialog('營地工坊 · 暫停中','鍛匠工坊','金屬零件 '+run.party.journey.scrap+'/99 · 銅幣 '+run.coins+'。每件裝備只能選一種特性、強化兩次。隊中有鍛匠時費用減半；沒有鍛匠也能使用營地工具。'+(!safe?'請先靠近安全營地或行商。':''),body||'<p>尚無可處理的裝備。</p>',act('料理與休息','party-kitchen')+act('裝備背包','bag')+act('回到迷宮','close'),{silent:quiet,summary:'鍛匠工坊。可以拆解裝備，或選擇耐用、輕巧、防滑特性。每件裝備最多強化兩次。'});
+    }
+    function sitePanel(s){const done=r().party.journey.site.done,has=P.has(r(),s.offer.job);ctx.dialog('職業探索 · 暫停中',s.offer.name,s.offer.description,
+      '<p class="tower-copy">'+esc(s.offer.reward)+' 另獲得八枚銅幣。這是可跳過的探索，不影響主線通關。</p><p class="tower-copy">'+(done?'此處已完成，不會再次給予獎勵。':'一般處理需在現場累積十二秒，途中仍有怪物與陷阱；離開、受傷或變形會中斷，可稍後接續。已完成 '+Math.floor(r().party.journey.site.progress)+' 秒。')+'</p>',
+      (done?'':act('請'+P.PROFESSIONS[s.offer.job].name+s.offer.verb,'party-explore-job',s.offer.id,!has)+act('慢慢處理 · 十二秒','party-explore-work',s.offer.id))+act('返回迷宮','close'),{summary:done?'這處探索已經完成。':s.offer.description+' 沒有對應職業也可以慢慢處理，需要十二秒。'});}
+    function finishSite(s,method){const result=X.explore(r(),s.offer.id,method,r().revision);working=null;if(!commit(result))return false;if(result.effect.passage)ctx.passage?.(s);ctx.audio.sfxUse();ctx.close?.();return true;}
+    function bossHelp(){if(!r()?.party?.boss)return;const d=X.BOSSES[r().floor];ctx.dialog('章末機關 · 暫停中',d.name,d.description,'<p class="tower-copy">'+esc(X.hint(r()))+'</p><p class="tower-copy">地面警戒圈標示危險範圍；黃光時退開，紅光時不可接近。操作只需靠近並按對話鈕。所有職業都能完成。整座迷宮的變形倒數維持原規則。</p>',act('回到迷宮','close'),{summary:d.description+' '+X.hint(r())});}
     function panel(kind='team',quiet=false){if(!enabled())return;
       const run=r(),p=run.party;let body='',copy='四人小隊：主角加三名旅人。劍士就是護衛，占用一個隊友名額。';
       if(kind==='cook'){
@@ -77,15 +124,33 @@
       }else{
         body='<div class="tower-grid"><article class="tower-item">'+portrait(p.profession)+'<h3>'+esc(P.PROFESSIONS[p.profession].name)+' · 你</h3><p>'+esc(P.PROFESSIONS[p.profession].description)+'</p></article>'+p.members.map(m=>'<article class="tower-item">'+portrait(m.profession)+'<h3>'+esc(P.PROFESSIONS[m.profession].person)+' · '+esc(P.PROFESSIONS[m.profession].name)+'</h3><p>強度 '+m.level+'/5 · 生命 '+Math.ceil(m.hp)+'/'+P.memberMax(m)+(m.hp<=0?' · 需要料理或營地休息':'')+'</p>'+act('與他道別','party-dismiss-ask',m.id)+'</article>').join('')+'</div><p class="tower-copy">'+(p.buffs.length?p.buffs.map(b=>P.BUFFS[b.id]+'（'+b.floors+' 層）').join(' · '):'烹飪料理可獲得增益；最多同時保留兩種。')+'</p>';
       }
-      ctx.dialog('高塔遠征 · 暫停中',{team:'冒險隊伍',cook:'旅人廚房',bestiary:'迷宮生物誌'}[kind],copy,body,act('隊伍','party-team')+act('料理','party-kitchen')+act('生物誌','party-bestiary')+act('分享乾糧休息','party-rest',null,!safeCamp())+act('修理 '+(P.has(run,'smith')?3:6)+' 幣','party-repair',null,!safeCamp())+act('裝備與道具','bag')+act('回到迷宮','close'),{silent:quiet,summary:{team:'冒險隊伍。主角加三名同伴。',cook:'旅人廚房。選擇烹飪，或享用料理。',bestiary:'迷宮生物誌。了解怪物，收集材料。'}[kind]});
+      ctx.dialog('高塔遠征 · 暫停中',{team:'冒險隊伍',cook:'旅人廚房',bestiary:'迷宮生物誌'}[kind],copy,body,act('隊伍','party-team')+act('料理','party-kitchen')+act('鍛匠工坊','party-forge')+act('生物誌','party-bestiary')+(run.party.boss?act('本層機關說明','party-boss-help'):'')+act('分享乾糧休息','party-rest',null,!safeCamp())+act('修理 '+(P.has(run,'smith')?3:6)+' 幣','party-repair',null,!safeCamp())+act('裝備與道具','bag')+act('回到迷宮','close'),{silent:quiet,summary:{team:'冒險隊伍。主角加三名同伴。',cook:'旅人廚房。選擇烹飪，或享用料理。',bestiary:'迷宮生物誌。了解怪物，收集材料。'}[kind]});
     }
     function commit(result,speak=true){if(!ctx.transact(result))return false;if(speak&&result.message)ctx.toast(result.message,2300,result.message);return true;}
-    function interact(){if(!live()||!near)return false;const n=near;if(n.kind==='camp'){panel('cook');return true;}
+    function interact(){if(!live()||!near||ctx.G.shifting||distance(near)>2.6||!clear(near))return false;const n=near;if(n.kind==='camp'){panel('cook');return true;}
+      if(n.kind==='site'){sitePanel(n);return true;}
       if(n.kind==='recruit'){const job=P.PROFESSIONS[offer.profession];ctx.dialog(job.name+' · '+job.person,'一起尋找回家的路',job.description,'<div class="party-invite">'+portrait(offer.profession)+'<p>強度 '+offer.level+'/5 · 招募費 '+offer.price+' 枚銅幣 · 隊伍 '+(r().party.members.length+1)+'/4</p></div>',act('邀請加入','party-recruit',offer.id,r().coins<offer.price||r().party.members.length>=3)+act('查看隊伍','party-team')+act('下次再聊','close'),{speaker:{gender:job.gender,age:'adult'},summary:job.name+'，'+job.person+'。'+job.description+'。邀請加入需要'+offer.price+'枚銅幣。'});return true;}
       if(n.kind==='boss'){if(commit(P.bossAction(r(),n.index,r().revision)))ctx.save();return true;}return false;
     }
     function handle(key,id){if(!key.startsWith('party-'))return false;if(!enabled())return true;
       if(key==='party-team'){panel();return true;}if(key==='party-kitchen'){panel('cook');return true;}if(key==='party-bestiary'){panel('bestiary');return true;}
+      if(key==='party-forge'){forgePanel();return true;}if(key==='party-boss-help'){bossHelp();return true;}
+      if(key==='party-forge-ask'||key==='party-forge-confirm'){
+        if(!safeCamp())return true;const split=id?.indexOf('|'),trait=id?.slice(0,split),gearId=id?.slice(split+1),g=X.allGear(r()).find(g=>g.id===gearId);if(!g||!Object.hasOwn(X.TRAITS,trait))return true;
+        if(key==='party-forge-ask'){pendingForge={id,revision:r().revision};ctx.dialog('確認鍛造',g.name+' · '+X.TRAITS[trait].name,'選定特性後不能更換，每件裝備最多強化兩次。確認後才會扣除工坊列出的零件與銅幣。','',act('返回工坊','party-forge')+act('確認鍛造','party-forge-confirm',id),{summary:'確認鍛造'+X.TRAITS[trait].name+'。選定後不能更換。'});return true;}
+        if(!pendingForge||pendingForge.id!==id)return true;
+        if(commit(X.forge(r(),gearId,trait,pendingForge.revision))){ctx.refreshGear?.();forgePanel(true);}return true;
+      }
+      if(key==='party-dismantle-ask'||key==='party-dismantle'){
+        if(!safeCamp())return true;const g=X.allGear(r()).find(g=>g.id===id);if(!g)return true;
+        if(key==='party-dismantle-ask'){pendingDismantle={id,revision:r().revision};ctx.dialog('拆解裝備確認','拆解'+g.name+'？','拆解後不能取回，將獲得'+X.salvageValue(g)+'份零件。'+(r().equipment[g.slot]?.id===id?'這件裝備正在穿戴中。':''),'',act('保留裝備','party-forge')+act('確認拆解','party-dismantle',id),{summary:'確定拆解'+g.name+'？拆解後不能取回。'});return true;}
+        if(!pendingDismantle||pendingDismantle.id!==id)return true;
+        if(commit(X.dismantle(r(),id,pendingDismantle.revision))){ctx.refreshGear?.();forgePanel(true);}return true;
+      }
+      if(key==='party-explore-job'||key==='party-explore-work'){
+        const s=stations.find(s=>s.kind==='site'&&s.offer.id===id);if(!live()||!s||distance(s)>2.6||!clear(s)||r().party.journey.site.done||ctx.G.shifting)return true;
+        if(key==='party-explore-job')finishSite(s,'profession');else{working=s;ctx.close?.();ctx.toast('開始處理，留意四周的動靜。',1600,'開始處理，留意四周。');}return true;
+      }
       if(key==='party-dismiss-ask'){const m=r().party.members.find(m=>m.id===id);if(m)ctx.dialog('與同伴道別','確定讓'+P.PROFESSIONS[m.profession].person+'離隊？','這位旅人會繼續自己的旅程，不能在原地重新招募。已支付的費用不會退回。','',act('繼續同行','party-team')+act('確定道別','party-dismiss',id));return true;}
       if(key==='party-dismiss'){if(commit(P.dismiss(r(),id,r().revision))){syncActors();panel('team',true);}return true;}
       if(key==='party-recruit'){if(!near||near.kind!=='recruit'||distance(near)>2.6||!clear(near))return true;if(commit(P.recruit(r(),id,r().revision))){near.model.visible=false;near=null;syncActors();panel('team',true);}return true;}
@@ -101,7 +166,7 @@
       if(result.effect.dead){m.alive=false;m.model.visible=false;ctx.quest('defeat',{monsterId:m.id});ctx.toast(result.message,2600,result.message);if(memberId){ctx.audio.sfxGuardDefeat?.();if(r().party.members.find(x=>x.id===memberId)?.profession==='swordsman')root.GameVoice?.announceAsset('guard.defeat','怪物已經打倒了，繼續前進！',true);}ctx.save();}
       else if(result.effect.broken)ctx.toast('武器用壞了！仍可徒手攻擊，記得找商人補充。',2000,'武器用壞了');
     }
-    function attack(){if(!live()||ctx.paused()||ctx.G.shifting||skillLeft>0)return;skillLeft=.8;ctx.audio.sfxSwing();ctx.swing();
+    function attack(){if(!live()||ctx.paused()||ctx.G.shifting||skillLeft>0)return;skillLeft=X.attackInterval(r());ctx.audio.sfxSwing();ctx.swing();
       const facing=ctx.player()?.rotation.y||0,target=ctx.monsters().filter(m=>{const p=m.model.position;return m.alive&&distance(p)<2.8&&clear(p)&&Math.cos(Math.atan2(p.x-ctx.G.px,p.z-ctx.G.pz)-facing)>-.05;}).sort((a,b)=>distance(a.model.position)-distance(b.model.position))[0];
       if(target)applyHit(target);else ctx.toast('前方沒有碰到怪物，靠近後再出手。',1200,false);
     }
@@ -111,15 +176,16 @@
       if(m.windup>0){m.windup-=dt;if(m.windup<=0){const hit=P.hurtMember(r(),a.id,m.def.damage,r().revision);if(commit(hit,false)){ctx.audio.sfxGuardBlock?.();if(hit.effect.down)ctx.toast(hit.message,2500,hit.message);}m.cooldown=2.4;}}
       else if(m.cooldown<=0)m.windup=.9;return true;
     }
-    function shift(){for(const a of actors){const c=ctx.worldToCell(a.model.position.x,a.model.position.z),p=ctx.cell(c.x,c.y);a.model.position.set(p.x,0,p.z);a.path=[];a.pathLeft=0;}}
+    function shift(){working=null;for(const a of actors){const c=ctx.worldToCell(a.model.position.x,a.model.position.z),p=ctx.cell(c.x,c.y);a.model.position.set(p.x,0,p.z);a.path=[];a.pathLeft=0;}}
     function friendlyVisibility(model){
       const camera=ctx.camera?.();if(!camera)return;const c=camera.position,p=model.position,dx=ctx.G.px-c.x,dz=ctx.G.pz-c.z,length=dx*dx+dz*dz,t=length>.01?((p.x-c.x)*dx+(p.z-c.z)*dz)/length:0;
       const cameraDistance=Math.hypot(p.x-c.x,p.z-c.z),occludes=c.y<3.5&&(cameraDistance<1.4||(t>0&&t<1&&Math.hypot(p.x-c.x-t*dx,p.z-c.z-t*dz)<.65));
       if(model.userData.partyOccludes!==occludes){model.userData.partyOccludes=occludes;model.traverse(o=>{if(o.isMesh&&o.material){o.material.transparent=occludes;o.material.opacity=occludes?.16:1;o.material.depthWrite=!occludes;}});}
       for(const key of ['partyTag','partyHp','partyHpBack'])if(model.userData[key])model.userData[key].visible=!occludes&&cameraDistance>2.8;
     }
-    function tick(dt,now){if(!live())return;skillLeft=Math.max(0,skillLeft-dt);guardVoiceLeft=Math.max(0,guardVoiceLeft-dt);pulse+=dt;
+    function tick(dt,now){if(!live()||ctx.paused()||ctx.G.shifting)return;skillLeft=Math.max(0,skillLeft-dt);guardVoiceLeft=Math.max(0,guardVoiceLeft-dt);pulse+=dt;
       near=stations.filter(s=>s.model.visible&&distance(s)<2.6&&clear(s)).sort((a,b)=>distance(a)-distance(b))[0]||null;
+      if(working){if(distance(working)>2.6||!clear(working)||ctx.hurt?.()){working=null;ctx.toast('先避開危險，稍後可以接著處理。',1400,false);}else{const site=r().party.journey.site;site.progress=Math.min(12,site.progress+dt);if(site.progress>=12)finishSite(working,'work');}}
       for(const s of stations)if(s.kind==='recruit')friendlyVisibility(s.model);
       for(const a of actors){const m=r().party.members.find(m=>m.id===a.id);if(!m)continue;friendlyVisibility(a.model);a.model.userData.partyHp.scale.x=.94*Math.max(.001,m.hp/P.memberMax(m));a.model.rotation.z=m.hp<=0?.2:0;if(m.hp<=0)continue;
         const enemy=ctx.monsters().filter(e=>e.alive&&distance(e.model.position)<6&&ctx.clear(a.model.position.x,a.model.position.z,e.model.position.x,e.model.position.z)).sort((a,b)=>distance(a.model.position)-distance(b.model.position))[0];
@@ -139,18 +205,29 @@
         if(m.kind==='moth'){m.model.userData.body.children.filter(x=>x.name==='party-wing').forEach((w,i)=>w.rotation.z=Math.sin(now*.012)*(i?1:-1)*.5);if(m.windup>0)for(const other of ctx.monsters())if(other.alive&&other!==m&&Math.hypot(other.model.position.x-m.model.position.x,other.model.position.z-m.model.position.z)<6)other.alertLeft=4;}
         if(m.kind==='mushroom'&&m.windup>0&&m.windup<=dt&&distance(m.model.position)<2.8&&clear(m.model.position))r().party.slowLeft=3;
       }
-      const b=r().party.boss;if(b){const phase=P.bossPhase(r()),cycle=Math.floor(b.clock/14);for(const s of stations.filter(s=>s.kind==='boss')){const seal=s.model.children.find(x=>x.name==='seal');if(seal){seal.rotation.y=b.angles[s.index]*Math.PI/2;seal.position.y=1.15+(phase==='strike'?.5:Math.sin(pulse*2)*.08);seal.material.color.setHex(b.seals[s.index]?0x83ccac:phase==='warning'?0xffc273:phase==='strike'?0xf28975:0x97dddb);}for(const arm of s.model.children.filter(x=>x.name==='boss-arm'))arm.scale.y=!b.seals[s.index]&&phase==='strike'?1:!b.seals[s.index]&&phase==='warning'?.18+Math.sin(pulse*12)*.08:.08;const warning=s.model.children.find(x=>x.name==='boss-warning');if(warning)warning.material.color.setHex(b.seals[s.index]?0x80cab2:phase==='strike'?0xec7f69:0xe5bd6b);if(phase==='strike'&&!b.seals[s.index]&&distance(s)<1.65&&clear(s)&&s.hitCycle!==cycle){s.hitCycle=cycle;ctx.damage(r().floor===90?12:15,'trap','高塔的石陣震了起來，快退到安全的地方！');}}}
+      const b=r().party.boss;if(b){const phase=P.bossPhase(r()),d=X.BOSSES[r().floor];for(const s of stations.filter(s=>s.kind==='boss')){
+        const hazard=X.danger(r(),s.index),seal=s.model.children.find(x=>x.name==='seal'),solved=b.seals[s.index],color=solved?0x83ccac:phase==='warning'?0xffc273:hazard.active?0xf28975:d.kind==='pulse'&&X.cycle(r())%3===s.index?0xffffff:d.color;
+        if(seal){seal.rotation.y=b.angles[s.index]*Math.PI/2;seal.position.y=1.2+(phase==='strike'?.16:Math.sin(pulse*2)*.06);seal.traverse(o=>{if(o.isMesh)o.material.color.setHex(color);});}
+        for(const arm of s.model.children.filter(x=>x.name==='boss-arm')){arm.scale.y=hazard.active?1:!solved&&phase==='warning'?.22+Math.sin(pulse*10)*.04:.08;const angle=arm.userData.angle;arm.position.set(Math.sin(angle)*hazard.radius*.82,0,Math.cos(angle)*hazard.radius*.82);}
+        const warning=s.model.children.find(x=>x.name==='boss-warning');warning.scale.set(hazard.radius,hazard.radius,1);warning.material.color.setHex(color);
+        const water=s.model.children.find(x=>x.name==='boss-water');if(water){water.scale.set(hazard.radius,1,hazard.radius);water.position.y=hazard.active?.5:.05;water.visible=!solved;}
+        if(hazard.active&&distance(s)<hazard.radius&&clear(s)&&s.hitCycle!==hazard.cycle){s.hitCycle=hazard.cycle;ctx.damage(hazard.damage,'trap','機關動起來了，快退到警戒圈外！');if(ctx.paused()||r().status!=='playing')break;}
+      }}
       uiClock+=dt;if(uiClock>.15){uiClock=0;hud();}
     }
     function hud(){if(!enabled())return;
       const status=document.getElementById('towerGuardStatus');if(status){status.hidden=false;let button=status.querySelector('.party-status');if(!button){status.innerHTML='<button class="party-status" type="button"></button>';button=status.firstChild;button.onclick=()=>panel();}button.textContent=P.PROFESSIONS[r().party.profession].name+' · 隊伍 '+(r().party.members.length+1)+'/4'+(r().party.members.some(m=>m.hp<=0)?' · 同伴需要休息':'');}
       const attack=document.getElementById('towerAttackBtn');if(attack&&live()){attack.disabled=skillLeft>0;attack.textContent=(r().equipment.weapon?'揮擊':'徒手')+(skillLeft>0?' '+skillLeft.toFixed(1):' X');}
       const skillButton=document.getElementById('towerProfessionBtn');if(skillButton){skillButton.hidden=!live();skillButton.disabled=r().party.cooldown>0||ctx.paused();skillButton.textContent=r().party.cooldown>0?'準備 '+Math.ceil(r().party.cooldown)+'秒':P.PROFESSIONS[r().party.profession].skill+' C';}
-      const talk=document.getElementById('towerTalkBtn');if(near&&live()&&talk){talk.disabled=false;talk.hidden=ctx.paused();talk.ariaLabel=near.kind==='camp'?'營地料理（R）':near.kind==='boss'?'操作封印（R）':'邀請同伴（R）';}
-      const objective=document.getElementById('towerObjective');if(objective&&live()){if(near)objective.textContent=near.kind==='camp'?'旅人營地 · 可烹飪、休息與修理':near.kind==='recruit'?'旅人正在招募同行者 · 靠近對話':P.BOSS_FLOORS[r().floor].name+' · '+({idle:'靠近機關開始挑戰',warning:'地面發光，先退開！',strike:'石陣正在甦醒',rest:'震動平息，可以操作機關',done:'封印已解除'}[P.bossPhase(r())]);else if(r().party.boss&&!r().party.boss.done)objective.textContent=P.BOSS_FLOORS[r().floor].name+' · 解開兩座機關 '+r().party.boss.seals.filter(Boolean).length+'/2';}
+      const talk=document.getElementById('towerTalkBtn');if(near&&live()&&talk){talk.disabled=false;talk.hidden=ctx.paused();talk.ariaLabel=near.kind==='camp'?'營地料理（R）':near.kind==='boss'?'操作機關（R）':near.kind==='site'?'探索機關（R）':'邀請同伴（R）';}
+      const objective=document.getElementById('towerObjective');if(objective&&live()){
+        if(working)objective.textContent='處理中 '+Math.floor(r().party.journey.site.progress)+'/12 秒 · 可隨時離開避險';
+        else if(near)objective.textContent=near.kind==='camp'?'旅人營地 · 料理、鍛造與休息':near.kind==='recruit'?'旅人正在招募同行者 · 靠近對話':near.kind==='site'?near.offer.name+' · '+(r().party.journey.site.done?'已完成':'對話可選職業專長或一般處理'):X.BOSSES[r().floor].name+' · '+({idle:'對話開始；背包可讀機關說明',warning:'黃光預警，先退開！',strike:'機關啟動，避開警戒圈',rest:X.hint(r()),done:'封印已解除'}[P.bossPhase(r())]);
+        else if(r().party.boss&&!r().party.boss.done)objective.textContent=X.BOSSES[r().floor].name+' · 機關 '+r().party.boss.seals.filter(Boolean).length+'/'+r().party.boss.seals.length+' · 背包內有說明';
+      }
     }
     function install(){const rail=document.getElementById('towerActionRail');if(!rail)return;const b=document.createElement('button');b.id='towerProfessionBtn';b.className='tower-btn';b.hidden=true;ctx.bind(b,skill);rail.prepend(b);}
-    return {enabled,live,portrait,ingredientModel,monsterModel,build,tick,hud,attack,skill,guard,shift,interact,handle,panel,install,reset,safeCamp,get nearby(){return live()?near:null;},reserved:()=>live()?stations:[],markers:()=>live()?stations.filter(s=>s.model.visible).map(s=>({cx:s.cx,cy:s.cy,color:s.kind==='boss'?'#efc977':'#a0dcc2',label:s.kind==='boss'?'陣':s.kind==='camp'?'營':'友'})):[]};
+    return {enabled,live,portrait,ingredientModel,monsterModel,build,tick,hud,attack,skill,guard,shift,interact,handle,panel,install,reset,safeCamp,get nearby(){return live()?near:null;},reserved:()=>live()?stations:[],markers:()=>live()?stations.filter(s=>s.model.visible).map(s=>({cx:s.cx,cy:s.cy,color:s.kind==='boss'?'#efc977':'#a0dcc2',label:s.kind==='boss'?String(s.index+1):s.kind==='camp'?'營':s.kind==='site'?'探':'友'})):[]};
   }
   root.TowerPartyRuntime={create};
 })(typeof globalThis!=='undefined'?globalThis:this);

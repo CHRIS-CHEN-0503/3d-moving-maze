@@ -105,6 +105,7 @@
       partyUI=window.TowerPartyRuntime.create({THREE,G,core:C,text,action,dialog,transact,save,toast:showToast,audio:AudioEng,quest:questEvent,
         run:()=>run,paused:()=>paused,world:()=>world,monsters:()=>monsters,traders:()=>traders,player:()=>playerGroup,camera:()=>camera,inDungeon,
         clear:hasClearPath,cell:cellPoint,worldToCell,chooseCell,makeText:makeTextSprite,follow:followNpc,dispose:disposeSceneObject,damage,
+        close:closeDialog,refreshGear,hurt:()=>hurtLeft>0,passage:openExplorationPassage,
         bind:bindActionBtn,swing:()=>{attackLeft=.8;window.CharacterMotion?.beginAction(playerGroup,'attack',.8);}});
       partyUI.install();
     }
@@ -166,7 +167,12 @@
   function save() {
     if (!run) return false;
     syncEngine();
-    try { localStorage.setItem(SAVE, JSON.stringify(run)); return true; }
+    try {
+      const raw=localStorage.getItem(SAVE);let previous=null;
+      try{previous=raw?JSON.parse(raw):null;}catch(_){}
+      if(run.party?.journey&&previous?.party&&!previous.party.journey&&C.validateSave(previous))localStorage.setItem(SAVE+'_before_expedition2',raw);
+      localStorage.setItem(SAVE, JSON.stringify(run)); return true;
+    }
     catch (_) { if (!saveFailed) { saveFailed = true; showToast('瀏覽器無法保存進度，請保持此分頁開啟。', 4000); } return false; }
   }
   function canCollectOriginal(id) { return !active || !run.claimed.includes(id); }
@@ -181,7 +187,7 @@
   }
   function open(silent=false) {
     const saved = readSave();
-    dialog('單人長篇冒險 · 高塔遠征', '倒轉高塔・第 99 層', '你在陌生的召喚陣中醒來。塔頂只有一扇向下的門。與同樣受困的旅人組隊、討伐怪物、採集食材，在移動的迷宮裡煮一頓熱飯，再一起尋找回家的路。', '<div class="tower-story-cover" role="img" aria-label="被召喚到雲上高塔的冒險者"></div><p class="tower-copy">六種職業 · 主角加三位同伴 · 八道料理 · 第 90、80 層迷宮封印挑戰。所有樓層保留原主線，後續章末挑戰將分批擴充。</p><p class="tower-copy">沿用原本移動操作 · 每層自動保存（續玩回到當層入口） · 魔法地圖變形後重新探索。</p>',
+    dialog('單人長篇冒險 · 高塔遠征', '倒轉高塔・第 99 層', '你在陌生的召喚陣中醒來。塔頂只有一扇向下的門。與同樣受困的旅人組隊、討伐怪物、採集食材，在移動的迷宮裡煮一頓熱飯，再一起尋找回家的路。', '<div class="tower-story-cover" role="img" aria-label="被召喚到雲上高塔的冒險者"></div><p class="tower-copy">六種職業 · 四人隊伍 · 八道料理 · 十座章末迷宮機關 · 職業探索與鍛造。第 90 至 10 層的整十樓層及第 1 層，各有專屬挑戰。</p><p class="tower-copy">沿用原本移動操作 · 每層自動保存（續玩回到當層入口） · 魔法地圖變形後重新探索。</p>',
       (saved && saved.status !== 'won' ? action('繼續：第 ' + saved.floor + ' 層', 'continue') : saved&&N?action('回顧已完成故事','story-archive'):'') + action(saved ? '重新開始故事' : '建立主角', 'new') + action('回首頁', 'close'),{silent});
   }
   function beginNew() {
@@ -190,7 +196,7 @@
   }
   function chooseProfession(value,upgrade=false) {
     pendingProfession=value;upgradingProfession=upgrade;
-    dialog('高塔遠征 · 選擇職業','你想如何走出這座塔？','外觀與操作不變，職業決定你的專長。冒險途中可招募三位同伴；劍士負責護衛，不另占額外名額。'+(value.warrior?'原有護衛會直接轉成劍士隊友，進度與已支付的費用均保留。':''),'<div class="tower-grid party-professions">'+Object.entries(P.PROFESSIONS).map(([id,job])=>'<article class="tower-item">'+partyUI.portrait(id)+'<h3>'+text(job.name)+'</h3><p>'+text(job.description)+'</p>'+action('選擇'+job.name,'profession',id)+'</article>').join('')+'</div>',action('稍後再選','profession-cancel'),{summary:'請選擇職業。劍士、術士、鎖匠、廚師、療癒師、裝備師。'});
+    dialog('高塔遠征 · 選擇職業','你想如何走出這座塔？','外觀與操作不變，職業決定你的專長。冒險途中可招募三位同伴；劍士負責護衛，不另占額外名額。'+(value.warrior?'原有護衛會直接轉成劍士隊友，進度與已支付的費用均保留。':''),'<div class="tower-grid party-professions">'+Object.entries(P.PROFESSIONS).map(([id,job])=>'<article class="tower-item">'+partyUI.portrait(id)+'<h3>'+text(job.name)+'</h3><p>'+text(job.description)+'</p>'+action('選擇'+job.name,'profession',id)+'</article>').join('')+'</div>',action('稍後再選','profession-cancel'),{summary:'請選擇職業。劍士、術士、斥候、廚師、療癒師、鍛匠。'});
   }
   function enter() {
     if(P&&partyUI&&!run.party){chooseProfession(run,true);return;}
@@ -441,6 +447,14 @@
     }
   }
   function cellPoint(x, y) { return { cx: x, cy: y, ...cellToWorld(x, y) }; }
+  function openExplorationPassage(point,inspect=false){
+    if(!active||inDungeon()||G.shifting)return false;
+    const candidates=G.wallBoxes.filter(w=>!w.boundary&&['h','v'].includes(w.type)).map(w=>({w,d:Math.hypot((w.minX+w.maxX)/2-point.x,(w.minZ+w.maxZ)/2-point.z)})).filter(v=>v.d<G.cell*.7).sort((a,b)=>a.d-b.d);
+    if(inspect)return !!candidates[0];
+    if(candidates[0]){removeWallBox(candidates[0].w);AudioEng.sfxBreak();}
+    if(run.effects.reveal>0){const c=worldToCell(G.px,G.pz);G.solutionPath=solveMaze(c.x,c.y);}
+    return !!candidates[0];
+  }
   function chooseCell(random, used, minimum = 2) {
     for (let i = 0; i < 500; i++) {
       const x = Math.floor(random() * G.mazeW), y = Math.floor(random() * G.mazeH), key = x + ',' + y;
@@ -965,7 +979,7 @@
     playerGroup.add(gearVisual);
   }
   function gearDescription(gear) {
-    if(run?.party)return '耐久 '+gear.durability+'/'+gear.maxDurability+' · '+(gear.slot==='weapon'?'攻擊 '+({bat:15,pan:13,staff:11}[gear.kind]+gear.bonus*2)+' · 短暫暈眩':'防禦 '+gear.defense)+(gear.bonus?' · 強化 +'+gear.bonus:'');
+    if(run?.party)return '耐久 '+gear.durability+'/'+gear.maxDurability+' · '+(gear.slot==='weapon'?'攻擊 '+({bat:15,pan:13,staff:11}[gear.kind]+gear.bonus*2)+' · 短暫暈眩':'防禦 '+gear.defense)+(gear.bonus?' · 強化 +'+gear.bonus:'')+(gear.forge?' · '+window.TowerExpedition.TRAITS[gear.forge.trait].name+' '+gear.forge.level+'/2'+(gear.forge.trait==='durable'?'（耐用保護剩 '+gear.forge.reserve+' 次）':''):'');
     return '耐久 '+gear.durability+'/'+gear.maxDurability+' · '+(gear.slot==='weapon'?'基礎擊暈 '+C.GEAR[gear.kind].stunSeconds+' 秒':'防禦 '+gear.defense)+(gear.bonus?' · 強化 +'+gear.bonus:'');
   }
   function gearCard(gear,equipped=false) {
@@ -1025,7 +1039,7 @@
     const stats=C.equipmentStats(run),worn=Object.values(run.equipment).filter(Boolean).map(g=>gearCard(g,true)).join(''),stored=run.gearBag.map(g=>gearCard(g)).join('');
     if(run.party){
       const body='<section class="tower-guard-summary"><h3>防禦 '+stats.defense+' · 強化 +'+stats.bonus+'</h3><p>武器可直接討伐怪物，命中消耗一點耐久；短暫暈眩後，怪物會有四秒抗暈期。三件防具受擊各消耗一點耐久。武器損壞後仍可徒手攻擊。</p></section><h3>穿戴中</h3><div class="tower-grid">'+(worn||'<p>尚未穿戴裝備。</p>')+'</div><h3>裝備行囊 '+run.gearBag.length+'/24</h3><div class="tower-grid">'+stored+'</div><h3>生存補給</h3><div class="tower-grid">'+cards+'</div>';
-      dialog('旅人背包 · 暫停中','裝備與補給','生命 '+Math.ceil(run.hp)+' / '+C.MAX_HP+' · 飽足 '+Math.ceil(run.hunger)+'% · 銅幣 '+run.coins,body,action('隊伍','party-team')+action('食材與料理','party-kitchen')+action('生物誌','party-bestiary')+action('故事日誌','journal')+action('任務日誌','quest')+(inDungeon()?action('副本目標','dungeon-brief'):'')+action('回到迷宮','close')+action('保存並離開','quit'),{silent:quiet===true,summary:'裝備與補給。可以更換裝備、使用道具，或查看隊伍與料理。'});return;
+      dialog('旅人背包 · 暫停中','裝備與補給','生命 '+Math.ceil(run.hp)+' / '+C.MAX_HP+' · 飽足 '+Math.ceil(run.hunger)+'% · 銅幣 '+run.coins,body,action('隊伍','party-team')+action('食材與料理','party-kitchen')+action('鍛匠工坊','party-forge')+(run.party.boss&&!inDungeon()?action('本層機關說明','party-boss-help'):'')+action('生物誌','party-bestiary')+action('故事日誌','journal')+action('任務日誌','quest')+(inDungeon()?action('副本目標','dungeon-brief'):'')+action('回到迷宮','close')+action('保存並離開','quit'),{silent:quiet===true,summary:'裝備與補給。可以更換裝備、使用道具，或查看隊伍、料理與鍛匠工坊。'});return;
     }
     dialog('旅人背包 · 暫停中','裝備與補給','生命 '+Math.ceil(run.hp)+' / '+C.MAX_HP+' · 飽足 '+Math.ceil(run.hunger)+'% · 銅幣 '+run.coins,'<section class="tower-guard-summary"><h3>防禦 '+stats.defense+' · 強化 +'+stats.bonus+' · 擊暈 '+stats.stunSeconds+' 秒</h3><p>每次命中，三件已穿防具各減 1 耐久；武器命中減 1。每點已穿裝備強化增加 10 秒擊暈，耐久耗盡即損壞。</p></section><h3>穿戴中</h3><div class="tower-grid">'+(worn||'<p>尚未穿戴裝備。</p>')+'</div><h3 class="tower-section-title">裝備行囊 '+run.gearBag.length+'/24</h3><div class="tower-grid">'+(stored||'<p>商人與寶箱取得的裝備會放在這裡。</p>')+'</div><h3 class="tower-section-title">生存補給</h3><div class="tower-grid">'+cards+'</div><section class="tower-guard-summary"><h3>'+text(warriorStatus())+'</h3></section>'+warriorRules(),(N?action('故事日誌','journal'):'')+action('任務日誌','quest')+(inDungeon()?action('副本目標','dungeon-brief'):'')+action('回到迷宮','close')+action('保存並離開','quit'),{silent:quiet===true,summary:'裝備與補給。穿戴中：'+(Object.values(run.equipment).filter(Boolean).map(gearSpeech).join('、')||'尚未穿戴裝備')+'。可以更換裝備或使用補給。'});
   }
@@ -1164,6 +1178,7 @@
       if(transact(result)){trade(true);window.GameVoice?.announce((key==='sell'?'賣出 ':'獲得 ')+(C.ITEMS[id]?.name||C.GEAR[id]?.name||'裝備'),true);}return;
     }
   }
-  window.TowerMode = { get active(){return active;}, get paused(){return paused;}, get partyActive(){return active&&!!run?.party;}, useProfessionSkill:()=>partyUI?.skill(), movementScale:()=>active&&!paused&&!G.shifting?hazardSlow*(run.party?.slowLeft>0?.6:1):1, open, beginNew, tick, floorSeed, atmosphereStyle, scheduleShift, updateShift, reachExit, defeat, requestQuit, canCollectOriginal, collectedOriginal, itemConfig, reservedCells, preserveFloorPickups, soundChanged, mapMarkers };
+  function movementScale(){if(!active||paused||G.shifting)return 1;const traits=run.party?window.TowerExpedition.traits(run):{speed:1,grip:0};return Math.min(1,hazardSlow+(traits.grip>0?.15:0))*(run.party?.slowLeft>0?(traits.grip>0?.8:.6):1)*traits.speed;}
+  window.TowerMode = { get active(){return active;}, get paused(){return paused;}, get partyActive(){return active&&!!run?.party;}, useProfessionSkill:()=>partyUI?.skill(), movementScale, open, beginNew, tick, floorSeed, atmosphereStyle, scheduleShift, updateShift, reachExit, defeat, requestQuit, canCollectOriginal, collectedOriginal, itemConfig, reservedCells, preserveFloorPickups, soundChanged, mapMarkers };
   install();
 })();

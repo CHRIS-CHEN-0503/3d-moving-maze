@@ -14,6 +14,7 @@
   const narrativeRules = () => typeof module === 'object' && module.exports ? require('./tower-narrative.js') : globalThis.TowerNarrative;
   const dungeonRules = () => typeof module === 'object' && module.exports ? require('./tower-dungeons.js') : globalThis.TowerDungeons;
   const partyRules = () => typeof module === 'object' && module.exports ? require('./tower-party-core.js') : globalThis.TowerPartyCore;
+  const expeditionRules = () => typeof module === 'object' && module.exports ? require('./tower-expedition-core.js') : globalThis.TowerExpedition;
   const GEAR = Object.freeze({
     helmet: Object.freeze({ kind: 'helmet', slot: 'helmet', name: '頭盔', defense: 2, stunSeconds: 0, buyPrice: 14 }),
     armor: Object.freeze({ kind: 'armor', slot: 'armor', name: '盔甲', defense: 4, stunSeconds: 0, buyPrice: 22 }),
@@ -150,7 +151,9 @@
     const name = item.name + (value.bonus ? ` +${value.bonus}` : '');
     const defense = item.slot === 'weapon' ? 0 : item.defense + value.bonus;
     if (value.name !== name || value.defense !== defense) return null;
-    return { id: value.id, kind: value.kind, slot: item.slot, name, durability: value.durability, maxDurability: value.maxDurability, defense, bonus: value.bonus };
+    const forge=value.forge===undefined?undefined:expeditionRules()?.validateForge(value.forge,item.slot);
+    if(value.forge!==undefined&&!forge)return null;
+    return { id: value.id, kind: value.kind, slot: item.slot, name, durability: value.durability, maxDurability: value.maxDurability, defense, bonus: value.bonus,...(forge?{forge}:{}) };
   }
 
   function gearPrice(gear) {
@@ -281,7 +284,7 @@
     const chronicle = narrativeRules().validateChronicle(run.chronicle, run.floor);
     const expedition = dungeonRules().validateExpedition(run.expedition, run.floor, run.seed);
     if (!chronicle || !expedition) return null;
-    const party = run.party === undefined ? undefined : partyRules()?.validate(run.party, run.floor, defeatedMonsters);
+    const party = run.party === undefined ? undefined : partyRules()?.validate(run.party, run.floor, defeatedMonsters,hiredWarriors);
     if (run.party !== undefined && !party) return null;
     return {
       // Preserve the old health percentage once; subsequent reads are already v2.
@@ -525,7 +528,7 @@
       for (const slot of ['helmet', 'armor', 'shield']) {
         const gear = next.equipment[slot];
         if (!gear) continue;
-        gear.durability -= 1;
+        if(next.party)expeditionRules().wear(next,gear);else gear.durability -= 1;
         if (gear.durability === 0) { broken.push(gear); next.equipment[slot] = null; }
       }
     }

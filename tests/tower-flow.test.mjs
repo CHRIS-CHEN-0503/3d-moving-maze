@@ -17,10 +17,11 @@ const SAVE_KEY = 'maze3d_tower_v1';
 // Only the DOM and original game-engine boundary are stubbed. The real core,
 // runtime, events, storage and dialog rendering execute unmodified by default.
 // Other runtime suites can explicitly request a test-only closure bridge.
-function harness(initialSave, runtimeBridge = '') {
+function harness(initialSave, runtimeBridge = '',preferences = {}) {
   const elements = new Map(), windowEvents = new Map(), storage = new Map(), toasts = [];
   let now = 10000;
   if (initialSave !== undefined) storage.set(SAVE_KEY, typeof initialSave === 'string' ? initialSave : JSON.stringify(initialSave));
+  for(const [key,value] of Object.entries(preferences))storage.set(key,value);
   class Element {
     constructor(tag = 'div') { this.tagName = tag.toUpperCase(); this.style = {}; this.listeners = new Map(); this.children = []; this.dataset = {}; this.hidden = false; this.disabled = false; this.isConnected = true; this.value = ''; this.textContent = ''; this._html = ''; this._id = ''; this.classes = new Set(); this.classList = { add: (...names) => names.forEach(name => this.classes.add(name)), remove: (...names) => names.forEach(name => this.classes.delete(name)), toggle: (name, enabled) => enabled ? this.classes.add(name) : this.classes.delete(name) }; }
     set id(value) { this._id = value; elements.set(value, this); }
@@ -109,6 +110,18 @@ test('story menu routes new players through the existing character creation flow
   assert.equal(h.context.entryFlow, 'story');
   assert.equal(h.get('profileTitle').textContent, '高塔主角 · 先選外觀');
   assert.equal(h.context.TowerMode.active, false);
+});
+
+test('survival HUD is compact by default, remembers expansion, and never changes the journey',()=>{
+  const key='maze3d_tower_hud_expanded',h=harness(undefined,'window.__hudTest={setHp(value){run.hp=value;updateHud();}};');
+  assert.equal(h.get('towerHudDetails').hidden,true);assert.equal(h.get('towerHudToggle')['aria-expanded'],'false');
+  h.context.TowerMode.beginNew();h.click('close');const saved=JSON.stringify(h.save());
+  h.get('towerHudToggle').onclick();assert.equal(h.get('towerHudDetails').hidden,false);assert.equal(h.get('towerHudToggle')['aria-expanded'],'true');assert.equal(h.storage.get(key),'1');
+  assert.equal(h.context.TowerMode.paused,false);assert.equal(JSON.stringify(h.save()),saved);
+  const reloaded=harness(h.save(),'',{[key]:h.storage.get(key)});assert.equal(reloaded.get('towerHudDetails').hidden,false);
+  h.get('towerHudToggle').onclick();h.context.__hudTest.setHp(12);
+  assert.equal(h.get('towerHudDetails').hidden,true);assert.equal(h.get('towerHealth').textContent,'12 / 60');assert.equal(h.get('towerHp').value,12);assert.ok(h.context.document.body.classes.has('tower-danger'));
+  h.context.localStorage.setItem=()=>{throw Error('Storage blocked');};assert.doesNotThrow(()=>h.get('towerHudToggle').onclick());assert.equal(h.get('towerHudDetails').hidden,false);
 });
 
 test('beginNew creates a valid save and renders opening prose rather than an object', () => {

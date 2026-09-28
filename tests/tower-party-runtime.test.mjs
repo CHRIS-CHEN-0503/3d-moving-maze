@@ -5,7 +5,7 @@ import {createRequire} from 'node:module';
 import vm from 'node:vm';
 const require=createRequire(import.meta.url),T=require('../lib/three.min.js'),C=require('../story/story-core.js'),P=require('../story/tower-party-core.js'),V=require('../story/tower-characters.js'),N=require('../story/tower-narrative.js');
 const source=readFileSync(new URL('../story/tower-party-runtime.js',import.meta.url),'utf8');
-function harness(floor=84){
+function harness(floor=84,options={}){
   let run=P.enable(C.newRun({seed:31415}),'swordsman').run;run.floor=floor;run.floorsCleared=99-floor;run.chronicle=N.newChronicle(floor);P.advance(run);
   let paused=false,failSave=false,wall=false,swings=0,hits=0,world=new T.Group(),monsters=[],messages=[],dialog=null,followTargets=[];
   const player=new T.Group(),G={px:0,pz:0,running:true,shifting:false};
@@ -14,7 +14,7 @@ function harness(floor=84){
   const ui=context.TowerPartyRuntime.create({THREE:T,G,core:C,text:String,action:(label,key,id,disabled)=>`${label}|${key}|${id}|${disabled}`,dialog:(...args)=>dialog=args,
     transact:result=>{if(!result.ok||failSave)return false;run=result.run;return true;},save:()=>!failSave,toast:message=>messages.push(message),audio:{sfxHit:()=>hits++,sfxSwing(){},sfxUse(){},sfxGuardBlock(){}},quest(){},
     run:()=>run,paused:()=>paused,inDungeon:()=>false,world:()=>world,monsters:()=>monsters,traders:()=>[],player:()=>player,
-    clear:()=>!wall,cell:(cx,cy)=>({cx,cy,x:cx*4,z:cy*4}),worldToCell:(x,z)=>({x:Math.round(x/4),y:Math.round(z/4)}),chooseCell:()=>({cx:nextCell,cy:0,x:nextCell++*4,z:0}),makeText:()=>new T.Group(),follow:(a,dt,speed,stop,target)=>{followTargets.push(target);return false;},dispose:()=>{},damage:()=>{},bind:()=>{},swing:()=>swings++,
+    clear:()=>!wall,followClear:options.followClear,cell:(cx,cy)=>({cx,cy,x:cx*4,z:cy*4}),worldToCell:(x,z)=>({x:Math.round(x/4),y:Math.round(z/4)}),chooseCell:()=>({cx:nextCell,cy:0,x:nextCell++*4,z:0}),makeText:()=>new T.Group(),follow:(a,dt,speed,stop,target)=>{followTargets.push(target);return false;},dispose:()=>{},damage:()=>{},bind:()=>{},swing:()=>swings++,
   });
   const spec=P.monsterSpecs(run)[0];if(spec){const model=ui.monsterModel(spec.kind,spec.strength)||new T.Group();if(!model.userData.body)model.userData.body=new T.Group();model.position.set(0,0,2);monsters=[{...spec,model,alive:true,windup:0,cooldown:2}];}
   ui.build(()=>.5,new Set());
@@ -70,4 +70,19 @@ test('ordinary exploration advances only nearby while running and persists compl
   h.ui.handle('party-explore-work',s.offer.id);h.ui.tick(4,100);assert.equal(h.run.party.journey.site.progress,4);h.paused=true;h.ui.tick(4,200);assert.equal(h.run.party.journey.site.progress,4);
   h.paused=false;h.wall=true;h.ui.tick(4,300);assert.equal(h.run.party.journey.site.progress,4);h.wall=false;h.ui.handle('party-explore-work',s.offer.id);h.ui.tick(8,400);assert.equal(h.run.party.journey.site.done,true);
   const coins=h.run.coins;h.ui.handle('party-explore-work',s.offer.id);h.ui.tick(12,500);assert.equal(h.run.coins,coins);assert.ok(C.validateSave(h.run));
+});
+test('six companion professions survive stairs and rebuild outside the full walking collision margin',()=>{
+  const jobs=Object.keys(P.PROFESSIONS),safe=p=>Math.abs(p.x)+.28<1.65&&Math.abs(p.z)+.28<1.65;
+  for(let offset=0;offset<jobs.length;offset+=3){
+    const h=harness(99,{followClear:(a,b)=>safe(a)&&safe(b)});
+    h.run.party.members=jobs.slice(offset,offset+3).map((profession,i)=>({id:'companion:test:'+profession,profession,level:i+1,hp:i?20:0,cooldown:0,hurtLeft:0}));h.run.party.joined=h.run.party.members.map(m=>m.id);
+    const before=JSON.parse(JSON.stringify(h.run.party.members));
+    for(let i=0;i<3;i++){
+      const result=C.descend(h.run);assert.ok(result.ok);h.run=C.validateSave(JSON.stringify(result.run));assert.deepEqual(h.run.party.members,before);
+      h.ui.build(()=>.5,new Set());const models=h.world.children.at(-1).children.filter(m=>m.userData.companionId);
+      assert.equal(models.length,3);assert.equal(new Set(models.map(m=>m.userData.companionId)).size,3);
+      for(const model of models)assert.ok(safe(model.position),model.userData.companionId);
+      for(let a=0;a<models.length;a++)for(let b=a+1;b<models.length;b++)assert.ok(models[a].position.distanceTo(models[b].position)>.55);
+    }
+  }
 });

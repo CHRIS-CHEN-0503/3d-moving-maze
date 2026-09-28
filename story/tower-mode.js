@@ -49,13 +49,26 @@
   const text = escapeHtml;
   const el = id => document.getElementById(id);
 
+  function setHudExpanded(expanded,persist=false) {
+    el('towerHudDetails').hidden=!expanded;
+    const toggle=el('towerHudToggle');
+    toggle.setAttribute('aria-expanded',String(expanded));
+    toggle.setAttribute('aria-label',expanded?'收合生存資訊':'展開生存資訊');
+    toggle.title=expanded?'收合資訊':'展開資訊';
+    el('towerHud').setAttribute('data-expanded',String(expanded));
+    if(persist)try{localStorage.setItem('maze3d_tower_hud_expanded',expanded?'1':'0');}catch(_){}
+  }
+
   function install() {
     const hud = document.createElement('section');
     hud.id = 'towerHud'; hud.setAttribute('aria-label', '高塔生存狀態');
-    hud.innerHTML = '<span class="tower-stat"><small>倒轉高塔</small><b id="towerFloor">99 F</b></span><span class="tower-stat"><small>生命</small><b id="towerHealth">'+C.MAX_HP+' / '+C.MAX_HP+'</b><progress id="towerHp" class="tower-health" max="'+C.MAX_HP+'" value="'+C.MAX_HP+'" aria-label="生命值"></progress></span><span class="tower-stat"><small>銅幣</small><b id="towerCoins">0</b></span><span class="tower-stat"><small>章節</small><b id="towerChapter"></b></span><div id="towerGuardStatus" class="tower-guard-status" hidden></div>';
+    hud.innerHTML = '<div class="tower-hud-summary"><span class="tower-stat tower-floor-stat"><small>樓層</small><b id="towerFloor">99 F</b></span><span class="tower-hud-health"><span class="tower-stat"><small>生命</small><b id="towerHealth">'+C.MAX_HP+' / '+C.MAX_HP+'</b></span><progress id="towerHp" class="tower-health" max="'+C.MAX_HP+'" value="'+C.MAX_HP+'" aria-label="生命值"></progress></span><button type="button" id="towerHudToggle" aria-controls="towerHudDetails" aria-expanded="false" aria-label="展開生存資訊"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg></button></div><div id="towerHudDetails" hidden><div class="tower-hud-meta"><span id="towerChapter"></span><span class="tower-stat"><small>銅幣</small><b id="towerCoins">0</b></span></div><div id="towerGuardStatus" class="tower-guard-status" hidden></div></div>';
     el('gameScreen').appendChild(hud);
     const hurt=document.createElement('div');hurt.id='towerHurtGlow';hurt.setAttribute('aria-hidden','true');el('gameScreen').appendChild(hurt);
-    const gearStatus=document.createElement('div');gearStatus.id='towerGearStatus';gearStatus.className='tower-gear-status';hud.appendChild(gearStatus);
+    const gearStatus=document.createElement('div');gearStatus.id='towerGearStatus';gearStatus.className='tower-gear-status';el('towerHudDetails').appendChild(gearStatus);
+    let hudExpanded=false;try{hudExpanded=localStorage.getItem('maze3d_tower_hud_expanded')==='1';}catch(_){}
+    setHudExpanded(hudExpanded);
+    bindActionBtn(el('towerHudToggle'),()=>setHudExpanded(el('towerHudDetails').hidden,true));
     const rail = document.createElement('nav'); rail.id = 'towerActionRail'; rail.setAttribute('aria-label', '劇情操作');
     rail.innerHTML = '<button class="tower-btn" id="towerBagBtn">背包 <small>B</small></button><button class="tower-btn" id="towerJournalBtn">日誌 <small>J</small></button><button class="tower-btn" id="towerAttackBtn">揮擊 <small>X</small></button>';
     el('gameScreen').appendChild(rail);
@@ -104,7 +117,7 @@
     if(P&&window.TowerPartyRuntime){
       partyUI=window.TowerPartyRuntime.create({THREE,G,core:C,text,action,dialog,transact,save,toast:showToast,audio:AudioEng,quest:questEvent,
         run:()=>run,paused:()=>paused,world:()=>world,monsters:()=>monsters,traders:()=>traders,player:()=>playerGroup,camera:()=>camera,inDungeon,
-        clear:hasClearPath,cell:cellPoint,worldToCell,chooseCell,makeText:makeTextSprite,follow:followNpc,dispose:disposeSceneObject,damage,
+        clear:hasClearPath,followClear:followerClear,cell:cellPoint,worldToCell,chooseCell,makeText:makeTextSprite,follow:followNpc,dispose:disposeSceneObject,damage,
         close:closeDialog,refreshGear,hurt:()=>hurtLeft>0,passage:openExplorationPassage,
         bind:bindActionBtn,swing:()=>{attackLeft=.8;window.CharacterMotion?.beginAction(playerGroup,'attack',.8);}});
       partyUI.install();
@@ -1076,7 +1089,7 @@
       exitDeclined=true;const chapter=N.chapterForFloor(run.floor);
       dialog('主線尚未完成','門上缺少一枚印記','找到「'+chapter.clueName+'」才能打開下一章的門。小地圖金色「印」標記指向線索，靠近後按「印記 R」。','',action('返回尋找','close')+action('故事日誌','journal'));return;
     }
-    if(run.party&&!P.canDescend(run)){exitDeclined=true;dialog('迷宮本身就是魔王',P.BOSS_FLOORS[run.floor].name,P.BOSS_FLOORS[run.floor].description+' 小地圖「陣」指向機關。','',action('回去解除封印','close'));return;}
+    if(run.party&&!P.canDescend(run)){exitDeclined=true;dialog('迷宮本身就是魔王',P.BOSS_FLOORS[run.floor].name,P.BOSS_FLOORS[run.floor].description+' 小地圖的數字標記指向機關，背包可閱讀解法。','',action('回去解除封印','close'));return;}
     let q=run.adventure.quest;
     if(q&&q.status!=='claimed'&&!confirmed){
       const portal=cellToWorld(G.exitCell.x,G.exitCell.y);

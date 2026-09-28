@@ -28,27 +28,27 @@ test('six gear kinds have only three armor slots and one nonlethal weapon slot',
   assert.deepEqual(['helmet', 'armor', 'shield'].map(kind => C.GEAR[kind].defense), [2, 4, 3]);
   const run = fresh();
   assert.equal(run.equipment.weapon.kind, 'staff');
-  assert.ok(run.equipment.weapon.durability >= 3 && run.equipment.weapon.durability <= 10);
+  assert.ok(run.equipment.weapon.durability >= 9 && run.equipment.weapon.durability <= 30);
   assert.equal(run.bag.shield, 0);
   assert.equal(run.equipment.shield, null);
 });
 
-test('normal equipment rolls 3..10 durability deterministically; enhanced rolls progress in three tiers', () => {
+test('normal equipment scales original 3..10 durability; enhanced rolls retain three tiers', () => {
   const ordinary = new Set(), deepBonus = new Set(), deepDurability = new Set();
   for (let seed = 1; seed <= 100; seed += 1) {
     for (const kind of Object.keys(C.GEAR)) {
       const plain = C.createGear(kind, 99, seed, 'supply');
-      ordinary.add(plain.durability);
+      const mult=C.durabilityMultiplier(kind);ordinary.add(plain.durability/mult);
       assert.deepEqual(C.createGear(kind, 99, seed, 'supply'), plain);
-      assert.ok(plain.durability >= 3 && plain.durability <= 10);
+      assert.ok(plain.durability >= 3*mult && plain.durability <= 10*mult);
       assert.equal(plain.durability, plain.maxDurability);
       assert.equal(plain.bonus, 0);
       for (const [floor, maxDurability, maxBonus] of [[99, 13, 1], [70, 13, 1], [69, 16, 2], [40, 16, 2], [39, 20, 3], [1, 20, 3]]) {
         const improved = C.createGear(kind, floor, seed, 'chest', true);
-        assert.ok(improved.maxDurability >= 10 && improved.maxDurability <= maxDurability);
+        assert.ok(improved.maxDurability >= 10*mult && improved.maxDurability <= maxDurability*mult);
         assert.ok(improved.bonus >= 1 && improved.bonus <= maxBonus);
         assert.ok(C.validateGear(improved));
-        if (floor === 1) { deepBonus.add(improved.bonus); deepDurability.add(improved.maxDurability); }
+        if (floor === 1) { deepBonus.add(improved.bonus); deepDurability.add(improved.maxDurability/mult); }
       }
     }
   }
@@ -269,7 +269,7 @@ test('save validation clones equipment, stun and adventure state and rejects cor
   assert.equal(run.monsterStuns['monster-0'], 10);
   assert.equal(run.adventure.quest.events.length, 1);
   const gear = run.equipment.weapon;
-  for (const mutation of [{ defense: 10000 }, { bonus: 4 }, { durability: 0 }, { maxDurability: 100 }, { slot: 'armor' }, { kind: '__proto__' }]) {
+  for (const mutation of [{ defense: 10000 }, { bonus: 4 }, { durability: -1 }, { maxDurability: 100 }, { slot: 'armor' }, { kind: '__proto__' }]) {
     assert.equal(C.validateSave({ ...run, equipment: { ...run.equipment, weapon: { ...gear, ...mutation } } }), null);
   }
   assert.equal(C.validateSave({ ...run, gearBag: [gear] }), null);

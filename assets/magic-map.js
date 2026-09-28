@@ -35,11 +35,12 @@
   function mask(ctx,{w,h,x,y,hWalls,vWalls,pad,cw,ch}){
     if(!state||state.w!==w||state.h!==h)reset(w,h);
     explore(state,x,y,hWalls,vWalls);
+    if(globalThis.MazeSight?.active())return;
     const radius=globalThis.TowerMode?.temporaryMapRadius?.()||0;peek=radius>0?create(w,h):null;if(peek)explore(peek,x,y,hWalls,vWalls,radius);
     if(state.revealed)return;
     ctx.save();ctx.fillStyle='#0b1727';
     for(let cy=0;cy<h;cy++)for(let cx=0;cx<w;cx++)if(!state.seen[cy*w+cx]&&!peek?.seen[cy*w+cx])ctx.fillRect(pad+cx*cw-.6,pad+cy*ch-.6,cw+1.2,ch+1.2);
     ctx.restore();
   }
-  return Object.freeze({create,explore,enabled,count,reset,reveal,isRevealed,visible,snapshot,restore,mask});
+  return Object.freeze({create,explore,enabled,count,reset,reveal,isRevealed,visible,snapshot,restore,mask,layoutKey});
 });

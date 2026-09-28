@@ -38,7 +38,16 @@
     const speechSupported=!!(synth&&Utterance),AudioCtor=env.Audio,pack=env.MazeVoicePack;
     const recordedSupported=typeof AudioCtor==='function'&&!!pack?.get,supported=speechSupported||recordedSupported,now=()=>env.Date?.now?.()??Date.now();
     let enabled=true,preferred='',voices=[],queue=[],current=null,currentAudio=null,player=null,generation=0,lastStory=null,failure='',listener=()=>{},sequence=0,loadTimer=null,character=()=>({});
-    const recent=new Map();
+    const recent=new Map(),pinnedVoices=new Map();
+    function characterSpeaker(){return {...character(),consistent:true};}
+    function pinSpeaker(speaker){
+      if(!speaker.consistent)return speaker;
+      const key=speaker.identity||[speaker.gender||'narrator',speaker.age||'adult'].join(':');
+      // Pin the device default too when voices have not loaded yet. A later
+      // voiceschanged event must not change this character mid-session.
+      if(!pinnedVoices.has(key))pinnedVoices.set(key,chooseVoice(voices,preferred,speaker));
+      return {...speaker,deviceOnly:true,pinnedVoice:pinnedVoices.get(key)||null};
+    }
     function status(){return {supported,enabled,speaking:!!(current||currentAudio),voice:chooseVoice(voices,preferred),voices:voices.filter(v=>/^zh(?:[-_]|$)/i.test(v.lang)),failure,recorded:recordedSupported};}
     function notify(){listener(status());}
     function clearLoadTimer(){if(loadTimer!==null){env.clearTimeout?.(loadTimer);loadTimer=null;}}
@@ -74,7 +83,7 @@
         try{audio.play()?.catch?.(fallback);notify();}catch(_){fallback();}return;
       }
       if(!speechSupported){failure='unavailable';next();return;}
-      const profile=entry.speaker||{},token=generation,u=new Utterance(entry.text),voice=chooseVoice(voices,preferred,profile);
+      const profile=pinSpeaker(entry.speaker||{}),token=generation,u=new Utterance(entry.text),voice=profile.consistent?profile.pinnedVoice:chooseVoice(voices,preferred,profile);
       u.lang=voice?.lang||'zh-TW';if(voice)u.voice=voice;u.rate=1;u.pitch=profile.age==='elder'?.95:profile.age==='child'?1.06:1;u.volume=1;
       current=u;
       const finish=()=>{if(token!==generation||current!==u)return;current=null;next();};
@@ -82,6 +91,7 @@
       try{synth.speak(u);notify();}catch(_){failure='unavailable';current=null;queue=[];notify();}
     }
     function entriesFor(text,story,speaker={}){
+      speaker=pinSpeaker(speaker);
       const parts=(speaker.deviceOnly||speaker.npc)?[{text}]:recordedSupported&&pack.plan?pack.plan(text,speaker.gender):[{text}],expires=story?0:now()+12000;
       return parts.flatMap(p=>p.asset?[{...p,expires,speaker}]:chunks(p.text).map(text=>({text,expires,speaker})));
     }
@@ -110,16 +120,20 @@
     }
     function readPanel(panel){
       const spoken=panelText(panel),asset=panel?.voiceAsset||'',after=panel?.voiceAfterText||'';
-      const speaker=panel?.voiceSpeaker||{};
-      return asset?playAsset(asset,spoken,{replace:true,story:true,after,speaker}):say(spoken,{replace:true,story:true,speaker});
+      const specified=panel?.voiceSpeaker||{};
+      const wholeSummary=panel?.voiceScope==='summary'&&!!after;
+      const speaker=wholeSummary?{...specified,consistent:true}:!asset&&panel?.voiceScope!=='full'&&!specified.npc?{...characterSpeaker(),...specified}:specified;
+      // A merchant introduction and a dynamic equipment list must be one voice,
+      // not a recorded actor followed by a different device actor.
+      return asset&&!wholeSummary?playAsset(asset,spoken,{replace:true,story:true,after,speaker}):say(spoken,{replace:true,story:true,speaker});
     }
-    function configure(settings={}){if(typeof settings.character==='function')character=settings.character;const changed=preferred!==(settings.voice||'');enabled=settings.enabled!==false;preferred=settings.voice||'';if(!enabled||changed)stop();refresh();}
+    function configure(settings={}){if(typeof settings.character==='function')character=settings.character;const changed=preferred!==(settings.voice||'');enabled=settings.enabled!==false;preferred=settings.voice||'';if(changed)pinnedVoices.clear();if(!enabled||changed)stop();refresh();}
     function listen(fn){listener=typeof fn==='function'?fn:()=>{};notify();}
     synth?.addEventListener?.('voiceschanged',refresh);
     env.document?.addEventListener?.('visibilitychange',()=>{if(env.document.hidden)stop();});
     env.addEventListener?.('pagehide',()=>stop(true));refresh();
     function replay(){return lastStory?.asset?playAsset(lastStory.asset,lastStory.text,{replace:true,story:true,after:lastStory.after,speaker:lastStory.speaker}):say(lastStory?.text||'',{replace:true,story:true,speaker:lastStory?.speaker});}
-    return {configure,status,listen,refresh,readPanel,stop,announce:(text,replace=false)=>say(text,{replace,speaker:/^(獲得|使用|裝備|賣出)\s/.test(clean(text))?character():{}}),announceAsset:(id,text,replace=false)=>playAsset(id,text,{replace}),announceAssets:(ids,text)=>playAsset(ids[0],text,{replace:true,continuation:ids.slice(1)}),replay,preview:()=>say('你好，我會陪你探索迷宮。準備好了，就一起出發吧！',{replace:true})};
+    return {configure,status,listen,refresh,readPanel,stop,announce:(text,replace=false)=>say(text,{replace,speaker:/(?:^|[。！!，,\s])(?:已)?(?:獲得|取得|使用|裝備|卸下|穿戴|賣出|修復|修理|打造|製作|烹飪|享用)/.test(clean(text))?characterSpeaker():{}}),announceAsset:(id,text,replace=false)=>playAsset(id,text,{replace}),announceAssets:(ids,text)=>playAsset(ids[0],text,{replace:true,continuation:ids.slice(1)}),replay,preview:()=>say('你好，我會陪你探索迷宮。準備好了，就一起出發吧！',{replace:true})};
   }
   return {create,clean,chunks,chooseVoice,panelText};
 });

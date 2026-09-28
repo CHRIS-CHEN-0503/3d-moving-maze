@@ -4,8 +4,8 @@
   function create(ctx){
     const P=root.TowerPartyCore,X=root.TowerExpedition,T=ctx.THREE,V=root.TowerCharacters,H=root.TowerHeroes;
     const modern=()=>!!r()?.party?.loadouts,records=()=>modern()?H.followerRecords(r()):r().party.members;
-    const heroes=root.TowerHeroesRuntime?.create({...ctx,actors:()=>actors,syncActors,hit:applyHit,portrait,walkClear:(a,b)=>walkClear(a,b)});
-    let actors=[],queue=[],queueClock=0,stations=[],near=null,offer=null,group=null,pulse=0,uiClock=0,skillLeft=0,guardVoiceLeft=0,worldFloor=null,worldSeed=null,working=null,pendingForge=null,pendingDismantle=null;
+    const heroes=root.TowerHeroesRuntime?.create({...ctx,actors:()=>actors,safeCamp,syncActors,hit:applyHit,portrait,walkClear:(a,b)=>walkClear(a,b)});
+    let actors=[],queue=[],queueClock=0,stations=[],near=null,offer=null,group=null,pulse=0,uiClock=0,skillLeft=0,guardVoiceLeft=0,worldFloor=null,worldSeed=null,working=null,pendingForge=null,pendingDismantle=null,pendingRepair=null,forgeSelected=null;
     const r=()=>ctx.run(), enabled=()=>!!r()?.party, live=()=>enabled()&&(modern()||!ctx.inDungeon())&&worldFloor===r().floor&&worldSeed===r().seed;
     const esc=ctx.text,act=ctx.action;
     const distance=p=>Math.hypot(ctx.G.px-p.x,ctx.G.pz-p.z);
@@ -137,15 +137,15 @@
       queue=queue.filter(a=>actors.includes(a));for(const a of actors)if(!queue.includes(a))queue.push(a);queueClock=0;
     }
     function safeCamp(){return live()&&(stations.some(s=>s.kind==='camp'&&distance(s)<2.8&&clear(s))||ctx.traders().some(s=>distance(s)<2.8&&clear(s)))&&!ctx.monsters().some(m=>m.alive&&distance(m.model.position)<4&&clear(m.model.position));}
-    function forgePanel(quiet=false){if(!enabled())return;pendingForge=pendingDismantle=null;const run=r(),safe=safeCamp();
-      const body='<div class="tower-grid party-forge-grid">'+X.allGear(run).map(g=>{
-        const level=(g.forge?.level||0)+1,parts=level*3,coins=modern()?Math.ceil(level*8*(1-H.teamPassive(run,'economy')/100)):level*(P.has(run,'smith')?4:8);
-        const choices=g.forge?[g.forge.trait]:Object.keys(X.TRAITS).filter(t=>t!=='grip'||g.slot!=='weapon');
-        return '<article class="tower-item"><h3>'+esc(g.name)+(run.equipment[g.slot]?.id===g.id?' · 穿戴中':'')+'</h3><p>耐久 '+g.durability+'/'+g.maxDurability+' · '+(g.forge?X.TRAITS[g.forge.trait].name+' '+g.forge.level+'/2':'尚未鍛造')+'</p><div class="party-forge-traits">'+
-          choices.map(t=>'<section><b>'+esc(X.TRAITS[t].name)+'</b><p>'+esc(X.TRAITS[t].description)+'</p>'+act(level>2?'已達上限':(g.forge?'升級':'選擇')+X.TRAITS[t].name+' · '+parts+' 零件／'+coins+' 幣','party-forge-ask',t+'|'+g.id,!safe||level>2||run.party.journey.scrap<parts||run.coins<coins)+'</section>').join('')+'</div>'+
-          act('拆解 · 回收 '+X.salvageValue(g)+' 零件','party-dismantle-ask',g.id,!safe)+'</article>';
-      }).join('')+'</div>';
-      ctx.dialog('營地工坊 · 暫停中','鍛匠工坊','金屬零件 '+run.party.journey.scrap+'/99 · 銅幣 '+run.coins+'。每件裝備只能選一種特性、強化兩次。新版工料折扣依實際擁有的「節省工料」被動計算；沒有鍛匠也能使用營地工具。'+(!safe?'請先靠近安全營地或行商。':''),body||'<p>尚無可處理的裝備。</p>',act('料理與休息','party-kitchen')+act('裝備背包','bag')+act('回到迷宮','close'),{silent:quiet,summary:'鍛匠工坊。可以拆解裝備，或選擇耐用、輕巧、防滑特性。每件裝備最多強化兩次。'});
+    function forgePanel(quiet=false){if(!enabled())return;pendingForge=pendingDismantle=pendingRepair=null;const run=r(),safe=safeCamp(),gear=X.allGear(run);
+      if(!gear.some(g=>g.id===forgeSelected))forgeSelected=gear[0]?.id;
+      const g=gear.find(g=>g.id===forgeSelected),draw=kind=>root.TowerHeroIcons?.svg(kind)||'';
+      const list='<nav class="forge-picker" aria-label="選擇要處理的裝備">'+gear.map(item=>'<button class="tower-btn forge-pick" data-tower="party-forge-select" data-item="'+esc(item.id)+'" aria-pressed="'+(item.id===forgeSelected)+'">'+draw(item.kind)+'<span><b>'+esc(item.name)+'</b><small>'+ (item.durability===0?'已損壞': '耐久 '+item.durability+'/'+item.maxDurability)+'</small></span></button>').join('')+'</nav>';
+      let detail='<p>尚無可處理的裝備。</p>';
+      if(g){const level=(g.forge?.level||0)+1,parts=level*3,coins=modern()?Math.ceil(level*8*(1-H.teamPassive(run,'economy')/100)):level*(P.has(run,'smith')?4:8),quote=X.repairQuote(run,g.id),choices=g.forge?[g.forge.trait]:Object.keys(X.TRAITS).filter(t=>t!=='grip'||g.slot!=='weapon');
+        detail='<section class="forge-detail" aria-label="選中裝備的作業"><header class="forge-piece">'+draw(g.kind)+'<div><h3>'+esc(g.name)+'</h3><p>耐久 '+g.durability+'/'+g.maxDurability+' · '+(g.forge?X.TRAITS[g.forge.trait].name+' '+g.forge.level+'/2':'尚未鍛造')+'</p></div></header><section class="forge-repair"><h3>'+(g.durability===0?'重建破損裝備':'修理裝備')+'</h3><p>'+(quote?quote.broken?'需有能行動的鍛匠；修理費為正常費用的 1.5 倍。':'補滿這件裝備的耐久，不補回耐用特性的保護次數。':'耐久完整，無需修理。')+'</p>'+ (quote?act('修復 · '+quote.parts+' 零件／'+quote.coins+' 幣','party-mend-ask',g.id,!safe||!quote.allowed||run.coins<quote.coins||run.party.journey.scrap<quote.parts):'')+'</section><h3>鍛造特性</h3><div class="party-forge-traits">'+choices.map(t=>'<section><div><b>'+esc(X.TRAITS[t].name)+'</b><p>'+esc(X.TRAITS[t].description)+'</p></div>'+act(level>2?'已達上限':(g.forge?'升級':'選擇')+X.TRAITS[t].name+' · '+parts+' 零件／'+coins+' 幣','party-forge-ask',t+'|'+g.id,!safe||g.durability===0||level>2||run.party.journey.scrap<parts||run.coins<coins)+'</section>').join('')+'</div><div class="forge-salvage">'+act('拆解 · 回收 '+X.salvageValue(g)+' 零件','party-dismantle-ask',g.id,!safe)+'</div></section>';
+      }
+      ctx.dialog('營地工坊 · 暫停中','鍛匠工坊','零件 '+run.party.journey.scrap+'/99 · 銅幣 '+run.coins+(!safe?' · 請先靠近安全營地或行商。':' · 先選裝備，再選作業。'),'<div class="forge-workspace">'+list+detail+'</div>',act('料理與休息','party-kitchen')+act('裝備背包','bag')+act('回到迷宮','close'),{silent:quiet,workshop:true,summary:'鍛匠工坊。先選裝備，再選修理、鍛造或拆解。'});
     }
     function sitePanel(s){const done=r().party.journey.site.done,has=P.has(r(),s.offer.job);ctx.dialog('職業探索 · 暫停中',s.offer.name,s.offer.description,
       '<p class="tower-copy">'+esc(s.offer.reward)+' 另獲得八枚銅幣。這是可跳過的探索，不影響主線通關。</p><p class="tower-copy">'+(done?'此處已完成，不會再次給予獎勵。':'一般處理需在現場累積十二秒，途中仍有怪物與陷阱；離開、受傷或變形會中斷，可稍後接續。已完成 '+Math.floor(r().party.journey.site.progress)+' 秒。')+'</p>',
@@ -173,6 +173,13 @@
     function handle(key,id){if(heroes?.handle(key,id))return true;if(!key.startsWith('party-'))return false;if(!enabled())return true;
       if(key==='party-team'){panel();return true;}if(key==='party-kitchen'){panel('cook');return true;}if(key==='party-bestiary'){panel('bestiary');return true;}
       if(key==='party-forge'){forgePanel();return true;}if(key==='party-boss-help'){bossHelp();return true;}
+      if(key==='party-forge-select'){forgeSelected=id;forgePanel(true);return true;}
+      if(key==='party-mend-ask'||key==='party-mend-confirm'){
+        if(!safeCamp())return true;const g=X.allGear(r()).find(g=>g.id===id),q=X.repairQuote(r(),id);if(!g||!q)return true;
+        if(key==='party-mend-ask'){pendingRepair={id,revision:r().revision};ctx.dialog('確認修理',g.name,'補滿耐久需要 '+q.coins+' 枚銅幣與 '+q.parts+' 份金屬零件。'+(q.broken?'破損修理費已乘上 1.5 倍，且需要能行動的鍛匠。':''),'',act('返回工坊','party-forge')+act('確認修復','party-mend-confirm',id),{summary:'確認修復 '+g.name+'。'});return true;}
+        if(!pendingRepair||pendingRepair.id!==id)return true;
+        if(commit(X.repair(r(),id,pendingRepair.revision))){ctx.refreshGear?.();syncActors();forgePanel(true);}return true;
+      }
       if(key==='party-forge-ask'||key==='party-forge-confirm'){
         if(!safeCamp())return true;const split=id?.indexOf('|'),trait=id?.slice(0,split),gearId=id?.slice(split+1),g=X.allGear(r()).find(g=>g.id===gearId);if(!g||!Object.hasOwn(X.TRAITS,trait))return true;
         if(key==='party-forge-ask'){pendingForge={id,revision:r().revision};ctx.dialog('確認鍛造',g.name+' · '+X.TRAITS[trait].name,'選定特性後不能更換，每件裝備最多強化兩次。確認後才會扣除工坊列出的零件與銅幣。','',act('返回工坊','party-forge')+act('確認鍛造','party-forge-confirm',id),{summary:'確認鍛造'+X.TRAITS[trait].name+'。選定後不能更換。'});return true;}
@@ -202,8 +209,8 @@
       const result=P.strike(r(),m.id,{memberId,front,skillId},r().revision);if(!commit(result,false))return;
       ctx.audio.sfxHit();if(result.effect.stunned){m.windup=0;ctx.quest('stun',{monsterId:m.id});}
       if(result.effect.dead){m.alive=false;m.model.visible=false;ctx.quest('defeat',{monsterId:m.id});ctx.toast(result.message,2600,result.message);if(memberId){ctx.audio.sfxGuardDefeat?.();if(r().party.members.find(x=>x.id===memberId)?.profession==='swordsman')root.GameVoice?.announceAsset('guard.defeat','怪物已經打倒了，繼續前進！',true);}ctx.save();}
-      else if(result.effect.broken)ctx.toast('武器用壞了！仍可徒手攻擊，記得找商人補充。',2000,'武器用壞了');
-      if(result.effect.stunned||skillId==='backstab')m.windup=0;return result;
+      else if(result.effect.broken)ctx.toast('武器用壞了！可換上備用武器，或請鍛匠在營地修復。',2400,'武器壞了，找鍛匠修理吧');
+      if(result.effect.stunned||skillId==='backstab'||skillId==='decisive_slash')m.windup=0;return result;
     }
     function attack(){if(!live()||ctx.paused()||ctx.G.shifting||(modern()?H.actor(r()).attack:skillLeft)>0)return;skillLeft=modern()?H.stats(r()).interval:X.attackInterval(r());ctx.audio.sfxSwing();ctx.swing();
       const facing=ctx.player()?.rotation.y||0,target=ctx.monsters().filter(m=>{const p=m.model.position;return m.alive&&distance(p)<(modern()?H.stats(r()).reach:2.8)&&clear(p)&&Math.cos(Math.atan2(p.x-ctx.G.px,p.z-ctx.G.pz)-facing)>-.05;}).sort((a,b)=>distance(a.model.position)-distance(b.model.position))[0];
@@ -213,11 +220,11 @@
     function guard(m,dt){if(!live())return false;if(heroes?.blocker(m,dt))return true;
       const provoke=modern()?H.state(r()).enemy[m.id]:null;if(provoke?.tauntLeft>0&&provoke.tauntId!==H.state(r()).active){const bait=actors.find(a=>a.id===provoke.tauntId);if(bait&&H.hp(r(),bait.id)>0&&Math.hypot(bait.model.position.x-m.model.position.x,bait.model.position.z-m.model.position.z)>(m.def.ranged?7:1.7)){ctx.follow(m,dt,m.def.speed??2.1,1.35,bait.model.position,{direct:true});return true;}}const a=actors.find(a=>{const member=records().find(x=>x.id===a.id);return (modern()?H.pv(r(),'guard_instinct',a.id)>0||(H.state(r()).enemy[m.id]?.tauntLeft>0&&H.state(r()).enemy[m.id]?.tauntId===a.id):member?.profession==='swordsman')&&member.hp>0&&Math.hypot(a.model.position.x-m.model.position.x,a.model.position.z-m.model.position.z)<(m.def.ranged?7:1.8)&&ctx.clear(a.model.position.x,a.model.position.z,m.model.position.x,m.model.position.z);});
       if(!a){m.partyGuardId=null;return false;}if(m.partyGuardId!==a.id&&guardVoiceLeft<=0){root.GameVoice?.announceAsset('guard.hold','我來擋住牠，你先走！',true);guardVoiceLeft=8;}m.partyGuardId=a.id;m.path=[];m.model.rotation.y=Math.atan2(a.model.position.x-m.model.position.x,a.model.position.z-m.model.position.z);m.cooldown=Math.max(0,m.cooldown-dt);
-      if(m.windup>0){m.windup-=dt;if(m.windup<=0){if(modern())H.setBuff(r(),a.id,'intercept',.1,1);const status=modern()?H.state(r()).enemy[m.id]:null,weak=status?.weak||0;if(status)status.weak=0;const hit=P.hurtMember(r(),a.id,m.def.damage*(1-weak),r().revision);if(commit(hit,false)){ctx.audio.sfxGuardBlock?.();if(hit.effect.down)ctx.toast(hit.message,2500,hit.message);}m.cooldown=2.4;}}
+      if(m.windup>0){m.windup-=dt;if(m.windup<=0){if(modern())H.setBuff(r(),a.id,'intercept',.1,1);const status=modern()?H.state(r()).enemy[m.id]:null,weak=Math.max(status?.weak||0,status?.relayWeak>0?.25:0);if(status)status.weak=0;const hit=P.hurtMember(r(),a.id,m.def.damage*(1-weak),r().revision);if(commit(hit,false)){ctx.audio.sfxGuardBlock?.();if(hit.effect.down)ctx.toast(hit.message,2500,hit.message);}m.cooldown=2.4;}}
       else if(m.cooldown<=0)m.windup=.9;return true;
     }
     function shift(){
-      pruneRecruits();working=null;queueClock=0;if(modern()){const seconds=H.teamPassive(r(),'intuition');if(seconds)r().effects.reveal=seconds;}heroes?.reset();const placed=[];
+      pruneRecruits();working=null;queueClock=0;if(modern()){const seconds=H.teamPassive(r(),'intuition');if(seconds)r().effects.reveal=seconds;}heroes?.reset();if(modern())root.TowerHeroGrowth.state(r()).route=null;const placed=[];
       for(const a of actors){
         const c=ctx.worldToCell(a.model.position.x,a.model.position.z),centre=ctx.cell(c.x,c.y),p=companionSpawn(centre,placed,placed.length);
         a.model.position.set(p.x,0,p.z);a.path=[];a.pathLeft=0;a.safeTurn=false;a.queueLeader=null;placed.push(a);
@@ -268,7 +275,7 @@
       for(const s of stations)if(s.kind==='recruit')friendlyVisibility(s.model);
       orderQueue(dt);
       let leader={x:ctx.G.px,z:ctx.G.pz},leaderId='player';
-      for(const a of queue){const m=records().find(m=>m.id===a.id);if(!m)continue;friendlyVisibility(a.model);a.model.userData.partyHp.scale.x=.94*Math.max(.001,m.hp/P.memberMax(m));a.model.rotation.z=m.hp<=0?.2:0;if(m.hp<=0)continue;
+      for(const a of queue){const m=records().find(m=>m.id===a.id);if(!m)continue;friendlyVisibility(a.model);a.model.userData.partyHp.scale.x=.94*Math.max(.001,m.hp/(modern()?H.maxHp(r(),m.id):P.memberMax(m)));a.model.rotation.z=m.hp<=0?.2:0;if(m.hp<=0)continue;
         const enemy=ctx.monsters().filter(e=>e.alive&&distance(e.model.position)<6&&ctx.clear(a.model.position.x,a.model.position.z,e.model.position.x,e.model.position.z)).sort((a,b)=>distance(a.model.position)-distance(b.model.position))[0];
         const fighting=(modern()?H.pv(r(),'guard_instinct',a.id)>0:m.profession==='swordsman')&&enemy,target=fighting?enemy.model.position:leader,targetId=fighting?'enemy:'+enemy.id:leaderId;
         if(a.queueLeader!==targetId){a.queueLeader=targetId;a.path=[];a.pathLeft=0;}
@@ -282,7 +289,7 @@
         for(const key of ['legL','legR'])if(a.model.userData[key])a.model.userData[key].rotation.x=moving?Math.sin(now*.01)*(key==='legL'?1:-1)*.35:0;
         if(a.model.userData.armR){const elapsed=(m.profession==='mage'?3:1.8)-m.cooldown;a.model.userData.armR.rotation.x=m.cooldown>0&&elapsed<.45?-Math.sin(elapsed/.45*Math.PI)*1.1:0;}
         if(!modern()&&m.profession==='healer'&&m.cooldown<=0&&r().hp<30&&r().party.ingredients.herb&&distance(a.model.position)<5){const result=ctx.core.transaction(r(),r().revision,n=>{n.party.ingredients.herb--;n.hp=Math.min(ctx.core.MAX_HP,n.hp+16);n.party.members.find(x=>x.id===m.id).cooldown=20;return {ok:true,message:'澄音用香草替你包紮了傷口。'};});commit(result);}
-        if(enemy&&m.cooldown<=0&&(modern()||['swordsman','mage','scout'].includes(m.profession))&&Math.hypot(a.model.position.x-enemy.model.position.x,a.model.position.z-enemy.model.position.z)<(modern()?H.stats(r(),m.id).reach:m.profession==='mage'?6:2.4)){
+        if(enemy&&m.cooldown<=0&&!(modern()&&heroes.wantsSkill(m.id))&&(modern()||['swordsman','mage','scout'].includes(m.profession))&&Math.hypot(a.model.position.x-enemy.model.position.x,a.model.position.z-enemy.model.position.z)<(modern()?H.stats(r(),m.id).reach:m.profession==='mage'?6:2.4)){
           a.model.rotation.y=Math.atan2(enemy.model.position.x-a.model.position.x,enemy.model.position.z-a.model.position.z);root.CharacterMotion?.beginAction(a.model,'attack',.5);applyHit(enemy,m.id);
         }
       }

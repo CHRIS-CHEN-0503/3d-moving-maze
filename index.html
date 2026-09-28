@@ -613,7 +613,7 @@ button:focus-visible,input:focus-visible{outline:3px solid #fff;outline-offset:3
 }
 @media(prefers-reduced-motion:reduce){.flow-panel{animation:none}.home-action{transition:none}}
 </style>
-<link rel="stylesheet" href="assets/game-polish.css?v=1.36.0">
+<link rel="stylesheet" href="assets/game-polish.css?v=1.39.3">
 <link rel="stylesheet" href="assets/play-controls.css?v=1.32.0">
 <link rel="stylesheet" href="story/tower-party.css?v=1.39.0">
 </head>
@@ -732,7 +732,7 @@ button:focus-visible,input:focus-visible{outline:3px solid #fff;outline-offset:3
       <span id="cartWrap" style="display:none;">🛒 <b id="cartAmt">$0</b><span id="cartRank" style="font-size:.8rem;color:#8be9fd;margin-left:6px;"></span></span>
       <span><span class="ui-icon icon-shift inline-ui-icon" aria-hidden="true"></span><span id="shiftCountdown">--</span></span>
       <span><span class="ui-icon icon-castle inline-ui-icon" aria-hidden="true"></span><span id="hudLvlName"></span></span>
-      <span><span class="ui-icon icon-repeat inline-ui-icon" aria-hidden="true"></span><span id="hudRound">1/1</span></span>
+      <button type="button" id="hudRoundControl" disabled><span class="ui-icon icon-repeat inline-ui-icon" aria-hidden="true"></span><span id="hudRound">1/1</span></button>
     </div>
     <div id="minimapWrap">
       <canvas id="minimap" width="240" height="240"></canvas>
@@ -990,7 +990,7 @@ button:focus-visible,input:focus-visible{outline:3px solid #fff;outline-offset:3
    3D移動迷宮 — 給小朋友的變形迷宮冒險
    ===================================================== */
 const $=id=>document.getElementById(id);
-const GAME_VERSION='1.39.2';
+const GAME_VERSION='1.39.3';
 
 /* ---------- 設定（後台可調） ---------- */
 const DEFAULT_CFG={teamSize:2,shiftMin:3,itemCount:6,foodCount:4,hungerMin:3,stunSec:3,pingSec:3,smellCells:3,mazeSize:13,magicMap:0,duelMin:5,unpaidRate:100,musicOn:1,speechOn:1,speechVoice:'',apiUrl:'',roomMax:3,rounds:3,goodsCount:16,shopCollect:1,shopMin:2.5,cartFull:400,views:{fp:1,tp:1,top:1},broker:'wss://broker.emqx.io:8084/mqtt'};
@@ -5109,10 +5109,10 @@ window.addEventListener('pagehide',()=>{AudioEng.shiftSound?.stop();AudioEng.com
 <script src="story/tower-audio.js"></script>
 <script src="story/tower-expedition-core.js?v=1.38.0"></script>
 <script src="story/tower-lighting-core.js?v=1.39.1"></script>
-<script src="story/tower-party-core.js?v=1.39.0"></script>
-<script src="story/tower-party-runtime.js?v=1.39.2"></script>
+<script src="story/tower-party-core.js?v=1.39.3"></script>
+<script src="story/tower-party-runtime.js?v=1.39.3"></script>
 <script src="story/tower-lighting-runtime.js?v=1.39.1"></script>
-<script src="story/tower-mode.js?v=1.39.2"></script>
+<script src="story/tower-mode.js?v=1.39.3"></script>
 <script src="assets/room-lifecycle.js?v=1.36.0"></script>
 <script src="assets/shop-collection-core.js?v=1.31.0"></script>
 <script src="assets/shop-collection.js?v=1.31.0"></script>

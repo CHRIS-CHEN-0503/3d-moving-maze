@@ -42,6 +42,7 @@ function harness(initialSave, runtimeBridge = '',preferences = {}) {
     get innerHTML() { return this._html; }
     appendChild(child) { this.children.push(child); return child; }
     setAttribute(key, value) { this[key] = value; }
+    removeAttribute(key) { delete this[key]; }
     getContext() { return { strokeText() {}, fillText() {} }; }
     addEventListener(type, fn) { this.listeners.set(type, fn); }
     closest(selector) { return selector === 'button[data-tower]' && this.dataset.tower ? this : null; }
@@ -49,7 +50,7 @@ function harness(initialSave, runtimeBridge = '',preferences = {}) {
     focus() { document.activeElement = this; }
   }
   const document = { body: new Element('body'), hidden: false, activeElement: null, getElementById: id => elements.get(id) || null, createElement: tag => new Element(tag), addEventListener() {} };
-  for (const id of ['gameScreen', 'hudRightBtns', 'storyEntryBtn', 'joyBase', 'joyStick', 'playerName', 'profileTitle', 'profileNextBtn', 'hudLvlName', 'hudRound', 'shiftCountdown', 'preWarn', 'preWarnSec']) { const element = new Element(); element.id = id; }
+  for (const id of ['gameScreen', 'hudRightBtns', 'storyEntryBtn', 'joyBase', 'joyStick', 'playerName', 'profileTitle', 'profileNextBtn', 'hudLvlName', 'hudRound', 'hudRoundControl', 'shiftCountdown', 'preWarn', 'preWarnSec']) { const element = new Element(); element.id = id; }
   const buildCharacter = () => {
     const model = new THREE.Group();
     for (const name of ['body', 'armL', 'armR', 'legL', 'legR']) { const part = new THREE.Group(); model.userData[name] = part; model.add(part); }

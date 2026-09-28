@@ -72,7 +72,12 @@
     const h=hash(run.seed,`recruit:${run.floor}`), early=[99,97,95,93,91,89];
     if(!early.includes(run.floor)&&h%100>=45)return null;
     const jobs=Object.keys(PROFESSIONS),job=jobs[early.includes(run.floor)?early.indexOf(run.floor):h%6],level=Math.min(5,1+Math.floor((99-run.floor)/22));
-    return {id:`companion:${run.floor}:${run.seed}`,profession:job,level,price:8+level*4};
+    const id=`companion:${run.floor}:${run.seed}`;
+    // Each profession is one named traveller, not a new person on every floor.
+    // Resting/downed members still belong to the party. Preserve the seeded
+    // offer instead of rerolling it when the player recruits or dismisses someone.
+    if(run.party?.joined.includes(id)||run.party?.members.some(m=>m.profession===job))return null;
+    return {id,profession:job,level,price:8+level*4};
   }
   function recruit(run,id,revision){return transact(run,revision,(n,p)=>{
     const offer=recruitOffer(n);if(!offer||offer.id!==id||p.joined.includes(id))return {ok:false,message:'這位旅人已經離開，或已受過你的邀請。'};

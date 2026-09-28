@@ -14,6 +14,7 @@
   let shiftLeft = C.floorConfig(99).shiftSeconds, wasShifting = false, floorConfig = null, saveClock = 0, hudClock = 0;
   let attackLeft = 0, hurtLeft = 0, warning = false, floorStarted = false, saveFailed = false;
   let encounterHold = 0;
+  let objectiveHint = null;
   let hurtFlash = 0, guardClashAt = 0;
   let bolts = [];
   let mainClue = null, rift = null, dungeonObjects = [], nearbyJourney = null, exploredCells = new Set(), reader = null, sideReader = null;
@@ -49,6 +50,75 @@
   const text = escapeHtml;
   const el = id => document.getElementById(id);
 
+  function createObjectiveHint(control,panel,available,readText) {
+    let enabled=false,left=0,pointer=null,key=null,focused=true,shown=null,at=null;
+    const ready=()=>enabled&&focused&&!document.hidden&&available();
+    function show(value){
+      if(shown===value)return;shown=value;panel.hidden=!value;
+      if(enabled)control.setAttribute('aria-expanded',String(value));
+    }
+    function render(){
+      const canShow=ready();if(canShow&&at===null)at=performance.now();
+      const visible=canShow&&(left>0||pointer!==null||key!==null);
+      if(visible&&readText){const message=readText();if(message!=null&&panel.textContent!==message)panel.textContent=message;}
+      show(visible);
+    }
+    function releasePointer(){
+      const id=pointer;pointer=null;
+      if(id!==null)try{if(control.hasPointerCapture(id))control.releasePointerCapture(id);}catch(_){}
+    }
+    function suspend(){releasePointer();key=null;at=null;show(false);}
+    function endPointer(event){
+      if(event.pointerId!==pointer)return;
+      event.preventDefault();event.stopPropagation();releasePointer();render();
+    }
+    control.addEventListener('pointerdown',event=>{
+      if(!ready()||pointer!==null||event.button!==0)return;
+      event.preventDefault();event.stopPropagation();left=0;pointer=event.pointerId;
+      try{control.setPointerCapture(pointer);}catch(_){}
+      render();
+    });
+    control.addEventListener('pointercancel',endPointer);
+    control.addEventListener('lostpointercapture',endPointer);
+    window.addEventListener('pointerup',endPointer);
+    control.addEventListener('keydown',event=>{
+      if(!ready()||!['Space','Enter'].includes(event.code))return;
+      event.preventDefault();event.stopPropagation();if(key!==null)return;
+      left=0;key=event.code;render();
+    });
+    window.addEventListener('keyup',event=>{
+      if(event.code!==key)return;
+      event.preventDefault();event.stopPropagation();key=null;render();
+    });
+    control.addEventListener('click',event=>{if(enabled){event.preventDefault();event.stopPropagation();}});
+    control.addEventListener('contextmenu',event=>{if(enabled)event.preventDefault();});
+    control.addEventListener('blur',()=>{if(pointer!==null||key!==null){suspend();render();}});
+    window.addEventListener('blur',()=>{focused=false;suspend();});
+    window.addEventListener('focus',()=>{focused=true;render();});
+    document.addEventListener('visibilitychange',()=>{if(document.hidden)suspend();else render();});
+    return {
+      enter(){
+        suspend();enabled=true;left=3;
+        control.disabled=false;control.setAttribute('role','button');control.tabIndex=0;
+        control.setAttribute('aria-controls',panel.id);
+        control.setAttribute('aria-expanded','false');
+        control.setAttribute('aria-label','按住查看劇情目標，放開隱藏');
+        control.title='按住查看劇情目標';render();
+      },
+      tick(){
+        if(!ready()){suspend();return;}
+        // The engine clamps frame time for movement. Use the actual visible
+        // elapsed time here so slow phones still dismiss the hint in 3 seconds.
+        const now=performance.now();left=Math.max(0,left-(at===null?0:Math.max(0,now-at)/1000));at=now;if(left<1e-6)left=0;render();
+      },
+      suspend,refresh:render,
+      stop(){
+        suspend();enabled=false;left=0;control.disabled=true;control.tabIndex=-1;control.title='';
+        for(const name of ['role','aria-controls','aria-label','aria-expanded'])control.removeAttribute(name);
+      },
+    };
+  }
+
   function setHudExpanded(expanded,persist=false) {
     el('towerHudDetails').hidden=!expanded;
     const toggle=el('towerHudToggle');
@@ -77,7 +147,8 @@
     // 固定圖示不隨互動類型變動；文字僅供輔助閱讀，保留原本 R 互動。
     talk.innerHTML='<svg viewBox="0 0 32 32" aria-hidden="true" focusable="false"><path d="M23 18h2a3 3 0 0 0 3-3V8a3 3 0 0 0-3-3H13a3 3 0 0 0-3 3v2"/><path d="M7 12h12a3 3 0 0 1 3 3v7a3 3 0 0 1-3 3h-6l-6 4v-4a3 3 0 0 1-3-3v-7a3 3 0 0 1 3-3Z"/><path d="M9 18h.1M13 18h.1M17 18h.1"/></svg>';
     el('hudRightBtns').appendChild(talk);
-    const objective = document.createElement('div'); objective.id = 'towerObjective'; el('gameScreen').appendChild(objective);
+    const objective = document.createElement('div'); objective.id = 'towerObjective'; objective.hidden=true; el('gameScreen').appendChild(objective);
+    objectiveHint=createObjectiveHint(el('hudRoundControl'),objective,()=>active&&floorStarted&&G.running&&!paused&&run?.status==='playing',()=>N&&!inDungeon()?N.objective(run):null);
     const overlay = document.createElement('div'); overlay.id = 'towerOverlay'; overlay.hidden = true;
     overlay.innerHTML = '<section id="towerDialog" class="tower-card" role="dialog" aria-modal="true" aria-labelledby="towerDialogTitle" tabindex="-1"></section>';
     document.body.appendChild(overlay);
@@ -141,6 +212,7 @@
       Object.keys(keys).forEach(k => delete keys[k]); joy.active = false; joy.dx = joy.dy = 0;
       el('joyBase').style.display = el('joyStick').style.display = 'none';
     }
+    objectiveHint?.suspend();
     if (el('towerOverlay').hidden) modalFocus = document.activeElement;
     el('towerOverlay').hidden = false;
     const closeButton=!pendingDungeonShift&&(!active||(run.status==='playing'&&G.running&&floorStarted))?'<button class="tower-close" data-tower="close" aria-label="關閉對話並返回">返回</button>':'';
@@ -172,6 +244,7 @@
     }
     if (modalFocus && modalFocus.isConnected) modalFocus.focus();
     if(active&&floorStarted)partyUI?.hud();
+    objectiveHint?.refresh();
   }
   function readSave() {
     try { return C.validateSave(JSON.parse(localStorage.getItem(SAVE) || 'null')); }
@@ -230,6 +303,7 @@
     loadFloor(true);
   }
   function loadFloor(intro) {
+    objectiveHint?.suspend();
     pendingDungeonShift=null;closeDialog(); floorStarted = false; reader=null;sideReader=null;
     lightingUI?.reset();
     floorConfig = C.floorConfig(run.floor);
@@ -253,6 +327,7 @@
     floorStarted = true; saveClock = 0; attackLeft = 0; hurtLeft = 3; wasShifting = false;
     clearHurtFeedback();guardClashAt=0;
     save(); updateHud();
+    objectiveHint?.enter();
     if(instance){dungeonBriefing();return;}
     if(N){
       const chapter=N.chapterForFloor(run.floor),scene=run.floor===chapter.high&&N.scenesForFloor(run.floor).find(entry=>!run.chronicle.read.includes(entry.id));
@@ -766,6 +841,7 @@
   }
   function tick(dt, now) {
     if (!active || !floorStarted) return;
+    objectiveHint?.tick(dt);
     if(G.shifting)clearBolts();
     if (wasShifting && !G.shifting) {
       wasShifting = false;
@@ -832,6 +908,7 @@
     if(run.effects.reveal>0){G.mapUntil=now+250; if(!G.solutionPath){const p=worldToCell(G.px,G.pz);G.solutionPath=solveMaze(p.x,p.y);}}
     hudClock+=dt;if(hudClock>.15){hudClock=0;updateHud();}
     saveClock+=dt;if(saveClock>8){saveClock=0;save();}
+    objectiveHint?.refresh();
   }
   function hasClearPath(ax,az,bx,bz) {
     const steps=Math.ceil(Math.hypot(bx-ax,bz-az)/.3);
@@ -1167,6 +1244,7 @@
     window.GameVoice?.stop(true);
     if(window.TowerAudio)window.TowerAudio.stop();
     active=false;floorStarted=false;paused=false;
+    objectiveHint?.stop();
     partyUI?.reset();
     lightingUI?.reset();
     clearBolts();

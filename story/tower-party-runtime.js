@@ -166,7 +166,7 @@
       }
       if(key==='party-dismiss-ask'){const m=r().party.members.find(m=>m.id===id);if(m)ctx.dialog('與同伴道別','確定讓'+P.PROFESSIONS[m.profession].person+'離隊？','這位旅人會繼續自己的旅程，不能在原地重新招募。已支付的費用不會退回。','',act('繼續同行','party-team')+act('確定道別','party-dismiss',id));return true;}
       if(key==='party-dismiss'){if(commit(P.dismiss(r(),id,r().revision))){syncActors();panel('team',true);}return true;}
-      if(key==='party-recruit'){if(!near||near.kind!=='recruit'||distance(near)>2.6||!clear(near))return true;if(commit(P.recruit(r(),id,r().revision))){near.model.visible=false;near=null;syncActors();panel('team',true);}return true;}
+      if(key==='party-recruit'){if(!near||near.kind!=='recruit'||distance(near)>2.6||!clear(near))return true;if(commit(P.recruit(r(),id,r().revision))){const station=near;group.remove(station.model);ctx.dispose(station.model);stations=stations.filter(s=>s!==station);near=null;offer=null;syncActors();panel('team',true);}return true;}
       if(key==='party-cook'&&safeCamp()){if(commit(P.cook(r(),id,r().revision)))panel('cook',true);return true;}
       if(key==='party-eat'){if(commit(P.eat(r(),id,r().revision)))panel('cook',true);return true;}
       if((key==='party-rest'||key==='party-repair')&&safeCamp()){if(commit(P.camp(r(),key==='party-rest'?'rest':'repair',r().revision)))panel('cook',true);return true;}return true;

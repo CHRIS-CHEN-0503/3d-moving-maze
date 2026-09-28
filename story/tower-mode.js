@@ -118,7 +118,7 @@
     if(P&&window.TowerPartyRuntime){
       partyUI=window.TowerPartyRuntime.create({THREE,G,core:C,text,action,dialog,transact,save,toast:showToast,audio:AudioEng,quest:questEvent,
         run:()=>run,paused:()=>paused,world:()=>world,monsters:()=>monsters,traders:()=>traders,player:()=>playerGroup,camera:()=>camera,inDungeon,
-        clear:hasClearPath,followClear:followerClear,cell:cellPoint,worldToCell,chooseCell,makeText:makeTextSprite,follow:followNpc,dispose:disposeSceneObject,damage,
+        clear:hasClearPath,followClear:followerClear,followDistance:followerDistance,cell:cellPoint,worldToCell,chooseCell,makeText:makeTextSprite,follow:followNpc,dispose:disposeSceneObject,damage,
         close:closeDialog,refreshGear,hurt:()=>hurtLeft>0,passage:openExplorationPassage,
         bind:bindActionBtn,swing:()=>{attackLeft=.8;window.CharacterMotion?.beginAction(playerGroup,'attack',.8);}});
       partyUI.install();
@@ -671,23 +671,40 @@
     for(let i=1;i<=steps;i++)if(playerInWall(a.x+(b.x-a.x)*i/steps,a.z+(b.z-a.z)*i/steps,.28))return false;
     return true;
   }
-  function followNpc(actor,dt,speed,stopDistance,target={x:G.px,z:G.pz}) {
+  function followerDistance(a,b){
+    if(followerClear(a,b))return Math.hypot(a.x-b.x,a.z-b.z);
+    const from=worldToCell(a.x,a.z),to=worldToCell(b.x,b.z),path=solveMaze(from.x,from.y,to.x,to.y);
+    if(!path.length)return Infinity;
+    if(path.length>1&&followerClear(a,cellToWorld(...path[1])))path.shift();
+    let distance=0,previous=a;
+    for(const cell of path){const p=cellToWorld(...cell);distance+=Math.hypot(p.x-previous.x,p.z-previous.z);previous=p;}
+    return distance+Math.hypot(b.x-previous.x,b.z-previous.z);
+  }
+  function followNpc(actor,dt,speed,stopDistance,target={x:G.px,z:G.pz},options={}) {
     const p=actor.model.position;
     actor.pathLeft=Math.max(0,(actor.pathLeft||0)-dt);
     if(Math.hypot(target.x-p.x,target.z-p.z)<=stopDistance&&followerClear(p,target))return false;
+    // A moving queue leader may stop between cell centres. Follow that exact
+    // position when the full body can pass, without circling the cell centre.
+    if(options.direct&&!actor.safeTurn&&followerClear(p,target)){
+      const dx=target.x-p.x,dz=target.z-p.z,len=Math.hypot(dx,dz),step=Math.min(Math.max(0,len-stopDistance),speed*Math.min(dt,.1));
+      const next={x:p.x+dx/len*step,z:p.z+dz/len*step};
+      if(followerClear(p,next)){actor.path=[];p.x=next.x;p.z=next.z;actor.model.rotation.y=Math.atan2(dx,dz);return step>0;}
+      actor.safeTurn=true;actor.path=[];actor.pathLeft=0;
+    }
     let waypoint=actor.path?.length?cellToWorld(...actor.path[0]):null;
     // 到達安全路點才重算，不能因已跨入下一格就略過尚未走完的轉角。
-    if(waypoint&&Math.hypot(waypoint.x-p.x,waypoint.z-p.z)<.03){actor.path.shift();waypoint=null;}
+    if(waypoint&&Math.hypot(waypoint.x-p.x,waypoint.z-p.z)<.03){actor.path.shift();actor.safeTurn=false;waypoint=null;}
     if((!actor.path?.length||!waypoint)&&actor.pathLeft<=0){
       const a=worldToCell(p.x,p.z),b=worldToCell(target.x,target.z);
       actor.path=solveMaze(a.x,a.y,b.x,b.y);actor.pathLeft=.5;
-      if(actor.path.length>1&&followerClear(p,cellToWorld(...actor.path[1])))actor.path.shift();
+      if(actor.path.length>1&&!actor.safeTurn&&followerClear(p,cellToWorld(...actor.path[1])))actor.path.shift();
     }
     waypoint=actor.path?.length?cellToWorld(...actor.path[0]):target;
-    if(Math.hypot(waypoint.x-p.x,waypoint.z-p.z)<.03){actor.path.shift();return false;}
+    if(Math.hypot(waypoint.x-p.x,waypoint.z-p.z)<.03){actor.path.shift();actor.safeTurn=false;return false;}
     const dx=waypoint.x-p.x,dz=waypoint.z-p.z,len=Math.hypot(dx,dz),step=Math.min(len,speed*Math.min(dt,.1));
     const next={x:p.x+dx/len*step,z:p.z+dz/len*step};
-    if(!followerClear(p,next)){actor.path=[];return false;}
+    if(!followerClear(p,next)){actor.path=[];actor.pathLeft=0;actor.safeTurn=true;return false;}
     p.x=next.x;p.z=next.z;actor.model.rotation.y=Math.atan2(dx,dz);
     return step>0;
   }

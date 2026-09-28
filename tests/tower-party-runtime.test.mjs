@@ -86,3 +86,27 @@ test('six companion professions survive stairs and rebuild outside the full walk
     }
   }
 });
+test('scene rebuild never spawns a named recruit already following the player, including old saves and downed members',()=>{
+  for(const floor of [99,97,95,93,91,89])for(const hp of [0,20]){
+    const h=harness(floor),offer=P.recruitOffer(h.run),id='companion:earlier:'+offer.profession;
+    h.run.party.members=[{id,profession:offer.profession,level:2,hp,cooldown:0,hurtLeft:0}];h.run.party.joined=[id];
+    h.run=C.validateSave(JSON.stringify(h.run));assert.ok(h.run);const before=JSON.stringify(h.run);
+    h.ui.build(()=>.5,new Set());
+    assert.equal(h.ui.reserved().filter(s=>s.kind==='recruit').length,0,offer.profession);
+    assert.equal(h.ui.markers().filter(s=>s.label==='友').length,0);
+    const models=h.world.children.at(-1).children.filter(m=>m.userData.companionId);assert.equal(models.length,1);assert.equal(models[0].userData.companionId,id);
+    h.ui.shift();h.ui.tick(.01,100);assert.equal(h.ui.reserved().filter(s=>s.kind==='recruit').length,0);
+    assert.equal(JSON.stringify(h.run),before);
+  }
+});
+test('successful recruitment removes the idle NPC, interaction and map marker only after durable save',()=>{
+  const h=harness(99),station=h.ui.reserved().find(s=>s.kind==='recruit'),offer=P.recruitOffer(h.run),before=JSON.stringify(h.run);
+  h.G.px=station.x;h.G.pz=station.z;h.ui.tick(.01,100);
+  h.failSave=true;h.ui.handle('party-recruit',offer.id);
+  assert.equal(JSON.stringify(h.run),before);assert.ok(station.model.parent);assert.ok(h.ui.reserved().includes(station));assert.ok(h.ui.markers().some(s=>s.label==='友'));
+  h.failSave=false;h.ui.handle('party-recruit',offer.id);
+  assert.equal(h.run.party.members.length,1);assert.equal(station.model.parent,null);
+  assert.equal(h.ui.reserved().filter(s=>s.kind==='recruit').length,0);assert.equal(h.ui.markers().filter(s=>s.label==='友').length,0);assert.equal(h.ui.nearby,null);
+  h.ui.shift();h.ui.tick(.01,200);assert.equal(h.ui.interact(),false);
+  h.ui.build(()=>.5,new Set());assert.equal(h.ui.reserved().filter(s=>s.kind==='recruit').length,0);
+});

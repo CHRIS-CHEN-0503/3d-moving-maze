@@ -432,6 +432,11 @@ body.story-active #towerActionRail {
   line-height: 1.5;
   pointer-events: none;
 }
+#towerObjective[hidden] { display:none!important; }
+#hudRoundControl {display:inline-flex;align-items:center;gap:6px;background:none;border:0;color:inherit;font:inherit;padding:0;margin:0;opacity:1;pointer-events:none;}
+body.story-active #hudRoundControl[role="button"] {display:inline-flex;align-items:center;gap:6px;padding:4px 6px;margin:-4px -6px;border-radius:8px;pointer-events:auto;touch-action:none;user-select:none;-webkit-user-select:none;-webkit-touch-callout:none;cursor:pointer;}
+body.story-active #hudRoundControl[aria-expanded="true"] {background:#a4d8e522;color:#eafcff;}
+body.story-active #hudRoundControl:focus-visible {outline:2px solid #ffe2a2;outline-offset:2px;}
 
 @media (orientation: landscape) and (max-height: 540px) {
   #titleScreen { padding: 9px max(12px, env(safe-area-inset-right)) 10px max(12px, env(safe-area-inset-left)); }

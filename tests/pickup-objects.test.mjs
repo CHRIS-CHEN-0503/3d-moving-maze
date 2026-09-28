@@ -53,9 +53,11 @@ test('一張圖集失敗不阻斷另一張圖集；晚訂閱也收到通知且�
   let late=0;const unsubscribe=h.api.onReady(()=>late++);assert.equal(late,1);unsubscribe();
   h.images[0].onload();assert.equal(late,1);assert.equal(ready,2);
 });
-test('收合規則只隱藏輔助按鈕，不包含技能道具與劇情揮擊',()=>{
+test('設定彈窗取代收合：戰鬥技能不隱藏，背包與日誌常駐側欄',()=>{
   const css=readFileSync(new URL('../assets/play-controls.css',import.meta.url),'utf8');
-  const rule=css.match(/#gameScreen:not\(\.actions-open\)[^{]+\{visibility:hidden;pointer-events:none;\}/)[0];
-  assert.ok(rule.includes('#towerBagBtn'));assert.ok(rule.includes('#towerJournalBtn'));
-  assert.doesNotMatch(rule,/game-action-btn|#skillBtn|#towerAttackBtn|#captureRelay|#towerActionRail/);
+  assert.doesNotMatch(css,/#gameScreen:not\(\.actions-open\)[^{]+\{visibility:hidden/);
+  const dock=readFileSync(new URL('../assets/battle-dock.js',import.meta.url),'utf8'),skin=readFileSync(new URL('../assets/battle-dock.css',import.meta.url),'utf8');
+  assert.ok(dock.includes("['towerBagBtn','towerJournalBtn','viewToggle']"));
+  assert.ok(dock.includes("['heroQuickBar','heroSkillBar','towerProfessionBtn','towerAttackBtn','actionsToggle']"));
+  assert.match(skin,/flex-direction:column-reverse/);assert.match(skin,/flex-direction:row-reverse/);assert.match(skin,/#heroSkillBar[^}]*overflow-x:auto/);
 });

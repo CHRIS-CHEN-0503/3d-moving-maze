@@ -1,0 +1,39 @@
+/* Story battle controls: one bottom row, an always-visible utility column. */
+body.story-active #gameScreen{--dock-size:clamp(44px,5.65vw,60px);--dock-gap:5px;--dock-edge:calc(10px + env(safe-area-inset-bottom));--dock-right:calc(12px + env(safe-area-inset-right))}
+#battleDock{display:contents}
+#battleSettings{background:#142737;color:#f6e9cf;border:1px solid #829dab;border-radius:20px;padding:24px;max-width:min(460px,90vw);max-height:85vh;overflow:auto;text-align:center}#battleSettings::backdrop{background:#06101c99}
+#gameScreen #hudRightBtns{display:flex;opacity:1;pointer-events:none;transform:none}#gameScreen #hudRightBtns>#viewToggle{pointer-events:auto}#gameScreen #hudRightBtns>#soundToggle,#gameScreen #hudRightBtns>#quitBtn{display:none!important}
+#gameScreen:not(.actions-open) #hudRightBtns>.battle-control{visibility:visible;pointer-events:auto}
+body.story-active #battleDock{position:absolute;display:flex;align-items:end;justify-content:flex-end;gap:var(--dock-gap);right:var(--dock-right);bottom:var(--dock-edge);max-width:calc(100% - 24px - env(safe-area-inset-left) - env(safe-area-inset-right));z-index:26;pointer-events:none}
+body.story-active #gameScreen #heroQuickBar,body.story-active #gameScreen #heroSkillBar{position:static;left:auto;right:auto;bottom:auto;transform:none;display:flex;gap:var(--dock-gap);max-width:none;margin:0;pointer-events:auto}
+body.story-active #gameScreen #heroQuickBar{flex:0 0 auto;padding-right:10px;margin-right:5px;border-right:1px solid #a6cdb74d}
+body.story-active #gameScreen #heroSkillBar{flex:0 1 auto;flex-direction:row-reverse;min-width:0;overflow-x:auto;scrollbar-width:thin;scrollbar-color:#cfb977 #142a37;overscroll-behavior:contain}
+body.story-active #gameScreen #battleDock button,body.story-active #gameScreen #hudRightBtns>.battle-control{box-sizing:border-box;position:relative;flex:0 0 var(--dock-size);width:var(--dock-size);height:var(--dock-size);min-width:var(--dock-size);min-height:var(--dock-size);border:1px solid #90aebb;border-radius:11px;padding:3px 1px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:0;font:600 10px/1.15 system-ui;color:#f9ebc9;box-shadow:inset 0 1px 0 #ffffff12,0 3px 8px #0005;touch-action:manipulation;pointer-events:auto}
+body.story-active #gameScreen #battleDock .hero-skill{background:linear-gradient(#214557f5,#142d40f5)}
+body.story-active #gameScreen #battleDock .hero-quick{background:linear-gradient(#3a5647f5,#213c34f5);border-color:#8eaf98}
+body.story-active #gameScreen #battleDock .hero-icon,body.story-active #gameScreen .battle-control .hero-icon{width:calc(var(--dock-size) - 20px);height:calc(var(--dock-size) - 20px);filter:none;flex:none}
+body.story-active #gameScreen #battleDock .hero-quick .hero-icon{width:calc(var(--dock-size) - 12px);height:calc(var(--dock-size) - 12px)}
+.battle-control>svg{fill:none;stroke:currentColor;stroke-width:3;stroke-linecap:round;stroke-linejoin:round}
+body.story-active #gameScreen .battle-control>svg{position:static;inset:auto;margin:0}
+body.story-active #gameScreen #battleDock #towerAttackBtn{background:linear-gradient(#674739f5,#432c29f5);border-color:#bf9981}
+body.story-active #gameScreen #actionsToggle{position:relative;right:auto;bottom:auto;background:linear-gradient(#414756f5,#272e3af5);border-color:#87929f}
+body.story-active #gameScreen .battle-control small{position:absolute;right:4px;top:2px;font-size:9px;color:#d1dce1}
+body.story-active #gameScreen #hudRightBtns{display:flex!important;visibility:visible!important;opacity:1!important;pointer-events:none;transform:none!important;right:var(--dock-right);bottom:calc(var(--dock-edge) + var(--dock-size) + 8px);top:auto;gap:var(--dock-gap);flex-direction:column-reverse}
+body.story-active #gameScreen #hudRightBtns>#soundToggle,body.story-active #gameScreen #hudRightBtns>#quitBtn{display:none!important}
+body.story-active #gameScreen #towerBagBtn{background:linear-gradient(#6a5439f5,#42362af5);border-color:#b9a17c}
+body.story-active #gameScreen #towerJournalBtn{background:linear-gradient(#514364f5,#322b45f5);border-color:#ad9ac5}
+body.story-active #gameScreen #viewToggle{background:linear-gradient(#2e555cf5,#203840f5);border-color:#86b2b9}
+body.story-active #gameScreen #towerTalkBtn{position:absolute;right:calc(100% + 10px);bottom:calc((var(--dock-size) + var(--dock-gap))*2);width:var(--dock-size);height:var(--dock-size);min-height:var(--dock-size);pointer-events:auto}
+body.story-active #towerActionRail{display:none!important}
+body.story-active #gameScreen #battleDock #towerProfessionBtn{position:static;font-size:10px;white-space:normal;min-width:var(--dock-size);max-width:var(--dock-size)}
+body.story-active #gameScreen #battleDock [hidden]{display:none!important}
+body.story-active #towerObjective{bottom:calc(var(--dock-edge) + var(--dock-size) + 14px);max-width:min(420px,50vw);pointer-events:none}
+body.story-active #toast{bottom:calc(24px + clamp(44px,5.65vw,60px) + env(safe-area-inset-bottom));max-width:50vw}
+body:not(.story-active) #hudRightBtns>#towerBagBtn,body:not(.story-active) #hudRightBtns>#towerJournalBtn,body:not(.story-active) #battleDock>#towerAttackBtn{display:none!important}
+body:not(.story-active) #heroQuickBar,body:not(.story-active) #heroSkillBar,body:not(.story-active) #heroTeamBar,body:not(.story-active) #towerProfessionBtn{display:none!important}
+body:not(.story-active) #gameScreen #hudRightBtns>.battle-control,body:not(.story-active) #gameScreen #actionsToggle{width:48px;height:48px;min-height:48px;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:0;padding:3px;border-radius:11px;background:#263c4df2;border:1px solid #90aebb;color:#f9ebc9;font:600 10px/1.15 system-ui}
+body:not(.story-active) #gameScreen .battle-control .hero-icon{position:static;inset:auto;width:27px;height:27px;flex:none;margin:0;filter:none}
+body:not(.story-active) #gameScreen .battle-control small:empty{display:none}
+.battle-settings-options{display:flex;flex-wrap:wrap;gap:14px;justify-content:center;padding:16px 0}.battle-settings-options .tower-btn{min-width:140px;min-height:56px}
+.skill-sort-list{display:grid;gap:8px;margin:12px 0}.skill-sort-row{display:flex;align-items:center;gap:10px;padding:8px;background:#1a3444;border:1px solid #4b687a;border-radius:10px}.skill-sort-row .hero-icon{width:38px;height:38px}.skill-sort-row strong{flex:1;font-size:16px}.skill-sort-row .tower-btn{min-width:44px;min-height:44px;padding:8px}.skill-sort-row small{color:#c4d2de}
+@media(max-width:700px){body.story-active #gameScreen{--dock-gap:4px}body.story-active #gameScreen #heroQuickBar{padding-right:6px;margin-right:2px}body.story-active #gameScreen #battleDock button{font-size:9px}}

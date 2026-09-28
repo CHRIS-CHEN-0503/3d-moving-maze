@@ -5,9 +5,7 @@
 #actionsToggle {position:absolute;right:calc(10px + env(safe-area-inset-right));bottom:calc(10px + env(safe-area-inset-bottom));z-index:38;pointer-events:auto;border-radius:50%;width:50px;height:50px;}
 #actionsToggle svg,#shopTrapBtn svg {width:26px;height:26px;fill:none;stroke:currentColor;stroke-width:2.4;stroke-linecap:round;stroke-linejoin:round;}
 #actionsToggle svg {position:absolute;top:3px;left:11px;}
-#gameScreen:not(.actions-open) #hudRightBtns > button:not(#towerTalkBtn),
-#gameScreen:not(.actions-open) #towerBagBtn,
-#gameScreen:not(.actions-open) #towerJournalBtn {visibility:hidden;pointer-events:none;}
+/* Utility buttons stay visible; audio and leaving now live in Settings. */
 /* 即時技能、攻擊與道具不受輔助選單控制，僅由玩法決定是否可用。 */
 body.story-active #towerActionRail {pointer-events:none;}
 #towerActionRail > button {pointer-events:auto;}

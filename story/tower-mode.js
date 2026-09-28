@@ -240,6 +240,7 @@
     el('towerDialog').voiceSpeaker=roleSpeaker?{...roleSpeaker,npc:true}:{};
     if(!narration.silent)window.GameVoice?.readPanel(el('towerDialog'));
   }
+  function openBattleSettings(){if(!active||!G.running)return;dialog('旅程暫停中','遊戲設定','音樂與離開集中在這裡，關閉後繼續冒險。','<div class="battle-settings-options">'+action('音樂：'+(G.muted?'關':'開'),'battle-music')+action('離開遊戲','quit')+(modern()?action('技能排序','hero-order')+action('自動行動／快捷欄','hero-policy'):'')+'</div>',action('繼續遊戲','close'),{summary:'遊戲設定。音樂、離開遊戲、技能排序。'});}
   function closeDialog() {
     if(pendingDungeonShift)return;
     pendingWarriorReplacement=null;
@@ -829,14 +830,14 @@
     el('towerTalkBtn').disabled = !nearest && !nearestWarrior && !nearbyEncounter; el('towerTalkBtn').ariaLabel = nearbyEncounter ? (nearbyEncounter===chest?'開箱（R）':'對話（R）') : nearestWarrior ? '對話：聘請（R）' : nearest ? '對話：交易（R）' : '附近無人';
     if(!run.party){el('towerGuardStatus').hidden = !run.warrior;el('towerGuardStatus').textContent = warriorStatus();}
     el('towerGearStatus').textContent=Object.entries(run.equipment).map(([slot,gear])=>({helmet:'盔',armor:'甲',shield:'盾',weapon:'武'}[slot])+' '+(gear?gear.durability:'—')).join(' · ');
-    el('towerAttackBtn').disabled = attackLeft > 0 || !run.equipment.weapon; el('towerAttackBtn').textContent = !run.equipment.weapon?'需裝備武器':attackLeft > 0 ? '擊暈 ' + attackLeft.toFixed(1) : '擊暈 X';
+    el('towerAttackBtn').disabled = attackLeft > 0 || !run.equipment.weapon;if(window.BattleDock)BattleDock.attackLabel(!run.equipment.weapon?'徒手':'揮擊',attackLeft);else el('towerAttackBtn').textContent = !run.equipment.weapon?'需裝備武器':attackLeft > 0 ? '擊暈 ' + attackLeft.toFixed(1) : '擊暈 X';
     const effects = Object.entries(run.effects).filter(([,v])=>v>0).map(([k,v])=>({shield:'護盾',freeze:'定牆',repel:'驅怪',reveal:'出口路線'}[k])+' '+Math.ceil(v)+'秒');
     el('towerObjective').textContent = nearestWarrior ? '戰士 '+nearestWarrior.offer.strength+'/5 · '+costText(nearestWarrior.offer.cost)+' · 點「聘請」查看契約' : effects.length ? effects.join(' · ') : nearest ? nearest.name + '：靠近後可購買／出售補給' : '找到金色傳送門，前往' + (run.floor > 1 ? '第 ' + (run.floor - 1) + ' 層' : '塔外');
     const q=run.adventure.quest;
     if(nearbyEncounter)el('towerObjective').textContent=nearbyEncounter===chest?'封印寶箱 · 可能藏著強化裝備，也可能是陷阱':explorerName()+' · 對話查看委託';
     else if(q&&q.status!=='claimed'&&!nearest&&!nearestWarrior)el('towerObjective').textContent=(E.explorerOffer(run)?.title||'探索者委託')+' · '+q.progress+'/'+q.goal+(q.status==='ready'?' · 報酬待領':'');
     else if(N&&!nearest&&!nearestWarrior)el('towerObjective').textContent=N.objective(run);
-    if(inDungeon()){const offer=dungeonOffer(),state=run.expedition.active;el('towerFloor').textContent='裂隙 · '+run.floor+' F';el('towerObjective').textContent=offer.title+' · '+state.progress.length+'/3 · 剩 '+Math.ceil(Math.max(0,offer.timeLimit-state.elapsed))+' 秒'+(['bells','threads'].includes(offer.kind)?' · '+offer.order.map(i=>i+1).join('→'):offer.kind==='stars'&&state.progress.length===1?(state.shiftCount>state.shiftAtStart?' · 星路已更新':' · 等待牆壁變形'):'');el('towerAttackBtn').disabled=true;el('towerAttackBtn').textContent='探索試煉';}
+    if(inDungeon()){const offer=dungeonOffer(),state=run.expedition.active;el('towerFloor').textContent='裂隙 · '+run.floor+' F';el('towerObjective').textContent=offer.title+' · '+state.progress.length+'/3 · 剩 '+Math.ceil(Math.max(0,offer.timeLimit-state.elapsed))+' 秒'+(['bells','threads'].includes(offer.kind)?' · '+offer.order.map(i=>i+1).join('→'):offer.kind==='stars'&&state.progress.length===1?(state.shiftCount>state.shiftAtStart?' · 星路已更新':' · 等待牆壁變形'):'');el('towerAttackBtn').disabled=true;if(window.BattleDock)BattleDock.attackLabel('探索',0);else el('towerAttackBtn').textContent='探索試煉';}
     if(nearbyJourney){el('towerTalkBtn').disabled=false;el('towerTalkBtn').ariaLabel=nearbyJourney===rift?'裂隙（R）':nearbyJourney===mainClue?'印記（R）':'調查（R）';el('towerObjective').textContent=nearbyJourney===rift?'裂隙副本 · 自願進入，結束回到原層':nearbyJourney===mainClue?'主線印記 · '+N.chapterForFloor(run.floor).clueName:el('towerObjective').textContent;}
     el('towerTalkBtn').hidden=paused||!G.running||el('towerTalkBtn').disabled;
     document.body.classList.toggle('tower-danger',run.hp<=C.MAX_HP*.25);
@@ -1299,6 +1300,8 @@
       if(upgradingProfession){try{localStorage.setItem(SAVE+'_before_party',JSON.stringify(pendingProfession));}catch(_){showToast('無法保存升級前的備份，尚未改動舊旅程。請先騰出瀏覽器儲存空間。');return;}}
       if(!upgradingProfession){try{const old=localStorage.getItem(SAVE);if(old)localStorage.setItem(SAVE+'_before_heroes_'+Date.now(),old);}catch(_){showToast('無法備份舊存檔，尚未開始新旅程。');return;}}
       const previous=run;run=result.run;floorStarted=false;if(!save()){run=previous;return;}pendingProfession=null;upgradingProfession=false;enter();return;}
+    if(key==='battle-settings'){openBattleSettings();return;}
+    if(key==='battle-music'){el('soundToggle').click();openBattleSettings();return;}
     if(partyUI?.handle(key,id))return;
     if(lightingUI?.handle(key,id))return;
     if(key==='close'){closeDialog();return;}
@@ -1354,6 +1357,6 @@
   function voiceProfile(){if(!active||!run?.party)return null;const job=modern()?Heroes.job(run):run.party.profession;return {identity:'tower-'+(modern()?Heroes.state(run).active:'hero')+'-'+job,gender:window.TowerPartyCore.PROFESSIONS[job].gender,age:'adult'};}
   function toolUsed(){if(active&&modern()){Heroes.toolSpent(run);run.engine.shovels=G.shovels;}}
   function movementScale(){if(!active||paused||G.shifting)return 1;const traits=run.party?window.TowerExpedition.traits(run):{speed:1,grip:0};return (modern()?Heroes.speed(run):1)*Math.min(1,hazardSlow+(traits.grip>0?.15:0))*(run.party?.slowLeft>0?(traits.grip>0?.8:.6):1)*traits.speed;}
-  window.TowerMode = { sightRoot:()=>active?world:null, voiceProfile, toolUsed, get active(){return active;}, get paused(){return paused;}, get partyActive(){return active&&!!run?.party;}, temporaryMapRadius:()=>modern()?(Heroes.buff(run,'path_eye')?.power||0):0, lightRadius:()=>active?lightingUI?.radius():null, useProfessionSkill:()=>partyUI?.skill(), movementScale, open, beginNew, tick, floorSeed, atmosphereStyle, scheduleShift, updateShift, reachExit, defeat, requestQuit, canCollectOriginal, collectedOriginal, itemConfig, reservedCells, preserveFloorPickups, soundChanged, mapMarkers };
+  window.TowerMode = { openBattleSettings, sightRoot:()=>active?world:null, voiceProfile, toolUsed, get active(){return active;}, get paused(){return paused;}, get partyActive(){return active&&!!run?.party;}, temporaryMapRadius:()=>modern()?(Heroes.buff(run,'path_eye')?.power||0):0, lightRadius:()=>active?lightingUI?.radius():null, useProfessionSkill:()=>partyUI?.skill(), movementScale, open, beginNew, tick, floorSeed, atmosphereStyle, scheduleShift, updateShift, reachExit, defeat, requestQuit, canCollectOriginal, collectedOriginal, itemConfig, reservedCells, preserveFloorPickups, soundChanged, mapMarkers };
   install();
 })();

@@ -3,8 +3,12 @@ import { access, readFile, stat } from 'node:fs/promises';
 import vm from 'node:vm';
 
 const html = await readFile(new URL('../index.html', import.meta.url), 'utf8');
+for(const asset of ['maze-sight-core','maze-sight']){
+  new vm.Script(await readFile(new URL(`../assets/${asset}.js`,import.meta.url),'utf8'),{filename:asset+'.js'});
+  assert.ok(html.includes(`src="./assets/${asset}.js?v=`),`缺少視野模組：${asset}`);
+}
 
-for(const asset of ['tower-lighting-core','tower-lighting-runtime','tower-heroes-core','tower-heroes-icons','tower-heroes-visuals','tower-heroes-runtime']){
+for(const asset of ['tower-hero-growth','tower-growth-runtime','tower-lighting-core','tower-lighting-runtime','tower-heroes-core','tower-heroes-icons','tower-heroes-visuals','tower-heroes-runtime']){
   new vm.Script(await readFile(new URL(`../story/${asset}.js`,import.meta.url),'utf8'),{filename:asset+'.js'});
   assert.ok(html.includes(`src="story/${asset}.js?v=`),`缺少照明模組：${asset}`);
 }

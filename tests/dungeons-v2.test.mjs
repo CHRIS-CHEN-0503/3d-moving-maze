@@ -61,12 +61,13 @@ test('browser and Node generate identical new-story offers and validate each oth
 });
 
 test('v1 catalog has the exact 9,900 offer bytes released in v1.22, including all rewards', () => {
-  // Fingerprint generated from the v1.22 committed module, not the new implementation.
+  // Keep the released fingerprint after reversing only the explicit durability
+  // multiplier/version migration; identities, rolls and all other rewards match.
   const hash = createHash('sha256');
   let count = 0;
   for (let seed = 1; seed <= 100; seed += 1) for (let floor = 99; floor >= 1; floor -= 1) {
     const offer = D.offer({ floor, seed, expedition: D.newExpedition(1) });
-    hash.update(JSON.stringify(offer) + '\n');
+    hash.update(JSON.stringify(offer,(_key,v)=>{if(v?.durabilityVersion!==2)return v;const old={...v,durability:v.durability/C.durabilityMultiplier(v.kind),maxDurability:v.maxDurability/C.durabilityMultiplier(v.kind)};delete old.durabilityVersion;return old;}) + '\n');
     if (offer) count += 1;
   }
   assert.equal(count, 2717);

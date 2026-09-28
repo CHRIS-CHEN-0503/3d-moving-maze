@@ -617,6 +617,8 @@ button:focus-visible,input:focus-visible{outline:3px solid #fff;outline-offset:3
 <link rel="stylesheet" href="assets/play-controls.css?v=1.32.0">
 <link rel="stylesheet" href="story/tower-party.css?v=1.40.1">
 <link rel="stylesheet" href="story/tower-heroes.css?v=1.40.1">
+<link rel="stylesheet" href="story/tower-mobile.css?v=1.42.0">
+<link rel="stylesheet" href="story/tower-growth.css?v=1.42.0">
 </head>
 <body>
 
@@ -977,12 +979,14 @@ button:focus-visible,input:focus-visible{outline:3px solid #fff;outline-offset:3
 <script src="./assets/native-symbols.js"></script>
 <script src="./assets/game-rules.js?v=1.36.0"></script>
 <script src="./assets/gameplay-rules.js?v=1.36.0"></script>
-<script src="./assets/magic-map.js?v=1.40.0"></script>
+<script src="./assets/magic-map.js?v=1.42.0"></script>
+<script src="./assets/maze-sight-core.js?v=1.42.0"></script>
+<script src="./assets/maze-sight.js?v=1.42.0"></script>
 <script src="./assets/maze-materials.js?v=1.36.0"></script>
 <script src="./assets/voice-catalog.js?v=1.33.0"></script>
 <script src="./assets/role-voices.js?v=1.35.5"></script>
 <script src="./assets/voice-pack.js?v=1.34.0"></script>
-<script src="./assets/game-voice.js?v=1.35.0"></script>
+<script src="./assets/game-voice.js?v=1.42.0"></script>
 <script src="./assets/maze-stone-audio.js?v=1.34.2"></script>
 <script src="./assets/combat-audio.js?v=1.35.5"></script>
 <script>
@@ -991,7 +995,7 @@ button:focus-visible,input:focus-visible{outline:3px solid #fff;outline-offset:3
    3D移動迷宮 — 給小朋友的變形迷宮冒險
    ===================================================== */
 const $=id=>document.getElementById(id);
-const GAME_VERSION='1.40.1';
+const GAME_VERSION='1.42.0';
 
 /* ---------- 設定（後台可調） ---------- */
 const DEFAULT_CFG={teamSize:2,shiftMin:3,itemCount:6,foodCount:4,hungerMin:3,stunSec:3,pingSec:3,smellCells:3,mazeSize:13,magicMap:0,duelMin:5,unpaidRate:100,musicOn:1,speechOn:1,speechVoice:'',apiUrl:'',roomMax:3,rounds:3,goodsCount:16,shopCollect:1,shopMin:2.5,cartFull:400,views:{fp:1,tp:1,top:1},broker:'wss://broker.emqx.io:8084/mqtt'};
@@ -3015,6 +3019,7 @@ function drawMap(cv,big){
     MagicMap.mask(ctx,{w:W,h:H,x:p.x,y:p.y,hWalls:G.hWalls,vWalls:G.vWalls,pad,cw,ch});
   }
   // 玩家（帶方向的三角形）
+  window.MazeSight?.map(ctx,pad,cw,ch);
   const PX=pad+(G.px/G.cell+(W-1)/2)*cw+cw*0.5;
   const PZ=pad+(G.pz/G.cell+(H-1)/2)*ch+ch*0.5;
   ctx.save();
@@ -3032,6 +3037,7 @@ function drawMap(cv,big){
 const _projV=new THREE.Vector3();
 function updateTopMask(){
   const el=$('topMask');
+  if(window.MazeSight){el.style.display='none';return;}
   const owl=performance.now()<G.owlUntil;
   if(G.view!=='top'||owl||isShop()||!G.running){ el.style.display='none'; return; }
   el.style.display='block';
@@ -3700,6 +3706,7 @@ function updatePreview(){
    開始遊戲
    ===================================================== */
 function startGame(){
+  window.MazeSight?.reset();
   AudioEng.init(); AudioEng.resume();
   if(document.activeElement&&document.activeElement.blur)document.activeElement.blur();
   setSeed(MP.on?MP.seed:(window.TowerMode&&TowerMode.active?TowerMode.floorSeed():null));
@@ -3801,12 +3808,18 @@ function startGame(){
    主迴圈
    ===================================================== */
 let lastT=0,mapAcc=0,chipAcc=0;
+function sightFrame(){return {T:THREE,g:G,scene,wall:wallMesh,atmosphere:mazeAtmosphere,radius:Math.max(.8,(window.TowerMode?.lightRadius?.()||G.cell*(isShop()?6:5))/G.cell),objects:()=>{
+  const list=[],containers=new Set([itemGroup,window.TowerMode?.sightRoot?.()]);
+  const visit=o=>{if(!o||o===wallMesh||o===floorMesh||o===playerGroup||o===compass3D||o===camera||o===mazeAtmosphere?.floorRoot||o.name==='maze-sight-layer'||o.isLight)return;if(containers.has(o)||['tower-party-scene','tower-lighting'].includes(o.name)){o.children.forEach(visit);return;}list.push(o);};
+  for(const o of scene.children)if(o===envGroup)o.children.forEach(visit);else visit(o);return list;
+}};}
+function renderMaze(){if(window.MazeSight&&wallMesh)MazeSight.render(sightFrame(),renderer,camera);else renderer.render(scene,camera);}
 function loop(tms){
   requestAnimationFrame(loop);
   if(!renderer)return;
   const t=tms/1000, dt=Math.min(0.05,t-lastT||0.016); lastT=t;
   if(!$('gameScreen').classList.contains('active'))return;
-  if(window.TowerMode&&TowerMode.active&&TowerMode.paused){renderer.render(scene,camera);return;}
+  if(window.TowerMode&&TowerMode.active&&TowerMode.paused){renderMaze();return;}
   if(G.running&&!G.shifting){
     G.elapsed=(performance.now()-G.startTime)/1000-G.timeOffset;
     $('hudTime').textContent=fmtTime(G.elapsed);
@@ -3868,9 +3881,10 @@ function loop(tms){
     }
   }
   // 小地圖（每 0.15 秒重畫）
+  if(window.MazeSight&&wallMesh)MazeSight.update(sightFrame(),tms);
   mapAcc+=dt; if(mapAcc>0.15){mapAcc=0;drawMap($('minimap'),false);
     if($('bigMapOverlay').style.display==='flex')drawMap($('bigMap'),true);}
-  renderer.render(scene,camera);
+  renderMaze();
 }
 
 /* =====================================================
@@ -5098,14 +5112,17 @@ window.addEventListener('pagehide',()=>{AudioEng.shiftSound?.stop();AudioEng.com
 </script>
 <script src="assets/classic-audio.js"></script>
 <script src="assets/setup-controls.js?v=1.36.0"></script>
-<script src="assets/voice-settings.js?v=1.34.0"></script>
+<script src="assets/voice-settings.js?v=1.42.0"></script>
 <script src="assets/capture-core.js?v=1.36.0"></script>
 <script src="assets/capture-mode.js?v=1.36.0"></script>
-<script src="story/tower-heroes-core.js?v=1.40.1"></script>
+<script src="story/tower-hero-growth.js?v=1.42.0"></script>
+<script src="story/tower-heroes-core.js?v=1.42.0"></script>
 <script src="story/tower-heroes-icons.js?v=1.40.0"></script>
-<script src="story/tower-heroes-visuals.js?v=1.40.0"></script>
-<script src="story/tower-heroes-runtime.js?v=1.40.1"></script>
-<script src="story/story-core.js?v=1.40.1"></script>
+<script src="story/tower-heroes-visuals.js?v=1.42.0"></script>
+<script src="story/tower-skill-effects.js?v=1.42.0"></script>
+<script src="story/tower-growth-runtime.js?v=1.42.0"></script>
+<script src="story/tower-heroes-runtime.js?v=1.42.0"></script>
+<script src="story/story-core.js?v=1.42.0"></script>
 <script src="story/tower-narrative.js"></script>
 <script src="story/tower-side-stories.js"></script>
 <script src="story/tower-dungeons.js?v=1.40.0"></script>
@@ -5113,12 +5130,12 @@ window.addEventListener('pagehide',()=>{AudioEng.shiftSound?.stop();AudioEng.com
 <script src="story/tower-encounters.js?v=1.40.1"></script>
 <script src="story/tower-characters.js?v=1.35.2"></script>
 <script src="story/tower-audio.js"></script>
-<script src="story/tower-expedition-core.js?v=1.40.0"></script>
+<script src="story/tower-expedition-core.js?v=1.42.0"></script>
 <script src="story/tower-lighting-core.js?v=1.40.0"></script>
-<script src="story/tower-party-core.js?v=1.40.1"></script>
-<script src="story/tower-party-runtime.js?v=1.40.0"></script>
+<script src="story/tower-party-core.js?v=1.42.0"></script>
+<script src="story/tower-party-runtime.js?v=1.42.0"></script>
 <script src="story/tower-lighting-runtime.js?v=1.40.0"></script>
-<script src="story/tower-mode.js?v=1.40.1"></script>
+<script src="story/tower-mode.js?v=1.42.0"></script>
 <script src="assets/room-lifecycle.js?v=1.36.0"></script>
 <script src="assets/shop-collection-core.js?v=1.31.0"></script>
 <script src="assets/shop-collection.js?v=1.31.0"></script>

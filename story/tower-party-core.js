@@ -5,6 +5,7 @@
   const X=()=>typeof module==='object'&&module.exports?require('./tower-expedition-core.js'):globalThis.TowerExpedition;
   const L=()=>typeof module==='object'&&module.exports?require('./tower-lighting-core.js'):globalThis.TowerLighting;
   const H=()=>typeof module==='object'&&module.exports?require('./tower-heroes-core.js'):globalThis.TowerHeroes;
+  const G=()=>typeof module==='object'&&module.exports?require('./tower-hero-growth.js'):globalThis.TowerHeroGrowth;
   const own=(o,k)=>Object.hasOwn(o,k), num=(v,a,b,int=false)=>Number.isFinite(v)&&v>=a&&v<=b&&(!int||Number.isInteger(v));
   const PROFESSIONS=Object.freeze({
     swordsman:{name:'劍士',person:'蒼衡',gender:'male',color:0x5594c1,skill:'守護架勢',description:'近戰傷害較高。技能：六秒內減傷一半；劍士隊友會替你攔下近身怪物。',cooldown:20},
@@ -99,11 +100,11 @@
     if(!own(RECIPES,id))return {ok:false,message:'沒有這份食譜。'};const r=RECIPES[id],chance=p.loadouts?H().teamPassive(n,'double_portion'):0,amount=p.loadouts?(chance>0&&H().roll(n,p.loadouts.active,'cook')<chance?2:1):has(n,'chef')?2:1;
     if(p.meals[id]+amount>99)return {ok:false,message:'料理盒已滿。'};
     if(Object.entries(r.cost).some(([k,v])=>p.ingredients[k]<v))return {ok:false,message:'食材還不夠，再去找找吧。'};
-    for(const[k,v]of Object.entries(r.cost))p.ingredients[k]-=v;p.meals[id]+=amount;return {ok:true,message:`完成${r.name}，共${amount}份。`};
+    if(p.loadouts){const chef=H().ids(n).find(k=>H().hp(n,k)>0&&H().pv(n,'ingredient_care',k)>0)||p.loadouts.active;G().consumeCost(n,chef,r.cost);}else for(const[k,v]of Object.entries(r.cost))p.ingredients[k]-=v;p.meals[id]+=amount;return {ok:true,message:`完成${r.name}，共${amount}份。`};
   });}
   function eat(run,id,revision){return transact(run,revision,(n,p)=>{
     if(!own(RECIPES,id)||!p.meals[id])return {ok:false,message:'料理盒裡沒有這道料理。'};const r=RECIPES[id];
-    n.hp=Math.min(C().MAX_HP,n.hp+r.hp);n.hunger=Math.min(100,n.hunger+r.hunger*(p.loadouts?1+H().teamPassive(n,'gourmet')/100:1));if(r.team){if(p.loadouts)H().ids(n).filter(k=>k!==p.loadouts.active).forEach(k=>H().heal(n,k,r.team));else p.members.forEach(m=>m.hp=Math.min(memberMax(m),m.hp+r.team));}if(p.loadouts)H().food(n);
+    n.hp=Math.min(p.loadouts?H().maxHp(n):C().MAX_HP,n.hp+r.hp);n.hunger=Math.min(100,n.hunger+r.hunger*(p.loadouts?1+H().teamPassive(n,'gourmet')/100:1));if(r.team){if(p.loadouts)H().ids(n).filter(k=>k!==p.loadouts.active&&H().hp(n,k)>0).forEach(k=>H().heal(n,k,r.team));else p.members.forEach(m=>m.hp=Math.min(memberMax(m),m.hp+r.team));}if(p.loadouts){H().food(n);G().recipe(n,id);}
     if(r.buff){p.buffs=p.buffs.filter(b=>b.id!==r.buff);p.buffs.push({id:r.buff,floors:3});if(p.buffs.length>2)p.buffs.shift();}
     p.meals[id]--;return {ok:true,message:`享用${r.name}。`};
   });}
@@ -114,8 +115,8 @@
     }
     if(action!=='repair')return {ok:false,message:'未知的營地服務。'};
     const cost=p.loadouts?Math.ceil(6*(1-H().teamPassive(n,'economy')/100)):has(n,'smith')?3:6;if(n.coins<cost)return {ok:false,message:'修理費不足。'};
-    const gear=p.loadouts?H().ids(n).flatMap(id=>Object.values(H().equipment(n,id)).filter(Boolean)):Object.values(n.equipment).filter(Boolean);if(!gear.some(g=>g.durability<g.maxDurability))return {ok:false,message:'穿戴的裝備不需要修理。'};
-    n.coins-=cost;gear.forEach(g=>g.durability=Math.min(g.maxDurability,g.durability+4));return {ok:true,message:'已修補穿戴中的裝備。'};
+    const gear=(p.loadouts?H().ids(n).flatMap(id=>Object.values(H().equipment(n,id)).filter(Boolean)):Object.values(n.equipment).filter(Boolean)).filter(g=>g.durability>0);if(!gear.some(g=>g.durability<g.maxDurability))return {ok:false,message:'沒有可保養的裝備；完全損壞請到鍛匠工坊修復。'};
+    n.coins-=cost;gear.forEach(g=>g.durability=Math.min(g.maxDurability,g.durability+4*C().durabilityMultiplier(g.kind)));return {ok:true,message:'已保養穿戴中的裝備，破損裝備需另行修復。'};
   });}
   function defs(){return {...C().MONSTERS,...MONSTERS};}
   function monsterSpecs(run){

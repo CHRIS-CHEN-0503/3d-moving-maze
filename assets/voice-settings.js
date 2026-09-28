@@ -16,11 +16,11 @@
     }
     select.value=chosen;on.value=String(CFG.speechOn);on.disabled=!state.supported;select.disabled=!state.supported||!state.enabled;preview.disabled=!state.supported||!state.enabled;
     if(salePreview)salePreview.disabled=!state.supported||!state.enabled;
-    hint.textContent=!state.supported?'這個瀏覽器不支援朗讀，文字與遊戲仍可正常使用。':!state.enabled?'語音已關閉，與背景音樂分開設定。':state.failure?'專用音檔暫時無法播放，會嘗試裝置朗讀。請點「試聽」重試並檢查音量。':'正常語速；人物固定台詞依性別、年齡與個性配聲。道具提示跟隨角色男女聲，故事旁白保持溫暖女聲。隨機內容的聲線依裝置可用聲音而定。'+(state.voice?'備援旁白：'+state.voice.name+'。':'裝置中文聲音仍在載入；專用音檔可直接播放。');
+    hint.textContent=!state.supported?'這個瀏覽器不支援朗讀，文字與遊戲仍可正常使用。':!state.enabled?'語音已關閉，與背景音樂分開設定。':state.failure?'專用音檔暫時無法播放，會嘗試裝置朗讀。請點「試聽」重試並檢查音量。':'正常語速；人物固定台詞依性別、年齡與個性配聲。物品提示與裝備介紹使用同一個裝置聲線，不混接錄音；優先配合角色性別。故事、入口與叫賣保留專用配音。若裝置未提供對應中文男女聲，會固定使用現有中文聲音。'+(state.voice?'備援旁白：'+state.voice.name+'。':'裝置中文聲音仍在載入；專用音檔可直接播放。');
   }
   on.addEventListener('change',save);select.addEventListener('change',save);preview.addEventListener('click',()=>voice.preview());
   salePreview?.addEventListener('click',()=>voice.announceAsset('shop.sale.clear.20','大拍賣！限時20秒，快來搶購！',true));
-  voice.listen(render);voice.configure({enabled:!!CFG.speechOn,voice:CFG.speechVoice,character:()=>({gender:CH().gender==='m'?'male':'female',age:G.charIdx<4?'child':'adult'})});
+  voice.listen(render);voice.configure({enabled:!!CFG.speechOn,voice:CFG.speechVoice,character:()=>window.TowerMode?.voiceProfile?.()||({identity:'classic-'+G.charIdx,gender:CH().gender==='m'?'male':'female',age:G.charIdx<4?'child':'adult'})});
   // 系統語音需使用者操作才可播放；正式開始時以一句簡短提示啟動。
   document.getElementById('enterMenuBtn')?.addEventListener('click',()=>voice.announce('歡迎來到移動迷宮。請選擇你的冒險。',true));
   document.addEventListener('click',event=>{

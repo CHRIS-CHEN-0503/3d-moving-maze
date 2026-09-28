@@ -31,7 +31,7 @@
   const ITEMS = Object.freeze({
     heal: Object.freeze({ id: 'heal', name: '療癒藥', description: '恢復 35 點生命。', buyPrice: 14, sellPrice: 6, color: '#ff7889' }),
     ration: Object.freeze({ id: 'ration', name: '乾糧', description: '恢復 45 點飽食度。', buyPrice: 8, sellPrice: 3, color: '#efc073' }),
-    shield: Object.freeze({ id: 'shield', name: '星紋護盾', description: '25 秒內受到的傷害減少 65%。', buyPrice: 18, sellPrice: 8, color: '#70bfff' }),
+    shield: Object.freeze({ id: 'shield', name: '星紋護盾', description: '職業旅程：最大生命35%的護盾，持續五分鐘。舊旅程：25秒減傷65%。', buyPrice: 18, sellPrice: 8, color: '#70bfff' }),
     hourglass: Object.freeze({ id: 'hourglass', name: '定牆沙漏', description: '暫停迷宮變形 25 秒。', buyPrice: 20, sellPrice: 9, color: '#ffd36f' }),
     bell: Object.freeze({ id: 'bell', name: '驅怪鈴', description: '讓怪物退避 20 秒。', buyPrice: 18, sellPrice: 8, color: '#bda2ff' }),
     map: Object.freeze({ id: 'map', name: '魔法地圖', description: '完整揭露當下迷宮直到變形，之後重新探索；出口路線額外指引 18 秒。', buyPrice: 12, sellPrice: 5, color: '#6de5d7' }),
@@ -140,6 +140,10 @@
     return { version: 1, claimed: [...value.claimed], quest };
   }
 
+  function durabilityMultiplier(kind) {
+    const item=GEAR[kind];
+    return item?.slot==='weapon'||item?.type==='heavy'||['helmet','armor','shield','round_shield','tower_shield'].includes(kind)?3:2;
+  }
   function createGear(kind, floor, seed, sourceId, enhanced = false) {
     floorConfig(floor);
     if (!Object.hasOwn(GEAR, kind) || !validNumber(seed, 1, 0xffffffff, true) || typeof sourceId !== 'string' || !sourceId || sourceId.length > 96 || typeof enhanced !== 'boolean') throw new RangeError('無效的裝備來源。');
@@ -148,34 +152,37 @@
     const tier = floor >= 70 ? 1 : floor >= 40 ? 2 : 3;
     const bonus = enhanced ? 1 + hash % tier : 0;
     const maximum = [0, 13, 16, 20][tier];
-    const maxDurability = enhanced ? 10 + (hash >>> 8) % (maximum - 9) : 3 + (hash >>> 8) % 8;
+    const maxDurability = (enhanced ? 10 + (hash >>> 8) % (maximum - 9) : 3 + (hash >>> 8) % 8)*durabilityMultiplier(kind);
     const item = GEAR[kind];
-    return { id: `gear:${floor}:${seed}:${sourceId}:${kind}`, kind, slot: item.slot, name: item.name + (bonus ? ` +${bonus}` : ''), durability: maxDurability, maxDurability, defense: item.slot === 'weapon' ? 0 : item.defense + bonus, bonus };
+    return { id: `gear:${floor}:${seed}:${sourceId}:${kind}`, kind, slot: item.slot, name: item.name + (bonus ? ` +${bonus}` : ''), durability: maxDurability, maxDurability, durabilityVersion:2, defense: item.slot === 'weapon' ? 0 : item.defense + bonus, bonus };
   }
 
   function validateGear(value) {
     if (!value || typeof value !== 'object' || !Object.hasOwn(GEAR, value.kind) || typeof value.id !== 'string' || !value.id || value.id.length > 160) return null;
     const item = GEAR[value.kind];
-    if (value.slot !== item.slot || !validNumber(value.bonus, 0, 3, true) || !validNumber(value.maxDurability, value.bonus ? 10 : 3, value.bonus ? 20 : 10, true) || !validNumber(value.durability, 1, value.maxDurability, true)) return null;
+    const legacy=value.durabilityVersion===undefined,mult=legacy?1:durabilityMultiplier(value.kind);
+    if(!legacy&&value.durabilityVersion!==2)return null;
+    if (value.slot !== item.slot || !validNumber(value.bonus, 0, 3, true) || !validNumber(value.maxDurability, (value.bonus ? 10 : 3)*mult, (value.bonus ? 20 : 10)*mult, true) || value.maxDurability%mult!==0 || !validNumber(value.durability, legacy?1:0, value.maxDurability, true)) return null;
     const name = item.name + (value.bonus ? ` +${value.bonus}` : '');
     const defense = item.slot === 'weapon' ? 0 : item.defense + value.bonus;
     if (value.name !== name || value.defense !== defense) return null;
     const forge=value.forge===undefined?undefined:expeditionRules()?.validateForge(value.forge,item.slot);
     if(value.forge!==undefined&&!forge)return null;
-    return { id: value.id, kind: value.kind, slot: item.slot, name, durability: value.durability, maxDurability: value.maxDurability, defense, bonus: value.bonus,...(forge?{forge}:{}) };
+    const upgrade=legacy?durabilityMultiplier(value.kind):1;
+    return { id: value.id, kind: value.kind, slot: item.slot, name, durability: value.durability*upgrade, maxDurability: value.maxDurability*upgrade, durabilityVersion:2, defense, bonus: value.bonus,...(forge?{forge}:{}) };
   }
 
   function gearPrice(gear) {
     const item = validateGear(gear);
     if (!item) throw new RangeError('無效的裝備報價。');
-    return GEAR[item.kind].buyPrice + item.maxDurability * 2 + item.bonus * 16;
+    return GEAR[item.kind].buyPrice + item.maxDurability / durabilityMultiplier(item.kind) * 2 + item.bonus * 16;
   }
 
   function equipmentStats(run) {
-    const worn = Object.values(run.equipment || {}).filter(Boolean);
+    const worn = Object.values(run.equipment || {}).filter(g=>g&&g.durability>0);
     const defense = worn.reduce((sum, gear) => sum + gear.defense, 0);
     const bonus = worn.reduce((sum, gear) => sum + gear.bonus, 0);
-    const weapon = run.equipment && run.equipment.weapon;
+    const weapon = run.equipment?.weapon?.durability>0?run.equipment.weapon:null;
     return { defense, bonus, stunSeconds: weapon ? GEAR[weapon.kind].stunSeconds + bonus * 10 : 0 };
   }
 
@@ -215,7 +222,7 @@
     if (typeof run === 'string') { try { run = JSON.parse(run); } catch (_) { return null; } }
     if (!run || typeof run !== 'object' || Array.isArray(run) || ![1, STATE_VERSION].includes(run.stateVersion) || run.mode !== 'tower') return null;
     const legacyHealth = run.stateVersion === 1;
-    if (!validNumber(run.floor, 1, 99, true) || !validNumber(run.hp, 0, legacyHealth ? 100 : MAX_HP) || !validNumber(run.hunger, 0, 100) || !validNumber(run.coins, 0, MAX_COINS, true)) return null;
+    if (!validNumber(run.floor, 1, 99, true) || !validNumber(run.hp, 0, legacyHealth ? 100 : run.party?.loadouts?87:MAX_HP) || !validNumber(run.hunger, 0, 100) || !validNumber(run.coins, 0, MAX_COINS, true)) return null;
     if (!validNumber(run.seed, 1, 0xffffffff, true) || !validNumber(run.revision, 0, Number.MAX_SAFE_INTEGER - 1, true) || !validNumber(run.charIdx, 0, 5, true)) return null;
     if (typeof run.name !== 'string' || !run.name.trim() || run.name.length > 24 || !['playing', 'won', 'dead'].includes(run.status)) return null;
     if (!validNumber(run.elapsed, 0, 315360000) || !validNumber(run.floorsCleared, 0, 99, true)) return null;
@@ -245,6 +252,8 @@
     }
     // Optional exploration checkpoint; old saves remain valid. A changed layout rejects it at runtime.
     const map = run.engine.mapKnowledge;
+    const sightRules=typeof module==='object'&&module.exports?require('../assets/maze-sight-core.js'):globalThis.MazeSightCore;
+    if(run.engine.sightMemory&&sightRules){const seen=sightRules.restore(run.engine.sightMemory);if(seen&&typeof run.engine.sightMemory.key==='string'&&/^[a-f0-9]{1,8}$/.test(run.engine.sightMemory.key))engine.sightMemory={...sightRules.snapshot(seen),key:run.engine.sightMemory.key};}
     if (map && validNumber(map.w, 1, 25, true) && validNumber(map.h, 1, 25, true) && typeof map.key === 'string' && /^[a-f0-9]{1,8}$/.test(map.key) && typeof map.revealed === 'boolean' && typeof map.seen === 'string' && map.seen.length === map.w * map.h && !/[^01]/.test(map.seen)) {
       engine.mapKnowledge = { w: map.w, h: map.h, key: map.key, seen: map.seen, revealed: map.revealed };
     }
@@ -295,6 +304,7 @@
     const party = run.party === undefined ? undefined : partyRules()?.validate(run.party, run.floor, defeatedMonsters,hiredWarriors);
     if (run.party !== undefined && !party) return null;
     if(party?.loadouts&&!heroRules().validEquipment({party,equipment,gearBag}))return null;
+    if(party?.loadouts&&run.hp>heroRules().maxHp({party}))return null;
     return {
       // Preserve the old health percentage once; subsequent reads are already v2.
       stateVersion: STATE_VERSION, mode: 'tower', floor: run.floor, hp: legacyHealth ? run.hp * MAX_HP / 100 : run.hp, hunger: run.hunger,
@@ -494,6 +504,7 @@
   }
 
   function useItem(run, itemId, expectedRevision) {
+    if(run.party?.loadouts){const growth=typeof module==='object'&&module.exports?require('./tower-hero-growth.js'):globalThis.TowerHeroGrowth;return growth.use(run,itemId,undefined,false,expectedRevision);}
     return transaction(run, expectedRevision, (next) => {
       if (!Object.hasOwn(next.bag, itemId) || next.bag[itemId] < 1) return { ok: false, message: '背包裡沒有這件道具。' };
       if (itemId === 'feather') return { ok: false, message: '復甦羽會在受到致命傷時自動保護你。' };
@@ -590,6 +601,7 @@
       next.floorsCleared += 1;
       next.effects = { shield: 0, freeze: 0, repel: 0, reveal: 0 };
       next.claimed = []; next.floorElapsed = 0; next.defeatedMonsters = [];
+      delete next.engine.sightMemory;
       next.monsterStuns = {}; next.adventure = newAdventure();
       next.expedition.discovered = false;
       if (next.warrior && next.warrior.mode === 'holding') next.warrior = null;
@@ -604,5 +616,5 @@
     });
   }
 
-  return Object.freeze({ STATE_VERSION, MAX_HP, MAX_MONSTERS, validMonsterId, ITEMS, GEAR, MONSTERS, CHAPTERS, OPENING, ENDING, EXCHANGES, floorConfig, newRun, validateSave, buy, sell, exchange, useItem, collect, takeDamage, tickEffects, descend, monsterStrength, warriorOffer, hireWarrior, interceptMonster, createGear, validateGear, gearPrice, equipmentStats, receiveGear, grantGear, equipGear, discardGear, buyGear, effectiveMonsterStrength, hitMonster, resolveHeldMonster, transaction, applyDamage, newAdventure, validateAdventure });
+  return Object.freeze({ STATE_VERSION, MAX_HP, MAX_MONSTERS, validMonsterId, ITEMS, GEAR, MONSTERS, CHAPTERS, OPENING, ENDING, EXCHANGES, floorConfig, newRun, validateSave, buy, sell, exchange, useItem, collect, takeDamage, tickEffects, descend, monsterStrength, warriorOffer, hireWarrior, interceptMonster, createGear, validateGear, durabilityMultiplier, gearPrice, equipmentStats, receiveGear, grantGear, equipGear, discardGear, buyGear, effectiveMonsterStrength, hitMonster, resolveHeldMonster, transaction, applyDamage, newAdventure, validateAdventure });
 });

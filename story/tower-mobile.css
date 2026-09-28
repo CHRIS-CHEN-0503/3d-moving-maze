@@ -1,0 +1,61 @@
+/* Separate scrolling regions: controls always reserve their own space. */
+#towerDialog.tower-card{display:flex;flex-direction:column;overflow:hidden;padding:0;max-height:calc(100dvh - 36px);width:min(980px,100%)}
+.tower-dialog-header{display:flex;align-items:center;gap:14px;padding:18px 22px;border-bottom:1px solid #7794a433;flex:none}
+.tower-dialog-titles{flex:1;min-width:0}.tower-dialog-header .tower-heading{margin:0;font-size:25px;overflow-wrap:anywhere}
+.tower-dialog-header .tower-kicker{margin:0 0 5px}.tower-dialog-header .tower-close{position:static;float:none;flex:none;min-height:44px}
+.tower-dialog-header .tower-voice-controls{margin:0;flex:none}.tower-dialog-header .tower-voice-controls .tower-btn{min-height:44px}
+.tower-dialog-content{min-height:0;overflow:auto;overscroll-behavior:contain;-webkit-overflow-scrolling:touch;padding:16px 22px;scroll-padding:12px;flex:1}
+#towerDialog>.tower-actions{position:static;flex:none;margin:0;padding:10px 22px;border-top:1px solid #7794a444;background:#132537}
+.tower-dialog-content .tower-copy{max-width:none}.tower-dialog-content input{max-width:100%;box-sizing:border-box;font-size:16px}
+.forge-workspace{display:grid;grid-template-columns:minmax(170px,28%) minmax(0,1fr);gap:18px;align-items:start}
+.forge-picker{display:flex;flex-direction:column;gap:7px;min-width:0}
+.forge-pick{display:flex;align-items:center;gap:8px;text-align:left;min-width:0;width:100%}
+.forge-pick .hero-icon{width:32px;height:36px}.forge-pick span{min-width:0}.forge-pick b{display:block;font-size:15px;overflow-wrap:anywhere}.forge-pick small{font-size:13px;color:#c1d4df;display:block}
+.forge-pick[aria-pressed=true]{border-color:#edc97c;background:#345468;box-shadow:inset 3px 0 #edc97c}
+.forge-detail{min-width:0}.forge-piece{display:flex;align-items:center;gap:12px}.forge-piece .hero-icon{width:48px;height:48px}
+.forge-repair{padding:12px;margin:10px 0 18px;background:#244449;border:1px solid #90c9b966;border-radius:10px}
+.forge-detail .party-forge-traits{display:flex;flex-direction:column;gap:10px}.forge-detail .party-forge-traits section{display:flex;flex-direction:row;align-items:center;gap:12px;padding:12px}
+.forge-detail .party-forge-traits section>div{flex:1;min-width:0}.forge-detail .party-forge-traits .tower-btn{flex:none;max-width:48%;white-space:normal}
+.forge-detail p{font-size:15px;line-height:1.6}.forge-salvage{margin-top:18px;border-top:1px solid #7690a344;padding-top:12px}
+.hero-gear-alerts{display:flex;align-items:center;flex-wrap:wrap;gap:2px;max-width:62px}
+.hero-gear-alert{display:grid;place-items:center;color:#ffb44f;background:#4b341c;border:1px solid currentColor;border-radius:5px;width:25px;height:27px}
+.hero-gear-alert.critical{color:#ff7a80;background:#481f2a;border-width:2px}
+.hero-gear-alert.broken{border-style:dashed}.hero-gear-alert .hero-icon{width:23px;height:25px;filter:none;stroke:currentColor}
+.hero-gear-alert svg{color:inherit!important}.hero-member-heading{display:flex;align-items:center;gap:4px;justify-content:center}
+.hero-gear-alert svg g{stroke:currentColor}
+#heroTeamBar button:has(.hero-gear-alert){width:auto;min-width:70px;max-width:125px}
+#heroTeamBar{flex-wrap:nowrap;overflow-x:auto;scrollbar-width:thin}
+#heroTeamBar button{flex:none}#heroTeamBar button:has(.hero-gear-alert){grid-template-columns:auto auto;align-items:center}
+#heroTeamBar button:has(.hero-gear-alert)>.party-glyph,#heroTeamBar button:has(.hero-gear-alert)>meter{grid-column:1/-1}
+.hero-gear-alerts:empty{display:none}
+@media(max-width:1000px),(max-height:600px){
+  #towerOverlay{padding:max(6px,env(safe-area-inset-top)) max(8px,env(safe-area-inset-right)) max(6px,env(safe-area-inset-bottom)) max(8px,env(safe-area-inset-left))}
+  #towerDialog.tower-card,#towerDialog.hero-management{padding:0;width:100%;max-width:none;height:100%;max-height:calc(100dvh - 12px - env(safe-area-inset-top) - env(safe-area-inset-bottom));border-radius:13px}
+  .tower-dialog-header{padding:7px 12px;gap:8px;min-height:48px}.tower-dialog-header .tower-heading{font-size:19px;line-height:1.3;letter-spacing:0}.tower-dialog-header .tower-kicker{font-size:11px;letter-spacing:.04em;margin:0 0 2px}
+  .tower-dialog-header .tower-voice-controls{gap:5px}#towerDialog .tower-dialog-header .tower-voice-controls button{font-size:0;width:44px;height:44px;padding:10px;justify-content:center}
+  .tower-dialog-header .tower-close{width:52px;padding:8px;font-size:15px}.tower-dialog-header .tower-voice-controls svg{width:23px;height:23px}
+  .tower-dialog-content{padding:10px 12px;scrollbar-gutter:stable}
+  #towerDialog>.tower-actions{flex-wrap:nowrap;justify-content:flex-start;overflow-x:auto;overscroll-behavior:contain;gap:7px;padding:7px 12px}
+  #towerDialog>.tower-actions .tower-btn{flex:none;white-space:nowrap;min-height:44px;padding:8px 13px;font-size:15px}
+  #towerDialog .tower-btn{min-height:44px;font-size:15px;touch-action:manipulation}
+  #towerDialog .tower-copy,#towerDialog .tower-item p,#towerDialog .hero-equipped p,#towerDialog .hero-skill-list p{font-size:16px;line-height:1.65}
+  #towerDialog .tower-copy{margin:3px 0 12px}#towerDialog .tower-grid{grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+  #towerDialog .tower-grid .tower-item{padding:12px}#towerDialog .tower-grid .tower-item h3{font-size:18px}
+  #towerDialog .hero-tabs{flex-wrap:nowrap;overflow-x:auto;gap:7px;margin:0 0 10px}#towerDialog .hero-tabs .tower-btn{flex:none;white-space:nowrap}
+  #towerDialog .hero-page-tabs .tower-btn{flex:1}#towerDialog .hero-equipped-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
+  #towerDialog .hero-equipped{padding:10px;gap:5px}#towerDialog .hero-equipped .hero-icon{width:46px;height:46px}
+  #towerDialog .hero-bag-item{flex-wrap:wrap}#towerDialog .hero-bag-item>div{flex:1;min-width:50%}#towerDialog .hero-bag-item .hero-icon{width:42px;height:44px}
+  #towerDialog .hero-catalog{grid-template-columns:repeat(2,minmax(0,1fr))}#towerDialog .hero-skill-list .hero-icon{width:42px;height:44px}
+  #towerDialog .tower-prose p{font-size:19px;line-height:1.85;letter-spacing:.025em}.tower-prose{padding-left:12px}
+  .tower-workshop .tower-dialog-content{display:flex;flex-direction:column;overflow:hidden}.tower-workshop .tower-dialog-content>.tower-copy{flex:none;font-size:14px!important;margin-bottom:8px!important}
+  .forge-workspace{flex:1;min-height:0;grid-template-columns:minmax(144px,27%) minmax(0,1fr);align-items:stretch;gap:12px}
+  .forge-picker,.forge-detail{min-height:0;overflow:auto;overscroll-behavior:contain;scrollbar-gutter:stable;padding:2px 4px 16px 0}
+  #towerDialog .forge-pick{padding:8px;gap:6px;min-height:58px}.forge-pick .hero-icon{width:27px;height:30px}.forge-pick b{font-size:15px}
+  .forge-detail .party-forge-traits section{display:block;padding:10px}.forge-detail .party-forge-traits .tower-btn{max-width:none;width:100%;margin-top:8px}.forge-detail p{font-size:15px!important}
+}
+@media(max-width:500px){
+  #towerDialog .tower-grid,#towerDialog .hero-catalog{grid-template-columns:minmax(0,1fr)}
+  .tower-dialog-header .tower-kicker{display:none}.tower-dialog-header{padding:6px 8px}.tower-dialog-header .tower-heading{font-size:18px}
+  .forge-workspace{display:flex;flex-direction:column;gap:8px}.forge-picker{flex:none;flex-direction:row;overflow-x:auto;overflow-y:hidden;padding:0 0 5px;max-height:92px}.forge-pick{flex:none;width:154px}.forge-detail{flex:1}
+}
+@media(max-height:360px){.tower-dialog-header .tower-kicker{display:none}.tower-dialog-header{min-height:44px;padding-top:3px;padding-bottom:3px}#towerDialog>.tower-actions{padding-top:4px;padding-bottom:4px}.tower-dialog-content{padding-top:6px;padding-bottom:6px}}

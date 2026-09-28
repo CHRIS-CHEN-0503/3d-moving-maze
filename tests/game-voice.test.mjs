@@ -39,10 +39,10 @@ test('下載卡住會備援，已開始播放或關閉語音會清除等待計�
   h.audio[1].onwaiting();assert.equal(h.timers.size,1);h.audio[1].onplaying();assert.equal(h.timers.size,0);
   h.voice.announce('遊戲設定',true);assert.equal(h.timers.size,1);h.voice.stop();assert.equal(h.timers.size,0);
 });
-test('固定提示自動找錄音，不預載；重複拾取去重且不搶話',()=>{
+test('拾取使用固定裝置聲線，不預載、不混接錄音；重複拾取去重且不搶話',()=>{
   const h=catalogHarness();assert.equal(h.audio.length,0);
   h.voice.announce('獲得 餅乾');h.voice.announce('獲得 餅乾');h.voice.announce('使用 鐵鍬');
-  assert.equal(h.audio.length,1);assert.equal(h.spoken.length,0);h.drain();assert.equal(h.audio.length,2);assert.equal(h.spoken.length,0);
+  assert.equal(h.audio.length,0);assert.equal(h.spoken.length,1);h.drain();assert.equal(h.audio.length,0);assert.equal(h.spoken.length,2);
 });
 test('動態名字保留裝置朗讀，錄音與裝置語音不重疊，也不截斷同一事件',()=>{
   const h=catalogHarness();h.voice.announce('小雨獲得 餅乾。小晴獲得 牛奶。小明獲得 鐵鍬。');
@@ -50,8 +50,8 @@ test('動態名字保留裝置朗讀，錄音與裝置語音不重疊，也不�
   assert.equal(h.audio.length,3);assert.deepEqual(h.spoken.map(x=>x.text).join('').replace(/[。]/g,''),'小雨小晴小明');
 });
 test('自動錄音失敗只備援該片段，不重試壞音檔或取消後續事件',()=>{
-  const h=catalogHarness();h.voice.announce('獲得 餅乾');h.voice.announce('使用 鐵鍬');
-  h.audio[0].onerror();assert.equal(h.audio[0].paused,true);assert.equal(h.spoken[0].text,'獲得 餅乾');
+  const h=catalogHarness();h.voice.announce('單人遊戲');h.voice.announce('多人遊戲');
+  h.audio[0].onerror();assert.equal(h.audio[0].paused,true);assert.equal(h.spoken[0].text,'單人遊戲');
   h.spoken[0].onend();assert.equal(h.audio.length,2);h.audio[1].onended();assert.equal(h.voice.status().speaking,false);
 });
 test('沒有裝置語音仍可播放固定音檔，關閉後舊回呼不能續播',()=>{
@@ -66,10 +66,22 @@ test('一般事件最多排四個，過期提示不延遲重播；故事不使�
   const story=catalogHarness();story.voice.readPanel({voiceScope:'full',querySelectorAll:()=>[{closest:()=>null,textContent:text}]});story.drain();assert.equal(story.audio.length,6);
 });
 const female={voiceURI:'mei',name:'Mei-Jia',lang:'zh-TW',localService:true},male={voiceURI:'yun',name:'YunJhe',lang:'zh-TW'},en={voiceURI:'en',name:'Samantha',lang:'en-US'};
-test('角色男聲、女聲與修正版讀音使用專用錄音，正常速度且維持音高',()=>{
-  const h=catalogHarness();h.voice.configure({character:()=>({gender:'male'})});h.voice.announce('獲得 餅乾');
-  assert.match(h.audio[0].src,/roles\/male-/);assert.equal(h.instances[0].playbackRate,1);assert.equal(h.instances[0].preservesPitch,true);
-  h.voice.configure({character:()=>({gender:'female'})});h.voice.announce('獲得 銅幣',true);assert.match(h.audio[1].src,/roles\/fix-/);
+test('首次聲音清單尚未載入時固定裝置預設，不在後續道具提示突然換人',()=>{
+  const h=catalogHarness();h.voice.configure({character:()=>({identity:'late-smith',gender:'male'})});h.voice.announce('獲得 餅乾');
+  h.env.speechSynthesis.getVoices=()=>[female,male];h.voice.refresh();h.voice.announce('獲得 銅幣',true);
+  assert.ok(h.spoken.every(u=>u.voice===undefined&&u.lang==='zh-TW'));assert.equal(h.audio.length,0);
+});
+test('無空格、新道具、混合裝備摘要與後載入聲音不會令同角色聲線變換',()=>{
+  const h=catalogHarness();h.env.speechSynthesis.getVoices=()=>[female,male];h.voice.configure({character:()=>({identity:'smith',gender:'male'})});
+  for(const text of ['獲得 餅乾','獲得甜根莖','獲得 織光法袍','使用香草','已裝備 巡塔長劍']){h.voice.announce(text,true);assert.equal(h.spoken.at(-1).voice,male);assert.equal(h.spoken.at(-1).text,text);}
+  h.env.speechSynthesis.getVoices=()=>[female,{...male,voiceURI:'better',localService:true}];h.voice.refresh();
+  h.voice.readPanel({voiceScope:'summary',voiceText:'織光法袍。獲得 銅幣。確認修復。',querySelectorAll:()=>[]});h.drain();
+  assert.equal(h.audio.length,0);assert.ok(h.spoken.every(u=>u.voice===male));
+});
+test('角色物品整段固定男聲或女聲，正常速度；入口選單仍有专用錄音',()=>{
+  const h=catalogHarness();h.env.speechSynthesis.getVoices=()=>[female,male];h.voice.configure({character:()=>({gender:'male'})});h.voice.announce('獲得 餅乾');
+  assert.equal(h.audio.length,0);assert.equal(h.spoken[0].voice,male);assert.equal(h.spoken[0].rate,1);
+  h.voice.configure({character:()=>({gender:'female'})});h.voice.announce('獲得 銅幣',true);assert.equal(h.spoken[1].voice,female);
   h.voice.announce('單人遊戲',true);assert.equal(h.instances[0].playbackRate,1.16);
   assert.equal(V.chooseVoice([female,male],'mei',{gender:'male'}),male);
   assert.equal(V.chooseVoice([female,male],'yun',{gender:'female'}),female);
@@ -77,6 +89,11 @@ test('角色男聲、女聲與修正版讀音使用專用錄音，正常速度�
 test('人物動態對話保持人物性別，不混入不同性別的通用錄音',()=>{
   const h=catalogHarness();h.voice.readPanel({voiceScope:'full',voiceSpeaker:{gender:'male',npc:true},querySelectorAll:()=>[{closest:()=>null,textContent:'獲得 餅乾'}]});
   assert.equal(h.audio.length,0);assert.equal(h.spoken[0].text,'獲得 餅乾');
+});
+test('行商裝備介紹整段同一聲線，不在預錄介紹與物品摘要間換人',()=>{
+  const h=catalogHarness();h.env.speechSynthesis.getVoices=()=>[female,male];h.voice.refresh();
+  h.voice.readPanel({voiceScope:'summary',voiceText:'鐵嶺。出售巡塔長劍。獲得 餅乾。',voiceAsset:'merchant.tieLing',voiceAfterText:'出售巡塔長劍。',voiceSpeaker:{gender:'male',npc:true},querySelectorAll:()=>[]});h.drain();
+  assert.equal(h.audio.length,0);assert.ok(h.spoken.length>1);assert.ok(h.spoken.every(u=>u.voice===male));
 });
 test('進入遊戲固定使用低沉男聲，錄音失敗仍保留男性備援，其他旁白不變',()=>{
   const pack=require('../assets/voice-pack.js'),text='歡迎來到移動迷宮。請選擇你的冒險。',track=pack.get(pack.plan(text)[0].asset);

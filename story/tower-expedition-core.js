@@ -95,14 +95,28 @@
     if(offer.job==='scout')n.effects.reveal=Math.max(n.effects.reveal,18);
     if(offer.job==='chef'){for(const k of ['root','nectar'])n.party.ingredients[k]=Math.min(99,n.party.ingredients[k]+2);}
     if(offer.job==='healer'){if(n.party.loadouts)H().ids(n).forEach(id=>H().heal(n,id,id==='hero'?12:10));else{n.hp=Math.min(C().MAX_HP,n.hp+12);n.party.members.forEach(m=>m.hp=Math.min(P().memberMax(m),m.hp+10));}}
-    if(offer.job==='smith'){n.party.journey.scrap=Math.min(99,n.party.journey.scrap+4);Object.values(n.equipment).filter(Boolean).forEach(g=>g.durability=Math.min(g.maxDurability,g.durability+2));}
+    if(offer.job==='smith'){n.party.journey.scrap=Math.min(99,n.party.journey.scrap+4);Object.values(n.equipment).filter(g=>g&&g.durability>0).forEach(g=>g.durability=Math.min(g.maxDurability,g.durability+2));}
     return {ok:true,message:'完成探索，獲得八枚銅幣。'+offer.reward,effect:{passage:['swordsman','scout'].includes(offer.job)}};
   });}
   const TRAITS=Object.freeze({durable:{name:'耐用',description:'每級多承受兩次耐久消耗；修理不會補回這層保護。'},light:{name:'輕巧',description:'武器每級縮短揮擊間隔 0.08 秒；防具每級移速增加 3%，全身最高 6%。'},grip:{name:'防滑',description:'僅防具：每級降低一點陷阱傷害，全身最多四點，並減輕緩速。'}});
   function validateForge(value,slot){if(value===undefined)return undefined;if(!value||!own(TRAITS,value.trait)||!integer(value.level,1,2)||!integer(value.reserve,0,value.trait==='durable'?value.level*2:0)||value.trait==='grip'&&slot==='weapon')return null;return {trait:value.trait,level:value.level,reserve:value.reserve};}
   const H=()=>typeof module==='object'&&module.exports?require('./tower-heroes-core.js'):globalThis.TowerHeroes;
   const allGear=run=>run.party?.loadouts?H().allGear(run):[...run.gearBag,...Object.values(run.equipment).filter(Boolean)];
-  const salvageValue=g=>Math.min(6,1+g.bonus+Math.floor(g.durability/4));
+  const salvageValue=g=>Math.min(6,1+g.bonus+Math.floor(g.durability/(4*C().durabilityMultiplier(g.kind))));
+  function repairQuote(run,id){
+    const g=allGear(run).find(g=>g.id===id);if(!run.party||!g||g.durability===g.maxDurability)return null;
+    const broken=g.durability===0,units=Math.ceil((g.maxDurability-g.durability)/(4*C().durabilityMultiplier(g.kind)));
+    const discount=run.party.loadouts?H().teamPassive(run,'economy'):P().has(run,'smith')?50:0;
+    const normalCoins=Math.ceil(units*6*(1-discount/100)),coins=broken?Math.ceil(normalCoins*1.5):normalCoins,parts=Math.max(1,Math.ceil(units/2));
+    return {broken,normalCoins,coins,parts,allowed:!broken||!!P().has(run,'smith')};
+  }
+  function repair(run,id,revision){return C().transaction(run,revision,n=>{
+    const q=repairQuote(n,id);if(!q)return {ok:false,message:'這件裝備不需要修理，或已經被移走。'};
+    if(!q.allowed)return {ok:false,message:'完全損壞的裝備，需要隊伍中仍能行動的鍛匠才能修復。'};
+    if(n.coins<q.coins||n.party.journey.scrap<q.parts)return {ok:false,message:`需要 ${q.coins} 枚銅幣與 ${q.parts} 份金屬零件。`};
+    const g=allGear(n).find(g=>g.id===id);n.coins-=q.coins;n.party.journey.scrap-=q.parts;g.durability=g.maxDurability;
+    return {ok:true,message:'修復 '+g.name+'，耐久已補滿。',effect:{repaired:g.id,broken:q.broken}};
+  });}
   function dismantle(run,id,revision){return C().transaction(run,revision,n=>{
     if(!n.party)return {ok:false,message:'請先選擇冒險職業。'};const g=allGear(n).find(g=>g.id===id);if(!g)return {ok:false,message:'裝備已不在背包裡。'};
     const value=salvageValue(g);if(n.party.journey.scrap+value>99)return {ok:false,message:'零件袋放不下，請先使用零件。'};
@@ -111,14 +125,14 @@
   });}
   function forge(run,id,trait,revision){return C().transaction(run,revision,n=>{
     if(!n.party||!own(TRAITS,trait))return {ok:false,message:'無效的鍛造選項。'};
-    const g=allGear(n).find(g=>g.id===id);if(!g||g.forge?.level===2||g.forge&&g.forge.trait!==trait||trait==='grip'&&g.slot==='weapon')return {ok:false,message:'每件裝備只能選一種特性，最多強化兩次。'};
+    const g=allGear(n).find(g=>g.id===id);if(!g||g.durability===0||g.forge?.level===2||g.forge&&g.forge.trait!==trait||trait==='grip'&&g.slot==='weapon')return {ok:false,message:'先修復破損裝備；每件裝備只能選一種特性，最多強化兩次。'};
     const level=(g.forge?.level||0)+1,parts=level*3,coins=n.party.loadouts?Math.ceil(level*8*(1-H().teamPassive(n,'economy')/100)):P().has(n,'smith')?level*4:level*8;
     if(n.party.journey.scrap<parts||n.coins<coins)return {ok:false,message:`需要${parts}份金屬零件與${coins}枚銅幣。`};
     n.party.journey.scrap-=parts;n.coins-=coins;g.forge={trait,level,reserve:(g.forge?.reserve||0)+(trait==='durable'?2:0)};
     return {ok:true,message:`${g.name}獲得${TRAITS[trait].name}，第${level}級。`};
   });}
-  function wear(run,g){if(g.forge?.reserve>0)g.forge.reserve--;else g.durability--;if(g.durability===0&&run.party)run.party.journey.scrap=Math.min(99,run.party.journey.scrap+1);}
-  function traits(run){let light=0,grip=0;for(const g of Object.values(run.equipment||{}).filter(g=>g&&g.slot!=='weapon')){if(g.forge?.trait==='light')light+=g.forge.level;if(g.forge?.trait==='grip')grip+=g.forge.level;}return {speed:1+Math.min(2,light)*.03,grip:Math.min(4,grip)};}
+  function wear(run,g){if(g.durability<=0)return;if(g.forge?.reserve>0)g.forge.reserve--;else g.durability--;if(g.durability===0&&run.party&&!run.party.loadouts)run.party.journey.scrap=Math.min(99,run.party.journey.scrap+1);}
+  function traits(run){let light=0,grip=0;for(const g of Object.values(run.equipment||{}).filter(g=>g&&g.durability>0&&g.slot!=='weapon')){if(g.forge?.trait==='light')light+=g.forge.level;if(g.forge?.trait==='grip')grip+=g.forge.level;}return {speed:1+Math.min(2,light)*.03,grip:Math.min(4,grip)};}
   function attackInterval(run){const f=run.equipment.weapon?.forge;return .8-(f?.trait==='light'?f.level*.08:0);}
-  return Object.freeze({BOSSES,SITES,TRAITS,newBoss,validateBoss,phase,cycle,target,hint,bossAction,danger,newJourney,validateJourney,siteOffer,explore,validateForge,allGear,salvageValue,dismantle,forge,wear,traits,attackInterval});
+  return Object.freeze({BOSSES,SITES,TRAITS,newBoss,validateBoss,phase,cycle,target,hint,bossAction,danger,newJourney,validateJourney,siteOffer,explore,validateForge,allGear,salvageValue,dismantle,repairQuote,repair,forge,wear,traits,attackInterval});
 });

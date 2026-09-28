@@ -19,7 +19,7 @@
     return g;
   }
   function base(job,build,identity='hero'){const styles={swordsman:[0x577c99,0x604b3c,'boy'],mage:[0x796396,0x383243,'girl'],scout:[0x498a78,0x624930,'girl'],chef:[0xa68156,0x473428,'boy'],healer:[0x6d9982,0x49302b,'girl'],smith:[0x796957,0x453e38,'boy']},s=styles[job];const m=build({shirt:s[0],pants:0x354351,skin:identity==='hero'?0xe3b48d:0xcfa889,hair:identity==='hero'?0x2e2933:s[1],type:s[2]});m.userData.heroIdentityStyle=identity==='hero'?'protagonist':'traveller';m.userData.heroJob=job;m.userData.heroPieces=[];return m;}
-  function dress(T,model,equipment,dispose){const signature=Object.values(equipment).map(g=>g?.kind||'-').join('|');if(model.userData.heroDress===signature)return;
+  function dress(T,model,equipment,dispose){equipment=Object.fromEntries(Object.entries(equipment).map(([slot,g])=>[slot,g?.durability===0?null:g]));const signature=Object.values(equipment).map(g=>g?.kind||'-').join('|');if(model.userData.heroDress===signature)return;
     for(const p of model.userData.heroPieces||[]){p.parent?.remove(p);dispose(p);}const pieces=[];
     for(const item of Object.values(equipment).filter(Boolean)){const piece=gear(T,item.kind),slot=item.slot;pieces.push(piece);
       if(item.kind==='robe'&&model.userData.heroJob==='healer')piece.traverse(o=>{if(o.isMesh&&o.material.color.getHex()===0x45617c)o.material.color.setHex(0x6c947f);});

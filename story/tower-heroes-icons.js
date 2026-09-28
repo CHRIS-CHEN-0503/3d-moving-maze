@@ -76,6 +76,38 @@
     economy:g(hammer,'translate(-2 2) scale(.7)')+circle(46,46,14)+p('M46 37v18m-5-15h10m-10 9h10'),
     care:g(hammer,'translate(8 0) scale(.7)')+p('M6 40q26 16 52 0l-6 13-20 7-20-7M8 9h9m-5-5v10'),
   };
+  Object.assign(drawings,{
+    decisive_slash:g(sword,'rotate(30 32 32)')+p('M3 18Q29-3 60 19M3 29Q32 1 61 32M10 48l12-7'),
+    star_ring:g(star,'translate(16 14) scale(.6)')+p('M6 9l16 13m5-20 5 15m22-9-12 14M5 49q27 21 54 0M8 43q24 18 48 0'),
+    escape_line:p('M7 54V37h17V22h17V7M36 12l5-5 5 5M17 53h15V38h19V23M47 48l5 6 8-13'),
+    hero_feast:g(bowl,'translate(0 9)')+g(star,'translate(20 -1) scale(.35)')+p('M4 10v20m54-20v20'),
+    dawn_sanctuary:g(book,'translate(0 15) scale(.9)')+circle(32,15,10)+p('M32 0v4M14 7l5 5m26-5-5 5M32 10v10m-5-5h10'),
+    moving_fortress:p('M7 56V12h12v8h7V8h12v12h7v-8h12v44ZM7 30h50M24 56V38h16v18M15 38v9m34-9v9'),
+    unyielding:shield+g(sword,'translate(10 12) scale(.7)')+p('M3 8l8 6m50-6-8 6'),
+    twin_stars:g(star,'translate(-2 3) scale(.6)')+g(star,'translate(27 23) scale(.6)')+p('M5 49q16 15 22-6m11-30q10-11 20 0'),
+    relay_opening:g(eye,'translate(0 -4) scale(.8)')+p('M6 51h18l9-9 8 9h17M49 44l9 7-9 7'),
+    many_flavors:g(bowl,'translate(-2 18) scale(.8)')+g(leaf,'translate(27 0) scale(.55)')+p('M11 8h12v14H11m-5-7h22'),
+    life_covenant:g(shield,'translate(4 8) scale(.85)')+p('M23 25h18m-9-9v18M7 6l6 8m45-8-6 8'),
+    artisan_soul:g(hammer,'translate(-1 2) scale(.75)')+g(star,'translate(31 29) scale(.45)')+p('M7 53h21'),
+    iron_wall:p('M6 10h52v46H6ZM6 25h52M6 40h52M23 10v15m19 0v15M23 40v16'),
+    last_stand:g(sword,'translate(-4 0)')+p('M44 59V25l-7 8m7-8 7 8M4 37l10 10'),
+    spell_precision:g(eye,'translate(0 10) scale(.8)')+g(star,'translate(35 0) scale(.45)'),
+    shield_mastery:g(shield,'translate(0 6) scale(.8)')+g(star,'translate(33 1) scale(.45)'),
+    hunter_eye:eye+p('M32 2v14m0 32v14M2 32h14m32 0h14'),
+    quick_hands:g(boot,'translate(5 6) scale(.8)')+p('M4 8h23M2 17h21M1 26h19'),
+    ingredient_care:g(leaf,'translate(-1 0) scale(.8)')+p('M30 45h28v14H30Zm7 0v-8h14v8'),
+    food_sharing:g(bowl,'translate(-2 -1) scale(.6)')+p('M29 48h28m-7-7 7 7-7 7M9 41v17m-8-8h16'),
+    gentle_care:leaf+circle(48,46,12)+p('M42 46h12m-6-6v12'),
+    steadfast:g(shield,'translate(8 12) scale(.7)')+p('M3 9h19m-10-7v16M43 7l6 7 10-12'),
+    tempered_edge:g(sword,'rotate(40 32 32)')+p('M8 55q-6-15 5-22 0 14 10 13 1 12-15 9Z'),
+    sturdy_gear:drawings.heavy_armor+p('M27 30h10v14H27m5-10v6'),
+    item_heal:p('M23 5h18v9H23Zm2 9v9L13 34v22h38V34L39 23v-9M15 37h34M26 43h12m-6-6v18'),
+    item_ration:p('M8 24Q8 8 32 8t24 16v31H8ZM8 28h48M19 17l-4 7m15-10-4 9m15-9-4 9M13 47h38'),
+    item_shield:shield+g(star,'translate(21 20) scale(.35)'),
+    item_hourglass:p('M16 5h32v9q0 11-12 18 12 7 12 18v9H16v-9q0-11 12-18-12-7-12-18ZM13 5h38M13 59h38M23 49l9-10 9 10Z'),
+    item_bell:p('M13 43h38L45 32V20q-13-19-26 0v12ZM8 44h48v7H8M25 53q7 12 14 0M29 9V3h6v6'),
+    item_map:p('M5 12l18-6 18 7 18-6v45l-18 7-18-7-18 6ZM23 6v46m18-39v46M12 27l17 13 20-18m-6-1 6 1-1 7'),
+  });
   function svg(id){if(!drawings[id])return '';return '<svg class="hero-icon" viewBox="0 0 64 64" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><g fill="#284957" fill-opacity=".75" stroke="#f6db9e" stroke-width="2.8" stroke-linecap="round" stroke-linejoin="round">'+drawings[id]+'</g></svg>';}
   return Object.freeze({svg,ids:Object.freeze(Object.keys(drawings))});
 });

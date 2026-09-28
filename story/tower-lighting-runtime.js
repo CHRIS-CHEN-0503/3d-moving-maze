@@ -51,7 +51,7 @@
       profile=L.profile(ctx.environment().id);rig=ctx.environment().rig;
       group=new T.Group();group.name='tower-lighting';ctx.world().add(group);
       // Keep a constant light count (no shader recompilation when walking past lamps).
-      for(let i=0;i<3;i++){const light=new T.PointLight(0xffd19a,0,14,1.4);light.name='tower-light-slot-'+i;light.castShadow=false;group.add(light);lamps.push(light);}
+      for(let i=0;i<3;i++){const light=new T.PointLight(0xffd19a,0,i===0?14:10.5,1.4);light.name='tower-light-slot-'+i;light.castShadow=false;group.add(light);lamps.push(light);}
       carried=torchModel();carried.scale.setScalar(.8);group.add(carried);
       orb=new T.Group();orb.name='daylight-orb';part(orb,new T.IcosahedronGeometry(.14,0),0xfff4cb,0,0,0,true);const ring=part(orb,new T.TorusGeometry(.26,.018,4,16),0xffe2a1,0,0,0,true);ring.rotation.x=Math.PI/2;group.add(orb);
       const entry=ctx.cell(0,0);
@@ -112,11 +112,21 @@
     function updateVisual(dt,force=false){
       if(!group||!enabled())return;
       const mode=L.portable(r());nearClock-=dt;
-      if(nearClock<=0||force){nearClock=.15;nearSources=sources.filter(p=>distance(p)<11&&clear(p)).sort((a,b)=>distance(a)-distance(b)).slice(0,2);}
-      const ambientRadius=nearSources.reduce((value,p)=>Math.max(value,12-distance(p)*.6),profile.radius);
+      if(nearClock<=0||force){nearClock=.15;nearSources=sources.filter(p=>distance(p)<10.5&&clear(p)).sort((a,b)=>distance(a)-distance(b)).slice(0,2);}
+      // A distant lamp is a beacon, not free illumination of the whole corridor.
+      const ambientRadius=nearSources.reduce((value,p)=>Math.max(value,10.5-distance(p)*1.15),profile.radius);
       range=Math.max(ambientRadius,mode==='daylight'?15:mode==='torch'?10:profile.radius);
-      // Ambient never drops to black; fog creates a readable but limited unlit range.
-      if(rig?.fog){const height=G.view==='top'?Math.abs(ctx.camera().position.y):0;rig.fog.near=Math.hypot(height,range*.8);rig.fog.far=Math.hypot(height,range*2.7);}
+      // Keep the player clear when the third-person camera is pulled back. The
+      // extra distance belongs to the camera, not to the player's sight range.
+      if(rig?.fog){
+        const camera=ctx.camera();
+        if(G.view==='top'){
+          const height=Math.abs(camera.position.y);rig.fog.near=Math.hypot(height,range*.6);rig.fog.far=Math.hypot(height,range*1.8);
+        }else{
+          const offset=G.view==='tp'?Math.hypot(camera.position.x-G.px,camera.position.y-1.5,camera.position.z-G.pz):0;
+          rig.fog.near=offset+range*.6;rig.fog.far=offset+range*1.8;
+        }
+      }
       const light=lamps[0];light.position.set(G.px,2.25,G.pz);light.color.setHex(mode==='daylight'?0xfff2d1:0xffc07a);light.distance=mode==='daylight'?21:14;
       light.intensity=mode==='none'?0:mode==='daylight'?4.2:3.3;
       for(let i=0;i<2;i++){const source=nearSources[i],slot=lamps[i+1];slot.intensity=source?3.2:0;if(source){slot.color.setHex(source.color);slot.position.set(source.x,1.8,source.z);}}

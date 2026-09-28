@@ -441,6 +441,8 @@
       const light=window.TowerLighting.profile(floorConfig.environmentId);
       scene.background.setHex(light.sky);scene.fog.color.setHex(light.sky);
       envGroup.children[0].intensity=light.hemi;envGroup.children[1].intensity=light.ambient;sun.intensity=light.sun;
+      // Lava cracks remain a faint landmark, not a full-floor light source.
+      floorMesh.material.emissiveIntensity=.035;
       lightingRig={fog:scene.fog};
     }
     wallMesh.material.color.setHex(wall);

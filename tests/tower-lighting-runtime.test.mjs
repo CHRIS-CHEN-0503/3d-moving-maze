@@ -37,6 +37,20 @@ test('torch and daylight increase range and top-view fog compensates for camera 
   const torch=h.ui.radius();h.run=L.daylight(h.run).run;h.ui.updateVisual(0,true);assert.ok(h.ui.radius()>torch);assert.equal(h.world.getObjectByName('traveller-torch').visible,false);assert.equal(h.world.getObjectByName('daylight-orb').visible,true);
   h.G.view='top';h.camera.position.y=50;h.ui.updateVisual(0,true);assert.ok(h.fog.near>50&&h.fog.far>h.fog.near);h.active=false;assert.equal(h.ui.radius(),null);
 });
+test('unlit fog remains close without hiding the third-person hero at either camera distance',()=>{
+  const h=harness();h.G.px=200;h.ui.updateVisual(0,true);assert.ok(h.ui.radius()<3.5);
+  for(const d of [3,8,11]){
+    h.camera.position.set(200,1.5,d);h.ui.updateVisual(0,true);
+    assert.ok(h.fog.near>d);assert.ok(h.fog.far-d<6);
+  }
+  h.G.view='fp';h.ui.updateVisual(0,true);assert.ok(h.fog.near<2&&h.fog.far<6);
+});
+test('a faraway visible lamp does not grant a full camp sight radius',()=>{
+  const h=harness();h.G.px=-7;h.G.pz=0;h.ui.updateVisual(0,true);
+  assert.equal(h.ui.radius(),L.profile('echo').radius);
+  assert.ok(h.world.getObjectByName('tower-light-slot-1').intensity>0,'the visible lamp remains a beacon');
+  h.G.px=0;h.ui.updateVisual(0,true);assert.ok(h.ui.radius()>9);
+});
 test('failed or occluded material pickup leaves resources and model intact; reload cannot duplicate',()=>{
   const h=harness(),item=h.ui.reserved().find(s=>s.id?.startsWith('light-supply'));h.G.px=item.x;h.G.pz=item.z;
   h.wall=true;h.ui.tick(0);assert.equal(h.run.party.light.wood,2);h.wall=false;h.failed=true;h.ui.tick(0);assert.equal(h.run.party.light.wood,2);assert.equal(item.model.visible,true);

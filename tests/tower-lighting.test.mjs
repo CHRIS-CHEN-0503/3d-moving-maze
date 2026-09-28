@@ -61,8 +61,8 @@ test('portable light continues inside side dungeons, without new merchant stock 
   r=L.daylight(r).run;r=advanceTime(r,30);assert.equal(r.party.light.daylight,570);assert.equal(L.gather(r,'light-supply-0').ok,false);assert.equal(L.buy(r,'tieLing').ok,false);
   assert.ok(C.validateSave(JSON.stringify(r)));
 });
-test('all ten regions have readable but varied ambient light and original source silhouettes',()=>{
+test('all ten regions require light beyond the immediate surroundings while retaining distinct palettes',()=>{
   assert.equal(Object.keys(L.PROFILES).length,10);const styles=new Set();
-  for(const c of C.CHAPTERS){const p=L.profile(c.id);assert.ok(p.radius>=6&&p.ambient>=.27&&p.hemi>=.4);styles.add(p.style);}
+  for(const c of C.CHAPTERS){const p=L.profile(c.id);assert.ok(p.radius>=2.5&&p.radius<=3.5);assert.ok(p.ambient>=.02&&p.hemi>=.045&&p.sun>0);assert.ok(p.ambient+p.hemi+p.sun<.17);assert.ok(Math.max(p.sky>>16,(p.sky>>8)&255,p.sky&255)<30);styles.add(p.style);}
   assert.ok(styles.size>=5);assert.ok(L.profile('garden').radius>L.profile('echo').radius);assert.equal(L.profile('__proto__'),L.PROFILES.echo);
 });

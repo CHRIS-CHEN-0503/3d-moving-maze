@@ -162,7 +162,7 @@ test('劇情冷卻與距離維持原規則，打空同樣啟動朝前揮擊',()=
 test('副本提前返回之前更新武器位置，暫停期間保持既有姿態',()=>{
   const tick=tower.slice(tower.indexOf('  function tick(dt, now)'),tower.indexOf('  function hasClearPath'));
   const pose=tick.indexOf('worldWeaponPose');assert.ok(pose>tick.indexOf('if (paused ||'));
-  assert.ok(pose<tick.indexOf('if(inDungeon()){tickDungeon'),'副本移動不可將武器留在入口');
+  assert.ok(pose<tick.indexOf('tickDungeon(dt,now);return;'),'副本移動不可將武器留在入口');
 });
 
 test('預覽只在選角頁繪製，換角色釋放前一個模型的資源',()=>{

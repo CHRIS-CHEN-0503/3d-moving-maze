@@ -50,6 +50,6 @@ test('四種怪物傷害不變，但無防具滿血能承受的命中次數降�
 test('生命介面、背包和重試統一使用核心生命上限',()=>{
   const source=readFileSync(new URL('../story/tower-mode.js',import.meta.url),'utf8');
   assert.match(source,/towerHealth[^\n]*C.MAX_HP/);assert.match(source,/max="'\+C.MAX_HP\+'/);
-  assert.match(source,/旅人背包[^\n]*C.MAX_HP/);assert.match(source,/key==='retry'[^\n]*run.hp=C.MAX_HP/);
+  assert.match(source,/旅人背包[^\n]*C.MAX_HP/);assert.match(source,/key==='retry'[^\n]*run.hp=modern\(\)\?Heroes.maxHp\(run\):C.MAX_HP/);
   assert.doesNotMatch(source,/run.hp=100|run.hp\)\s*\+\s*' \/ 100/);
 });

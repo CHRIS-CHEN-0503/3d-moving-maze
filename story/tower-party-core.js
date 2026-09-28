@@ -4,6 +4,7 @@
   const C=()=>typeof module==='object'&&module.exports?require('./story-core.js'):globalThis.TowerCore;
   const X=()=>typeof module==='object'&&module.exports?require('./tower-expedition-core.js'):globalThis.TowerExpedition;
   const L=()=>typeof module==='object'&&module.exports?require('./tower-lighting-core.js'):globalThis.TowerLighting;
+  const H=()=>typeof module==='object'&&module.exports?require('./tower-heroes-core.js'):globalThis.TowerHeroes;
   const own=(o,k)=>Object.hasOwn(o,k), num=(v,a,b,int=false)=>Number.isFinite(v)&&v>=a&&v<=b&&(!int||Number.isInteger(v));
   const PROFESSIONS=Object.freeze({
     swordsman:{name:'劍士',person:'蒼衡',gender:'male',color:0x5594c1,skill:'守護架勢',description:'近戰傷害較高。技能：六秒內減傷一半；劍士隊友會替你攔下近身怪物。',cooldown:20},
@@ -34,8 +35,8 @@
   const BOSS_FLOORS=X().BOSSES;
   function hash(seed,text){let h=seed>>>0;for(const c of String(text))h=Math.imul(h^c.charCodeAt(0),16777619)>>>0;return h;}
   const emptyStock=keys=>Object.fromEntries(Object.keys(keys).map(k=>[k,0]));
-  const has=(run,job)=>run.party&&(run.party.profession===job||run.party.members.some(m=>m.profession===job&&m.hp>0));
-  const memberMax=m=>28+m.level*6;
+  const has=(run,job)=>run.party&&(run.party.loadouts?H().ids(run).some(id=>H().job(run,id)===job&&H().hp(run,id)>0):run.party.profession===job||run.party.members.some(m=>m.profession===job&&m.hp>0));
+  const memberMax=m=>m.id==='hero'?60:28+m.level*6;
   const newBoss=floor=>X().newBoss(floor);
   function enable(run,profession){
     const next=C().validateSave(run);if(!next||!own(PROFESSIONS,profession)||next.party)return {ok:false,run,message:'請選擇有效的冒險職業。'};
@@ -65,7 +66,9 @@
     if(value.light!==undefined&&!L())return null; // Never silently discard saved fuel if a script failed to load.
     const light=L()?.validate(value.light,floor);
     if(boss===undefined||!journey||L()&&!light)return null;
-    return {version:1,profession:value.profession,members,joined:[...value.joined],ingredients:{...value.ingredients},meals:{...value.meals},buffs:value.buffs.map(b=>({...b})),cooldown:value.cooldown,guardLeft:value.guardLeft,trapWard:value.trapWard,slowLeft:value.slowLeft,health:{...value.health},poise:{...value.poise},boss,journey,...(light?{light}:{})};
+    const loadouts=value.loadouts===undefined?undefined:H()?.validate(value.loadouts,{profession:value.profession,members});
+    if(value.loadouts!==undefined&&!loadouts)return null;
+    return {version:1,profession:value.profession,members,joined:[...value.joined],ingredients:{...value.ingredients},meals:{...value.meals},buffs:value.buffs.map(b=>({...b})),cooldown:value.cooldown,guardLeft:value.guardLeft,trapWard:value.trapWard,slowLeft:value.slowLeft,health:{...value.health},poise:{...value.poise},boss,journey,...(light?{light}:{}),...(loadouts?{loadouts}:{})};
   }
   function transact(run,revision,fn){return C().transaction(run,revision,next=>!next.party?{ok:false,message:'尚未選擇冒險職業。'}:fn(next,next.party));}
   function recruitOffer(run){
@@ -84,34 +87,34 @@
     if(p.members.length>=3)return {ok:false,message:'四人隊伍已滿，請先在隊伍頁面與一位同伴道別。'};
     if(p.members.some(m=>m.profession===offer.profession))return {ok:false,message:'隊伍已有這個職業的同伴，留個位置給不同專長的旅人吧。'};
     if(n.coins<offer.price)return {ok:false,message:'銅幣不足，先探索其他通道吧。'};
-    n.coins-=offer.price;p.members.push({id,profession:offer.profession,level:offer.level,hp:28+offer.level*6,cooldown:0,hurtLeft:0});p.joined.push(id);
+    n.coins-=offer.price;const member={id,profession:offer.profession,level:offer.level,hp:28+offer.level*6,cooldown:0,hurtLeft:0};p.members.push(member);p.joined.push(id);if(p.loadouts)H().addMember(n,member);
     return {ok:true,message:`${PROFESSIONS[offer.profession].person}加入隊伍。`};
   });}
-  function dismiss(run,id,revision){return transact(run,revision,(n,p)=>{const m=p.members.find(m=>m.id===id);if(!m)return {ok:false,message:'這位同伴不在隊伍中。'};p.members=p.members.filter(m=>m.id!==id);return {ok:true,message:`與${PROFESSIONS[m.profession].person}道別了。`};});}
+  function dismiss(run,id,revision){return transact(run,revision,(n,p)=>{const m=p.members.find(m=>m.id===id);if(!m)return {ok:false,message:'這位同伴不在隊伍中。'};if(p.loadouts){if(p.loadouts.active===id)return {ok:false,message:'先切換另一位隊員帶隊，再與他道別。'};const gear=Object.values(H().equipment(n,id)).filter(Boolean);if(n.gearBag.length+gear.length>24)return {ok:false,message:'先清出背包空間，保留同伴的裝備。'};n.gearBag.push(...gear);H().removeMember(n,id);}p.members=p.members.filter(m=>m.id!==id);return {ok:true,message:'與'+PROFESSIONS[m.profession].person+'道別了。'};});}
   function gather(run,source,id,revision){return transact(run,revision,(n,p)=>{
     if(!/^s\d{1,2}$/.test(source)||!own(INGREDIENTS,id)||n.claimed.includes(source))return {ok:false,message:'這份材料已經採集過了。'};
     if(p.ingredients[id]>=99)return {ok:false,message:'材料袋已滿。'};p.ingredients[id]++;n.claimed.push(source);return {ok:true,message:`獲得${INGREDIENTS[id]}。`};
   });}
   function cook(run,id,revision){return transact(run,revision,(n,p)=>{
-    if(!own(RECIPES,id))return {ok:false,message:'沒有這份食譜。'};const r=RECIPES[id],amount=has(n,'chef')?2:1;
+    if(!own(RECIPES,id))return {ok:false,message:'沒有這份食譜。'};const r=RECIPES[id],chance=p.loadouts?H().teamPassive(n,'double_portion'):0,amount=p.loadouts?(chance>0&&H().roll(n,p.loadouts.active,'cook')<chance?2:1):has(n,'chef')?2:1;
     if(p.meals[id]+amount>99)return {ok:false,message:'料理盒已滿。'};
     if(Object.entries(r.cost).some(([k,v])=>p.ingredients[k]<v))return {ok:false,message:'食材還不夠，再去找找吧。'};
     for(const[k,v]of Object.entries(r.cost))p.ingredients[k]-=v;p.meals[id]+=amount;return {ok:true,message:`完成${r.name}，共${amount}份。`};
   });}
   function eat(run,id,revision){return transact(run,revision,(n,p)=>{
     if(!own(RECIPES,id)||!p.meals[id])return {ok:false,message:'料理盒裡沒有這道料理。'};const r=RECIPES[id];
-    n.hp=Math.min(C().MAX_HP,n.hp+r.hp);n.hunger=Math.min(100,n.hunger+r.hunger);if(r.team)p.members.forEach(m=>m.hp=Math.min(memberMax(m),m.hp+r.team));
+    n.hp=Math.min(C().MAX_HP,n.hp+r.hp);n.hunger=Math.min(100,n.hunger+r.hunger*(p.loadouts?1+H().teamPassive(n,'gourmet')/100:1));if(r.team){if(p.loadouts)H().ids(n).filter(k=>k!==p.loadouts.active).forEach(k=>H().heal(n,k,r.team));else p.members.forEach(m=>m.hp=Math.min(memberMax(m),m.hp+r.team));}if(p.loadouts)H().food(n);
     if(r.buff){p.buffs=p.buffs.filter(b=>b.id!==r.buff);p.buffs.push({id:r.buff,floors:3});if(p.buffs.length>2)p.buffs.shift();}
     p.meals[id]--;return {ok:true,message:`享用${r.name}。`};
   });}
   function camp(run,action,revision){return transact(run,revision,(n,p)=>{
     if(action==='rest'){
-      if(!p.members.some(m=>m.hp<memberMax(m)))return {ok:false,message:'同伴們的狀態很好。'};
-      if(n.bag.ration<1)return {ok:false,message:'休息需要一份乾糧。'};n.bag.ration--;p.members.forEach(m=>m.hp=memberMax(m));return {ok:true,message:'大家分享乾糧，恢復了精神。'};
+      if(p.loadouts?!H().ids(n).some(id=>H().hp(n,id)<H().maxHp(n,id)):!p.members.some(m=>m.hp<memberMax(m)))return {ok:false,message:'同伴們的狀態很好。'};
+      if(n.bag.ration<1)return {ok:false,message:'休息需要一份乾糧。'};n.bag.ration--;if(p.loadouts)H().ids(n).forEach(id=>H().setHp(n,id,H().maxHp(n,id)));else p.members.forEach(m=>m.hp=memberMax(m));return {ok:true,message:'大家分享乾糧，恢復了精神。'};
     }
     if(action!=='repair')return {ok:false,message:'未知的營地服務。'};
-    const cost=has(n,'smith')?3:6;if(n.coins<cost)return {ok:false,message:'修理費不足。'};
-    const gear=Object.values(n.equipment).filter(Boolean);if(!gear.some(g=>g.durability<g.maxDurability))return {ok:false,message:'穿戴的裝備不需要修理。'};
+    const cost=p.loadouts?Math.ceil(6*(1-H().teamPassive(n,'economy')/100)):has(n,'smith')?3:6;if(n.coins<cost)return {ok:false,message:'修理費不足。'};
+    const gear=p.loadouts?H().ids(n).flatMap(id=>Object.values(H().equipment(n,id)).filter(Boolean)):Object.values(n.equipment).filter(Boolean);if(!gear.some(g=>g.durability<g.maxDurability))return {ok:false,message:'穿戴的裝備不需要修理。'};
     n.coins-=cost;gear.forEach(g=>g.durability=Math.min(g.maxDurability,g.durability+4));return {ok:true,message:'已修補穿戴中的裝備。'};
   });}
   function defs(){return {...C().MONSTERS,...MONSTERS};}
@@ -121,7 +124,7 @@
     const pool=f>=70?['mushroom','crab','moth']:['mushroom','crab','moth','flower',...C().floorConfig(f).monsterTypes];
     return Array.from({length:count},(_,i)=>{const kind=pool[hash(run.seed,`monster:${f}:${i}`)%pool.length],def=defs()[kind],strength=Math.min(5,def.strength+(f<=19?1:0));return {id:`monster-${i}`,kind,def,strength,maxHp:18+strength*8+Math.floor((99-f)/8)};});
   }
-  function strike(run,id,options={},revision){return transact(run,revision,(n,p)=>{
+  function strike(run,id,options={},revision){if(run.party?.loadouts)return H().strike(run,id,options,revision);return transact(run,revision,(n,p)=>{
     const spec=monsterSpecs(n).find(m=>m.id===id);if(!spec||n.defeatedMonsters.includes(id))return {ok:false,message:'這隻怪物已經倒下了。'};
     const member=options.memberId?p.members.find(m=>m.id===options.memberId&&m.hp>0):null;
     if(options.memberId&&(!member||member.cooldown>0))return {ok:false,message:'同伴正在調整呼吸。'};
@@ -135,11 +138,11 @@
     const drops={};if(hp===0){n.defeatedMonsters.push(id);delete p.health[id];delete p.poise[id];delete n.monsterStuns[id];n.coins=Math.min(999999,n.coins+8+spec.strength*2);Object.assign(drops,MONSTERS[spec.kind]?.drop||{shell:1});for(const[k,v]of Object.entries(drops))p.ingredients[k]=Math.min(99,p.ingredients[k]+v);}
     return {ok:true,message:hp===0?`擊敗${spec.def.name}。${Object.keys(drops).map(k=>`獲得${INGREDIENTS[k]}`).join('，')}。`:`命中${spec.def.name}。`,effect:{target:'monster',damage,hp,dead:hp===0,broken,stunned,drops}};
   });}
-  function hurtMember(run,id,amount,revision){return transact(run,revision,(n,p)=>{
+  function hurtMember(run,id,amount,revision){if(run.party?.loadouts)return transact(run,revision,n=>H().hurt(n,id,amount));return transact(run,revision,(n,p)=>{
     const m=p.members.find(x=>x.id===id);if(!m||m.hp<=0||!num(amount,0,100))return {ok:false,message:'無效的隊友傷害。'};
     if(m.hurtLeft>0)return {ok:true,message:'',effect:{target:'companion',damage:0}};const damage=Math.max(1,amount-m.level);m.hp=Math.max(0,m.hp-damage);m.hurtLeft=2;return {ok:true,message:m.hp===0?`${PROFESSIONS[m.profession].person}需要休息！帶他回營地或分享料理。`:'劍士擋下了攻擊。',effect:{target:'companion',damage,down:m.hp===0}};
   });}
-  function skill(run,revision){return transact(run,revision,(n,p)=>{
+  function skill(run,revision,skillId){if(run.party?.loadouts)return H().cast(run,skillId||H().actor(run).skills[0],{},revision);return transact(run,revision,(n,p)=>{
     if(p.cooldown>0)return {ok:false,message:'技能還在準備中。'};const j=p.profession;
     if(j==='chef'){if(!p.ingredients.root)return {ok:false,message:'需要一份甜根莖。'};if(n.hunger>=100)return {ok:false,message:'肚子還很飽。'};p.ingredients.root--;n.hunger=Math.min(100,n.hunger+25);}
     if(j==='healer'){if(!p.ingredients.herb)return {ok:false,message:'需要一份香草。'};if(n.hp>=C().MAX_HP)return {ok:false,message:'生命已滿。'};p.ingredients.herb--;n.hp=Math.min(C().MAX_HP,n.hp+20);}
@@ -149,12 +152,12 @@
     p.cooldown=PROFESSIONS[j].cooldown;return {ok:true,message:PROFESSIONS[j].skill,effect:{skill:j}};
   });}
   function reduceDamage(run,amount,source){const p=run.party;if(!p||source==='hunger')return amount;if(source==='trap'&&p.trapWard>0)return 0;let result=Math.max(0,amount-(p.buffs.some(b=>b.id==='guard')?2:0)-(source==='trap'?X().traits(run).grip:0));if(p.guardLeft>0)result*=.5;if(source==='trap'&&p.buffs.some(b=>b.id==='trail'))result*=.5;if(source==='trap'&&has(run,'scout'))result*=.75;return Math.ceil(result);}
-  function tick(next,dt){const p=next.party;if(!p)return;L()?.tick(next,dt);for(const k of ['cooldown','guardLeft','trapWard','slowLeft'])p[k]=Math.max(0,p[k]-dt);if(next.expedition.active)return;
+  function tick(next,dt){const p=next.party;if(!p)return;L()?.tick(next,dt);if(p.loadouts)H().tick(next,dt);for(const k of ['cooldown','guardLeft','trapWard','slowLeft'])p[k]=Math.max(0,p[k]-dt);if(next.expedition.active)return;
     for(const m of p.members){m.cooldown=Math.max(0,m.cooldown-dt);m.hurtLeft=Math.max(0,m.hurtLeft-dt);}
     for(const k of Object.keys(p.poise)){p.poise[k]=Math.max(0,p.poise[k]-dt);if(!p.poise[k])delete p.poise[k];}
     if(p.boss?.started&&!p.boss.done)p.boss.clock+=dt;
   }
-  function advance(next){if(!next.party)return;L()?.advance(next);const p=next.party;p.health={};p.poise={};p.boss=newBoss(next.floor);p.journey={...X().newJourney(next.floor),scrap:p.journey?.scrap||0};p.buffs=p.buffs.map(b=>({...b,floors:b.floors-1})).filter(b=>b.floors>0);p.slowLeft=0;}
+  function advance(next){if(!next.party)return;L()?.advance(next);if(next.party.loadouts)H().advance(next);const p=next.party;p.health={};p.poise={};p.boss=newBoss(next.floor);p.journey={...X().newJourney(next.floor),scrap:p.journey?.scrap||0};p.buffs=p.buffs.map(b=>({...b,floors:b.floors-1})).filter(b=>b.floors>0);p.slowLeft=0;}
   const canDescend=run=>!run.party?.boss||run.party.boss.done;
   const bossPhase=run=>X().phase(run),mirrorTarget=(run,index)=>X().target(run,index),bossAction=(run,index,revision)=>X().bossAction(run,index,revision);
   return Object.freeze({PROFESSIONS,INGREDIENTS,RECIPES,BUFFS,MONSTERS,BOSS_FLOORS,enable,validate,has,memberMax,recruitOffer,recruit,dismiss,gather,cook,eat,camp,defs,monsterSpecs,strike,hurtMember,skill,reduceDamage,tick,advance,canDescend,bossPhase,mirrorTarget,bossAction});

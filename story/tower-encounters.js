@@ -53,19 +53,20 @@
     const [itemCount, foodCount, storyCount] = COUNTS[size];
     return { itemCount, foodCount, storyCount, total: itemCount + foodCount + storyCount };
   }
-  function merchantOffers(floor, seed) {
+  function merchantOffers(floor, seed, modern=false) {
     const C = core(), random = randomFor(floor, seed, 0x24181), ids = Object.keys(MERCHANTS);
     for (let i = ids.length - 1; i > 0; i--) { const j = Math.floor(random() * (i + 1)); [ids[i], ids[j]] = [ids[j], ids[i]]; }
     const count = floor < 70 && random() < .45 ? 2 : 1;
     return ids.slice(0, count).map(id => {
-      const entry = MERCHANTS[id];
+      const kinds={tieLing:['heavy_helm','light_hood','rune_crown','longsword','greatsword','smith_hammer','warhammer'],jinHe:['heavy_armor','light_armor','robe','cooking_pan','twin_daggers'],lanZhou:['buckler','round_shield','tower_shield','arcane_staff','spellbook']};
+      const old=MERCHANTS[id],entry=modern?{...old,equipmentKinds:kinds[id],greeting:'我是'+old.name+'，這裡有專用裝備與旅途補給。'}:old;
       return { ...entry, equipmentKinds: [...entry.equipmentKinds], supplies: [...entry.supplies], gear: entry.equipmentKinds.map(kind => {
         const gear = C.createGear(kind, floor, seed, `shop:${floor}:${id}:${kind}`, false);
         return { kind, gear, price: C.gearPrice(gear) };
       }) };
     });
   }
-  function merchant(run, merchantId) { return merchantOffers(run.floor, run.seed).find(entry => entry.id === merchantId); }
+  function merchant(run, merchantId) { return merchantOffers(run.floor, run.seed,!!run.party?.loadouts).find(entry => entry.id === merchantId); }
   function failure(run, message) { return { ok: false, run, message }; }
   function transaction(run, expectedRevision, fn) {
     return core().transaction(run, expectedRevision, next => {
@@ -108,17 +109,17 @@
       return { ok: true, message: `取得${offer.gear.name || C.GEAR[kind].name}。`, effect: { gear: offer.gear } };
     });
   }
-  function chestOffer(floor, seed) {
+  function chestOffer(floor, seed, modern=false) {
     const C = core(), random = randomFor(floor, seed, 0x74e12);
     if (random() >= .2) return null;
     const id = `chest:${floor}:${seed}`;
     if (random() < .35) return { id, outcome: 'trap', damage: 12 + Math.floor((99 - floor) / 10), gear: null };
-    const kind = GEAR_KINDS[Math.floor(random() * GEAR_KINDS.length)];
+    const pool=modern?Object.keys(C.GEAR).filter(k=>!GEAR_KINDS.includes(k)):GEAR_KINDS,kind=pool[Math.floor(random()*pool.length)];
     return { id, outcome: 'gear', damage: 0, gear: C.createGear(kind, floor, seed, id, true) };
   }
   function openChest(run, chestId, expectedRevision, invulnerable = false) {
     return transaction(run, expectedRevision, next => {
-      const C = core(), offer = chestOffer(next.floor, next.seed);
+      const C = core(), offer = chestOffer(next.floor, next.seed,!!next.party?.loadouts);
       if (!offer || offer.id !== chestId) return { ok: false, message: '這個樓層沒有這只寶箱。' };
       if (next.adventure.claimed.includes(offer.id)) return { ok: false, message: '寶箱已經開啟。' };
       const result = offer.outcome === 'gear' ? C.receiveGear(next, offer.gear) : C.applyDamage(next, offer.damage, 'trap', invulnerable);
@@ -127,10 +128,10 @@
       return { ok: true, message: offer.outcome === 'gear' ? '寶箱中藏著強化裝備。' : '寶箱觸發陷阱！', effect: { ...result.effect, outcome: offer.outcome, gear: offer.gear, damage: offer.outcome === 'trap' ? result.effect.damage : 0 } };
     });
   }
-  function questReward(floor, seed) {
+  function questReward(floor, seed, modern=false) {
     const C = core(), random = randomFor(floor, seed, 0x257ca), coins = 12 + Math.floor((99 - floor) / 6);
     if (random() < .45) {
-      const kind = GEAR_KINDS[Math.floor(random() * GEAR_KINDS.length)];
+      const pool=modern?Object.keys(C.GEAR).filter(k=>!GEAR_KINDS.includes(k)):GEAR_KINDS,kind=pool[Math.floor(random()*pool.length)];
       return { coins, items: {}, gear: C.createGear(kind, floor, seed, `quest-reward:${floor}:${seed}`, true) };
     }
     const id = ['heal', 'ration', 'shield', 'hourglass'][Math.floor(random() * 4)];
@@ -142,7 +143,7 @@
       relic: ['遺失的記憶', '幫我找回散落在迷宮中的記憶碎片。'], donate: ['旅人的急需', `請交付 ${q.goal} 份${C.ITEMS[q.target]?.name || '補給'}，讓我能繼續走下去。`],
       survey: ['繪製迷宮', '走訪三個不同的迷宮格，替我記下道路。'], shift: ['觀察高塔心跳', '陪我安全經歷一次迷宮變形。'], stun: ['爭取逃脫時間', '用武器擊暈指定怪物一次，替旅人爭取空檔。'],
     };
-    return { ...q, title: types[q.type][0], description: types[q.type][1], reward: questReward(run.floor, run.seed), explorer: explorerIdentity(run.floor, run.seed) };
+    return { ...q, title: types[q.type][0], description: types[q.type][1], reward: questReward(run.floor, run.seed,!!run.party?.loadouts), explorer: explorerIdentity(run.floor, run.seed) };
   }
   function explorerOffer(run) {
     const C = core(), random = randomFor(run.floor, run.seed, 0x5b31e);
@@ -210,7 +211,7 @@
     return transaction(run, expectedRevision, next => {
       const C = core(), q = next.adventure.quest;
       if (!q || q.status !== 'ready' || next.adventure.claimed.includes(`reward:${q.id}`)) return { ok: false, message: '沒有尚未領取的委託報酬。' };
-      const reward = questReward(next.floor, next.seed);
+      const reward = questReward(next.floor, next.seed,!!next.party?.loadouts);
       if (next.coins + reward.coins > 999999 || Object.entries(reward.items).some(([id, amount]) => next.bag[id] + amount > 99)) return { ok: false, message: '請先整理背包或銅幣，再領取報酬。' };
       if (reward.gear) { const result = C.receiveGear(next, reward.gear); if (!result.ok) return result; }
       next.coins += reward.coins; for (const [id, amount] of Object.entries(reward.items)) next.bag[id] += amount;

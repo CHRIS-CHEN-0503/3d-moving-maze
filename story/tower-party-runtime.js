@@ -3,11 +3,13 @@
   'use strict';
   function create(ctx){
     const P=root.TowerPartyCore,X=root.TowerExpedition,T=ctx.THREE,V=root.TowerCharacters;
-    let actors=[],stations=[],near=null,offer=null,group=null,pulse=0,uiClock=0,skillLeft=0,guardVoiceLeft=0,worldFloor=null,worldSeed=null,working=null,pendingForge=null,pendingDismantle=null;
+    let actors=[],queue=[],queueClock=0,stations=[],near=null,offer=null,group=null,pulse=0,uiClock=0,skillLeft=0,guardVoiceLeft=0,worldFloor=null,worldSeed=null,working=null,pendingForge=null,pendingDismantle=null;
     const r=()=>ctx.run(), enabled=()=>!!r()?.party, live=()=>enabled()&&!ctx.inDungeon()&&worldFloor===r().floor&&worldSeed===r().seed;
     const esc=ctx.text,act=ctx.action;
     const distance=p=>Math.hypot(ctx.G.px-p.x,ctx.G.pz-p.z);
     const clear=p=>ctx.clear(ctx.G.px,ctx.G.pz,p.x,p.z);
+    const QUEUE_GAP=1.8,BODY_GAP=1.15;
+    const walkClear=(a,b)=>ctx.followClear?ctx.followClear(a,b):ctx.clear(a.x,a.z,b.x,b.z);
     const part=(parent,geometry,color,x=0,y=0,z=0)=>{const m=new T.Mesh(geometry,new T.MeshLambertMaterial({color,flatShading:true}));m.position.set(x,y,z);parent.add(m);return m;};
     const ball=(p,s,c,x,y,z)=>part(p,new T.SphereGeometry(s,8,6),c,x,y,z);
     const box=(p,a,b,c,color,x,y,z)=>part(p,new T.BoxGeometry(a,b,c),color,x,y,z);
@@ -87,7 +89,7 @@
       else{box(model,1,.55,.65,0x8e9b9f,0,.4,0);const gear=part(model,new T.TorusGeometry(.32,.12,4,10),c,0,.9,0);gear.rotation.x=Math.PI/2;box(model,.7,.1,.1,0xd8b179,0,.9,0);}
       label(model,X.SITES[job].name,2);ring(model,.95,c);return model;
     }
-    function reset(){actors=[];stations=[];near=null;offer=null;group=null;pulse=0;skillLeft=0;guardVoiceLeft=0;worldFloor=null;worldSeed=null;working=null;pendingForge=pendingDismantle=null;}
+    function reset(){actors=[];queue=[];queueClock=0;stations=[];near=null;offer=null;group=null;pulse=0;skillLeft=0;guardVoiceLeft=0;worldFloor=null;worldSeed=null;working=null;pendingForge=pendingDismantle=null;}
     function build(random,used){reset();worldFloor=r()?.floor;worldSeed=r()?.seed;if(!live())return;group=new T.Group();ctx.world().add(group);
       const p=ctx.cell(0,0),camp={...p,kind:'camp',model:stationModel('camp')};camp.model.position.set(p.x,0,p.z);group.add(camp.model);stations.push(camp);
       offer=P.recruitOffer(r());if(offer&&!r().party.joined.includes(offer.id)){const p=ctx.chooseCell(random,used),model=memberModel(offer.profession,offer.level);model.position.set(p.x,0,p.z);label(model,P.PROFESSIONS[offer.profession].person+' · '+P.PROFESSIONS[offer.profession].name);group.add(model);stations.push({...p,kind:'recruit',model});}
@@ -95,19 +97,19 @@
       const site=X.siteOffer(r());if(site){let p=ctx.chooseCell(random,used);if(['swordsman','scout'].includes(site.job)&&ctx.passage)for(let i=0;i<8&&!ctx.passage(p,true);i++)p=ctx.chooseCell(random,used);const model=siteModel(site.job);model.position.set(p.x,0,p.z);group.add(model);const station={...p,kind:'site',offer:site,model};stations.push(station);if(r().party.journey.site.done&&['swordsman','scout'].includes(site.job))ctx.passage?.(station);}
       syncActors();const specs=P.monsterSpecs(r());for(const m of ctx.monsters()){healthBar(m.model,0xef9e81);m.partyMaxHp=specs.find(s=>s.id===m.id)?.maxHp||1;}
     }
-    function companionSpawn(){
-      const origin={x:ctx.G.px,z:ctx.G.pz};
+    function companionSpawn(origin={x:ctx.G.px,z:ctx.G.pz},occupied=actors,slot=actors.length){
       // Use the same body clearance as walking, not the thinner interaction ray.
       // Entry cells border two outer walls: the previous 1.5 m offset put a
       // 0.28 m follower inside their collision boxes and stuck on the next step.
-      for(const radius of [1.25,.85,.45])for(let i=0;i<8;i++){
-        const angle=actors.length*2.1+i*Math.PI/4+(ctx.player()?.rotation.y||0)+Math.PI,p={x:origin.x+Math.sin(angle)*radius,z:origin.z+Math.cos(angle)*radius};
-        if((ctx.followClear?ctx.followClear(origin,p):clear(p))&&actors.every(a=>Math.hypot(a.model.position.x-p.x,a.model.position.z-p.z)>.55))return p;
+      for(const radius of [1.25,.95])for(let i=0;i<16;i++){
+        const angle=slot*2.1+i*Math.PI/8+(ctx.player()?.rotation.y||0)+Math.PI,p={x:origin.x+Math.sin(angle)*radius,z:origin.z+Math.cos(angle)*radius};
+        if(walkClear(origin,p)&&distance(p)>.85&&occupied.every(a=>Math.hypot(a.model.position.x-p.x,a.model.position.z-p.z)>=BODY_GAP))return p;
       }
       return origin;
     }
     function syncActors(){if(!live()||!group)return;for(const a of actors)if(!r().party.members.some(m=>m.id===a.id)){group.remove(a.model);ctx.dispose(a.model);}actors=actors.filter(a=>r().party.members.some(m=>m.id===a.id));
       for(const m of r().party.members)if(!actors.some(a=>a.id===m.id)){const model=memberModel(m.profession,m.level),p=companionSpawn();model.position.set(p.x,0,p.z);model.userData.companionId=m.id;label(model,P.PROFESSIONS[m.profession].name+' · '+P.PROFESSIONS[m.profession].person);healthBar(model,0x8cd2bd,2.35);group.add(model);actors.push({id:m.id,model,path:[],pathLeft:0});}
+      queue=queue.filter(a=>actors.includes(a));for(const a of actors)if(!queue.includes(a))queue.push(a);queueClock=0;
     }
     function safeCamp(){return live()&&(stations.some(s=>s.kind==='camp'&&distance(s)<2.8&&clear(s))||ctx.traders().some(s=>distance(s)<2.8&&clear(s)))&&!ctx.monsters().some(m=>m.alive&&distance(m.model.position)<4&&clear(m.model.position));}
     function forgePanel(quiet=false){if(!enabled())return;pendingForge=pendingDismantle=null;const run=r(),safe=safeCamp();
@@ -187,7 +189,46 @@
       if(m.windup>0){m.windup-=dt;if(m.windup<=0){const hit=P.hurtMember(r(),a.id,m.def.damage,r().revision);if(commit(hit,false)){ctx.audio.sfxGuardBlock?.();if(hit.effect.down)ctx.toast(hit.message,2500,hit.message);}m.cooldown=2.4;}}
       else if(m.cooldown<=0)m.windup=.9;return true;
     }
-    function shift(){working=null;for(const a of actors){const c=ctx.worldToCell(a.model.position.x,a.model.position.z),p=ctx.cell(c.x,c.y);a.model.position.set(p.x,0,p.z);a.path=[];a.pathLeft=0;}}
+    function shift(){
+      working=null;queueClock=0;const placed=[];
+      for(const a of actors){
+        const c=ctx.worldToCell(a.model.position.x,a.model.position.z),centre=ctx.cell(c.x,c.y),p=companionSpawn(centre,placed,placed.length);
+        a.model.position.set(p.x,0,p.z);a.path=[];a.pathLeft=0;a.safeTurn=false;a.queueLeader=null;placed.push(a);
+      }
+    }
+    function orderQueue(dt){
+      queueClock-=dt;if(queueClock>0)return;queueClock=.5;
+      const player={x:ctx.G.px,z:ctx.G.pz},scores=new Map(queue.map(a=>[a,ctx.followDistance?ctx.followDistance(a.model.position,player):distance(a.model.position)]));
+      // Stable ordering with hysteresis: let the nearer traveller lead when
+      // turning around or leaving a narrow camp, without swapping every frame.
+      for(let i=0;i<queue.length-1;i++){
+        let nearest=i;for(let j=i+1;j<queue.length;j++)if(scores.get(queue[j])<scores.get(queue[nearest]))nearest=j;
+        // Compare with every remaining traveller. Adjacent-only swaps can miss
+        // a frontmost member behind two similar scores and deadlock the entry.
+        if(scores.get(queue[nearest])+.35<scores.get(queue[i]))queue.splice(i,0,queue.splice(nearest,1)[0]);
+      }
+    }
+    function queueMove(actor,dt,speed,stop,target){
+      const p=actor.model.position,start={x:p.x,z:p.z},peers=actors.filter(a=>a!==actor);
+      const gap=(point,a)=>Math.hypot(point.x-a.model.position.x,point.z-a.model.position.z);
+      const overlap=peers.some(a=>gap(start,a)<BODY_GAP-.001);
+      const free=point=>walkClear(start,point)&&peers.every(a=>gap(point,a)>=BODY_GAP-.001||gap(point,a)>gap(start,a)+.00001);
+      const moving=ctx.follow(actor,dt,speed,stop,target,{direct:true});
+      if(moving&&free(p)&&!overlap)return true;
+      if(!moving&&!overlap)return false;
+      let dx=p.x-start.x,dz=p.z-start.z;p.x=start.x;p.z=start.z;
+      // Yield sideways inside the corridor rather than walk through a companion.
+      // If a restored/turned-around group overlaps, separate gradually, never
+      // teleport through a wall or move the player to make room.
+      if(overlap){dx=dz=0;for(const other of peers){const d=gap(start,other);if(d<BODY_GAP){dx+=(start.x-other.model.position.x)/Math.max(d,.01);dz+=(start.z-other.model.position.z)/Math.max(d,.01);}}}
+      if(Math.hypot(dx,dz)<.001){const angle=actors.indexOf(actor)*2.1;dx=Math.sin(angle);dz=Math.cos(angle);}
+      const angle=Math.atan2(dx,dz),side=actors.indexOf(actor)%2?1:-1,step=speed*Math.min(dt,.1);
+      for(const turn of [0,side*Math.PI/4,-side*Math.PI/4,side*Math.PI/2,-side*Math.PI/2,Math.PI]){
+        const next={x:start.x+Math.sin(angle+turn)*step,z:start.z+Math.cos(angle+turn)*step};
+        if(!free(next))continue;p.x=next.x;p.z=next.z;actor.model.rotation.y=angle+turn;return step>0;
+      }
+      return false;
+    }
     function friendlyVisibility(model){
       const camera=ctx.camera?.();if(!camera)return;const c=camera.position,p=model.position,dx=ctx.G.px-c.x,dz=ctx.G.pz-c.z,length=dx*dx+dz*dz,t=length>.01?((p.x-c.x)*dx+(p.z-c.z)*dz)/length:0;
       const cameraDistance=Math.hypot(p.x-c.x,p.z-c.z),occludes=c.y<3.5&&(cameraDistance<1.4||(t>0&&t<1&&Math.hypot(p.x-c.x-t*dx,p.z-c.z-t*dz)<.65));
@@ -198,10 +239,17 @@
       near=stations.filter(s=>s.model.visible&&distance(s)<2.6&&clear(s)).sort((a,b)=>distance(a)-distance(b))[0]||null;
       if(working){if(distance(working)>2.6||!clear(working)||ctx.hurt?.()){working=null;ctx.toast('先避開危險，稍後可以接著處理。',1400,false);}else{const site=r().party.journey.site;site.progress=Math.min(12,site.progress+dt);if(site.progress>=12)finishSite(working,'work');}}
       for(const s of stations)if(s.kind==='recruit')friendlyVisibility(s.model);
-      for(const a of actors){const m=r().party.members.find(m=>m.id===a.id);if(!m)continue;friendlyVisibility(a.model);a.model.userData.partyHp.scale.x=.94*Math.max(.001,m.hp/P.memberMax(m));a.model.rotation.z=m.hp<=0?.2:0;if(m.hp<=0)continue;
+      orderQueue(dt);
+      let leader={x:ctx.G.px,z:ctx.G.pz},leaderId='player';
+      for(const a of queue){const m=r().party.members.find(m=>m.id===a.id);if(!m)continue;friendlyVisibility(a.model);a.model.userData.partyHp.scale.x=.94*Math.max(.001,m.hp/P.memberMax(m));a.model.rotation.z=m.hp<=0?.2:0;if(m.hp<=0)continue;
         const enemy=ctx.monsters().filter(e=>e.alive&&distance(e.model.position)<6&&ctx.clear(a.model.position.x,a.model.position.z,e.model.position.x,e.model.position.z)).sort((a,b)=>distance(a.model.position)-distance(b.model.position))[0];
-        const target=m.profession==='swordsman'&&enemy?enemy.model.position:undefined;
-        const moving=ctx.follow(a,dt,3.6,m.profession==='swordsman'&&enemy?1.35:1.7,target);
+        const fighting=m.profession==='swordsman'&&enemy,target=fighting?enemy.model.position:leader,targetId=fighting?'enemy:'+enemy.id:leaderId;
+        if(a.queueLeader!==targetId){a.queueLeader=targetId;a.path=[];a.pathLeft=0;}
+        const speed=fighting?3.6:Math.hypot(target.x-a.model.position.x,target.z-a.model.position.z)>6?6.2:5.6;
+        const moving=queueMove(a,dt,speed,fighting?1.35:QUEUE_GAP,target);
+        // A guard who leaves the line must not drag the rest of the party into
+        // battle; downed companions likewise never become a stationary leader.
+        if(!fighting){leader=a.model.position;leaderId=a.id;}
         friendlyVisibility(a.model);
         if(root.CharacterFace)root.CharacterFace.update(a.model,now/1000,enemy?'focus':'calm');
         for(const key of ['legL','legR'])if(a.model.userData[key])a.model.userData[key].rotation.x=moving?Math.sin(now*.01)*(key==='legL'?1:-1)*.35:0;

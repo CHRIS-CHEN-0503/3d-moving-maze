@@ -1,7 +1,7 @@
 /* Exploration is local to each player. Revealing a map never grants opponents' positions. */
 (function(root,factory){const api=factory();if(typeof module==='object'&&module.exports)module.exports=api;root.MagicMap=api;})(globalThis,function(){
   'use strict';
-  let state=null;
+  let state=null,peek=null;
   function create(w,h){
     if(!Number.isInteger(w)||!Number.isInteger(h)||w<1||h<1||w>25||h>25)throw new RangeError('Invalid maze dimensions');
     return{w,h,seen:new Uint8Array(w*h),revealed:false};
@@ -18,10 +18,10 @@
   }
   function enabled(story,mode,rules){return mode!=='shop'&&(story||rules?.magicMap===1);}
   function count(size){return size<=11?1:2;}
-  function reset(w,h){state=create(w,h);}
+  function reset(w,h){state=create(w,h);peek=null;}
   function reveal(){if(state)state.revealed=true;}
   function isRevealed(){return !!state?.revealed;}
-  function visible(x,y){return !!state&&x>=0&&y>=0&&x<state.w&&y<state.h&&(state.revealed||state.seen[y*state.w+x]===1);}
+  function visible(x,y){return !!state&&x>=0&&y>=0&&x<state.w&&y<state.h&&(state.revealed||state.seen[y*state.w+x]===1||peek?.seen[y*state.w+x]===1);}
   function layoutKey(hWalls,vWalls){
     let hash=2166136261;
     for(const rows of [hWalls,vWalls])for(const row of rows||[])for(const wall of row)hash=Math.imul(hash^(wall?1:0),16777619);
@@ -35,9 +35,10 @@
   function mask(ctx,{w,h,x,y,hWalls,vWalls,pad,cw,ch}){
     if(!state||state.w!==w||state.h!==h)reset(w,h);
     explore(state,x,y,hWalls,vWalls);
+    const radius=globalThis.TowerMode?.temporaryMapRadius?.()||0;peek=radius>0?create(w,h):null;if(peek)explore(peek,x,y,hWalls,vWalls,radius);
     if(state.revealed)return;
     ctx.save();ctx.fillStyle='#0b1727';
-    for(let cy=0;cy<h;cy++)for(let cx=0;cx<w;cx++)if(!state.seen[cy*w+cx])ctx.fillRect(pad+cx*cw-.6,pad+cy*ch-.6,cw+1.2,ch+1.2);
+    for(let cy=0;cy<h;cy++)for(let cx=0;cx<w;cx++)if(!state.seen[cy*w+cx]&&!peek?.seen[cy*w+cx])ctx.fillRect(pad+cx*cw-.6,pad+cy*ch-.6,cw+1.2,ch+1.2);
     ctx.restore();
   }
   return Object.freeze({create,explore,enabled,count,reset,reveal,isRevealed,visible,snapshot,restore,mask});

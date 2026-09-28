@@ -21,7 +21,8 @@ function withGuard(strength) {
 }
 
 test('six gear kinds have only three armor slots and one nonlethal weapon slot', () => {
-  assert.deepEqual(Object.keys(C.GEAR), ['helmet', 'armor', 'shield', 'bat', 'pan', 'staff']);
+  assert.deepEqual(Object.keys(C.GEAR).slice(0,6), ['helmet', 'armor', 'shield', 'bat', 'pan', 'staff']);
+  assert.equal(Object.keys(C.GEAR).length,23);
   assert.deepEqual(Object.keys(fresh().equipment), ['helmet', 'armor', 'shield', 'weapon']);
   assert.deepEqual(['bat', 'pan', 'staff'].map(kind => C.GEAR[kind].stunSeconds), [15, 20, 10]);
   assert.deepEqual(['helmet', 'armor', 'shield'].map(kind => C.GEAR[kind].defense), [2, 4, 3]);

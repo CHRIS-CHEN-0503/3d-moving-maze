@@ -104,13 +104,13 @@ function harness(initialSave, runtimeBridge = '',preferences = {}) {
   return { context, get, click, save, tick, storage, toasts, emit: (type, event = {}) => windowEvents.get(type)?.(event) };
 }
 
-test('story menu routes new players through the existing character creation flow', () => {
+test('story menu no longer opens the regular character creation flow', () => {
   const h = harness(); h.get('storyEntryBtn').onclick();
   assert.match(h.get('towerDialog').innerHTML, /建立主角/);
   h.click('new');
-  assert.equal(h.context.entryFlow, 'story');
-  assert.equal(h.get('profileTitle').textContent, '高塔主角 · 先選外觀');
-  assert.equal(h.context.TowerMode.active, false);
+  assert.equal(h.context.entryFlow, undefined);
+  assert.notEqual(h.get('profileTitle').textContent, '高塔主角 · 先選外觀');
+  assert.equal(h.context.TowerMode.active, true); // This legacy harness deliberately has no party module.
 });
 
 test('survival HUD is compact by default, remembers expansion, and never changes the journey',()=>{

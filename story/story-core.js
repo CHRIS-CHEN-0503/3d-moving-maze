@@ -14,6 +14,7 @@
   const narrativeRules = () => typeof module === 'object' && module.exports ? require('./tower-narrative.js') : globalThis.TowerNarrative;
   const dungeonRules = () => typeof module === 'object' && module.exports ? require('./tower-dungeons.js') : globalThis.TowerDungeons;
   const partyRules = () => typeof module === 'object' && module.exports ? require('./tower-party-core.js') : globalThis.TowerPartyCore;
+  const heroRules = () => typeof module === 'object' && module.exports ? require('./tower-heroes-core.js') : globalThis.TowerHeroes;
   const expeditionRules = () => typeof module === 'object' && module.exports ? require('./tower-expedition-core.js') : globalThis.TowerExpedition;
   const GEAR = Object.freeze({
     helmet: Object.freeze({ kind: 'helmet', slot: 'helmet', name: '頭盔', defense: 2, stunSeconds: 0, buyPrice: 14 }),
@@ -22,6 +23,7 @@
     bat: Object.freeze({ kind: 'bat', slot: 'weapon', name: '球棒', defense: 0, stunSeconds: 15, buyPrice: 16 }),
     pan: Object.freeze({ kind: 'pan', slot: 'weapon', name: '平底鍋', defense: 0, stunSeconds: 20, buyPrice: 20 }),
     staff: Object.freeze({ kind: 'staff', slot: 'weapon', name: '木杖', defense: 0, stunSeconds: 10, buyPrice: 12 }),
+    ...(heroRules()?.GEAR||{}),
   });
   const EQUIPMENT_SLOTS = ['helmet', 'armor', 'shield', 'weapon'];
   const ITEMS = Object.freeze({
@@ -286,6 +288,7 @@
     if (!chronicle || !expedition) return null;
     const party = run.party === undefined ? undefined : partyRules()?.validate(run.party, run.floor, defeatedMonsters,hiredWarriors);
     if (run.party !== undefined && !party) return null;
+    if(party?.loadouts&&!heroRules().validEquipment({party,equipment,gearBag}))return null;
     return {
       // Preserve the old health percentage once; subsequent reads are already v2.
       stateVersion: STATE_VERSION, mode: 'tower', floor: run.floor, hp: legacyHealth ? run.hp * MAX_HP / 100 : run.hp, hunger: run.hunger,
@@ -306,6 +309,7 @@
     if (expectedRevision !== undefined && expectedRevision !== next.revision) return failure(run, '背包已更新，請重新確認交易。');
     const result = action(next);
     if (!result.ok) return failure(run, result.message);
+    if(next.party?.loadouts)heroRules().sync(next);
     next.revision += 1;
     return { ...result, run: next };
   }
@@ -315,7 +319,7 @@
     const gear = validateGear(value);
     if (!gear) return { ok: false, message: '無效的裝備。' };
     if (next.gearBag.length >= 24) return { ok: false, message: '裝備行囊已滿，請先捨棄不需要的裝備。' };
-    if ([...next.gearBag, ...Object.values(next.equipment).filter(Boolean)].some(item => item.id === gear.id)) return { ok: false, message: '你已經擁有這件裝備。' };
+    if ((next.party?.loadouts?heroRules().allGear(next):[...next.gearBag, ...Object.values(next.equipment).filter(Boolean)]).some(item => item.id === gear.id)) return { ok: false, message: '你已經擁有這件裝備。' };
     next.gearBag.push(gear);
     return { ok: true, message: `${gear.name}已放入裝備行囊，記得穿戴。`, effect: { gear } };
   }
@@ -325,6 +329,7 @@
   }
 
   function equipGear(run, gearId, expectedRevision) {
+    if(run.party?.loadouts)return heroRules().equip(run,run.party.loadouts.active,gearId,expectedRevision);
     return transaction(run, expectedRevision, next => {
       const index = next.gearBag.findIndex(gear => gear.id === gearId);
       if (index < 0) return { ok: false, message: '行囊裡沒有這件裝備。' };
@@ -486,16 +491,17 @@
     return transaction(run, expectedRevision, (next) => {
       if (!Object.hasOwn(next.bag, itemId) || next.bag[itemId] < 1) return { ok: false, message: '背包裡沒有這件道具。' };
       if (itemId === 'feather') return { ok: false, message: '復甦羽會在受到致命傷時自動保護你。' };
-      if (itemId === 'heal' && next.hp >= MAX_HP) return { ok: false, message: '生命已滿，先把療癒藥留著吧。' };
+      const maximum=next.party?.loadouts?heroRules().maxHp(next):MAX_HP;
+      if (itemId === 'heal' && next.hp >= maximum) return { ok: false, message: '生命已滿，先把療癒藥留著吧。' };
       if (itemId === 'ration' && next.hunger >= 100) return { ok: false, message: '飽食度已滿，暫時不需要乾糧。' };
       const effect = { id: itemId };
-      if (itemId === 'heal') { effect.healed = Math.min(35, MAX_HP - next.hp); next.hp += effect.healed; }
-      if (itemId === 'ration') { effect.fed = Math.min(45, 100 - next.hunger); next.hunger += effect.fed; }
+      if (itemId === 'heal') { effect.healed = Math.min(35, maximum - next.hp); next.hp += effect.healed; }
+      if (itemId === 'ration') { effect.fed = Math.min(45*(next.party?.loadouts?1+heroRules().teamPassive(next,'gourmet')/100:1), 100 - next.hunger); next.hunger += effect.fed;if(next.party?.loadouts)heroRules().food(next); }
       const timed = { shield: ['shield', 25], hourglass: ['freeze', 25], bell: ['repel', 20], map: ['reveal', 18] };
       if (timed[itemId]) {
         const [key, seconds] = timed[itemId];
         if (next.effects[key] > 0) return { ok: false, message: '這個效果仍在持續，不需重複使用。' };
-        next.effects[key] = seconds; effect.duration = seconds;
+        next.effects[key] = seconds*(next.party?.loadouts?1+heroRules().pv(next,'extension')/100:1); effect.duration = next.effects[key];
       }
       next.bag[itemId] -= 1;
       return { ok: true, message: `使用${ITEMS[itemId].name}。`, effect };
@@ -519,6 +525,7 @@
   function applyDamage(next, amount, source = 'monster', invulnerable = false) {
     if (!validNumber(amount, 0, 10000) || !['monster', 'trap', 'hunger'].includes(source)) return { ok: false, message: '無效的傷害數值或來源。' };
     if(invulnerable===true)return {ok:true,message:'受傷保護中。',effect:{damage:0,revived:false,defense:0,broken:[],source,protected:true}};
+    if(next.party?.loadouts)return heroRules().hurt(next,next.party.loadouts.active,amount,source);
     if (next.party) amount = partyRules().reduceDamage(next, amount, source);
     const defense = source === 'hunger' ? 0 : equipmentStats(next).defense;
     const reduced = Math.max(0, amount - defense);

@@ -86,7 +86,7 @@
     }
     function panel(quiet=false){
       if(!ready())return;const run=r(),l=run.party.light;panelRevision=run.revision;
-      const body='<div class="tower-grid tower-light-grid"><article class="tower-item tower-light-card">'+icon('torch')+'<h3>火把 · 五分鐘</h3><p>持有 '+l.torches+' 支'+(l.fuel>0?' · 目前餘量 '+time(l.fuel):'')+'</p><p>木枝 '+l.wood+' · 布條 '+l.cloth+'<br>木枝、布條各一份即可製作。</p>'+ctx.action(l.lit?'熄滅並保留燃料':l.fuel>0?'重新點燃':'點燃火把','light-torch',null,!l.lit&&(l.daylight>0||!l.fuel&&!l.torches))+ctx.action('製作一支火把','light-craft',null,!l.wood||!l.cloth||l.torches>=99)+'</article><article class="tower-item tower-light-card">'+icon('daylight')+'<h3>日光術 · 十分鐘</h3><p>光照範圍比火把更大。需要主角或仍能行動的術士同伴。</p><p>'+(l.daylight>0?'剩餘 '+time(l.daylight):L.canCast(run)?'隊伍可以施放日光術。':'隊伍目前沒有能施法的術士。')+'</p>'+ctx.action('施放日光術','light-daylight',null,!L.canCast(run)||l.cooldown>0)+'</article></div><p class="tower-copy">日光術期間火把不耗燃料，結束後原本點燃的火把會接續照明。閱讀、暫停與離線時不計時。日光術結束即可再施放，不影響原本的職業技能。</p><p class="tower-copy">營地與行商有固定照明；木枝和布條可沿路拾取，每層僅採集一次，變形不會補生。所有行商也會販售火把。</p>';
+      const body='<div class="tower-grid tower-light-grid"><article class="tower-item tower-light-card">'+icon('torch')+'<h3>火把 · 五分鐘</h3><p>持有 '+l.torches+' 支'+(l.fuel>0?' · 目前餘量 '+time(l.fuel):'')+'</p><p>木枝 '+l.wood+' · 布條 '+l.cloth+'<br>木枝、布條各一份即可製作。</p>'+ctx.action(l.lit?'熄滅並保留燃料':l.fuel>0?'重新點燃':'點燃火把','light-torch',null,!l.lit&&(l.daylight>0||!l.fuel&&!l.torches))+ctx.action('製作一支火把','light-craft',null,!l.wood||!l.cloth||l.torches>=99)+'</article><article class="tower-item tower-light-card">'+icon('daylight')+'<h3>日光術 · 十分鐘</h3><p>光照範圍比火把更大。需要隊伍中仍能行動、且擁有日光術的術士。</p><p>'+(l.daylight>0?'剩餘 '+time(l.daylight):L.canCast(run)?'隊伍可以施放日光術。':'隊伍目前沒有能施法的術士。')+'</p>'+ctx.action('施放日光術','light-daylight',null,!L.canCast(run)||l.cooldown>0)+'</article></div><p class="tower-copy">日光術期間火把不耗燃料，結束後原本點燃的火把會接續照明。閱讀、暫停與離線時不計時。日光術結束即可再施放；新版人物須先擁有此主動技能。</p><p class="tower-copy">營地與行商有固定照明；木枝和布條可沿路拾取，每層僅採集一次，變形不會補生。所有行商也會販售火把。</p>';
       ctx.dialog('照明工具 · 暫停中','帶著光繼續前進',status(),body,ctx.action('裝備背包','bag')+ctx.action('回到迷宮','close'),{silent:quiet,summary:'照明工具。火把五分鐘；木枝和布條各一份可以製作。隊中有術士時可以施放十分鐘的日光術。'});
     }
     function handle(key,id){
@@ -115,7 +115,8 @@
       if(nearClock<=0||force){nearClock=.15;nearSources=sources.filter(p=>distance(p)<10.5&&clear(p)).sort((a,b)=>distance(a)-distance(b)).slice(0,2);}
       // A distant lamp is a beacon, not free illumination of the whole corridor.
       const ambientRadius=nearSources.reduce((value,p)=>Math.max(value,10.5-distance(p)*1.15),profile.radius);
-      range=Math.max(ambientRadius,mode==='daylight'?15:mode==='torch'?10:profile.radius);
+      const heroes=root.TowerHeroes,dayRange=r().party?.loadouts?Math.max(3,...heroes.ids(r()).map(id=>heroes.buff(r(),'daylight',id)?.power||0))*4:15;
+      range=Math.max(ambientRadius,mode==='daylight'?dayRange:mode==='torch'?10:profile.radius);
       // Keep the player clear when the third-person camera is pulled back. The
       // extra distance belongs to the camera, not to the player's sight range.
       if(rig?.fog){
@@ -127,7 +128,7 @@
           rig.fog.near=offset+range*.6;rig.fog.far=offset+range*1.8;
         }
       }
-      const light=lamps[0];light.position.set(G.px,2.25,G.pz);light.color.setHex(mode==='daylight'?0xfff2d1:0xffc07a);light.distance=mode==='daylight'?21:14;
+      const light=lamps[0];light.position.set(G.px,2.25,G.pz);light.color.setHex(mode==='daylight'?0xfff2d1:0xffc07a);light.distance=mode==='daylight'?Math.max(15,range+6):14;
       light.intensity=mode==='none'?0:mode==='daylight'?4.2:3.3;
       for(let i=0;i<2;i++){const source=nearSources[i],slot=lamps[i+1];slot.intensity=source?3.2:0;if(source){slot.color.setHex(source.color);slot.position.set(source.x,1.8,source.z);}}
       carried.visible=mode==='torch'&&G.view!=='fp';orb.visible=mode==='daylight';

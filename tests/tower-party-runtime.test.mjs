@@ -9,7 +9,7 @@ function harness(floor=84,options={}){
   let run=P.enable(C.newRun({seed:31415}),'swordsman').run;run.floor=floor;run.floorsCleared=99-floor;run.chronicle=N.newChronicle(floor);P.advance(run);
   let paused=false,failSave=false,wall=false,swings=0,hits=0,world=new T.Group(),monsters=[],messages=[],dialog=null,followTargets=[];
   const player=new T.Group(),G={px:0,pz:0,running:true,shifting:false};
-  const context=vm.createContext({TowerPartyCore:P,TowerExpedition:require('../story/tower-expedition-core.js'),TowerCharacters:V,document:{getElementById:()=>null}});vm.runInContext(source,context);
+  const context=vm.createContext({TowerPartyCore:options.partyCore||P,TowerExpedition:require('../story/tower-expedition-core.js'),TowerCharacters:V,document:{getElementById:()=>null}});vm.runInContext(source,context);
   let nextCell=1;
   const ui=context.TowerPartyRuntime.create({THREE:T,G,core:C,text:String,action:(label,key,id,disabled)=>`${label}|${key}|${id}|${disabled}`,dialog:(...args)=>dialog=args,
     transact:result=>{if(!result.ok||failSave)return false;run=result.run;return true;},save:()=>!failSave,toast:message=>messages.push(message),audio:{sfxHit:()=>hits++,sfxSwing(){},sfxUse(){},sfxGuardBlock(){}},quest(){},
@@ -109,4 +109,41 @@ test('successful recruitment removes the idle NPC, interaction and map marker on
   assert.equal(h.ui.reserved().filter(s=>s.kind==='recruit').length,0);assert.equal(h.ui.markers().filter(s=>s.label==='友').length,0);assert.equal(h.ui.nearby,null);
   h.ui.shift();h.ui.tick(.01,200);assert.equal(h.ui.interact(),false);
   h.ui.build(()=>.5,new Set());assert.equal(h.ui.reserved().filter(s=>s.kind==='recruit').length,0);
+});
+test('scene ownership cleanup removes the previous group before rebuilding on the same world',()=>{
+  const h=harness(91),oldGroup=h.world.children.at(-1),merchant=new T.Group();merchant.name='unrelated-merchant';h.world.add(merchant);
+  h.ui.build(()=>.5,new Set());
+  assert.equal(h.world.children.length,2);assert.equal(!!oldGroup.parent,false);assert.equal(merchant.parent===h.world,true);
+  h.ui.reset();h.ui.build(()=>.5,new Set());
+  assert.equal(h.world.children.length,2);assert.equal(merchant.parent===h.world,true);
+});
+test('renderer independently rejects duplicate offers even when a stale rules module still returns them',()=>{
+  const legacy={...P,recruitOffer:run=>P.recruitOffer({...run,party:{...run.party,members:[],joined:[]}})};
+  for(const hp of [0,34]){
+    const h=harness(91,{partyCore:legacy});
+    h.run.party.members=['healer','scout','chef'].map((profession,i)=>({id:'prior:'+profession,profession,level:1,hp:i?34:hp,cooldown:0,hurtLeft:0}));h.run.party.joined=h.run.party.members.map(m=>m.id);
+    const before=JSON.stringify(h.run);assert.equal(legacy.recruitOffer(h.run).profession,'healer');
+    h.ui.build(()=>.5,new Set());
+    assert.equal(h.ui.reserved().some(s=>s.kind==='recruit'),false);
+    assert.equal(h.ui.markers().some(s=>s.label==='友'),false);assert.equal(JSON.stringify(h.run),before);
+    let healers=0;h.world.traverse(m=>{if(m.name==='tower-explorer-mira'&&m.children.some(c=>c.name==='profession-mantle'))healers++;});assert.equal(healers,1);
+  }
+});
+test('an already drawn stale recruit is pruned on update without altering the saved companion or charging again',()=>{
+  const h=harness(91),station=h.ui.reserved().find(s=>s.kind==='recruit');
+  h.G.px=station.x;h.G.pz=station.z;h.ui.tick(.01,0);assert.equal(h.ui.nearby,station);
+  h.run.party.members=[{id:'companion:96:31415',profession:'healer',level:1,hp:34,cooldown:0,hurtLeft:0}];h.run.party.joined=h.run.party.members.map(m=>m.id);
+  const before=JSON.stringify(h.run);h.ui.tick(.01,100);
+  assert.equal(!!station.model.parent,false);assert.equal(h.ui.nearby,null);
+  assert.equal(h.ui.interact(),false);assert.equal(h.ui.markers().some(s=>s.label==='友'),false);assert.equal(h.ui.reserved().includes(station),false);
+  h.ui.handle('party-recruit',`companion:91:${h.run.seed}`);assert.equal(JSON.stringify(h.run),before);
+  h.ui.shift();assert.equal(!!station.model.parent,false);
+});
+test('interaction and map queries discard stale recruits even before the next animation frame',()=>{
+  for(const check of ['interact','markers','reserved','nearby']){
+    const h=harness(91),station=h.ui.reserved().find(s=>s.kind==='recruit');h.G.px=station.x;h.ui.tick(.01,0);
+    h.run.party.members=[{id:'prior:healer',profession:'healer',level:1,hp:34,cooldown:0,hurtLeft:0}];h.run.party.joined=['prior:healer'];
+    if(check==='nearby')assert.equal(h.ui.nearby,null);else h.ui[check]();
+    assert.equal(!!station.model.parent,false,check);
+  }
 });

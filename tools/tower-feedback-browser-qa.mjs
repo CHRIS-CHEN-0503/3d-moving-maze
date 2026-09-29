@@ -8,7 +8,7 @@ try{
   const source=await readFile(new URL('../story/tower-mode.js',import.meta.url),'utf8');
   const bridge=`window.__feedbackQA={sounds:[],
     seed(job,skill){
-      for(let seed=1;seed<500;seed++){run=Heroes.enable(P.enable(C.newRun({seed,name:'動作測試'}),job).run).run;if(Heroes.SKILLS[skill]?.unique)Heroes.gainXp(run,2810);if(!skill||Heroes.actor(run).skills.includes(skill))break;}
+      for(let seed=1;seed<500;seed++){run=Heroes.enable(P.enable(C.newRun({seed,name:'動作測試'}),job).run).run;if(Heroes.SKILLS[skill]?.unique)Heroes.gainXp(run,TowerHeroGrowth.XP.at(-1));if(!skill||Heroes.actor(run).skills.includes(skill))break;}
       for(const k of Object.keys(run.party.ingredients))run.party.ingredients[k]=30;
       run.party.journey.scrap=30;Heroes.setHp(run,'hero',10);run.hunger=10;run.equipment.weapon.durability--;
       enter();closeDialog();GameVoice.configure({enabled:false});G.frozen=true;G.muted=false;AudioEng.init();AudioEng.resume();

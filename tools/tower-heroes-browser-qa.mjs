@@ -14,7 +14,7 @@ try{
   close(){closeDialog();},snapshot,manage(){partyUI.heroes.panel();},catalog(job){partyUI.heroes.catalog(job);},
   switch(id){handleAction('hero-switch',id);return snapshot();},
   equip(kind){const g=C.createGear(kind,run.floor,run.seed,'qa:'+kind);if(!transact(C.grantGear(run,g)))throw Error('grant');if(!transact(Heroes.equip(run,Heroes.state(run).active,g.id)))throw Error('equip');return snapshot();},
-  level(){Heroes.gainXp(run,600);save();return snapshot();},
+  level(){Heroes.gainXp(run,6000);save();return snapshot();},
   tick(dt){tick(dt,performance.now());return snapshot();},
   cast(id){partyUI.heroes.cast(id,Heroes.state(run).active);return snapshot();},
   next(){const before=run.floor;const result=C.descend(run);if(!result.ok)throw Error(result.message);run=result.run;loadFloor(false);closeDialog();return {before,after:run.floor,...snapshot()};},

@@ -131,7 +131,7 @@
   function preview(run,offer){return makeActor(run,offer.id,offer.profession);}
   function enable(run){return C().transaction(run,run.revision,n=>{
     if(!n.party||state(n))return {ok:false,message:'請先選職業，或繼續既有職業旅程。'};
-    n.party.loadouts={version:1,active:'hero',level:1,xp:0,heroHp:n.hp,switchLeft:0,actors:{},enemy:{},removedTraps:[]};
+    n.party.loadouts={version:1,xpScale:G.XP_SCALE,active:'hero',level:1,xp:0,heroHp:n.hp,switchLeft:0,actors:{},enemy:{},removedTraps:[]};
     for(const id of ids(n))state(n).actors[id]=makeActor(n,id,job(n,id));
     state(n).growth=G.fresh(ids(n));
     n.equipment=actor(n,'hero').equipment;actor(n,'hero').equipment=null;n.charIdx=JOBS[job(n)].charIdx;
@@ -292,7 +292,7 @@
   function advance(run){if(!enabled(run))return;state(run).enemy={};state(run).removedTraps=[];gainXp(run,8);}
   const BUFFS=['guard','barrier','ward','rally','speed','polish','fortify','stealth','smoke','stomach','regen','daylight','slow','intercept','path_eye','oath_power','fortress','sanctuary','escape'];
   function validate(value,party){
-    if(!value||value.version!==1||!num(value.level,1,10,true)||!num(value.xp,0,100000,true)||!num(value.heroHp,0,60+(value.level-1)*3)||!num(value.switchLeft,0,1))return null;
+    if(!value||value.version!==1||!(value.xpScale===undefined||value.xpScale===G.XP_SCALE)||!num(value.level,1,10,true)||!num(value.xp,0,100000,true)||!num(value.heroHp,0,60+(value.level-1)*3)||!num(value.switchLeft,0,1))return null;
     const growth=G.validate(value.growth,party);if(!growth)return null;
     const expected=['hero',...party.members.map(m=>m.id)];if(!expected.includes(value.active)||!value.actors||Array.isArray(value.actors)||Object.keys(value.actors).length!==expected.length)return null;
     const actors={};for(const id of expected){
@@ -311,7 +311,9 @@
     if(!value.enemy||Array.isArray(value.enemy)||Object.keys(value.enemy).length>C().MAX_MONSTERS)return null;
     const enemy={};for(const[k,e]of Object.entries(value.enemy)){if(!C().validMonsterId(k)||!e||Object.keys(e).some(key=>!['slow','slowPower','blind','weak','mark','tauntLeft','tauntId','relay','relayCooldown','relayWeak','relayOwner'].includes(key))||Object.entries(e).some(([key,v])=>['tauntId','relayOwner'].includes(key)?!expected.includes(v):!num(v,0,60)))return null;enemy[k]={...e};}
     if(!Array.isArray(value.removedTraps)||value.removedTraps.length>30||!value.removedTraps.every(s=>typeof s==='string'&&s.length<100))return null;
-    return {removedTraps:[...value.removedTraps],version:1,active:value.active,level:value.level,xp:value.xp,heroHp:value.heroHp,switchLeft:value.switchLeft,actors,enemy,growth};
+    // Migrate existing progress once; preserve levels/skills and fractional progress.
+    const xp=Math.min(100000,value.xp*(value.xpScale===G.XP_SCALE?1:G.XP_SCALE));
+    return {removedTraps:[...value.removedTraps],version:1,xpScale:G.XP_SCALE,active:value.active,level:value.level,xp,heroHp:value.heroHp,switchLeft:value.switchLeft,actors,enemy,growth};
   }
   function validEquipment(run){if(!enabled(run))return true;const seen=new Set();for(const g of allGear(run)){if(seen.has(g.id))return false;seen.add(g.id);}const e=run.equipment,j=job(run);return Object.values(e).filter(Boolean).every(g=>GEAR[g.kind]?.jobs.includes(j))&&!(GEAR[e.weapon?.kind]?.hands===2&&e.shield);}
   return Object.freeze({JOBS,GEAR,SKILLS,PASSIVES,SLOTS,PREPARATION,preparationSeconds,scale,state,enabled,ids,job,level,actor,maxHp,hp,equipment,pv,teamPassive,buff,setBuff,draft,reorderSkills,preview,enable,addMember,removeMember,sync,setHp,switchActor,followerRecords,allGear,canEquip,equip,unequip,stats,wear,durabilityWarnings,hurt,heal,gainXp,strike,cast,food,speed,inflict,hungerScale,toolSpent,rescueChoice,tick,advance,validate,validEquipment,roll});

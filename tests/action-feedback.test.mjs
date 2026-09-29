@@ -33,7 +33,7 @@ function fixture(skill){
   let run;
   for(let seed=1;seed<500;seed++){
     run=H.enable(P.enable(C.newRun({seed}),skill.job).run).run;
-    if(skill.unique)H.gainXp(run,2810);
+    if(skill.unique)H.gainXp(run,28100);
     if(H.actor(run).skills.includes(skill.id))break;
   }
   assert.ok(H.actor(run).skills.includes(skill.id),skill.id);

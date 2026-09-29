@@ -99,11 +99,14 @@
       }else if(panelRevision===r().revision){
         if(key==='light-craft')result=L.craft(r(),panelRevision);
         if(key==='light-torch')result=L.torch(r(),panelRevision);
-        if(key==='light-daylight')result=L.daylight(r(),panelRevision);
+        if(key==='light-daylight'){
+          if(root.TowerHeroes?.enabled(r())){const H=root.TowerHeroes,id=H.ids(r()).find(id=>H.hp(r(),id)>0&&H.actor(r(),id).skills.includes('daylight'));ctx.close();if(id)ctx.castDaylight?.(id);return true;}
+          result=L.daylight(r(),panelRevision);
+        }
       }
       if(!result)return true;
       if(ctx.transact(result)){
-        ctx.audio.sfxUse();updateVisual(0,true);hud();
+        ctx.audio.sfxAction?.(key==='light-daylight'?'magic':key==='light-torch'?'smoke':'device');updateVisual(0,true);hud();
         if(key==='light-buy')ctx.trade(true);else if(key==='light-craft')panel(true);else ctx.close();
         ctx.toast(result.message,2000,result.message);
       }

@@ -7,6 +7,9 @@
   const G=typeof module==='object'&&module.exports?require('./tower-hero-growth.js'):globalThis.TowerHeroGrowth;
   const own=(o,k)=>Object.hasOwn(o,k),num=(n,a,b,int=false)=>Number.isFinite(n)&&n>=a&&n<=b&&(!int||Number.isInteger(n));
   const clone=v=>JSON.parse(JSON.stringify(v)),SLOTS=Object.freeze(['helmet','armor','weapon','shield']);
+  // Approved preparation proposals, each increased by 0.5 seconds. Other skills remain instant.
+  const PREPARATION=Object.freeze({starfall:1.5,star_ring:1.9,decisive_slash:1.3,whirlwind:.8,dawn_sanctuary:1.3,revive:1.5,moving_fortress:1.1,barricade:1,hero_feast:1.3,daylight:1.1});
+  const preparationSeconds=id=>PREPARATION[id]||0;
   const JOBS=Object.freeze({
     swordsman:{name:'劍士',armor:'heavy',starter:'longsword',color:'#89bce1',charIdx:2},
     mage:{name:'術士',armor:'robe',starter:'arcane_staff',color:'#c5a7f7',charIdx:3},
@@ -73,7 +76,7 @@
     skill('reinforce','smith','臨時加固',false,[1,2,3,4,5],40,'fortify','三十秒內抵銷數次裝備耐久消耗。',{shell:1}),
     skill('barricade','smith','架設路障',false,[20,28,36,44,52],35,'barricade','放置怪物可擊破的臨時路障，最多一座。',{shell:1}),
     skill('polish','smith','武器磨礪',false,[8,11,14,17,20],40,'polish','指定隊友的武器二十秒內增傷。',{shell:1}),
-  ].concat(G.actives).map(s=>[s.id,Object.freeze(G.sixth(s))])));
+  ].concat(G.actives).map(s=>{const value=G.sixth(s),seconds=preparationSeconds(s.id);return [s.id,Object.freeze({...value,power:s.effect==='disarm'?Object.freeze(value.power.map(n=>Math.round((n+.5)*10)/10)):value.power,description:value.description+(seconds?' 準備 '+seconds+' 秒後生效。':'')})];})));
   const passive=(id,job,name,power,description)=>Object.freeze({id,job,name,power:Object.freeze(power),description});
   const PASSIVES=Object.freeze(Object.fromEntries([
     passive('might','swordsman','剛力',[4,6,8,10,12],'本人的普通攻擊更有力。'),
@@ -311,5 +314,5 @@
     return {removedTraps:[...value.removedTraps],version:1,active:value.active,level:value.level,xp:value.xp,heroHp:value.heroHp,switchLeft:value.switchLeft,actors,enemy,growth};
   }
   function validEquipment(run){if(!enabled(run))return true;const seen=new Set();for(const g of allGear(run)){if(seen.has(g.id))return false;seen.add(g.id);}const e=run.equipment,j=job(run);return Object.values(e).filter(Boolean).every(g=>GEAR[g.kind]?.jobs.includes(j))&&!(GEAR[e.weapon?.kind]?.hands===2&&e.shield);}
-  return Object.freeze({JOBS,GEAR,SKILLS,PASSIVES,SLOTS,scale,state,enabled,ids,job,level,actor,maxHp,hp,equipment,pv,teamPassive,buff,setBuff,draft,reorderSkills,preview,enable,addMember,removeMember,sync,setHp,switchActor,followerRecords,allGear,canEquip,equip,unequip,stats,wear,durabilityWarnings,hurt,heal,gainXp,strike,cast,food,speed,inflict,hungerScale,toolSpent,rescueChoice,tick,advance,validate,validEquipment,roll});
+  return Object.freeze({JOBS,GEAR,SKILLS,PASSIVES,SLOTS,PREPARATION,preparationSeconds,scale,state,enabled,ids,job,level,actor,maxHp,hp,equipment,pv,teamPassive,buff,setBuff,draft,reorderSkills,preview,enable,addMember,removeMember,sync,setHp,switchActor,followerRecords,allGear,canEquip,equip,unequip,stats,wear,durabilityWarnings,hurt,heal,gainXp,strike,cast,food,speed,inflict,hungerScale,toolSpent,rescueChoice,tick,advance,validate,validEquipment,roll});
 });

@@ -203,7 +203,7 @@
     }
     if(window.TowerLighting&&window.TowerLightingRuntime){
       lightingUI=window.TowerLightingRuntime.create({THREE,G,run:()=>run,active:()=>active,world:()=>world,traders:()=>traders,player:()=>playerGroup,camera:()=>camera,dispose:disposeSceneObject,inDungeon,
-        environment:()=>({id:floorConfig.environmentId,rig:lightingRig}),clear:hasClearPath,cell:cellPoint,chooseCell,marker:makePickupMarker,
+        environment:()=>({id:floorConfig.environmentId,rig:lightingRig}),clear:hasClearPath,cell:cellPoint,chooseCell,marker:makePickupMarker,castDaylight:id=>partyUI?.heroes.cast('daylight',id,id),
         bind:bindActionBtn,action,dialog,transact,toast:showToast,audio:AudioEng,close:closeDialog,trade});
       lightingUI.install();
     }
@@ -1231,6 +1231,7 @@
   function useItem(id) {
     syncEngine();const before={...run.effects};
     if(!transact(C.useItem(run,id)))return;
+    AudioEng.sfxAction?.(window.CombatAudio?.itemKind(id)||'device');
     const mul=run.party?1:CH().itemDurMul||1;for(const key of Object.keys(run.effects))if(run.effects[key]>before[key])run.effects[key]*=mul;
     if(!run.party&&id==='ration'&&CH().foodMul)G.satiety=run.hunger=Math.min(100,run.hunger+45*(CH().foodMul-1));
     if(id==='map'){window.MagicMap?.reveal();const p=worldToCell(G.px,G.pz);G.solutionPath=solveMaze(p.x,p.y);G.mapUntil=performance.now()+run.effects.reveal*1000;}

@@ -150,7 +150,7 @@
     function sitePanel(s){const done=r().party.journey.site.done,has=P.has(r(),s.offer.job);ctx.dialog('職業探索 · 暫停中',s.offer.name,s.offer.description,
       '<p class="tower-copy">'+esc(s.offer.reward)+' 另獲得八枚銅幣。這是可跳過的探索，不影響主線通關。</p><p class="tower-copy">'+(done?'此處已完成，不會再次給予獎勵。':'一般處理需在現場累積十二秒，途中仍有怪物與陷阱；離開、受傷或變形會中斷，可稍後接續。已完成 '+Math.floor(r().party.journey.site.progress)+' 秒。')+'</p>',
       (done?'':act('請'+P.PROFESSIONS[s.offer.job].name+s.offer.verb,'party-explore-job',s.offer.id,!has)+act('慢慢處理 · 十二秒','party-explore-work',s.offer.id))+act('返回迷宮','close'),{summary:done?'這處探索已經完成。':s.offer.description+' 沒有對應職業也可以慢慢處理，需要十二秒。'});}
-    function finishSite(s,method){const result=X.explore(r(),s.offer.id,method,r().revision);working=null;if(!commit(result))return false;if(result.effect.passage)ctx.passage?.(s);ctx.audio.sfxUse();ctx.close?.();return true;}
+    function finishSite(s,method){const result=X.explore(r(),s.offer.id,method,r().revision);working=null;if(!commit(result))return false;if(result.effect.passage)ctx.passage?.(s);ctx.audio.sfxAction?.('device');ctx.close?.();return true;}
     function bossHelp(){if(!r()?.party?.boss)return;const d=X.BOSSES[r().floor];ctx.dialog('章末機關 · 暫停中',d.name,d.description,'<p class="tower-copy">'+esc(X.hint(r()))+'</p><p class="tower-copy">地面警戒圈標示危險範圍；黃光時退開，紅光時不可接近。操作只需靠近並按對話鈕。所有職業都能完成。整座迷宮的變形倒數維持原規則。</p>',act('回到迷宮','close'),{summary:d.description+' '+X.hint(r())});}
     function panel(kind='team',quiet=false){if(!enabled())return;if(kind==='team'&&modern()){heroes.panel(undefined,quiet);return;}
       const run=r(),p=run.party;let body='',copy='四人小隊：主角加三名旅人。劍士就是護衛，占用一個隊友名額。';
@@ -168,7 +168,7 @@
     function interact(){pruneRecruits();if(!live()||!near||ctx.G.shifting||distance(near)>2.6||!clear(near))return false;const n=near;if(n.kind==='camp'){panel('cook');return true;}
       if(n.kind==='site'){sitePanel(n);return true;}
       if(n.kind==='recruit'){const job=P.PROFESSIONS[offer.profession],draw=modern()?H.preview(r(),offer):null;ctx.dialog(job.name+' · '+job.person,'一起尋找回家的路',draw?'主動：'+draw.skills.map(k=>H.SKILLS[k].name).join('、')+'。被動：'+draw.passives.map(k=>H.PASSIVES[k].name).join('、')+'。':job.description,'<div class="party-invite">'+portrait(offer.profession)+'<p>強度 '+offer.level+'/5 · 招募費 '+offer.price+' 枚銅幣 · 隊伍 '+(r().party.members.length+1)+'/4</p></div>',act('邀請加入','party-recruit',offer.id,r().coins<offer.price||r().party.members.length>=3)+act('查看隊伍','party-team')+act('下次再聊','close'),{speaker:{gender:job.gender,age:'adult'},summary:job.name+'，'+job.person+'。'+job.description+'。邀請加入需要'+offer.price+'枚銅幣。'});return true;}
-      if(n.kind==='boss'){if(commit(P.bossAction(r(),n.index,r().revision)))ctx.save();return true;}return false;
+      if(n.kind==='boss'){if(commit(P.bossAction(r(),n.index,r().revision))){ctx.audio.sfxAction?.('device');ctx.save();}return true;}return false;
     }
     function handle(key,id){if(heroes?.handle(key,id))return true;if(!key.startsWith('party-'))return false;if(!enabled())return true;
       if(key==='party-team'){panel();return true;}if(key==='party-kitchen'){panel('cook');return true;}if(key==='party-bestiary'){panel('bestiary');return true;}
@@ -178,19 +178,19 @@
         if(!safeCamp())return true;const g=X.allGear(r()).find(g=>g.id===id),q=X.repairQuote(r(),id);if(!g||!q)return true;
         if(key==='party-mend-ask'){pendingRepair={id,revision:r().revision};ctx.dialog('確認修理',g.name,'補滿耐久需要 '+q.coins+' 枚銅幣與 '+q.parts+' 份金屬零件。'+(q.broken?'破損修理費已乘上 1.5 倍，且需要能行動的鍛匠。':''),'',act('返回工坊','party-forge')+act('確認修復','party-mend-confirm',id),{summary:'確認修復 '+g.name+'。'});return true;}
         if(!pendingRepair||pendingRepair.id!==id)return true;
-        if(commit(X.repair(r(),id,pendingRepair.revision))){ctx.refreshGear?.();syncActors();forgePanel(true);}return true;
+        if(commit(X.repair(r(),id,pendingRepair.revision))){ctx.audio.sfxAction?.('forge');ctx.refreshGear?.();syncActors();forgePanel(true);}return true;
       }
       if(key==='party-forge-ask'||key==='party-forge-confirm'){
         if(!safeCamp())return true;const split=id?.indexOf('|'),trait=id?.slice(0,split),gearId=id?.slice(split+1),g=X.allGear(r()).find(g=>g.id===gearId);if(!g||!Object.hasOwn(X.TRAITS,trait))return true;
         if(key==='party-forge-ask'){pendingForge={id,revision:r().revision};ctx.dialog('確認鍛造',g.name+' · '+X.TRAITS[trait].name,'選定特性後不能更換，每件裝備最多強化兩次。確認後才會扣除工坊列出的零件與銅幣。','',act('返回工坊','party-forge')+act('確認鍛造','party-forge-confirm',id),{summary:'確認鍛造'+X.TRAITS[trait].name+'。選定後不能更換。'});return true;}
         if(!pendingForge||pendingForge.id!==id)return true;
-        if(commit(X.forge(r(),gearId,trait,pendingForge.revision))){ctx.refreshGear?.();forgePanel(true);}return true;
+        if(commit(X.forge(r(),gearId,trait,pendingForge.revision))){ctx.audio.sfxAction?.('forge');ctx.refreshGear?.();forgePanel(true);}return true;
       }
       if(key==='party-dismantle-ask'||key==='party-dismantle'){
         if(!safeCamp())return true;const g=X.allGear(r()).find(g=>g.id===id);if(!g)return true;
         if(key==='party-dismantle-ask'){pendingDismantle={id,revision:r().revision};ctx.dialog('拆解裝備確認','拆解'+g.name+'？','拆解後不能取回，將獲得'+X.salvageValue(g)+'份零件。'+(r().equipment[g.slot]?.id===id?'這件裝備正在穿戴中。':''),'',act('保留裝備','party-forge')+act('確認拆解','party-dismantle',id),{summary:'確定拆解'+g.name+'？拆解後不能取回。'});return true;}
         if(!pendingDismantle||pendingDismantle.id!==id)return true;
-        if(commit(X.dismantle(r(),id,pendingDismantle.revision))){ctx.refreshGear?.();forgePanel(true);}return true;
+        if(commit(X.dismantle(r(),id,pendingDismantle.revision))){ctx.audio.sfxAction?.('device');ctx.refreshGear?.();forgePanel(true);}return true;
       }
       if(key==='party-explore-job'||key==='party-explore-work'){
         const s=stations.find(s=>s.kind==='site'&&s.offer.id===id);if(!live()||!s||distance(s)>2.6||!clear(s)||r().party.journey.site.done||ctx.G.shifting)return true;
@@ -199,20 +199,21 @@
       if(key==='party-dismiss-ask'){const m=r().party.members.find(m=>m.id===id);if(m)ctx.dialog('與同伴道別','確定讓'+P.PROFESSIONS[m.profession].person+'離隊？','這位旅人會繼續自己的旅程，不能在原地重新招募。已支付的費用不會退回。','',act('繼續同行','party-team')+act('確定道別','party-dismiss',id));return true;}
       if(key==='party-dismiss'){if(commit(P.dismiss(r(),id,r().revision))){syncActors();panel('team',true);}return true;}
       if(key==='party-recruit'){pruneRecruits();if(!near||near.kind!=='recruit'||distance(near)>2.6||!clear(near))return true;const station=near;if(commit(P.recruit(r(),id,r().revision))){if(stations.includes(station))removeStation(station);syncActors();panel('team',true);}return true;}
-      if(key==='party-cook'&&safeCamp()){if(commit(P.cook(r(),id,r().revision)))panel('cook',true);return true;}
-      if(key==='party-eat'){if(commit(P.eat(r(),id,r().revision)))panel('cook',true);return true;}
-      if((key==='party-rest'||key==='party-repair')&&safeCamp()){if(commit(P.camp(r(),key==='party-rest'?'rest':'repair',r().revision)))panel('cook',true);return true;}return true;
+      if(key==='party-cook'&&safeCamp()){if(commit(P.cook(r(),id,r().revision))){ctx.audio.sfxAction?.('cook');panel('cook',true);}return true;}
+      if(key==='party-eat'){if(commit(P.eat(r(),id,r().revision))){ctx.audio.sfxAction?.('cook');panel('cook',true);}return true;}
+      if((key==='party-rest'||key==='party-repair')&&safeCamp()){if(commit(P.camp(r(),key==='party-rest'?'rest':'repair',r().revision))){ctx.audio.sfxAction?.(key==='party-rest'?'cook':'forge');panel('cook',true);}return true;}return true;
     }
     function applyHit(m,memberId=null,skillId=null){
+      if(modern()&&heroes.preparing(memberId||H.state(r()).active))return;
       const source=memberId?actors.find(a=>a.id===memberId)?.model.position:{x:ctx.G.px,z:ctx.G.pz};if(!source)return;
       const dx=source.x-m.model.position.x,dz=source.z-m.model.position.z,front=Math.cos(Math.atan2(dx,dz)-m.model.rotation.y)>.45;
       const result=P.strike(r(),m.id,{memberId,front,skillId},r().revision);if(!commit(result,false))return;
-      ctx.audio.sfxHit();if(result.effect.stunned){m.windup=0;ctx.quest('stun',{monsterId:m.id});}
+      if(modern())heroes.impact(m,memberId||H.state(r()).active,skillId);else ctx.audio.sfxHit();if(result.effect.stunned){m.windup=0;ctx.quest('stun',{monsterId:m.id});}
       if(result.effect.dead){m.alive=false;m.model.visible=false;ctx.quest('defeat',{monsterId:m.id});ctx.toast(result.message,2600,result.message);if(memberId){ctx.audio.sfxGuardDefeat?.();if(r().party.members.find(x=>x.id===memberId)?.profession==='swordsman')root.GameVoice?.announceAsset('guard.defeat','怪物已經打倒了，繼續前進！',true);}ctx.save();}
       else if(result.effect.broken)ctx.toast('武器用壞了！可換上備用武器，或請鍛匠在營地修復。',2400,'武器壞了，找鍛匠修理吧');
       if(result.effect.stunned||skillId==='backstab'||skillId==='decisive_slash')m.windup=0;return result;
     }
-    function attack(){if(!live()||ctx.paused()||ctx.G.shifting||(modern()?H.actor(r()).attack:skillLeft)>0)return;skillLeft=modern()?H.stats(r()).interval:X.attackInterval(r());ctx.audio.sfxSwing();ctx.swing();
+    function attack(){if(!live()||ctx.paused()||ctx.G.shifting||(modern()&&heroes.preparing())||(modern()?H.actor(r()).attack:skillLeft)>0)return;skillLeft=modern()?H.stats(r()).interval:X.attackInterval(r());ctx.audio.sfxSwing();ctx.swing();
       const facing=ctx.player()?.rotation.y||0,target=ctx.monsters().filter(m=>{const p=m.model.position;return m.alive&&distance(p)<(modern()?H.stats(r()).reach:2.8)&&clear(p)&&Math.cos(Math.atan2(p.x-ctx.G.px,p.z-ctx.G.pz)-facing)>-.05;}).sort((a,b)=>distance(a.model.position)-distance(b.model.position))[0];
       if(target)applyHit(target);else{if(modern()){H.actor(r()).attack=H.stats(r()).interval;ctx.save();}ctx.toast('前方沒有碰到怪物，靠近後再出手。',1200,false);}
     }

@@ -142,7 +142,7 @@
 
   function durabilityMultiplier(kind) {
     const item=GEAR[kind];
-    return item?.slot==='weapon'||item?.type==='heavy'||['helmet','armor','shield','round_shield','tower_shield'].includes(kind)?3:2;
+    return item?.slot==='weapon'||item?.type==='heavy'||['helmet','armor','shield','round_shield','tower_shield'].includes(kind)?15:10;
   }
   function createGear(kind, floor, seed, sourceId, enhanced = false) {
     floorConfig(floor);
@@ -154,22 +154,24 @@
     const maximum = [0, 13, 16, 20][tier];
     const maxDurability = (enhanced ? 10 + (hash >>> 8) % (maximum - 9) : 3 + (hash >>> 8) % 8)*durabilityMultiplier(kind);
     const item = GEAR[kind];
-    return { id: `gear:${floor}:${seed}:${sourceId}:${kind}`, kind, slot: item.slot, name: item.name + (bonus ? ` +${bonus}` : ''), durability: maxDurability, maxDurability, durabilityVersion:2, defense: item.slot === 'weapon' ? 0 : item.defense + bonus, bonus };
+    return { id: `gear:${floor}:${seed}:${sourceId}:${kind}`, kind, slot: item.slot, name: item.name + (bonus ? ` +${bonus}` : ''), durability: maxDurability, maxDurability, durabilityVersion:3, defense: item.slot === 'weapon' ? 0 : item.defense + bonus, bonus };
   }
 
   function validateGear(value) {
     if (!value || typeof value !== 'object' || !Object.hasOwn(GEAR, value.kind) || typeof value.id !== 'string' || !value.id || value.id.length > 160) return null;
     const item = GEAR[value.kind];
-    const legacy=value.durabilityVersion===undefined,mult=legacy?1:durabilityMultiplier(value.kind);
-    if(!legacy&&value.durabilityVersion!==2)return null;
+    const legacy=value.durabilityVersion===undefined,currentMultiplier=durabilityMultiplier(value.kind);
+    if(!legacy&&value.durabilityVersion!==2&&value.durabilityVersion!==3)return null;
+    // Validate in the source version's units before upgrading, exactly once.
+    const mult=legacy?1:value.durabilityVersion===2?currentMultiplier/5:currentMultiplier;
     if (value.slot !== item.slot || !validNumber(value.bonus, 0, 3, true) || !validNumber(value.maxDurability, (value.bonus ? 10 : 3)*mult, (value.bonus ? 20 : 10)*mult, true) || value.maxDurability%mult!==0 || !validNumber(value.durability, legacy?1:0, value.maxDurability, true)) return null;
     const name = item.name + (value.bonus ? ` +${value.bonus}` : '');
     const defense = item.slot === 'weapon' ? 0 : item.defense + value.bonus;
     if (value.name !== name || value.defense !== defense) return null;
     const forge=value.forge===undefined?undefined:expeditionRules()?.validateForge(value.forge,item.slot);
     if(value.forge!==undefined&&!forge)return null;
-    const upgrade=legacy?durabilityMultiplier(value.kind):1;
-    return { id: value.id, kind: value.kind, slot: item.slot, name, durability: value.durability*upgrade, maxDurability: value.maxDurability*upgrade, durabilityVersion:2, defense, bonus: value.bonus,...(forge?{forge}:{}) };
+    const upgrade=currentMultiplier/mult;
+    return { id: value.id, kind: value.kind, slot: item.slot, name, durability: value.durability*upgrade, maxDurability: value.maxDurability*upgrade, durabilityVersion:3, defense, bonus: value.bonus,...(forge?{forge}:{}) };
   }
 
   function gearPrice(gear) {

@@ -5,7 +5,7 @@ const require=createRequire(import.meta.url),C=require('../story/story-core.js')
 const fresh=(job='smith')=>H.enable(P.enable(C.newRun({seed:43}),job).run).run;
 test('all weapon and armor multipliers match category; legacy damaged items upgrade once without healing',()=>{
   for(const [kind,def]of Object.entries(C.GEAR)){
-    const expected=def.slot==='weapon'||def.type==='heavy'||['helmet','armor','shield','round_shield','tower_shield'].includes(kind)?3:2;
+    const expected=def.slot==='weapon'||def.type==='heavy'||['helmet','armor','shield','round_shield','tower_shield'].includes(kind)?15:10;
     assert.equal(C.durabilityMultiplier(kind),expected);
     const gear=C.createGear(kind,49,13,'migration'),price=C.gearPrice(gear),old={...gear,durability:2,maxDurability:gear.maxDurability/expected};delete old.durabilityVersion;
     const upgraded=C.validateGear(old);assert.equal(upgraded.durability,2*expected);assert.equal(upgraded.maxDurability,gear.maxDurability);assert.deepEqual(C.validateGear(upgraded),upgraded);assert.equal(C.gearPrice(upgraded),price);

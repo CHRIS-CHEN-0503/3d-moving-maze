@@ -12,7 +12,14 @@
     else if(['buckler','round_shield','tower_shield'].includes(kind)){const big=kind==='tower_shield';if(big){box(.5,.75,.08,dark);box(.045,.72,.1,gold);box(.5,.045,.1,gold,0,.12);}else{const disk=rod(kind==='buckler'?.26:.31,.08,kind==='buckler'?wood:iron);disk.rotation.x=Math.PI/2;mesh(new T.TorusGeometry(kind==='buckler'?.24:.29,.025,4,12),gold,0,0,.055);mesh(new T.SphereGeometry(.075,8,6),iron,0,0,.08);}box(.16,.05,.11,wood,0,0,-.08);}
     else if(kind==='heavy_helm'){rod(.31,.21,iron,0,1.86);for(const side of [-1,1])box(.065,.26,.35,iron,side*.28,1.66);box(.04,.15,.5,gold,0,1.95);}
     else if(kind==='light_hood'){box(.61,.19,.56,wood,0,1.86);box(.62,.045,.22,0xae875e,0,1.79,.25);for(const side of [-1,1])box(.07,.25,.3,wood,side*.29,1.65,-.09);}
-    else if(kind==='rune_crown'){rod(.31,.09,gold,0,1.81);for(const side of [-1,0,1])mesh(new T.ConeGeometry(.06,side===0?.27:.16,4),0xc1d4ef,side*.19,1.94,.12);}
+    else if(kind==='rune_crown'){
+      // Low circlet: open headband, inset forehead jewel and rounded filigree, never spikes.
+      for(const y of [1.75,1.82]){const band=mesh(new T.TorusGeometry(.31,.018,4,20),gold,0,y);band.rotation.x=Math.PI/2;band.scale.x=1.05;}
+      for(const side of [-1,1]){box(.035,.09,.33,0x677b99,side*.32,1.785);const leaf=mesh(new T.SphereGeometry(.075,8,6),gold,side*.2,1.79,.27);leaf.scale.set(1.25,.5,.3);}
+      const mount=mesh(new T.TorusGeometry(.075,.017,4,12),gold,0,1.77,.327);mount.scale.y=1.15;
+      const jewel=mesh(new T.SphereGeometry(.062,8,6),0x91d8e4,0,1.77,.34);jewel.scale.set(.85,1.1,.42);
+      for(const side of [-1,1]){const scroll=mesh(new T.TorusGeometry(.09,.012,4,10,Math.PI),gold,side*.12,1.77,.31);scroll.rotation.z=side<0?0:Math.PI;}
+    }
     else if(kind==='heavy_armor'){box(.69,.49,.44,iron,0,1.02);for(const y of [.76,.87,1.2])box(.71,.055,.47,dark,0,y);for(const side of [-1,1])box(.22,.17,.42,iron,side*.4,1.25);box(.12,.14,.03,gold,0,1.1,.25);}
     else if(kind==='light_armor'){box(.66,.59,.4,0x89664a,0,.99);for(const side of [-1,1]){const strap=box(.055,.6,.43,0xc1a17b,side*.12,1);strap.rotation.z=side*.2;}box(.69,.07,.42,wood,0,.73);}
     else if(kind==='robe'){const skirt=mesh(new T.CylinderGeometry(.3,.46,.74,8),0x45617c,0,.66);skirt.scale.z=.75;box(.65,.55,.4,0x45617c,0,1.04);for(const side of [-1,1])box(.04,.79,.035,gold,side*.18,.91,.235);box(.66,.06,.43,gold,0,.92);}
@@ -26,10 +33,19 @@
       if(slot==='weapon'){piece.position.set(0,-.36,.13);model.userData.armR.add(piece);if(item.kind==='twin_daggers'){const left=gear(T,item.kind);left.position.set(0,-.36,.13);model.userData.armL.add(left);pieces.push(left);}else if(item.kind==='spellbook'){piece.position.set(0,1.04,.49);model.add(piece);}}
       else if(slot==='shield'){piece.position.set(.07,-.32,.08);piece.rotation.y=Math.PI/3;model.userData.armL.add(piece);}else model.add(piece);
     }
-    for(const p of model.userData.head?.children||[])if(p.name==='hair-crown'||p.name==='hair-fringe')p.visible=!equipment.helmet;
+    for(const p of model.userData.head?.children||[])if(p.name==='hair-crown'||p.name==='hair-fringe')p.visible=!equipment.helmet||equipment.helmet.kind==='rune_crown';
     Object.assign(model.userData,{heroDress:signature,heroPieces:pieces,heroWeapon:equipment.weapon?.kind,hasWeapon:!!equipment.weapon,hasShield:!!equipment.shield});
   }
-  function pose(model,remaining,interval,fp=false){const right=model.userData.armR,left=model.userData.armL,kind=model.userData.heroWeapon;if(!right||!left)return;const t=remaining>0?Math.max(0,Math.min(1,1-remaining/interval)):1,swing=remaining>0?Math.sin(t*Math.PI):0;
+  function pose(model,remaining,interval,fp=false,dt=0){const right=model.userData.armR,left=model.userData.armL,kind=model.userData.heroWeapon;if(!right||!left)return;
+    if(root.TowerCombatMotion){
+      const p=root.TowerCombatMotion.update(model,dt),T=root.THREE,q=model.userData.heroWrist||(model.userData.heroWrist=new T.Quaternion()),e=model.userData.heroWristEuler||(model.userData.heroWristEuler=new T.Euler());
+      right.rotation.set(p.rx,p.ry,p.rz);left.rotation.set(p.lx,p.ly,p.lz);model.rotation.x=p.lean;model.rotation.z=p.tilt;
+      for(const part of model.userData.heroPieces||[]){part.visible=!fp||part.parent===right||part.parent===left||part.name==='hero-gear-spellbook';
+        if(part.name==='hero-gear-'+kind){if(kind==='spellbook'){part.position.set(0,1.04+p.bookLift,.49);part.rotation.set(p.bookTilt,0,0);}else{const l=part.parent===left;e.set(l?p.lwx:p.wx,l?p.lwy:p.wy,l?p.lwz:p.wz);q.setFromEuler(e);part.quaternion.copy(part.parent.quaternion).invert().multiply(q);}}
+      }
+      if(model.userData.legL)model.userData.legL.rotation.x-=p.knee;if(model.userData.legR)model.userData.legR.rotation.x+=p.knee;return;
+    }
+    const t=remaining>0?Math.max(0,Math.min(1,1-remaining/interval)):1,swing=remaining>0?Math.sin(t*Math.PI):0;
     // Forward is +Z: negative shoulder rotation moves the hand towards +Z.
     right.rotation.x=-.25-swing*1.45;right.rotation.z=-.08+swing*.3;
     if(['greatsword','warhammer','arcane_staff'].includes(kind)){left.rotation.x=-.48-swing*1.2;left.rotation.z=-.95;right.rotation.z=.65;}

@@ -165,7 +165,11 @@
     bindActionBtn(el('towerAttackBtn'), attack);
     overlay.addEventListener('click', event => {
       const button = event.target.closest('button[data-tower]');
-      if (button && !button.disabled) handleAction(button.dataset.tower, button.dataset.item);
+      if (button && !button.disabled) {
+        const label=window.TowerMenuVoice?.label(button.dataset.tower,button.dataset.item);
+        handleAction(button.dataset.tower, button.dataset.item);
+        if(label)window.GameVoice?.announce(label,true);
+      }
     });
     window.addEventListener('keydown', event => {
       if (!active && overlay.hidden) return;
@@ -198,7 +202,7 @@
         clear:hasClearPath,followClear:followerClear,followDistance:followerDistance,cell:cellPoint,worldToCell,chooseCell,makeText:makeTextSprite,follow:followNpc,dispose:disposeSceneObject,damage,
         close:closeDialog,refreshGear,hurt:()=>hurtLeft>0,passage:openExplorationPassage,
         makeHero:(job,identity)=>HeroVisual.base(job,buildCharacter,identity),hazards:()=>hazards,clearSlow:()=>{hazardSlow=1;},
-        bind:bindActionBtn,swing:()=>{attackLeft=.8;window.CharacterMotion?.beginAction(playerGroup,'attack',.8);}});
+        bind:bindActionBtn,swing:()=>{attackLeft=.8;window.CharacterMotion?.beginAction(playerGroup,'attack',.8);if(modern())window.TowerCombatMotion?.begin(playerGroup,'attack',Heroes.stats(run).interval);}});
       partyUI.install();
     }
     if(window.TowerLighting&&window.TowerLightingRuntime){
@@ -238,7 +242,10 @@
     el('towerDialog').voiceAfterText=narration.afterText||'';
     const roleSpeaker=narration.speaker||window.MazeRoleVoices?.profiles?.[narration.asset]||(kicker==='旅途奇遇 · 護衛契約'?{gender:'male',age:nearestWarrior?.offer?.strength===1?'young':'adult'}:null);
     el('towerDialog').voiceSpeaker=roleSpeaker?{...roleSpeaker,npc:true}:{};
-    if(!narration.silent)window.GameVoice?.readPanel(el('towerDialog'));
+    if(!narration.silent){
+      if(window.TowerMenuVoice?.quiet(kicker,narration))window.GameVoice?.stop();
+      else window.GameVoice?.readPanel(el('towerDialog'));
+    }
   }
   function openBattleSettings(){if(!active||!G.running)return;dialog('旅程暫停中','遊戲設定','音樂與離開集中在這裡，關閉後繼續冒險。','<div class="battle-settings-options">'+action('音樂：'+(G.muted?'關':'開'),'battle-music')+action('離開遊戲','quit')+(modern()?action('技能排序','hero-order')+action('自動行動／快捷欄','hero-policy'):'')+'</div>',action('繼續遊戲','close'),{summary:'遊戲設定。音樂、離開遊戲、技能排序。'});}
   function closeDialog() {
@@ -883,7 +890,7 @@
     if (run.effects.freeze<=0) shiftLeft -= dt;
     attackLeft=Math.max(0,attackLeft-dt);hurtLeft=Math.max(0,hurtLeft-dt);
     hurtFlash=Math.max(0,hurtFlash-dt);el('towerHurtGlow').style.opacity=String(hurtFlash/.65);
-    if(modern()){G.drainPerSec=.12*Heroes.hungerScale(run);if(G.shovels!==run.engine.shovels){G.shovels=run.engine.shovels;updateShovelBtn();}HeroVisual.pose(playerGroup,Heroes.actor(run).attack,Heroes.stats(run).interval,G.view==='fp');updateHeroFirstPerson();}
+    if(modern()){G.drainPerSec=.12*Heroes.hungerScale(run);if(G.shovels!==run.engine.shovels){G.shovels=run.engine.shovels;updateShovelBtn();}HeroVisual.pose(playerGroup,Heroes.actor(run).attack,Heroes.stats(run).interval,G.view==='fp',dt);updateHeroFirstPerson();}
     if(gearVisual?.userData.weapon){
       if(window.CharacterMotion)window.CharacterMotion.worldWeaponPose(gearVisual.userData.weapon,playerGroup,1-attackLeft/.8,G.view==='fp');
       else gearVisual.userData.weapon.rotation.x=.25+Math.sin((.8-attackLeft)/.8*Math.PI)*1.35;

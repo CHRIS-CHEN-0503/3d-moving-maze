@@ -16,6 +16,7 @@
   let heroFp=null,heroFpKind='';
   let attackLeft = 0, hurtLeft = 0, warning = false, floorStarted = false, saveFailed = false;
   let encounterHold = 0;
+  const encounterAlert=window.TowerEncounterAlert?.create({THREE,world:()=>world,player:()=>playerGroup,camera:()=>camera,firstPerson:()=>G.view==='fp',voice:()=>window.GameVoice?.announceAsset('alert.monster','小心，附近有怪物。留意地上的紅圈，準備閃避，或請護衛攔住牠。',true)});
   let objectiveHint = null;
   let hurtFlash = 0, guardClashAt = 0;
   let bolts = [];
@@ -286,6 +287,7 @@
       if(run.party?.journey&&previous?.party&&!previous.party.journey&&C.validateSave(previous))localStorage.setItem(SAVE+'_before_expedition2',raw);
       if(run.party?.light&&previous?.party&&previous.party.light===undefined&&C.validateSave(previous))localStorage.setItem(SAVE+'_before_lighting',raw);
       if(run.party?.loadouts?.growth&&previous?.party?.loadouts&&!previous.party.loadouts.growth&&C.validateSave(previous)&&!localStorage.getItem(SAVE+'_before_hero_growth'))localStorage.setItem(SAVE+'_before_hero_growth',raw);
+      if(run.party?.loadouts?.xpScale===10&&previous?.party?.loadouts&&previous.party.loadouts.xpScale===undefined&&C.validateSave(previous)&&!localStorage.getItem(SAVE+'_before_xp10'))localStorage.setItem(SAVE+'_before_xp10',raw);
       const previousGear=previous?[...(previous.gearBag||[]),...Object.values(previous.equipment||{}),...Object.values(previous.party?.loadouts?.actors||{}).flatMap(a=>Object.values(a?.equipment||{}))].filter(Boolean):[];
       if(previous&&C.validateSave(previous)&&previousGear.some(g=>g.durabilityVersion===undefined)&&!localStorage.getItem(SAVE+'_before_durability2'))localStorage.setItem(SAVE+'_before_durability2',raw);
       if(previous&&C.validateSave(previous)&&previousGear.some(g=>g.durabilityVersion===undefined||g.durabilityVersion===2)&&!localStorage.getItem(SAVE+'_before_durability3'))localStorage.setItem(SAVE+'_before_durability3',raw);
@@ -322,11 +324,13 @@
     closeDialog();
     if (MP.on) mpLeave();
     active = true; floorStarted = false; document.body.classList.add('story-active');
+    encounterAlert?.resetSession();
     G.charIdx = run.charIdx; G.view = 'tp'; G.spMode = 'classic';
     el('playerName').value = run.name;
     loadFloor(true);
   }
   function loadFloor(intro) {
+    encounterAlert?.clearVisual();
     objectiveHint?.suspend();
     pendingDungeonShift=null;closeDialog(); floorStarted = false; reader=null;sideReader=null;
     lightingUI?.reset();
@@ -925,8 +929,8 @@
     updateWarrior(dt,now);
     for(const monster of monsters) updateMonster(monster,dt,now);
     updateBolts(dt);
-    const threat=!nearest&&run.effects.repel<=0&&!(now<G.invisUntil)&&monsters.some(m=>m.alive&&!isHeld(m)&&!(run.monsterStuns[m.id]>0)&&Math.hypot(G.px-m.model.position.x,G.pz-m.model.position.z)<m.def.sight&&(m.path.length>0||m.windup>0));
-    if(threat&&encounterHold===0)window.GameVoice?.announceAsset('alert.monster','小心，附近有怪物。留意地上的紅圈，準備閃避，或請護衛攔住牠。',true);
+    const threat=!nearest&&run.effects.repel<=0&&!(now<G.invisUntil)&&monsters.some(m=>m.alive&&hasClearPath(G.px,G.pz,m.model.position.x,m.model.position.z)&&!isHeld(m)&&!(run.monsterStuns[m.id]>0)&&Math.hypot(G.px-m.model.position.x,G.pz-m.model.position.z)<m.def.sight&&(m.path.length>0||m.windup>0));
+    encounterAlert?.update(threat,dt);
     encounterHold=threat?4:Math.max(0,encounterHold-dt);
     if(window.TowerAudio)window.TowerAudio.setEncounter(encounterHold>0);
     if(window.CharacterFace){
@@ -1293,7 +1297,7 @@
     cancelSceneTransition();G.running=false;G.frozen=true;
     window.GameVoice?.stop(true);
     if(window.TowerAudio)window.TowerAudio.stop();
-    active=false;floorStarted=false;paused=false;
+    active=false;floorStarted=false;paused=false;encounterAlert?.clearVisual();
     objectiveHint?.stop();
     partyUI?.reset();
     lightingUI?.reset();

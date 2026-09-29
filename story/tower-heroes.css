@@ -8,6 +8,14 @@
 #heroSkillBar{position:fixed;right:calc(88px + env(safe-area-inset-right));bottom:calc(80px + env(safe-area-inset-bottom));z-index:23;display:flex;gap:6px;pointer-events:auto}
 #heroSkillBar[hidden],#heroTeamBar[hidden]{display:none!important}.hero-skill{position:relative;width:65px;height:72px;border:1px solid #91a8b6;border-radius:14px;background:#19384bec;color:#fff2ce;display:flex;align-items:center;justify-content:center;flex-direction:column;padding:2px;font-size:11px;touch-action:manipulation}.hero-skill .hero-icon{width:38px;height:38px}.hero-skill small{position:absolute;right:4px;top:2px;color:#fff}.hero-skill:disabled{filter:grayscale(.8);opacity:.65}
 #heroTeamBar{position:static;display:flex;flex-wrap:wrap;gap:5px;max-width:100%;pointer-events:auto}
+#heroTactics[hidden]{display:none!important}
+#heroTactics{position:fixed;z-index:75;width:min(278px,calc(100vw - 16px));max-height:calc(100dvh - 16px);overflow:auto;padding:10px;background:#112b3bf5;border:1px solid #cdb777;border-radius:14px;box-shadow:0 10px 30px #0008;color:#f9edcf;pointer-events:auto;touch-action:manipulation}
+#heroTactics header{display:flex;align-items:center;justify-content:space-between;gap:8px;font-size:15px}
+#heroTactics header button{min-width:44px;min-height:44px;border:0;border-radius:9px;color:#edf5ff;background:#274356;font-size:24px}
+.hero-tactic-options{display:grid;gap:6px;margin-top:6px}
+.hero-tactic-options button{min-height:48px;text-align:left;border:1px solid #718e9d;border-radius:9px;padding:7px 10px;color:#e7f5ff;background:#1c394c;display:grid;gap:3px}
+.hero-tactic-options button[aria-pressed=true]{border-color:#f1c568;background:#455044}
+.hero-tactic-options b{font-size:16px}.hero-tactic-options small,#heroTactics p{font-size:12px;line-height:1.4;color:#c4d6df}#heroTactics p{margin:8px 0 0}#heroTactics button:focus-visible{outline:2px solid #ffd36e;outline-offset:2px}
 #heroTeamBar button{background:#152e3fe8;color:#dfecf2;border:1px solid #79909a;border-radius:10px;width:58px;padding:4px;display:grid;gap:3px;font-size:11px;touch-action:manipulation}#heroTeamBar button[aria-pressed=true]{border:2px solid #edc67a;background:#3c4c52}#heroTeamBar .party-glyph{width:26px;height:26px;margin:auto}#heroTeamBar meter{width:100%;height:5px}#heroTeamBar button:disabled{opacity:.4}
 @media(max-height:500px){#heroSkillBar{bottom:calc(65px + env(safe-area-inset-bottom));right:calc(85px + env(safe-area-inset-right))}.hero-skill{width:58px;height:59px;font-size:10px}.hero-skill .hero-icon{width:31px;height:31px}#heroTeamBar button{width:48px}#heroTeamBar .party-glyph{width:20px;height:20px}.hero-catalog{grid-template-columns:repeat(3,minmax(0,1fr))}}
 @media(max-width:640px){.hero-equipped-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.hero-catalog{grid-template-columns:repeat(2,minmax(0,1fr))}}

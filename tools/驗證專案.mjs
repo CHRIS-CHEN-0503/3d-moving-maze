@@ -8,7 +8,7 @@ for(const asset of ['maze-sight-core','maze-sight']){
   assert.ok(html.includes(`src="./assets/${asset}.js?v=`),`缺少視野模組：${asset}`);
 }
 
-for(const asset of ['tower-hero-growth','tower-growth-runtime','tower-lighting-core','tower-lighting-runtime','tower-heroes-core','tower-heroes-icons','tower-heroes-visuals','tower-heroes-runtime']){
+for(const asset of ['tower-combat-motion','tower-menu-voice','tower-hero-growth','tower-growth-runtime','tower-lighting-core','tower-lighting-runtime','tower-heroes-core','tower-heroes-icons','tower-heroes-visuals','tower-heroes-runtime']){
   new vm.Script(await readFile(new URL(`../story/${asset}.js`,import.meta.url),'utf8'),{filename:asset+'.js'});
   assert.ok(html.includes(`src="story/${asset}.js?v=`),`缺少照明模組：${asset}`);
 }
@@ -145,8 +145,8 @@ assert.match(html, /assets\/玩法說明圖集\.webp/, '遊戲說明沒有引用
 assert.match(html, /assets\/遊戲專屬介面圖示集-v1\.webp/, '遊戲 UI 沒有引用專屬圖示集');
 assert.match(
   html,
-  /<link\b(?=[^>]*\brel=["']icon["'])(?=[^>]*\bhref=["']\.\/assets\/迷宮指南針圖示-v1\.webp["'])[^>]*>/,
-  'favicon 沒有引用專屬迷宮指南針圖示',
+  /<link\b(?=[^>]*\brel=["']icon["'])(?=[^>]*\bhref=["']\.\/assets\/app-icon\/favicon-48\.png\?v=[\d.]+["'])[^>]*>/,
+  'favicon 沒有引用原創高塔傳送門圖示',
 );
 assert.match(html, /\.help-art\{[^}]*background-size:300% 100%/, '玩法圖集沒有保持三格橫向切片');
 assert.doesNotMatch(html, /\bclass=["'][^"']*\bconfetti\b[^"']*["']/, '勝利或失敗畫面仍有 confetti emoji 圖示列');
@@ -230,13 +230,12 @@ assert.ok(proprietaryAtlasStat.size < 300 * 1024, `專屬 UI 圖集超過 300KB 
 const proprietaryAtlasHeader = (await readFile(proprietaryAtlasUrl)).subarray(0, 12);
 assert.equal(proprietaryAtlasHeader.subarray(0, 4).toString('ascii'), 'RIFF', '專屬 UI 圖集不是有效的 RIFF 檔案');
 assert.equal(proprietaryAtlasHeader.subarray(8, 12).toString('ascii'), 'WEBP', '專屬 UI 圖集不是有效的 WebP 檔案');
-const faviconUrl = new URL('../assets/迷宮指南針圖示-v1.webp', import.meta.url);
+const faviconUrl = new URL('../assets/app-icon/favicon-48.png', import.meta.url);
 await access(faviconUrl);
 const faviconStat = await stat(faviconUrl);
 assert.ok(faviconStat.size < 50 * 1024, `favicon 超過 50KB 效能預算：${faviconStat.size} bytes`);
 const faviconHeader = (await readFile(faviconUrl)).subarray(0, 12);
-assert.equal(faviconHeader.subarray(0, 4).toString('ascii'), 'RIFF', 'favicon 不是有效的 RIFF 檔案');
-assert.equal(faviconHeader.subarray(8, 12).toString('ascii'), 'WEBP', 'favicon 不是有效的 WebP 檔案');
+assert.equal(faviconHeader.subarray(0, 8).toString('hex'), '89504e470d0a1a0a', 'favicon 不是有效的 PNG 檔案');
 await access(new URL('../lib/three.min.js', import.meta.url));
 await access(new URL('../functions/api/scores.js', import.meta.url));
 

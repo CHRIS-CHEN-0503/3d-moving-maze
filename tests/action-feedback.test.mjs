@@ -46,7 +46,7 @@ function fixture(skill){
   for(const key of Object.keys(run.party.ingredients))run.party.ingredients[key]=30;run.party.journey.scrap=30;
   const sounds=[],world=new T.Group(),player=new T.Group(),m={...P.monsterSpecs(run)[0],alive:true,model:new T.Group()};m.model.position.set(0,0,1.5);
   const trap={x:0,z:1,id:'test-trap',model:new T.Group()},g={running:true,shifting:false,px:0,pz:0};let runtime,paused=false,blocked=false,hits=0;
-  const env=vm.createContext({TowerHeroes:H,TowerPartyCore:P,TowerHeroGrowth:R,TowerHeroIcons:{svg:()=>''},CombatAudio:A,document:{getElementById:()=>null},Math});
+  const env=vm.createContext({TowerHeroes:H,TowerPartyCore:P,TowerHeroGrowth:R,TowerHeroIcons:{svg:()=>''},TowerCombatMotion:require('../story/tower-combat-motion.js'),CombatAudio:A,document:{getElementById:()=>null},Math});
   for(const file of ['story/tower-skill-effects.js','story/tower-growth-runtime.js','story/tower-heroes-runtime.js'])vm.runInContext(code(file),env);
   const ctx={THREE:T,G:g,core:C,run:()=>run,world:()=>world,player:()=>player,actors:()=>actors,monsters:()=>[m],hazards:()=>[trap],paused:()=>paused,text:s=>s,action:()=>'',portrait:()=>'',clear:()=>!blocked,walkClear:()=>true,
     audio:{sfxAction:k=>{sounds.push(k);},sfxHit(){}},toast(){},save(){},swing(){},close(){},dialog(){},dispose(){},
@@ -55,12 +55,14 @@ function fixture(skill){
     hit(enemy,memberId,skillId){const res=H.strike(run,enemy.id,{memberId,skillId},run.revision);if(res.ok){run=res.run;hits++;runtime.impact(enemy,memberId||H.state(run).active,skillId);if(res.effect.dead)enemy.alive=false;}return res;}
   };
   runtime=env.TowerHeroesRuntime.create(ctx);runtime.tick(0);
-  return {runtime,sounds,world,g,target,trap,run:()=>run,hits:()=>hits,block:v=>blocked=v,pause:v=>paused=v};
+  return {runtime,sounds,world,g,target,trap,motion:()=>player.userData.combatMotion,run:()=>run,hits:()=>hits,block:v=>blocked=v,pause:v=>paused=v};
 }
 test('every successful active skill emits action audio and geometry; failed repeat casts stay silent',()=>{
   for(const s of Object.values(H.SKILLS)){
     const f=fixture(s);assert.equal(f.runtime.cast(s.id,f.target),true,s.id);
     assert.ok(f.sounds.includes(H.preparationSeconds(s.id)?'charge':A.skillKind(s)),s.id);
+    assert.equal(f.motion().action,H.preparationSeconds(s.id)||s.effect==='disarm'?'charge':'skill',s.id);
+    assert.equal(f.motion().family,require('../story/tower-combat-motion.js').FAMILIES[s.effect],s.id);
     assert.ok(f.runtime.effectStats().groups>0,s.id);assert.ok(C.validateSave(f.run()),s.id);
     const before=f.sounds.length;f.runtime.cast(s.id,f.target);assert.equal(f.sounds.length,before,s.id+' failed cast');
     f.runtime.reset();assert.equal(f.runtime.effectStats().groups,0);

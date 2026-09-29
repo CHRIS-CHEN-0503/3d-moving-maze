@@ -28,7 +28,7 @@ test('six gear kinds have only three armor slots and one nonlethal weapon slot',
   assert.deepEqual(['helmet', 'armor', 'shield'].map(kind => C.GEAR[kind].defense), [2, 4, 3]);
   const run = fresh();
   assert.equal(run.equipment.weapon.kind, 'staff');
-  assert.ok(run.equipment.weapon.durability >= 9 && run.equipment.weapon.durability <= 30);
+  assert.ok(run.equipment.weapon.durability >= 45 && run.equipment.weapon.durability <= 150);
   assert.equal(run.bag.shield, 0);
   assert.equal(run.equipment.shield, null);
 });

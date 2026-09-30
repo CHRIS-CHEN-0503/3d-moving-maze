@@ -5,7 +5,7 @@ import {readFileSync} from 'node:fs';
 import vm from 'node:vm';
 const require=createRequire(import.meta.url),V=require('../assets/game-voice.js');
 function harness(){
-  let now=1000,voices=[];const spoken=[],events={},docEvents={};
+  let now=1000,voices=[{voiceURI:'mei',name:'Mei-Jia',lang:'zh-TW',localService:true}];const spoken=[],events={},docEvents={};
   const synth={getVoices:()=>voices,addEventListener:(key,fn)=>events[key]=fn,cancel(){this.cancelled=(this.cancelled||0)+1;},speak(u){spoken.push(u);}};
   const env={speechSynthesis:synth,SpeechSynthesisUtterance:class{constructor(text){this.text=text;}},Date:{now:()=>now},document:{hidden:false,addEventListener:(key,fn)=>docEvents[key]=fn},addEventListener:(key,fn)=>events[key]=fn};
   const voice=V.create(env);return{voice,spoken,synth,env,at:t=>now=t,voices:list=>{voices=list;events.voiceschanged();},finish:()=>spoken.at(-1).onend(),hide:()=>{env.document.hidden=true;docEvents.visibilitychange();}};
@@ -13,7 +13,7 @@ function harness(){
 function recordedHarness(){
   const audio=[],spoken=[],instances=[];
   class FakeAudio{constructor(){instances.push(this);}play(){const self=this;audio.push({src:this.src,played:true,onended:this.onended,onerror:this.onerror,get paused(){return self.paused;}});}pause(){this.paused=true;}}
-  const synth={getVoices:()=>[],addEventListener(){},cancel(){},speak(u){spoken.push(u);}};
+  const synth={getVoices:()=>[{voiceURI:'mei',name:'Mei-Jia',lang:'zh-TW'}],addEventListener(){},cancel(){},speak(u){spoken.push(u);}};
   const env={Audio:FakeAudio,MazeVoicePack:{get:id=>id==='intro'?{src:'./intro.mp3',text:'專用旁白'}:id==='limit'?{src:'./limit.mp3',text:'限時十五秒'}:null},speechSynthesis:synth,SpeechSynthesisUtterance:class{constructor(text){this.text=text;}},Date:{now:()=>1000},document:{hidden:false,addEventListener(){}},addEventListener(){}};
   return{voice:V.create(env),audio,spoken,instances};
 }
@@ -22,7 +22,7 @@ function catalogHarness(speech=true){
   const timers=new Map();let timerId=0;
   class FakeAudio{constructor(){instances.push(this);}play(){const self=this;audio.push({src:this.src,onended:this.onended,onerror:this.onerror,onplaying:this.onplaying,onwaiting:this.onwaiting,get paused(){return self.paused;}});}pause(){this.paused=true;}}
   const env={Audio:FakeAudio,MazeVoicePack:require('../assets/voice-pack.js'),Date:{now:()=>now},document:{hidden:false,addEventListener(){}},addEventListener(){},setTimeout(fn){timers.set(++timerId,fn);return timerId;},clearTimeout(id){timers.delete(id);}};
-  if(speech){env.speechSynthesis={getVoices:()=>[],addEventListener(){},cancel(){},speak:u=>spoken.push(u)};env.SpeechSynthesisUtterance=class{constructor(text){this.text=text;}};}
+  if(speech){env.speechSynthesis={getVoices:()=>[{voiceURI:'mei',name:'Mei-Jia',lang:'zh-TW'}],addEventListener(){},cancel(){},speak:u=>spoken.push(u)};env.SpeechSynthesisUtterance=class{constructor(text){this.text=text;}};}
   const voice=V.create(env);
   return {voice,audio,spoken,instances,timers,env,at:t=>now=t,drain(){let i=0,j=0,limit=100;while(voice.status().speaking&&limit--){if(audio[i])audio[i++].onended();else if(spoken[j])spoken[j++].onend();else break;}assert.ok(limit>0);}};
 }
@@ -39,10 +39,10 @@ test('下載卡住會備援，已開始播放或關閉語音會清除等待計�
   h.audio[1].onwaiting();assert.equal(h.timers.size,1);h.audio[1].onplaying();assert.equal(h.timers.size,0);
   h.voice.announce('遊戲設定',true);assert.equal(h.timers.size,1);h.voice.stop();assert.equal(h.timers.size,0);
 });
-test('拾取使用固定裝置聲線，不預載、不混接錄音；重複拾取去重且不搶話',()=>{
+test('已錄製的拾取使用提示跨裝置播放同一音檔，不預載；重複拾取去重且不搶話',()=>{
   const h=catalogHarness();assert.equal(h.audio.length,0);
   h.voice.announce('獲得 餅乾');h.voice.announce('獲得 餅乾');h.voice.announce('使用 鐵鍬');
-  assert.equal(h.audio.length,0);assert.equal(h.spoken.length,1);h.drain();assert.equal(h.audio.length,0);assert.equal(h.spoken.length,2);
+  assert.equal(h.audio.length,1);assert.equal(h.spoken.length,0);h.drain();assert.equal(h.audio.length,2);assert.equal(h.spoken.length,0);
 });
 test('動態名字保留裝置朗讀，錄音與裝置語音不重疊，也不截斷同一事件',()=>{
   const h=catalogHarness();h.voice.announce('小雨獲得 餅乾。小晴獲得 牛奶。小明獲得 鐵鍬。');
@@ -66,25 +66,36 @@ test('一般事件最多排四個，過期提示不延遲重播；故事不使�
   const story=catalogHarness();story.voice.readPanel({voiceScope:'full',querySelectorAll:()=>[{closest:()=>null,textContent:text}]});story.drain();assert.equal(story.audio.length,6);
 });
 const female={voiceURI:'mei',name:'Mei-Jia',lang:'zh-TW',localService:true},male={voiceURI:'yun',name:'YunJhe',lang:'zh-TW'},en={voiceURI:'en',name:'Samantha',lang:'en-US'};
-test('首次聲音清單尚未載入時固定裝置預設，不在後續道具提示突然換人',()=>{
-  const h=catalogHarness();h.voice.configure({character:()=>({identity:'late-smith',gender:'male'})});h.voice.announce('獲得 餅乾');
-  h.env.speechSynthesis.getVoices=()=>[female,male];h.voice.refresh();h.voice.announce('獲得 銅幣',true);
-  assert.ok(h.spoken.every(u=>u.voice===undefined&&u.lang==='zh-TW'));assert.equal(h.audio.length,0);
+test('首次聲音清單尚未載入會等待，不釘住系統預設；載入後整段固定國語男聲',()=>{
+  const h=catalogHarness();h.env.speechSynthesis.getVoices=()=>[];h.voice.configure({character:()=>({identity:'late-smith',gender:'male'})});h.voice.announce('獲得 新材料');
+  assert.equal(h.spoken.length,0);assert.equal(h.voice.status().loadingVoice,true);
+  h.env.speechSynthesis.getVoices=()=>[female,male];h.voice.refresh();assert.equal(h.spoken[0].voice,male);assert.equal(h.timers.size,0);
+  h.voice.announce('獲得 新武器',true);assert.equal(h.spoken[1].voice,male);assert.equal(h.audio.length,0);
 });
 test('無空格、新道具、混合裝備摘要與後載入聲音不會令同角色聲線變換',()=>{
   const h=catalogHarness();h.env.speechSynthesis.getVoices=()=>[female,male];h.voice.configure({character:()=>({identity:'smith',gender:'male'})});
-  for(const text of ['獲得 餅乾','獲得甜根莖','獲得 織光法袍','使用香草','已裝備 巡塔長劍']){h.voice.announce(text,true);assert.equal(h.spoken.at(-1).voice,male);assert.equal(h.spoken.at(-1).text,text);}
+  for(const text of ['獲得 未知材料','獲得 織光法袍','已裝備 巡塔長劍']){h.voice.announce(text,true);assert.equal(h.spoken.at(-1).voice,male);assert.equal(h.spoken.at(-1).text,text);}
   h.env.speechSynthesis.getVoices=()=>[female,{...male,voiceURI:'better',localService:true}];h.voice.refresh();
   h.voice.readPanel({voiceScope:'summary',voiceText:'織光法袍。獲得 銅幣。確認修復。',querySelectorAll:()=>[]});h.drain();
   assert.equal(h.audio.length,0);assert.ok(h.spoken.every(u=>u.voice===male));
 });
-test('角色物品整段固定男聲或女聲，正常速度；入口選單仍有专用錄音',()=>{
+test('角色物品整段使用男聲或女聲專用音檔，入口選單仍有專用錄音',()=>{
   const h=catalogHarness();h.env.speechSynthesis.getVoices=()=>[female,male];h.voice.configure({character:()=>({gender:'male'})});h.voice.announce('獲得 餅乾');
-  assert.equal(h.audio.length,0);assert.equal(h.spoken[0].voice,male);assert.equal(h.spoken[0].rate,1);
-  h.voice.configure({character:()=>({gender:'female'})});h.voice.announce('獲得 銅幣',true);assert.equal(h.spoken[1].voice,female);
+  assert.equal(h.audio.length,1);assert.equal(h.spoken.length,0);assert.match(h.audio[0].src,/roles\/male-/);assert.equal(h.instances[0].playbackRate,1);
+  h.voice.configure({character:()=>({gender:'female'})});h.voice.announce('獲得 銅幣',true);assert.doesNotMatch(h.audio[1].src,/roles\/male-/);
   h.voice.announce('單人遊戲',true);assert.equal(h.instances[0].playbackRate,1.16);
   assert.equal(V.chooseVoice([female,male],'mei',{gender:'male'}),male);
   assert.equal(V.chooseVoice([female,male],'yun',{gender:'female'}),female);
+});
+test('國語備援不使用粵語或非中文；台灣國語優先於其他地區的性別配對',()=>{
+  const cantonese={voiceURI:'hk',name:'Sinji',lang:'zh-HK'},hantHK={...cantonese,lang:'zh-Hant-HK'},cnMale={name:'YunXi',lang:'zh-CN'};
+  assert.equal(V.chooseVoice([en,cantonese,hantHK]),null);assert.equal(V.chooseVoice([cnMale,female], '',{gender:'male'}),female);
+});
+test('沒有國語備援時不播放錯誤預設聲音，專用錄音仍可使用；停止清除等待',()=>{
+  const h=catalogHarness();h.env.speechSynthesis.getVoices=()=>[en];h.voice.refresh();h.voice.announce('獲得 未知材料');assert.equal(h.spoken.length,0);
+  const timer=[...h.timers.values()][0];h.timers.clear();timer();assert.equal(h.voice.status().failure,'chinese-voice-unavailable');assert.equal(h.spoken.length,0);
+  h.voice.announce('獲得 餅乾',true);assert.equal(h.audio.length,1);
+  h.voice.announce('使用 未知材料',true);assert.equal(h.voice.status().loadingVoice,true);h.voice.stop();assert.equal(h.timers.size,0);timer();assert.equal(h.spoken.length,0);
 });
 test('人物動態對話保持人物性別，不混入不同性別的通用錄音',()=>{
   const h=catalogHarness();h.voice.readPanel({voiceScope:'full',voiceSpeaker:{gender:'male',npc:true},querySelectorAll:()=>[{closest:()=>null,textContent:'獲得 餅乾'}]});

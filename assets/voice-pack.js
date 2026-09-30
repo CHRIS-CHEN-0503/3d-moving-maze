@@ -27,6 +27,9 @@
   function get(id){return typeof id==='string'&&Object.hasOwn(tracks,id)?tracks[id]:null;}
   const normalize=s=>String(s||'').replace(/[\p{Extended_Pictographic}\uFE0F\u200D]/gu,'').replace(/\s+/g,'').replace(/[·・]/g,'・');
   const byText=new Map();for(const [id,track] of Object.entries(tracks))if(!id.startsWith('role.'))byText.set(normalize(track.text),id);
+  const exactText=new Map();const spokenKey=s=>normalize(s).replace(/[。！？!?，,；;：:]/g,'');
+  for(const [id,track] of Object.entries(tracks))if(!id.startsWith('role.'))exactText.set(spokenKey(track.text),id);
+  function exact(text,gender){const base=exactText.get(spokenKey(text));if(!base)return null;const id=roles?.variants?.[base]?.[gender]||base;return {asset:id,text:tracks[id].text};}
   const keys=[...byText.keys()].filter(Boolean).sort((a,b)=>b.length-a.length);
   const pattern=new RegExp(keys.map(k=>k.replace(/[.*+?^${}()|[\]\\]/g,'\\$&')).join('|'),'gu');
   function plan(text,gender){
@@ -43,5 +46,5 @@
     if(cursor<original.length)out.push({text:original.slice(cursor)});
     return out.filter(x=>x.asset||/[\p{L}\p{N}]/u.test(x.text));
   }
-  return Object.freeze({version:1,tracks,get,plan});
+  return Object.freeze({version:1,tracks,get,plan,exact});
 });

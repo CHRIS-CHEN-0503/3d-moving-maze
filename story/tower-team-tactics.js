@@ -11,8 +11,9 @@
     }
     return {activate,clear};
   }
-  function create({run,ready,saveChoice,switchActor,label,escape}){
+  function create({run,ready,saveChoice,switchActor,label,escape,targeting=()=>false,selectTarget=()=>{},cancelTarget=()=>{}}){
     const H=root.TowerHeroes,R=root.TowerHeroGrowth,doc=root.document;let panel=null,team=null,selected=null;
+    let ignoreTapUntil=0;
     const valid=id=>ready()&&H.ids(run()).includes(id)&&H.hp(run(),id)>0;
     const control=gesture({ready,single:open,double:id=>{close();if(valid(id))switchActor(id);}});
     function anchor(){return [...team.querySelectorAll('[data-hero-switch]')].find(b=>b.dataset.heroSwitch===selected);}
@@ -29,10 +30,10 @@
     function refresh(){if(!ready()){close();return;}if(selected){if(!valid(selected))close();else position();}}
     function install(){team=doc.getElementById('heroTeamBar');panel=doc.createElement('section');panel.id='heroTactics';panel.hidden=true;panel.setAttribute('role','dialog');panel.setAttribute('aria-label','隊員戰鬥策略');doc.getElementById('gameScreen').appendChild(panel);
       for(const host of [team,panel])for(const type of ['pointerdown','touchstart'])host.addEventListener(type,e=>e.stopPropagation(),{passive:true});
-      team.addEventListener('click',e=>{const b=e.target.closest('[data-hero-switch]');if(b&&!b.disabled){e.stopPropagation();control.activate(b.dataset.heroSwitch,e.detail===0);}});
+      team.addEventListener('click',e=>{const b=e.target.closest('[data-hero-switch]');if(!b||b.disabled)return;e.stopPropagation();if(targeting()){close();ignoreTapUntil=root.performance.now()+DOUBLE_MS;selectTarget(b.dataset.heroSwitch);return;}if(root.performance.now()<ignoreTapUntil)return;control.activate(b.dataset.heroSwitch,e.detail===0);});
       panel.addEventListener('click',e=>{e.stopPropagation();if(e.target.closest('[data-tactics-close]')){close(true);return;}const b=e.target.closest('[data-tactic]');if(b&&selected&&valid(selected)&&saveChoice(selected,b.dataset.tactic))close(true);});
       doc.addEventListener('pointerdown',e=>{if(!team.contains(e.target)&&!panel.contains(e.target))close();},{capture:true,passive:true});
-      doc.addEventListener('keydown',e=>{if(panel.hidden)return;if(e.key==='Escape'){e.preventDefault();e.stopImmediatePropagation();close(true);}else if(['ArrowDown','ArrowUp','Home','End'].includes(e.key)){e.preventDefault();const options=[...panel.querySelectorAll('[data-tactic]')],i=options.indexOf(doc.activeElement),next=e.key==='Home'?0:e.key==='End'?options.length-1:(i+(e.key==='ArrowDown'?1:options.length-1))%options.length;options[next].focus();}},{capture:true});
+      doc.addEventListener('keydown',e=>{if(targeting()&&e.key==='Escape'){e.preventDefault();e.stopImmediatePropagation();cancelTarget();return;}if(panel.hidden)return;if(e.key==='Escape'){e.preventDefault();e.stopImmediatePropagation();close(true);}else if(['ArrowDown','ArrowUp','Home','End'].includes(e.key)){e.preventDefault();const options=[...panel.querySelectorAll('[data-tactic]')],i=options.indexOf(doc.activeElement),next=e.key==='Home'?0:e.key==='End'?options.length-1:(i+(e.key==='ArrowDown'?1:options.length-1))%options.length;options[next].focus();}},{capture:true});
       root.addEventListener('resize',refresh);doc.addEventListener('visibilitychange',()=>{if(doc.hidden)close();});
     }
     return {install,refresh,close};

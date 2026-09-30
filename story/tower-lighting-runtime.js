@@ -68,7 +68,7 @@
     function install(){
       const summary=document.querySelector('#towerHud .tower-hud-summary'),button=document.createElement('button');
       button.id='towerLightBtn';button.type='button';button.hidden=true;button.setAttribute('aria-label','照明工具（L）');button.setAttribute('aria-keyshortcuts','L');button.innerHTML=icon('torch');summary.insertBefore(button,document.getElementById('towerHudToggle'));
-      ctx.bind(button,()=>panel());
+      ctx.bind(button,quickUse);
       const status=document.createElement('div');status.id='towerLightStatus';status.hidden=true;document.getElementById('towerHudDetails').appendChild(status);
     }
     function status(){const l=r().party.light;return l.daylight>0?'日光術 '+time(l.daylight):l.lit?'火把 '+time(l.fuel):'未點燈 · 火把 '+l.torches+' 支'+(l.fuel>0?'，餘火 '+time(l.fuel):'');}
@@ -76,8 +76,12 @@
       const button=document.getElementById('towerLightBtn'),line=document.getElementById('towerLightStatus');if(!button)return;
       button.hidden=!enabled();line.hidden=!enabled();if(!enabled())return;
       const mode=L.portable(r());button.dataset.light=mode;button.disabled=G.shifting||!G.running;
-      if(button.dataset.icon!==(mode==='daylight'?'daylight':'torch')){button.dataset.icon=mode==='daylight'?'daylight':'torch';button.innerHTML=icon(button.dataset.icon);}
-      button.title=status()+' · 照明工具（L）';button.setAttribute('aria-label',status()+'，開啟照明工具');line.textContent=status();
+      const symbol=L.canCast(r())?'daylight':'torch';
+      if(button.dataset.icon!==symbol){button.dataset.icon=symbol;button.innerHTML=icon(symbol);}
+      button.title=status()+' · 點擊直接'+(symbol==='daylight'?'施放日光術':'使用火把')+'（L）';button.setAttribute('aria-label',symbol==='daylight'?'施放日光術':'使用火把');line.textContent=status();
+    }
+    function quickUse(){if(!ready()||ctx.paused?.())return false;if(L.canCast(r())){if(r().party.light.daylight>0){ctx.toast('日光術仍在照明。',1500,false);return false;}if(root.TowerHeroes?.enabled(r())){const H=root.TowerHeroes,id=H.ids(r()).find(id=>H.hp(r(),id)>0&&H.actor(r(),id).skills.includes('daylight'));if(id)return ctx.castDaylight?.(id);return false;}}
+      const result=L.canCast(r())?L.daylight(r(),r().revision):L.torch(r(),r().revision);if(!ctx.transact(result)){if(result.message)ctx.toast(result.message,2000,result.message);return false;}ctx.audio.sfxAction?.(L.canCast(r())?'magic':'smoke');updateVisual(0,true);hud();ctx.toast(result.message,1800,result.message);return true;
     }
     function merchantCard(id){
       if(!enabled()||!Object.hasOwn(r().party.light.bought,id))return '';
@@ -86,8 +90,8 @@
     }
     function panel(quiet=false){
       if(!ready())return;const run=r(),l=run.party.light;panelRevision=run.revision;
-      const body='<div class="tower-grid tower-light-grid"><article class="tower-item tower-light-card">'+icon('torch')+'<h3>火把 · 五分鐘</h3><p>持有 '+l.torches+' 支'+(l.fuel>0?' · 目前餘量 '+time(l.fuel):'')+'</p><p>木枝 '+l.wood+' · 布條 '+l.cloth+'<br>木枝、布條各一份即可製作。</p>'+ctx.action(l.lit?'熄滅並保留燃料':l.fuel>0?'重新點燃':'點燃火把','light-torch',null,!l.lit&&(l.daylight>0||!l.fuel&&!l.torches))+ctx.action('製作一支火把','light-craft',null,!l.wood||!l.cloth||l.torches>=99)+'</article><article class="tower-item tower-light-card">'+icon('daylight')+'<h3>日光術 · 十分鐘</h3><p>光照範圍比火把更大。需要隊伍中仍能行動、且擁有日光術的術士。</p><p>'+(l.daylight>0?'剩餘 '+time(l.daylight):L.canCast(run)?'隊伍可以施放日光術。':'隊伍目前沒有能施法的術士。')+'</p>'+ctx.action('施放日光術','light-daylight',null,!L.canCast(run)||l.cooldown>0)+'</article></div><p class="tower-copy">日光術期間火把不耗燃料，結束後原本點燃的火把會接續照明。閱讀、暫停與離線時不計時。日光術結束即可再施放；新版人物須先擁有此主動技能。</p><p class="tower-copy">營地與行商有固定照明；木枝和布條可沿路拾取，每層僅採集一次，變形不會補生。所有行商也會販售火把。</p>';
-      ctx.dialog('照明工具 · 暫停中','帶著光繼續前進',status(),body,ctx.action('裝備背包','bag')+ctx.action('回到迷宮','close'),{silent:quiet,summary:'照明工具。火把五分鐘；木枝和布條各一份可以製作。隊中有術士時可以施放十分鐘的日光術。'});
+      const body='<div class="tower-grid tower-light-grid"><article class="tower-item tower-light-card">'+icon('torch')+'<h3>火把 · 五分鐘</h3><p>持有 '+l.torches+' 支'+(l.fuel>0?' · 目前餘量 '+time(l.fuel):'')+'</p><p>木枝 '+l.wood+' · 布條 '+l.cloth+'<br>沒有現成火把時，直接消耗木枝、布條各一份點燃，無須先製作。</p>'+ctx.action(l.lit?'熄滅並保留燃料':l.fuel>0?'重新點燃':'點燃火把','light-torch',null,!l.lit&&(l.daylight>0||!l.fuel&&!l.torches&&(!l.wood||!l.cloth)))+'</article><article class="tower-item tower-light-card">'+icon('daylight')+'<h3>日光術 · 十分鐘</h3><p>光照範圍比火把更大。需要隊伍中仍能行動、且擁有日光術的術士。</p><p>'+(l.daylight>0?'剩餘 '+time(l.daylight):L.canCast(run)?'隊伍可以施放日光術。':'隊伍目前沒有能施法的術士。')+'</p>'+ctx.action('施放日光術','light-daylight',null,!L.canCast(run)||l.cooldown>0)+'</article></div><p class="tower-copy">直接點左側照明小圖，或按 L 使用。擁有日光術時小圖會換成日光術。日光術期間火把不耗燃料；閱讀、暫停與離線時不計時。</p><p class="tower-copy">營地與行商有固定照明；材料每層僅採集一次，變形不會補生。行商也會販售火把。</p>';
+      ctx.dialog('照明工具 · 暫停中','帶著光繼續前進',status(),body,ctx.action('裝備背包','bag')+ctx.action('回到迷宮','close'),{silent:quiet,summary:'照明工具。點左側小圖直接使用，火把五分鐘；日光術十分鐘。'});
     }
     function handle(key,id){
       if(!key.startsWith('light-'))return false;if(!ready())return true;
@@ -152,7 +156,7 @@
         }
       }
     }
-    return {install,build,reset,tick,hud,panel,handle,merchantCard,updateVisual,reserved:()=>[...sources,...supplies],radius:()=>enabled()?range:null};
+    return {install,build,reset,tick,hud,panel,quickUse,handle,merchantCard,updateVisual,reserved:()=>[...sources,...supplies],radius:()=>enabled()?range:null};
   }
   root.TowerLightingRuntime={create};
 })(typeof globalThis!=='undefined'?globalThis:this);

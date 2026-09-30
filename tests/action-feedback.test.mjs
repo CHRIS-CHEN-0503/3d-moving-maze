@@ -5,8 +5,8 @@ import {readFileSync} from 'node:fs';
 import vm from 'node:vm';
 const require=createRequire(import.meta.url),A=require('../assets/combat-audio.js'),H=require('../story/tower-heroes-core.js'),C=require('../story/story-core.js'),P=require('../story/tower-party-core.js'),R=require('../story/tower-hero-growth.js'),T=require('../lib/three.min.js');
 const code=file=>readFileSync(new URL('../'+file,import.meta.url),'utf8');
-test('all 42 active skills and usable items map to original bounded audio; sound families are distinct',()=>{
-  assert.equal(Object.keys(H.SKILLS).length,42);
+test('all 49 active skills and usable items map to original bounded audio; sound families are distinct',()=>{
+  assert.equal(Object.keys(H.SKILLS).length,49);
   for(const s of Object.values(H.SKILLS)){assert.ok(A.SKILL_SOUNDS[s.effect],s.id);assert.ok(A.ACTIONS[A.skillKind(s)],s.id);}
   for(const id of R.itemIds)assert.ok(A.ACTIONS[A.itemKind(id)],id);
   const waves=[];
@@ -77,7 +77,7 @@ test('projectile impact is emitted only on a confirmed hit, never when occluded;
   }
 });
 test('all ten approved preparations add 0.5 seconds, defer effects/costs/cooldowns, and freeze while paused',()=>{
-  const expected={starfall:1.5,star_ring:1.9,decisive_slash:1.3,whirlwind:.8,dawn_sanctuary:1.3,revive:1.5,moving_fortress:1.1,barricade:1,hero_feast:1.3,daylight:1.1};
+  const expected={starfall:1.5,star_ring:1.9,decisive_slash:1.3,whirlwind:.8,dawn_sanctuary:1.3,revive:1.5,moving_fortress:1.1,barricade:1,hero_feast:1.3,daylight:1.1,worldtree_arrow:1.5};
   assert.deepEqual(H.PREPARATION,expected);
   for(const [id,seconds] of Object.entries(expected)){
     const f=fixture(H.SKILLS[id]),before=JSON.stringify(f.run());
@@ -86,6 +86,7 @@ test('all ten approved preparations add 0.5 seconds, defer effects/costs/cooldow
     f.pause(true);f.runtime.tick(5);assert.equal(f.runtime.preparing().left,seconds);f.pause(false);
     f.runtime.tick(seconds-.01);assert.equal(H.actor(f.run()).cooldowns[id],0,id);assert.equal(f.hits(),0);
     f.runtime.tick(.02);assert.equal(f.runtime.preparing(),null);assert.ok(H.actor(f.run()).cooldowns[id]>0,id);assert.ok(C.validateSave(f.run()),id);
+    if(id==='worldtree_arrow'){assert.equal(f.hits(),0);f.runtime.tick(.2);}
     if(H.SKILLS[id].attack)assert.equal(f.hits(),1,id);
     if(id==='daylight')assert.equal(f.run().party.light.daylight,600);
     if(id==='revive')assert.ok(H.hp(f.run(),f.target)>0);
@@ -118,5 +119,5 @@ test('impact geometry obeys visibility and cleans up both short bursts and charg
   assert.equal(fx.emit(H.SKILLS.wind_slash,{x:0,z:0},0,{impact:true}),null);
   visible=true;const hit=fx.emit(H.SKILLS.wind_slash,{x:0,z:0},0,{impact:true});assert.equal(hit.family,'hit');assert.ok(hit.parts.some(p=>p.base.y>=1));
   visible=false;fx.tick(.05);assert.equal(hit.group.visible,false);visible=true;fx.tick(.05);assert.equal(hit.group.visible,true);
-  fx.tick(.3);assert.equal(fx.stats().groups,0);fx.emit(H.SKILLS.starfall,{x:0,z:0},0,{stage:'charge'});fx.reset();assert.equal(world.children.length,0);
+  fx.tick(.4);assert.equal(fx.stats().groups,0);fx.emit(H.SKILLS.starfall,{x:0,z:0},0,{stage:'charge'});fx.reset();assert.equal(world.children.length,0);
 });

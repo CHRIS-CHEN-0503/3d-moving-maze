@@ -12,11 +12,12 @@
     warhammer:p('M29 31v29h6V31M6 8h52v24H6Zm8 0v24m36-24v24M20 15h23v10H20M29 48h6'),
     cooking_pan:pan,
     twin_daggers:p('m5 12 8 27 15 13 4-4-13-15ZM59 12l-8 27-15 13-4-4 13-15ZM18 42l-7 7m35-7 7 7M22 49l6 10m14-10-6 10'),
+    elven_bow:p('M18 5q39 26 0 54V5M8 32h50m-10-8 10 8-10 8M16 24l7 8-7 8'),
     heavy_helm:p('M10 40V26C10 0 54 0 54 26v14l-9 12-7-11H26l-7 11ZM10 29h44M21 32v6m7-6v6m8-6v6m7-6v6M29 8v14h6V8'),
     heavy_armor:p('M20 8h24l12 10-6 13-4-4v27H18V27l-4 4-6-13Zm4 0q8 13 16 0M18 33h28m-28 8h28m-28 9h28M23 20l9 5 9-5'),
     light_hood:p('M9 45V30Q9 5 32 6q23-1 23 24v15l-13 12-10-9-10 9ZM18 31q14-21 28 0v10q-14 17-28 0ZM13 47l9-3m29 3-9-3'),
     light_armor:p('M21 9h22l10 9-7 13v24H18V31l-7-13ZM22 10l10 12 10-12M24 28l16 8m-16 0 16-8m-16 16 16-8m-16 0 16 8M18 49h28'),
-    rune_crown:p('M10 39 6 15l15 10L32 9l11 16 15-10-4 24ZM10 39v10h44V39m-25-8 3-5 3 5-3 5Z'),
+    rune_crown:p('M7 28q25-12 50 0v15Q32 54 7 43ZM7 35q25-12 50 0M26 34q6-13 12 0t-12 0M15 37q3-5 6 0m22 0q3-5 6 0'),
     robe:p('M23 8h18l12 8 7 23-12 5-6-18 10 31H12l10-31-6 18L4 39l7-23ZM25 9l7 16 7-16M32 25v30M23 38h18M20 51h5m14 0h5'),
     buckler:circle(32,32,24)+circle(32,32,6)+p('M21 13v14m0 10v14m22-38v14m0 10v14M12 30h14m12 0h14'),
     round_shield:circle(32,32,26)+circle(32,32,20)+p('m32 21 11 11-11 11-11-11Z')+circle(32,8,2)+circle(8,32,2)+circle(56,32,2)+circle(32,56,2),
@@ -77,6 +78,7 @@
     care:g(hammer,'translate(8 0) scale(.7)')+p('M6 40q26 16 52 0l-6 13-20 7-20-7M8 9h9m-5-5v10'),
   };
   Object.assign(drawings,{
+    piercing_arrow:drawings.elven_bow+p('M5 12h14m-12 8h10'),binding_arrow:drawings.elven_bow+g(leaf,'translate(27 25) scale(.45)'),arrow_volley:p('M8 48 48 8m-14 1 14-1-1 14M20 57 57 20m-14 0h14v14M7 32 32 7m-11 0h11v11'),keen_sight:eye+g(leaf,'translate(31 27) scale(.45)'),woodland_stride:boot+g(leaf,'translate(30 0) scale(.45)'),ranger_ward:shield+g(leaf,'translate(16 15) scale(.55)'),steady_aim:drawings.elven_bow+circle(44,32,13),nimble_shot:drawings.elven_bow+p('M2 42h14m-11 8h11'),leaf_steps:boot+g(leaf,'translate(25 -3) scale(.5)'),longshot:eye+p('M32 5v13m0 28v13'),forest_cover:leaf+g(shield,'translate(29 27) scale(.5)'),worldtree_arrow:drawings.elven_bow+g(star,'translate(29 5) scale(.5)'),forest_echo:g(leaf,'translate(-2 0) scale(.8)')+p('M43 10q24 21 0 43M52 7q24 27 0 49'),
     decisive_slash:g(sword,'rotate(30 32 32)')+p('M3 18Q29-3 60 19M3 29Q32 1 61 32M10 48l12-7'),
     star_ring:g(star,'translate(16 14) scale(.6)')+p('M6 9l16 13m5-20 5 15m22-9-12 14M5 49q27 21 54 0M8 43q24 18 48 0'),
     escape_line:p('M7 54V37h17V22h17V7M36 12l5-5 5 5M17 53h15V38h19V23M47 48l5 6 8-13'),
@@ -108,6 +110,8 @@
     item_bell:p('M13 43h38L45 32V20q-13-19-26 0v12ZM8 44h48v7H8M25 53q7 12 14 0M29 9V3h6v6'),
     item_map:p('M5 12l18-6 18 7 18-6v45l-18 7-18-7-18 6ZM23 6v46m18-39v46M12 27l17 13 20-18m-6-1 6 1-1 7'),
   });
+  // Each tier keeps its recognizable whole object and adds its own inlaid trim.
+  for(const kind of ['longsword','greatsword','arcane_staff','spellbook','smith_hammer','warhammer','cooking_pan','twin_daggers','elven_bow','heavy_helm','heavy_armor','light_hood','light_armor','rune_crown','robe','buckler','round_shield','tower_shield'])for(const tier of [2,3])drawings[kind+'_t'+tier]=drawings[kind]+(tier===2?p('m45 42 5-5 5 5-5 5Z'):p('m43 38 7-7 7 7-7 7Zm-3 13 4-4 4 4-4 4m11 0 4-4 4 4-4 4'));
   function svg(id){if(!drawings[id])return '';return '<svg class="hero-icon" viewBox="0 0 64 64" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><g fill="#284957" fill-opacity=".75" stroke="#f6db9e" stroke-width="2.8" stroke-linecap="round" stroke-linejoin="round">'+drawings[id]+'</g></svg>';}
   return Object.freeze({svg,ids:Object.freeze(Object.keys(drawings))});
 });

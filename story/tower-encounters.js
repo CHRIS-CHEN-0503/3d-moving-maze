@@ -58,7 +58,9 @@
     for (let i = ids.length - 1; i > 0; i--) { const j = Math.floor(random() * (i + 1)); [ids[i], ids[j]] = [ids[j], ids[i]]; }
     const count = floor < 70 && random() < .45 ? 2 : 1;
     return ids.slice(0, count).map(id => {
-      const kinds={tieLing:['heavy_helm','light_hood','rune_crown','longsword','greatsword','smith_hammer','warhammer'],jinHe:['heavy_armor','light_armor','robe','cooking_pan','twin_daggers'],lanZhou:['buckler','round_shield','tower_shield','arcane_staff','spellbook']};
+      const kinds={tieLing:['heavy_helm','light_hood','rune_crown','longsword','greatsword','smith_hammer','warhammer'],jinHe:['heavy_armor','light_armor','robe','cooking_pan','twin_daggers'],lanZhou:['buckler','round_shield','tower_shield','arcane_staff','spellbook','elven_bow']};
+      const H=typeof module==='object'&&module.exports?require('./tower-heroes-core.js'):globalThis.TowerHeroes;
+      if(modern)for(const merchant of ids)kinds[merchant]=H.gearPool(floor).filter(k=>kinds[merchant].includes(H.GEAR[k].baseKind));
       const old=MERCHANTS[id],entry=modern?{...old,equipmentKinds:kinds[id],greeting:'我是'+old.name+'，這裡有專用裝備與旅途補給。'}:old;
       return { ...entry, equipmentKinds: [...entry.equipmentKinds], supplies: [...entry.supplies], gear: entry.equipmentKinds.map(kind => {
         const gear = C.createGear(kind, floor, seed, `shop:${floor}:${id}:${kind}`, false);
@@ -114,7 +116,7 @@
     if (random() >= .2) return null;
     const id = `chest:${floor}:${seed}`;
     if (random() < .35) return { id, outcome: 'trap', damage: 12 + Math.floor((99 - floor) / 10), gear: null };
-    const pool=modern?Object.keys(C.GEAR).filter(k=>!GEAR_KINDS.includes(k)):GEAR_KINDS,kind=pool[Math.floor(random()*pool.length)];
+    const pool=modern?Object.keys(C.GEAR).filter(k=>!GEAR_KINDS.includes(k)&&C.GEAR[k].tier<=(floor>=70?1:floor>=40?2:3)):GEAR_KINDS,kind=pool[Math.floor(random()*pool.length)];
     return { id, outcome: 'gear', damage: 0, gear: C.createGear(kind, floor, seed, id, true) };
   }
   function openChest(run, chestId, expectedRevision, invulnerable = false) {
@@ -131,7 +133,7 @@
   function questReward(floor, seed, modern=false) {
     const C = core(), random = randomFor(floor, seed, 0x257ca), coins = 12 + Math.floor((99 - floor) / 6);
     if (random() < .45) {
-      const pool=modern?Object.keys(C.GEAR).filter(k=>!GEAR_KINDS.includes(k)):GEAR_KINDS,kind=pool[Math.floor(random()*pool.length)];
+      const pool=modern?Object.keys(C.GEAR).filter(k=>!GEAR_KINDS.includes(k)&&C.GEAR[k].tier<=(floor>=70?1:floor>=40?2:3)):GEAR_KINDS,kind=pool[Math.floor(random()*pool.length)];
       return { coins, items: {}, gear: C.createGear(kind, floor, seed, `quest-reward:${floor}:${seed}`, true) };
     }
     const id = ['heal', 'ration', 'shield', 'hourglass'][Math.floor(random() * 4)];

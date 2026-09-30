@@ -41,7 +41,7 @@
   function torch(run,revision){return tx(run,revision,(n,l)=>{
     if(l.lit){l.lit=false;return {ok:true,message:'熄滅火把，保留剩餘燃料。'};}
     if(l.daylight>0)return {ok:false,message:'日光術正在照明，先節省火把。'};
-    if(!l.fuel){if(!l.torches)return {ok:false,message:'沒有火把了，可以製作或找商人購買。'};l.torches--;l.fuel=TORCH_SECONDS;}
+    if(!l.fuel){if(l.torches)l.torches--;else if(l.wood>0&&l.cloth>0){l.wood--;l.cloth--;}else return {ok:false,message:'需要一份木枝與布條，或向商人購買火把。'};l.fuel=TORCH_SECONDS;}
     l.lit=true;return {ok:true,message:'使用 火把'};
   });}
   function daylight(run,revision){if(run.party?.loadouts){const H=heroes(),id=H.ids(run).find(id=>H.hp(run,id)>0&&H.actor(run,id).skills.includes('daylight'));return H.cast(run,'daylight',{actorId:id},revision);}return tx(run,revision,(n,l)=>{

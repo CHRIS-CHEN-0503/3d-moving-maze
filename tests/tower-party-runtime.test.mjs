@@ -76,12 +76,12 @@ test('six companion professions survive stairs and rebuild outside the full walk
   const jobs=Object.keys(P.PROFESSIONS),safe=p=>Math.abs(p.x)+.28<1.65&&Math.abs(p.z)+.28<1.65;
   for(let offset=0;offset<jobs.length;offset+=3){
     const h=harness(99,{followClear:(a,b)=>safe(a)&&safe(b)});
-    h.run.party.members=jobs.slice(offset,offset+3).map((profession,i)=>({id:'companion:test:'+profession,profession,level:i+1,hp:i?20:0,cooldown:0,hurtLeft:0}));h.run.party.joined=h.run.party.members.map(m=>m.id);
+    h.run.party.members=jobs.slice(offset,offset+3).map((profession,i)=>({id:'companion:test:'+profession,profession,sex:P.PROFESSIONS[profession].gender,level:i+1,hp:i?20:0,cooldown:0,hurtLeft:0}));h.run.party.joined=h.run.party.members.map(m=>m.id);
     const before=JSON.parse(JSON.stringify(h.run.party.members));
     for(let i=0;i<3;i++){
       const result=C.descend(h.run);assert.ok(result.ok);h.run=C.validateSave(JSON.stringify(result.run));assert.deepEqual(h.run.party.members,before);
       h.ui.build(()=>.5,new Set());const models=h.world.children.at(-1).children.filter(m=>m.userData.companionId);
-      assert.equal(models.length,3);assert.equal(new Set(models.map(m=>m.userData.companionId)).size,3);
+      assert.equal(models.length,before.length);assert.equal(new Set(models.map(m=>m.userData.companionId)).size,before.length);
       for(const model of models)assert.ok(safe(model.position),model.userData.companionId);
       for(let a=0;a<models.length;a++)for(let b=a+1;b<models.length;b++)assert.ok(models[a].position.distanceTo(models[b].position)>.55);
     }

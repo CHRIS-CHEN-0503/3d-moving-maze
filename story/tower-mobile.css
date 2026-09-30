@@ -59,3 +59,15 @@
   .forge-workspace{display:flex;flex-direction:column;gap:8px}.forge-picker{flex:none;flex-direction:row;overflow-x:auto;overflow-y:hidden;padding:0 0 5px;max-height:92px}.forge-pick{flex:none;width:154px}.forge-detail{flex:1}
 }
 @media(max-height:360px){.tower-dialog-header .tower-kicker{display:none}.tower-dialog-header{min-height:44px;padding-top:3px;padding-bottom:3px}#towerDialog>.tower-actions{padding-top:4px;padding-bottom:4px}.tower-dialog-content{padding-top:6px;padding-bottom:6px}}
+/* Creation cards keep their job name and choice above the phone fold. */
+#towerDialog.hero-creation .party-professions{grid-template-columns:repeat(4,minmax(0,1fr));gap:10px}
+#towerDialog.hero-creation .hero-profession-card{display:grid;grid-template-columns:48px minmax(0,1fr);align-items:center;gap:6px;padding:10px;text-align:left}
+#towerDialog.hero-creation .hero-profession-card .hero-portrait{width:48px;height:58px;margin:0}
+#towerDialog.hero-creation .hero-profession-card h3{margin:0;font-size:19px}
+#towerDialog.hero-creation .hero-profession-card p,#towerDialog.hero-creation .hero-profession-card .tower-btn{grid-column:1/-1;margin:0;min-height:0}
+#towerDialog.hero-creation .hero-profession-card p{font-size:14px;line-height:1.5}
+#towerDialog.hero-creation .hero-profession-card .tower-btn{min-height:44px}
+#towerDialog.hero-creation .hero-create-fields{margin:6px 0 12px;gap:10px}
+@media(orientation:landscape) and (max-height:500px){#towerDialog.hero-creation .hero-create-fields label{display:flex;align-items:center;gap:8px}#towerDialog.hero-creation .hero-create-fields input{width:180px}#towerDialog.hero-creation .hero-profession-card .hero-portrait{width:36px;height:44px}#towerDialog.hero-creation .hero-profession-card{grid-template-columns:38px minmax(0,1fr);gap:5px;padding:8px}}
+@media(max-width:700px){#towerDialog.hero-creation .party-professions{grid-template-columns:repeat(3,minmax(0,1fr))}}
+@media(max-width:500px){#towerDialog.hero-creation .party-professions{grid-template-columns:repeat(2,minmax(0,1fr))}}

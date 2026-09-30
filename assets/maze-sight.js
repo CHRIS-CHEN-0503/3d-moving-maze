@@ -20,8 +20,8 @@
     const T=f.T,m=new T.Matrix4(),q=new T.Quaternion(),p=new T.Vector3(),s=new T.Vector3(),counts={live:0,memory:0,fog:0,shade:0};
     const put=(mesh,key,x,y,z,sx,sz)=>{p.set(x,y,z);s.set(sx,1,sz);m.compose(p,q,s);mesh.setMatrixAt(counts[key]++,m);};
     for(const b of g.wallBoxes){const exists=b.boundary||(b.type==='h'?g.hWalls[b.gy]?.[b.gx]:g.vWalls[b.gy]?.[b.gx]);const show=exists&&(b.boundary||(b.type==='h'?(cellVisible(b.gx,b.gy)||cellVisible(b.gx,b.gy+1)):(cellVisible(b.gx,b.gy)||cellVisible(b.gx+1,b.gy))));if(show)put(liveWalls,'live',(b.minX+b.maxX)/2,g.wallH/2,(b.minZ+b.maxZ)/2,b.maxX-b.minX,b.maxZ-b.minZ);}
-    for(let y=0;y<state.h-1;y++)for(let x=0;x<state.w;x++)if(state.horizontal[y*state.w+x]===1&&!cellVisible(x,y)&&!cellVisible(x,y+1))put(memoryWalls,'memory',(x+.5-state.w/2)*g.cell,.1,(y+1-state.h/2)*g.cell,g.cell+g.wallT,.12);
-    for(let y=0;y<state.h;y++)for(let x=0;x<state.w-1;x++)if(state.vertical[y*(state.w-1)+x]===1&&!cellVisible(x,y)&&!cellVisible(x+1,y))put(memoryWalls,'memory',(x+1-state.w/2)*g.cell,.1,(y+.5-state.h/2)*g.cell,.12,g.cell+g.wallT);
+    // Historical layout stays in the minimap only. Do not draw grey floor-plan
+    // outlines through the hidden surrounding maze in the main 3D view.
     for(let y=0;y<state.h;y++)for(let x=0;x<state.w;x++)if(!cellVisible(x,y)){const wx=(x+.5-state.w/2)*g.cell,wz=(y+.5-state.h/2)*g.cell;m.makeRotationX(-Math.PI/2);m.setPosition(wx,.045,wz);if(!state.seen[y*state.w+x])fog.setMatrixAt(counts.fog++,m);else shade.setMatrixAt(counts.shade++,m);}
     for(const [mesh,key]of [[liveWalls,'live'],[memoryWalls,'memory'],[fog,'fog'],[shade,'shade']]){mesh.count=counts[key];mesh.instanceMatrix.needsUpdate=true;}
     const tint=new T.Color();
@@ -47,5 +47,5 @@
   function restore(){for(const o of changed)o.visible=true;changed=[];hidden.clear();if(layer)layer.visible=false;}
   function render(f,renderer,camera){update(f);try{before();renderer.render(f.scene,camera);}finally{restore();}}
   function map(ctx,pad,cw,ch){if(!active()||!state)return;const g=frame.g;for(let y=0;y<state.h;y++)for(let x=0;x<state.w;x++)if(!cellVisible(x,y)){ctx.fillStyle=state.seen[y*state.w+x]?'#182631':'#091321';ctx.fillRect(pad+x*cw-.5,pad+y*ch-.5,cw+1,ch+1);}ctx.beginPath();ctx.strokeStyle='#667784';for(let y=0;y<state.h-1;y++)for(let x=0;x<state.w;x++)if(state.horizontal[y*state.w+x]===1&&!cellVisible(x,y)&&!cellVisible(x,y+1)){ctx.moveTo(pad+x*cw,pad+(y+1)*ch);ctx.lineTo(pad+(x+1)*cw,pad+(y+1)*ch);}for(let y=0;y<state.h;y++)for(let x=0;x<state.w-1;x++)if(state.vertical[y*(state.w-1)+x]===1&&!cellVisible(x,y)&&!cellVisible(x+1,y)){ctx.moveTo(pad+(x+1)*cw,pad+y*ch);ctx.lineTo(pad+(x+1)*cw,pad+(y+1)*ch);}ctx.stroke();}
-  root.MazeSight={active,reset,update,render,visible,cellVisible,map,snapshot:()=>C.snapshot(state),restore:v=>{const s=C.restore(v);if(s){state=s;last=0;}return !!s;},stats:()=>state?{current:state.current.reduce((a,b)=>a+b,0),seen:state.seen.reduce((a,b)=>a+b,0),batches:layer?.children.length||0}:null};
+  root.MazeSight={active,reset,update,render,visible,cellVisible,map,snapshot:()=>C.snapshot(state),restore:v=>{const s=C.restore(v);if(s){state=s;last=0;}return !!s;},stats:()=>state?{current:state.current.reduce((a,b)=>a+b,0),seen:state.seen.reduce((a,b)=>a+b,0),batches:layer?.children.length||0,memoryWalls:memoryWalls?.count||0}:null};
 })(globalThis);

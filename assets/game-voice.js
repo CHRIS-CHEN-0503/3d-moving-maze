@@ -12,12 +12,12 @@
     return out;
   }
   function chooseVoice(voices,preferred='',profile={}){
-    const zh=voices.filter(v=>/^zh(?:[-_]|$)/i.test(v.lang));
+    const zh=voices.filter(v=>/^zh(?:[-_](?:TW|CN|Hans|Hant)(?:[-_]|$)|$)/i.test(v.lang)&&!/^zh[-_]Hant[-_]HK/i.test(v.lang));
     const selected=zh.find(v=>v.voiceURI===preferred);if(selected&&!profile.gender)return selected;
     // 裝置不提供性別欄位，只能優先辨識已知女聲名稱，不假裝保證性別。
     const female=/女|female|mei[-\s]?jia|meijia|美佳|美嘉|曉曉|晓晓|xiaoxiao|hanhan|涵涵|yating|雅婷|hsiao|曉臻|曉雨|tracy|tingting|婷婷|sinji/i;
     const male=/男|male|yun[-\s]?(jhe|zhe|xi|yang)|雲哲|云哲|云希|云扬|zhiwei|志偉|志伟|kangkang|康康/i;
-    const score=v=>(/^zh[-_]TW$/i.test(v.lang)?40:0)+((profile.gender==='male'?male.test(v.name)&&!female.test(v.name):female.test(v.name))?80:0)+(v.localService?4:0)+(v.default?2:0);
+    const score=v=>(/^zh[-_](?:TW|Hant[-_]TW)$/i.test(v.lang)?200:100)+((profile.gender==='male'?male.test(v.name)&&!female.test(v.name):female.test(v.name))?40:0)+(v.localService?4:0)+(v.default?2:0);
     return zh.slice().sort((a,b)=>score(b)-score(a))[0]||null;
   }
   function panelText(panel){
@@ -38,27 +38,28 @@
     const speechSupported=!!(synth&&Utterance),AudioCtor=env.Audio,pack=env.MazeVoicePack;
     const recordedSupported=typeof AudioCtor==='function'&&!!pack?.get,supported=speechSupported||recordedSupported,now=()=>env.Date?.now?.()??Date.now();
     let enabled=true,preferred='',voices=[],queue=[],current=null,currentAudio=null,player=null,generation=0,lastStory=null,failure='',listener=()=>{},sequence=0,loadTimer=null,character=()=>({});
-    const recent=new Map(),pinnedVoices=new Map();
+    const recent=new Map(),pinnedVoices=new Map();let voiceTimer=null;
     function characterSpeaker(){return {...character(),consistent:true};}
     function pinSpeaker(speaker){
       if(!speaker.consistent)return speaker;
       const key=speaker.identity||[speaker.gender||'narrator',speaker.age||'adult'].join(':');
-      // Pin the device default too when voices have not loaded yet. A later
-      // voiceschanged event must not change this character mid-session.
-      if(!pinnedVoices.has(key))pinnedVoices.set(key,chooseVoice(voices,preferred,speaker));
+      // An unloaded list is not a voice. Pin only a real Mandarin voice.
+      const chosen=chooseVoice(voices,preferred,speaker);
+      if(!pinnedVoices.has(key)&&chosen)pinnedVoices.set(key,chosen);
       return {...speaker,deviceOnly:true,pinnedVoice:pinnedVoices.get(key)||null};
     }
-    function status(){return {supported,enabled,speaking:!!(current||currentAudio),voice:chooseVoice(voices,preferred),voices:voices.filter(v=>/^zh(?:[-_]|$)/i.test(v.lang)),failure,recorded:recordedSupported};}
+    function status(){return {supported,enabled,speaking:!!(current||currentAudio),loadingVoice:voiceTimer!==null,voice:chooseVoice(voices,preferred),voices:voices.filter(v=>chooseVoice([v])),failure,recorded:recordedSupported};}
     function notify(){listener(status());}
     function clearLoadTimer(){if(loadTimer!==null){env.clearTimeout?.(loadTimer);loadTimer=null;}}
-    function refresh(){try{voices=synth?.getVoices()||[];}catch(_){voices=[];}notify();}
+    function clearVoiceTimer(){if(voiceTimer!==null){env.clearTimeout?.(voiceTimer);voiceTimer=null;}}
+    function refresh(){try{voices=synth?.getVoices()||[];}catch(_){voices=[];}if(chooseVoice(voices)){clearVoiceTimer();if(failure==='chinese-voice-unavailable')failure='';}notify();if(voiceTimer===null&&queue.length)next();}
     function stop(forget=false){
-      generation++;queue=[];current=null;clearLoadTimer();
+      generation++;queue=[];current=null;clearLoadTimer();clearVoiceTimer();
       if(currentAudio){try{currentAudio.pause();currentAudio.currentTime=0;}catch(_){}currentAudio=null;}
       if(forget)lastStory=null;try{synth?.cancel();}catch(_){}notify();
     }
     function next(){
-      if(!enabled||current||currentAudio)return;
+      if(!enabled||current||currentAudio||voiceTimer!==null)return;
       while(queue.length&&queue[0].expires&&queue[0].expires<now())queue.shift();
       const entry=queue.shift();if(!entry){notify();return;}
       if(entry.asset&&recordedSupported){
@@ -84,6 +85,12 @@
       }
       if(!speechSupported){failure='unavailable';next();return;}
       const profile=pinSpeaker(entry.speaker||{}),token=generation,u=new Utterance(entry.text),voice=profile.consistent?profile.pinnedVoice:chooseVoice(voices,preferred,profile);
+      if(!voice){
+        // Some tablets deliver voiceschanged after the first user tap. Never speak
+        // with an unrelated system default while that list is still loading.
+        if(env.setTimeout){queue.unshift(entry);voiceTimer=env.setTimeout(()=>{voiceTimer=null;if(token!==generation)return;try{voices=synth.getVoices()||[];}catch(_){}if(!chooseVoice(voices,preferred,profile)){if(queue[0]===entry)queue.shift();failure='chinese-voice-unavailable';}next();notify();},1500);notify();}
+        else{failure='chinese-voice-unavailable';next();notify();}return;
+      }
       u.lang=voice?.lang||'zh-TW';if(voice)u.voice=voice;u.rate=1;u.pitch=profile.age==='elder'?.95:profile.age==='child'?1.06:1;u.volume=1;
       current=u;
       const finish=()=>{if(token!==generation||current!==u)return;current=null;next();};
@@ -91,6 +98,8 @@
       try{synth.speak(u);notify();}catch(_){failure='unavailable';current=null;queue=[];notify();}
     }
     function entriesFor(text,story,speaker={}){
+      const recorded=speaker.consistent&&!speaker.npc&&recordedSupported&&pack.exact?.(text,speaker.gender);
+      if(recorded)return [{...recorded,expires:story?0:now()+12000,speaker}];
       speaker=pinSpeaker(speaker);
       const parts=(speaker.deviceOnly||speaker.npc)?[{text}]:recordedSupported&&pack.plan?pack.plan(text,speaker.gender):[{text}],expires=story?0:now()+12000;
       return parts.flatMap(p=>p.asset?[{...p,expires,speaker}]:chunks(p.text).map(text=>({text,expires,speaker})));

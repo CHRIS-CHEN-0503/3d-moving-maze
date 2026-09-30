@@ -1,6 +1,6 @@
 /* Render-only, bounded fog/history batches. All temporary visibility is restored in finally. */
 (function(root){'use strict';const C=root.MazeSightCore;let state=null,layer=null,source=null,liveWalls=null,memoryWalls=null,fog=null,shade=null,last=0,revealed=false,frame=null,changed=[],batches=[];const hidden=new Set();
-  function active(){return !!frame&&['tp','top'].includes(frame.g.view);}
+  function active(){return !!frame&&!frame.fullVision&&['tp','top'].includes(frame.g.view);}
   function reset(){restore();if(layer){layer.parent?.remove(layer);const materials=new Set(),geometries=new Set();layer.traverse(o=>{if(o.geometry)geometries.add(o.geometry);if(o.material)materials.add(o.material);});materials.forEach(m=>m.dispose());geometries.forEach(g=>g.dispose());}state=layer=source=frame=null;batches=[];last=0;revealed=false;}
   function build(f){if(layer){layer.parent?.remove(layer);const mats=new Set(),geos=new Set();layer.traverse(o=>{if(o.geometry)geos.add(o.geometry);if(o.material)mats.add(o.material);});mats.forEach(m=>m.dispose());geos.forEach(g=>g.dispose());}const T=f.T,g=f.g,n=2*g.mazeW*g.mazeH+4;layer=new T.Group();layer.name='maze-sight-layer';layer.visible=false;f.scene.add(layer);batches=[];
     const mesh=(geo,mat,count)=>{const m=new T.InstancedMesh(geo,mat,count);m.frustumCulled=false;m.count=0;layer.add(m);return m;};
@@ -11,10 +11,10 @@
     for(const parent of [f.atmosphere?.wallRoot,f.atmosphere?.floorRoot])for(const src of parent?.children||[])if(src.isInstancedMesh)batches.push({src,mesh:mesh(src.geometry.clone(),src.material.clone(),src.count),wall:parent===f.atmosphere.wallRoot});source=f.wall;
   }
   function xy(x,z){const g=frame.g;return {x:x/g.cell+g.mazeW/2,y:z/g.cell+g.mazeH/2};}
-  function cellVisible(x,y){return !!state&&C.inside(state,x,y)&&!!state.current[y*state.w+x];}
+  function cellVisible(x,y){if(frame?.fullVision)return true;return !!state&&C.inside(state,x,y)&&!!state.current[y*state.w+x];}
   function visible(x,z){if(!active())return true;const p=xy(x,z),a=xy(frame.g.px,frame.g.pz);return Math.hypot(p.x-a.x,p.y-a.y)<=frame.radius&&C.line(state,a.x,a.y,p.x,p.y,frame.g.hWalls,frame.g.vWalls);}
   function tile(x,z){const p=xy(x,z);return cellVisible(Math.floor(p.x),Math.floor(p.y));}
-  function update(f,now=performance.now()){frame=f;const g=f.g;if(!g.hWalls||!g.vWalls||!f.wall)return;if(!state||state.w!==g.mazeW||state.h!==g.mazeH)state=C.create(g.mazeW,g.mazeH);if(source!==f.wall)build(f);if(now-last<100&&!f.force)return;last=now;const a=xy(g.px,g.pz);
+  function update(f,now=performance.now()){if(f.fullVision){if(layer||state)reset();frame=f;return;}frame=f;const g=f.g;if(!g.hWalls||!g.vWalls||!f.wall)return;if(!state||state.w!==g.mazeW||state.h!==g.mazeH)state=C.create(g.mazeW,g.mazeH);if(source!==f.wall)build(f);if(now-last<100&&!f.force)return;last=now;const a=xy(g.px,g.pz);
     // The grid remains the occluder while walls animate down, so a shift never grants X-ray vision.
     C.update(state,a.x,a.y,g.hWalls,g.vWalls,f.radius);const magic=!!root.MagicMap?.isRevealed();if(magic&&!revealed)C.reveal(state,g.hWalls,g.vWalls);revealed=magic;
     const T=f.T,m=new T.Matrix4(),q=new T.Quaternion(),p=new T.Vector3(),s=new T.Vector3(),counts={live:0,memory:0,fog:0,shade:0};

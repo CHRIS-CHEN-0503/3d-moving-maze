@@ -4,9 +4,9 @@ import {createRequire} from 'node:module';
 const require=createRequire(import.meta.url),C=require('../story/story-core.js'),P=require('../story/tower-party-core.js'),N=require('../story/tower-narrative.js');
 const fresh=(seed=31415,job='chef')=>P.enable(C.newRun({seed,name:'同行者測試'}),job).run;
 function setFloor(run,floor){run.floor=floor;run.floorsCleared=99-floor;run.chronicle=N.newChronicle(floor);P.advance(run);return run;}
-function withMember(run,profession,hp=20){const id='companion:earlier:'+profession;run.party.members=[{id,profession,level:2,hp,cooldown:0,hurtLeft:0}];run.party.joined=[id];return run;}
+function withMember(run,profession,hp=20){const id='companion:earlier:'+profession;run.party.members=[{id,profession,sex:P.PROFESSIONS[profession].gender,level:2,hp,cooldown:0,hurtLeft:0}];run.party.joined=[id];return run;}
 
-test('all six named travellers cannot appear again while already in the party, including downed members',()=>{
+test('all seven named travellers cannot appear again while already in the party, including downed members',()=>{
   const jobs=new Set();let checked=0;
   for(const seed of [7,31,214,31415])for(let floor=99;floor>=1;floor--){
     const run=setFloor(fresh(seed),floor),offer=P.recruitOffer(run);if(!offer)continue;
@@ -17,7 +17,7 @@ test('all six named travellers cannot appear again while already in the party, i
       assert.equal(JSON.stringify(run),before);checked++;
     }
   }
-  assert.equal(jobs.size,6);assert.ok(checked>200);
+  assert.equal(jobs.size,6);assert.ok(checked>200); // Legacy journeys retain their six seeded travellers.
 });
 
 test('old saves retain the original traveller, health, coins and items while suppressing their duplicate offer',()=>{

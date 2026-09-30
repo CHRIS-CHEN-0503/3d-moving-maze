@@ -26,7 +26,7 @@ test('torch lasts exactly five minutes, extinguish retains fuel, empty torch nev
   r=advanceTime(r,20);r=L.torch(r).run;r=advanceTime(r,60);assert.equal(r.party.light.fuel,280);assert.equal(r.party.light.lit,false);
   r=L.torch(r).run;assert.equal(r.party.light.torches,1);r=advanceTime(r,279.75);assert.equal(r.party.light.fuel,.25);assert.equal(L.portable(r),'torch');
   r=advanceTime(r,.25);assert.equal(r.party.light.fuel,0);assert.equal(r.party.light.lit,false);assert.equal(r.party.light.torches,1);
-  r=L.torch(r).run;assert.equal(r.party.light.torches,0);r=advanceTime(r,300);assert.equal(L.torch(r).ok,false);
+  r=L.torch(r).run;assert.equal(r.party.light.torches,0);r=advanceTime(r,300);const wood=r.party.light.wood,cloth=r.party.light.cloth;const direct=L.torch(r);assert.ok(direct.ok);assert.equal(direct.run.party.light.wood,wood-1);assert.equal(direct.run.party.light.cloth,cloth-1);assert.equal(direct.run.party.light.fuel,300);r=direct.run;r.party.light.wood=0;r=advanceTime(r,300);assert.equal(L.torch(r).ok,false);
 });
 test('daylight lasts ten minutes with independent cooldown and conserves torch fuel',()=>{
   let r=L.torch(fresh('mage')).run;r=L.daylight(r).run;assert.equal(r.party.light.daylight,600);assert.equal(r.party.cooldown,0);assert.equal(L.portable(r),'daylight');

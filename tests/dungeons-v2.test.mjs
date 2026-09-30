@@ -67,7 +67,7 @@ test('v1 catalog has the exact 9,900 offer bytes released in v1.22, including al
   let count = 0;
   for (let seed = 1; seed <= 100; seed += 1) for (let floor = 99; floor >= 1; floor -= 1) {
     const offer = D.offer({ floor, seed, expedition: D.newExpedition(1) });
-    hash.update(JSON.stringify(offer,(_key,v)=>{if(v?.durabilityVersion!==3)return v;const old={...v,durability:v.durability/C.durabilityMultiplier(v.kind),maxDurability:v.maxDurability/C.durabilityMultiplier(v.kind)};delete old.durabilityVersion;return old;}) + '\n');
+    hash.update(JSON.stringify(offer,(_key,v)=>{if(v?.durabilityVersion!==4)return v;const old={...v,durability:Math.round(v.durability/C.durabilityMultiplier(v.kind)),maxDurability:Math.round(v.maxDurability/C.durabilityMultiplier(v.kind))};delete old.durabilityVersion;return old;}) + '\n');
     if (offer) count += 1;
   }
   assert.equal(count, 2717);

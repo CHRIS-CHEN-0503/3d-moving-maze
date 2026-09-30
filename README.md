@@ -1,6 +1,8 @@
 # 🌀 3D移動迷宮
 
-目前原始碼版本：**v1.42.6**（版本號顯示在起始畫面、遊戲首頁下方與遊戲設定，改版時同步更新 `index.html` 裡的 `GAME_VERSION`；正式版本以網站顯示及部署紀錄為準。）
+目前原始碼版本：**v1.43.0**（版本號顯示在起始畫面、遊戲首頁下方與遊戲設定，改版時同步更新 `index.html` 裡的 `GAME_VERSION`；正式版本以網站顯示及部署紀錄為準。）
+
+v1.43.0：七種職業加入精靈射手、實際箭矢與隔牆阻擋；男女外觀、臉型、體態及身高依職業區分，能力相同，招募外觀固定存檔。十八類職業裝備各三階，共五十四件，需求等級一／三／五級；法杖與法書降低物理、增強法術與輔助。主角一／二／三級最多招募一／二／三人，既有較大隊伍保留；隊友四級可自行選一招普通主動或被動。耐久改為上一版的三分之二、取整數，首次寫回前備份並只換算一次。移除主畫面周圍的歷史牆線，小地圖保留探索紀錄；特效改為限量柔光粒子與填色光影。照明小圖直接使用日光術或火把，無現成火把時直接耗木枝、布條各一份，不必製作。選角只看外觀與職業，出發前才揭曉三主動、兩被動，確認後才建立存檔及開始，返回不重抽。本段為本機變更紀錄，不表示已部署。
 
 v1.42.6：已有錄音的物品提示優先使用專用音檔；動態文字等待國語聲音載入，不使用非國語預設聲音，裝備摘要保持整段同聲線。指定隊友的輔助技能改成先點技能，再點左側職業卡；選取時不開策略或切換角色，可取消且不耗資源。搶購模式取消視野迷霧與隔牆即時物件隱藏，小地圖保持全圖；低貨架、碰撞與陷阱效果不變。本段為本機變更紀錄，不表示已部署。
 
@@ -212,10 +214,13 @@ v1.18.0 提高首頁、角色與關卡選擇流程的字級，角色卡改為只
 npm run check
 ```
 
-Cloudflare Pages 專案名稱為 `3d-moving-maze`。`wrangler.toml` 已把獨立 KV namespace 綁成 `SCORES`，部署時使用：
+Cloudflare Pages 專案名稱為 `3d-moving-maze`。`wrangler.toml` 已把獨立 KV namespace 綁成 `SCORES`。正式部署使用已確認的提交匯出到新的暫存目錄，避免把工作目錄裡的 `.agent-run/` 測試紀錄與本機資料一起公開：
 
 ```bash
-wrangler pages deploy . --project-name 3d-moving-maze --branch main
+release_dir="$(mktemp -d /tmp/maze-release.XXXXXX)"
+release_sha="$(git rev-parse HEAD)"
+git archive "$release_sha" | tar -x -C "$release_dir"
+(cd "$release_dir" && wrangler pages deploy . --project-name 3d-moving-maze --branch main --commit-hash "$release_sha" --commit-dirty=false)
 ```
 
 ## 玩法

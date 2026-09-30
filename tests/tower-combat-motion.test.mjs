@@ -4,9 +4,9 @@ import {createRequire} from 'node:module';
 import {readFileSync} from 'node:fs';
 import vm from 'node:vm';
 const require=createRequire(import.meta.url),M=require('../story/tower-combat-motion.js'),Vox=require('../story/tower-menu-voice.js'),H=require('../story/tower-heroes-core.js'),T=require('../lib/three.min.js');
-test('eight weapon types alternate two distinct bounded tracks and return to rest',()=>{
+test('nine weapon types across three tiers alternate two distinct bounded tracks and return to rest',()=>{
  for(const kind of Object.keys(H.GEAR).filter(k=>H.GEAR[k].slot==='weapon')){
-  assert.equal(M.WEAPONS[kind].length,2);const model={userData:{heroWeapon:kind}},poses=[];
+  assert.equal(M.WEAPONS[H.GEAR[kind].baseKind].length,2);const model={userData:{heroWeapon:kind}},poses=[];
   for(let i=0;i<3;i++){
    M.begin(model,'attack',1);assert.equal(M.state(model).variant,i%2);
    const values=[];for(let f=0;f<30;f++){const p=M.update(model,1/30);assert.ok(Object.values(p).every(Number.isFinite));values.push({...p});}

@@ -17,6 +17,7 @@
     active('hero_feast','chef','迷宮盛宴',false,35,120,'feast','三種不同食材各一份：飽食+35、十秒恢復20%生命、全隊增傷15%四十五秒。'),
     active('dawn_sanctuary','healer','黎明聖域',false,40,120,'sanctuary','十秒治療領域恢復40%生命，施放時扶起一位隊友至30%生命。',{herb:3}),
     active('moving_fortress','smith','移動堡壘',false,100,90,'fortress','自身100%生命護盾五分鐘；十五秒持續挑釁、抵銷四次耐久消耗。',{shell:2}),
+    active('worldtree_arrow','archer','世界樹之箭',true,480,65,'great_arrow','凝聚精靈之力射出強力箭，傷害480%，並使怪物緩速；不能穿牆。'),
   ];
   const passives=[
     passive('iron_wall','swordsman','鐵壁',[1,1.5,2,2.5,3,3.5],'本人防禦增加。'),
@@ -31,12 +32,15 @@
     passive('steadfast','healer','堅韌祝福',[.5,1,1.5,2,2.5,3],'持有者存活時，全隊防禦增加。'),
     passive('tempered_edge','smith','淬刃',[2,4,6,8,10,12],'本人武器傷害增加百分比。'),
     passive('sturdy_gear','smith','厚實護具',[1,1.5,2,2.5,3,3.5],'穿戴未損壞防具時，本人防禦增加。'),
+    passive('longshot','archer','追獵',[5,8,11,14,17,20],'從怪物背後命中時傷害增加。'),
+    passive('forest_cover','archer','林地庇蔭',[5,10,15,20,25,30],'本人受到一般陷阱傷害減少。'),
     passive('unyielding','swordsman','不退之誓',Array(6).fill(25),'生命降至30%以下：25%生命護盾五分鐘、增傷25%八秒；間隔90秒。',true),
     passive('twin_stars','mage','雙星共鳴',Array(6).fill(45),'每第三次有效攻擊技能追加45%傷害回響，不重複控制效果。',true),
     passive('relay_opening','scout','破綻接力',Array(6).fill(60),'背後命中標記六秒；下一位隊友命中增傷60%，敵人弱化四秒；每敵間隔20秒。',true),
     passive('many_flavors','chef','百味養生',Array(6).fill(30),'吃兩種不同料理：全隊回復25%生命、30%生命護盾五分鐘；間隔90秒。',true),
     passive('life_covenant','healer','守命之約',Array(6).fill(30),'附近隊友受致命怪物或一般陷阱傷害：保留1生命、30%護盾五分鐘；間隔180秒。',true),
     passive('artisan_soul','smith','匠魂刻印',Array(6).fill(20),'營地對修滿裝備花兩零件刻印：20%耐久護層；武器增傷15%或防具防禦+2。每人限一件。',true),
+    passive('forest_echo','archer','森靈追擊',Array(6).fill(40),'射擊已被緩速的怪物額外增傷40%；纏枝箭與隊友的緩速都能觸發。',true),
   ];
   const itemIds=['heal','ration','shield','hourglass','bell','map'];
   function policy(){return {strategy:'support',materials:false,heal:{enabled:false,threshold:30,reserve:2},shield:false,bell:false,hourglass:false,map:false,itemLeft:0,thinkLeft:0};}
@@ -52,7 +56,8 @@
   function afterDamage(run,id){const h=H(),g=state(run);if(id==='hero'&&has(run,'unyielding')&&h.hp(run,id)<=h.maxHp(run,id)*.3&&g.defiance<=0){shield(run,id,h.maxHp(run,id)*.25);h.setBuff(run,id,'oath_power',8,25);g.defiance=90;}}
   function beforeDamage(run,id,damage,source){const h=H(),g=state(run);if(source==='trap'&&h.buff(run,'escape',id))return 0;if(damage>=h.hp(run,id)&&h.hp(run,id)>0&&['monster','trap'].includes(source)&&has(run,'life_covenant')&&g.covenant<=0&&(id==='hero'||g.nearby.hero?.includes(id))){g.covenant=180;shield(run,id,h.maxHp(run,id)*.3,'hero');return Math.max(0,h.hp(run,id)-1);}return damage;}
   function strikeMultiplier(run,id,monsterId,skill,front){const h=H(),g=state(run),a=h.actor(run,id),e=h.state(run).enemy[monsterId]||(h.state(run).enemy[monsterId]={});let mult=1;
-    if(front===false)mult*=1+h.pv(run,'hunter_eye',id)/100;
+    if(front===false)mult*=1+(h.pv(run,'hunter_eye',id)+h.pv(run,'longshot',id))/100;
+    if(has(run,'forest_echo',id)&&e.slow>0)mult*=1.4;
     if(e.relay>0&&e.relayOwner!==id){mult*=1.6;e.relay=0;e.relayWeak=4;}
     if(id==='hero'&&has(run,'relay_opening')&&front===false&&!e.relayCooldown){e.relay=6;e.relayOwner=id;e.relayCooldown=20;}
     if(skill&&has(run,'twin_stars',id)){if(a.pending.echo===undefined){g.echo=(g.echo+1)%3;a.pending.echo=g.echo===0;}if(a.pending.echo)mult*=1.45;}

@@ -27,13 +27,13 @@ test('兩份音效只合成一次、最多四個聲源、結束和停止確實�
   sources[9].onended();assert.equal(sources[9].disconnected,true);
   player.stop();player.stop();assert.ok(sources.every(s=>s.disconnected));
 });
-test('尊重靜音、無音效環境及停止場景；接入原有音效匯流排',()=>{
+test('音樂靜音不關閉音效；無音效環境及停止場景安全，接入獨立音效匯流排',()=>{
   const start=html.indexOf('const AudioEng={'),script=html.slice(start,html.indexOf('</script>',start));
   const played=[];let stopped=0;
   const c=vm.createContext({window:{},G:{muted:false},sound:{play:kind=>played.push(kind),stop:()=>stopped++}});
   vm.runInContext(script+'\nAudioEng.combatSound=sound;AudioEng.sfxSwing();AudioEng.sfxHit();',c);assert.deepEqual(played,[]);
   vm.runInContext('AudioEng.ctx={};AudioEng.sfxSwing();AudioEng.sfxHit()',c);assert.deepEqual(played,['swing','hit']);
-  c.G.muted=true;vm.runInContext('AudioEng.sfxSwing();AudioEng.sfxHit();AudioEng.stopMusic()',c);assert.equal(played.length,2);assert.equal(stopped,1);
+  c.G.muted=true;vm.runInContext('AudioEng.sfxSwing();AudioEng.sfxHit();AudioEng.stopMusic()',c);assert.equal(played.length,4);assert.equal(stopped,1);
   assert.match(html,/CombatAudio\?\.create\(this.ctx,this.fxGain\)/);
   assert.match(html,/visibilitychange[^\n]*combatSound\?\.stop/);
   assert.match(html,/pagehide[^\n]*combatSound\?\.stop/);

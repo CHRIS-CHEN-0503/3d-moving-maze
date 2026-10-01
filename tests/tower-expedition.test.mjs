@@ -10,7 +10,7 @@ test('all ten boss floors are solvable by all six professions, preserve timing a
   assert.deepEqual(Object.keys(X.BOSSES).map(Number),[1,10,20,30,40,50,60,70,80,90]);
   for(const floor of Object.keys(X.BOSSES).map(Number))for(const job of Object.keys(P.PROFESSIONS)){
     const r=fresh(floor,job),coins=r.coins;assert.equal(P.canDescend(r),false);const done=complete(r);
-    assert.equal(done.party.boss.done,true,`${floor}/${job}`);assert.equal(done.coins,coins+35);assert.equal(P.canDescend(done),true);assert.ok(C.validateSave(done));
+    assert.equal(done.party.boss.done,true,`${floor}/${job}`);assert.equal(done.coins,coins+35);assert.equal(P.canDescend(done),false,'Maze seals do not bypass the floor lord');done.defeatedMonsters.push('monster-11');assert.equal(P.canDescend(done),true);assert.ok(C.validateSave(done));
     assert.equal(X.bossAction(done,0).ok,false);assert.equal(C.floorConfig(floor).shiftSeconds,150-(99-floor));
     assert.equal(C.descend(done).ok,false,'boss does not bypass main story mark / final choice');
     let marked=N.collectClue(done).run;if(floor===1)marked=N.chooseEnding(marked,'release').run;

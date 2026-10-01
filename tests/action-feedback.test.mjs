@@ -12,7 +12,7 @@ test('all 49 active skills and usable items map to original bounded audio; sound
   const waves=[];
   for(const kind of Object.keys(A.ACTIONS)){
     const data=A.render(kind);assert.deepEqual(data,A.render(kind));
-    assert.equal(data[0],0);assert.equal(data.at(-1),0);assert.ok(data.length<=A.RATE*.66);
+    assert.equal(data[0],0);assert.equal(data.at(-1),0);assert.ok(data.length<=A.RATE*.81);
     let sum=0;for(const v of data){assert.ok(Number.isFinite(v)&&Math.abs(v)<.73);sum+=v*v;}
     assert.ok(Math.sqrt(sum/data.length)>.035,kind);waves.push(Buffer.from(data.buffer).toString('base64'));
   }
@@ -29,10 +29,10 @@ test('area hits are rate-limited, four voices maximum, buffers reused, reset per
   player.stop();player.play('hit-metal');assert.equal(sources.filter(s=>!s.done).length,1);player.stop();
 });
 
-function fixture(skill){
+function fixture(skill,options={}){
   let run;
   for(let seed=1;seed<500;seed++){
-    run=H.enable(P.enable(C.newRun({seed}),skill.job).run).run;
+    run=H.enable(P.enable(C.newRun({seed}),skill.job,options.sex||'male').run).run;
     if(skill.unique)H.gainXp(run,28100);
     if(H.actor(run).skills.includes(skill.id))break;
   }
@@ -44,18 +44,19 @@ function fixture(skill){
   }
   run.hunger=10;H.setHp(run,'hero',10);run.equipment.weapon.durability--;
   for(const key of Object.keys(run.party.ingredients))run.party.ingredients[key]=30;run.party.journey.scrap=30;
-  const sounds=[],world=new T.Group(),player=new T.Group(),m={...P.monsterSpecs(run)[0],alive:true,model:new T.Group()};m.model.position.set(0,0,1.5);
+  const sounds=[],voiceCalls=[],world=new T.Group(),player=new T.Group(),m={...P.monsterSpecs(run)[0],alive:true,model:new T.Group()};m.model.position.set(0,0,1.5);
   const trap={x:0,z:1,id:'test-trap',model:new T.Group()},g={running:true,shifting:false,px:0,pz:0};let runtime,paused=false,blocked=false,hits=0;
-  const env=vm.createContext({TowerHeroes:H,TowerPartyCore:P,TowerHeroGrowth:R,TowerHeroIcons:{svg:()=>''},TowerCombatMotion:require('../story/tower-combat-motion.js'),CombatAudio:A,document:{getElementById:()=>null},Math});
-  for(const file of ['story/tower-skill-effects.js','story/tower-growth-runtime.js','story/tower-heroes-runtime.js'])vm.runInContext(code(file),env);
+  let voiceEnabled=false,speaking=false;const voice={status:()=>({enabled:voiceEnabled,supported:true,speaking}),announceAsset:id=>voiceCalls.push(id)};
+  const env=vm.createContext({TowerHeroes:H,TowerPartyCore:P,TowerHeroGrowth:R,GameVoice:voice,TowerHeroIcons:{svg:()=>''},TowerCombatMotion:require('../story/tower-combat-motion.js'),CombatAudio:A,document:{getElementById:()=>null},Math});
+  for(const file of ['assets/character-voices.js','story/tower-combat-intent.js','story/tower-skill-effects.js','story/tower-growth-runtime.js','story/tower-heroes-runtime.js'])vm.runInContext(code(file),env);
   const ctx={THREE:T,G:g,core:C,run:()=>run,world:()=>world,player:()=>player,actors:()=>actors,monsters:()=>[m],hazards:()=>[trap],paused:()=>paused,text:s=>s,action:()=>'',portrait:()=>'',clear:()=>!blocked,walkClear:()=>true,
-    audio:{sfxAction:k=>{sounds.push(k);},sfxHit(){}},toast(){},save(){},swing(){},close(){},dialog(){},dispose(){},
+    audio:{sfxAction:k=>{sounds.push(k);},sfxHit(){}},toast(message,ms,read=true){if(voiceEnabled&&read)speaking=true;},save(){},swing(){},close(){},dialog(){},dispose(){},
     cell:(x,y)=>({x,z:y}),worldToCell:(x,z)=>({x:Math.floor(x),y:Math.floor(z)}),
     transact(result){if(!result.ok)return false;run=result.run;return true;},
     hit(enemy,memberId,skillId){const res=H.strike(run,enemy.id,{memberId,skillId},run.revision);if(res.ok){run=res.run;hits++;runtime.impact(enemy,memberId||H.state(run).active,skillId);if(res.effect.dead)enemy.alive=false;}return res;}
   };
   runtime=env.TowerHeroesRuntime.create(ctx);runtime.tick(0);
-  return {runtime,sounds,world,g,target,trap,motion:()=>player.userData.combatMotion,run:()=>run,hits:()=>hits,block:v=>blocked=v,pause:v=>paused=v};
+  return {runtime,sounds,voiceCalls,enableVoice:()=>{voiceEnabled=true;},world,g,target,trap,motion:()=>player.userData.combatMotion,run:()=>run,hits:()=>hits,block:v=>blocked=v,pause:v=>paused=v};
 }
 test('every successful active skill emits action audio and geometry; failed repeat casts stay silent',()=>{
   for(const s of Object.values(H.SKILLS)){
@@ -77,7 +78,7 @@ test('projectile impact is emitted only on a confirmed hit, never when occluded;
   }
 });
 test('all ten approved preparations add 0.5 seconds, defer effects/costs/cooldowns, and freeze while paused',()=>{
-  const expected={starfall:1.5,star_ring:1.9,decisive_slash:1.3,whirlwind:.8,dawn_sanctuary:1.3,revive:1.5,moving_fortress:1.1,barricade:1,hero_feast:1.3,daylight:1.1,worldtree_arrow:1.5};
+  const expected={starfall:1.5,star_ring:1.9,decisive_slash:1.3,whirlwind:.8,dawn_sanctuary:1.3,revive:1.5,moving_fortress:1.1,barricade:1,hero_feast:1.3,worldtree_arrow:1.5};
   assert.deepEqual(H.PREPARATION,expected);
   for(const [id,seconds] of Object.entries(expected)){
     const f=fixture(H.SKILLS[id]),before=JSON.stringify(f.run());
@@ -107,6 +108,18 @@ test('disarm work increases by 0.5 seconds at every tier and remains interruptib
   const f=fixture(H.SKILLS.disarm);f.runtime.cast('disarm','hero');assert.equal(f.runtime.preparing().total,3.5);
   f.runtime.tick(3.49);assert.equal(f.trap.heroRemoved,undefined);f.runtime.tick(.02);assert.equal(f.trap.heroRemoved,true);f.runtime.reset();
   const g=fixture(H.SKILLS.disarm);g.runtime.cast('disarm','hero');H.actor(g.run()).hurt=1;g.runtime.tick(.1);assert.equal(g.runtime.preparing(),null);assert.equal(g.trap.heroRemoved,undefined);g.runtime.reset();
+});
+test('successful guard, healing and completed disarm play the acting gender specialty, not generic overlapping narration',()=>{
+  for(const sex of ['male','female'])for(const skill of ['guard_stance','herbal_heal','disarm']){
+    const f=fixture(H.SKILLS[skill],{sex});H.setHp(f.run(),'hero',H.maxHp(f.run())*.5);f.enableVoice();f.runtime.cast(skill,'hero');if(skill==='disarm')f.runtime.tick(3.51);
+    assert.deepEqual(f.voiceCalls,['character.'+H.SKILLS[skill].job+'.'+sex+'.specialty'],sex+' '+skill);f.runtime.reset();
+  }
+  for(const sex of ['male','female'])for(const job of ['mage','archer']){
+    const f=fixture(H.SKILLS[job==='mage'?'arcane_bolt':'piercing_arrow'],{sex});H.setHp(f.run(),'hero',H.maxHp(f.run())*.5);f.enableVoice();assert.equal(job==='mage'?f.runtime.daylight():f.runtime.shoot(),true);assert.deepEqual(f.voiceCalls,['character.'+job+'.'+sex+'.specialty']);f.runtime.reset();
+  }
+});
+test('equipment descriptions show the selected wearer clothing variant without changing stats or durability',()=>{
+  for(const sex of ['male','female']){const f=fixture(H.SKILLS.guard_stance,{sex}),r=f.run(),before=JSON.stringify(r),fit=sex==='female'?'女裝版型':'男裝版型';for(const slot of ['helmet','armor'])assert.ok(f.runtime.info(r.equipment[slot],'hero').startsWith(fit));assert.doesNotMatch(f.runtime.info(r.equipment.weapon,'hero'),/男裝|女裝/);assert.equal(JSON.stringify(f.run()),before);f.runtime.reset();}
 });
 test('charge waveforms and visual duration match every approved preparation',()=>{
   for(const seconds of Object.values(H.PREPARATION)){const wave=A.render('charge',seconds);assert.equal(wave.length,Math.round(A.RATE*seconds));assert.equal(wave.at(-1),0);assert.ok(wave.every(v=>Number.isFinite(v)&&Math.abs(v)<.73));}

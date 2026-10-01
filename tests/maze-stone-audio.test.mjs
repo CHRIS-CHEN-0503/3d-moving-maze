@@ -19,11 +19,11 @@ test('只生成一次緩衝，重播停止舊聲源，停止與自然結束都�
   oldEnd();player.stop();assert.equal(sources[1].stopped,true);assert.equal(sources[1].disconnected,true);player.stop();
   player.play();sources[2].onended();assert.equal(sources[2].disconnected,true);player.stop();
 });
-test('變形入口使用石牆聲，其他警報不變，尊重靜音與語音音量匯流排',()=>{
+test('變形入口使用石牆聲，音樂靜音不關閉音效，音效使用獨立音量匯流排',()=>{
   const script=html.slice(html.indexOf('const AudioEng={'),html.indexOf('</script>',html.indexOf('const AudioEng={')));
   let played=0,stopped=0;const c=vm.createContext({window:{},G:{muted:true}});vm.runInContext(script,c);
-  c.player={play:()=>played++,stop:()=>stopped++};vm.runInContext('AudioEng.ctx={};AudioEng.shiftSound=player;AudioEng.sfxShift()',c);assert.equal(played,0);
-  c.G.muted=false;vm.runInContext('AudioEng.sfxShift();AudioEng.stopMusic()',c);assert.equal(played,1);assert.equal(stopped,1);
+  c.player={play:()=>played++,stop:()=>stopped++};vm.runInContext('AudioEng.ctx={};AudioEng.shiftSound=player;AudioEng.sfxShift()',c);assert.equal(played,1);
+  c.G.muted=false;vm.runInContext('AudioEng.sfxShift();AudioEng.stopMusic()',c);assert.equal(played,2);assert.equal(stopped,1);
   const shift=html.slice(html.indexOf('function doShift()'),html.indexOf('/* 迷宮變形時出口搬家'));
   assert.match(shift,/AudioEng\.sfxShift\(\)/);assert.doesNotMatch(shift,/sfxAlarm/);
   assert.equal((shift.match(/announceAsset\('maze\.shift\.deep'/g)||[]).length,1);

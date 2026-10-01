@@ -51,7 +51,8 @@ test('every map size step adds one to both monster population bounds', () => {
     if(!observed.has(config.size))observed.set(config.size,new Set());observed.get(config.size).add(config.monsterCount);
   }
   for(const [size,counts]of observed)assert.deepEqual([...counts].sort((a,b)=>a-b),Array.from({length:5},(_,i)=>i+1+(size-7)/2));
-  assert.equal(core.floorConfig(1).monsterMax,core.MAX_MONSTERS);
+  assert.equal(core.floorConfig(1).monsterMax,11,'Initial population keeps the original 1..5 plus size-step rule');
+  assert.equal(core.MAX_MONSTERS,32,'Save validation reserves stable originals, a lord and finite reinforcement IDs');
   assert.deepEqual(core.floorConfig(99).monsterTypes,['clockmite']);
   assert.equal(core.floorConfig(1).monsterTypes.length, 5);
   for(const seed of [0,-1,NaN,1.5,'1',0x100000000])assert.throws(()=>core.floorConfig(99,seed),RangeError);

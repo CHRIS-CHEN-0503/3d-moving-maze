@@ -13,7 +13,7 @@ const source = await readFile(new URL('../story/tower-mode.js', import.meta.url)
 const bridge = `window.__test = {
   setState(value) { run=value.run;active=true;floorStarted=true;floorConfig=C.floorConfig(run.floor);hurtLeft=0; },
   state() { return {run,paused,shiftLeft,attackLeft,hurtLeft}; },
-  dialog,closeDialog,readSave,save,updateMonster,hasClearPath,damage,damageFeedback,
+  dialog,closeDialog,readSave,save,updateMonster,hasClearPath,damage,damageFeedback,handleAction,
   setProtection(seconds){hurtLeft=seconds;},
 };`;
 assert.match(source, /  install\(\);\s*\}\)\(\);\s*$/);
@@ -180,6 +180,9 @@ test('帶著歸途星印完成終章選擇後正確結束旅程，重複出口�
   run = ending.run;
   h.testApi.setState({ run });
   h.api.reachExit();
+  assert.equal(h.testApi.state().run.status,'playing');
+  assert.match(h.nodes.get('towerDialog').innerHTML,/留在本層/);
+  h.testApi.handleAction('exit-confirm');
   const completed = h.testApi.state().run;
   assert.equal(completed.status, 'won');
   assert.equal(completed.floorsCleared, 99);

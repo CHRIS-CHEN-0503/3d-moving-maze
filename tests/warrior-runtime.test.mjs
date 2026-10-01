@@ -24,7 +24,7 @@ const bridge = `window.__warriorTest = {
   replaceMonsters(value) { monsters=value; },
   shifted() { wasShifting=true;G.shifting=false; },
   followNpc,updateWarrior,updateMonster,isHeld,warriorDialog,hireWarrior,reviewWarriorReplacement,trade,
-  restoreWarriorPosition,dialog,closeDialog,save,readSave,attack,updateBolts,clearBolts,launchBolt,defeatMonster,
+  restoreWarriorPosition,dialog,closeDialog,save,readSave,attack,updateBolts,clearBolts,launchBolt,defeatMonster,handleAction,
 };`;
 assert.match(source, /  install\(\);\s*\}\)\(\);\s*$/);
 
@@ -38,6 +38,7 @@ function runtime(run) {
   class Vector {
     constructor() { this.set(0,0,0); }
     set(x,y,z) { this.x=x;this.y=y;this.z=z;return this; }
+    setScalar(value) { return this.set(value,value,value); }
     copy(v) { return this.set(v.x,v.y,v.z); }
     distanceTo(v) { return Math.hypot(this.x-v.x,this.y-v.y,this.z-v.z); }
     lerp(v,t) { this.x+=(v.x-this.x)*t;this.y+=(v.y-this.y)*t;this.z+=(v.z-this.z)*t;return this; }
@@ -231,7 +232,7 @@ test('同分持續抵抗但下降後留在原層，不把牽制狀態帶到下�
   assert.equal(h.api.state().run.warrior.remaining,null);
   for(let second=0;second<65;second++)h.tick(1);
   assert.equal(h.api.isHeld(monster),true);assert.equal(h.api.state().run.hp,60);
-  h.context.window.TowerMode.reachExit();assert.equal(h.api.state().run.floor,59);assert.equal(h.api.state().run.warrior,null);
+  h.context.window.TowerMode.reachExit();h.api.handleAction('exit-confirm');assert.equal(h.api.state().run.floor,59);assert.equal(h.api.state().run.warrior,null);
 });
 
 test('五分戰士立即解決三分怪物，剩餘二分續行且怪物不會復活或重複領賞',()=>{
@@ -244,7 +245,7 @@ test('五分戰士立即解決三分怪物，剩餘二分續行且怪物不會�
   const coins=h.api.state().run.coins;h.api.updateWarrior(.05,h.now());assert.equal(h.api.state().run.coins,coins);
   h.api.save();const restored=runtime(h.api.readSave());
   assert.equal(restored.api.state().monsters.find(m=>m.id===monster.id).alive,false,'讀檔後也不能再領同一隻怪物的獎勵');
-  h.context.window.TowerMode.reachExit();assert.equal(h.api.state().run.floor,18);assert.equal(h.api.state().run.warrior.strength,2);
+  h.context.window.TowerMode.reachExit();h.api.handleAction('exit-confirm');assert.equal(h.api.state().run.floor,18);assert.equal(h.api.state().run.warrior.strength,2);
 });
 
 test('主角擊暈同分對手，護衛以減少後的分數擊殺並保留一分續行',()=>{

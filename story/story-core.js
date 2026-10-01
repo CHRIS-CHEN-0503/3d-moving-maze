@@ -8,8 +8,8 @@
 
   const STATE_VERSION = 2;
   const MAX_HP = 60;
-  const MAX_MONSTERS = 11; // Largest main-tower map: 19×19, population 7..11.
-  const validMonsterId = id => typeof id === 'string' && /^monster-(0|[1-9]\d*)$/.test(id) && Number(id.slice(8)) < MAX_MONSTERS;
+  const MAX_MONSTERS = 32; // Stable original/lord IDs plus the finite reinforcement roster; live caps are 10/15/20.
+  const validMonsterId = id => typeof id === 'string' && (/^monster-(0|[1-9]\d*)$/.test(id) && Number(id.slice(8)) < 12 || /^monster-r-[1-9]\d{0,5}-[0-2]$/.test(id));
   const MAX_COINS = 999999;
   const MAX_STACK = 99;
   // Late lookup keeps the browser's core → narrative → dungeons loading order safe.
@@ -601,7 +601,7 @@
   function descend(run, expectedRevision) {
     return transaction(run, expectedRevision, (next) => {
       if (next.expedition.active) return { ok: false, message: '請先離開裂隙副本，再繼續往下探索。' };
-      if (next.party && !partyRules().canDescend(next)) return { ok: false, message: '迷宮封印尚未解除，請先完成本層的迷宮挑戰。' };
+      if (next.party && !partyRules().canDescend(next)) return { ok: false, message: '請先解除迷宮封印並擊敗樓層主，才能往下走。' };
       if (!narrativeRules().canDescend(next)) return { ok: false, message: '章末之門尚未開啟，請先找到本章主線印記。' };
       if (next.floor === 1 && next.chronicle.ending === null) return { ok: false, message: '請先在塔心選擇高塔的未來，再踏出歸途之門。' };
       next.coins = Math.min(MAX_COINS, next.coins + floorConfig(next.floor).rewardCoins);
@@ -613,6 +613,7 @@
       next.expedition.discovered = false;
       if (next.warrior && next.warrior.mode === 'holding') next.warrior = null;
       if (next.floor === 1) {
+        if(next.party){next.party.loot={version:1,rolled:[],entries:[]};next.party.reinforcements={version:1,shift:0,monsters:[]};next.party.health={};next.party.poise={};if(next.party.loadouts)next.party.loadouts.enemy={};}
         next.status = 'won';
         return { ok: true, message: ENDING.text, effect: { ending: true } };
       }

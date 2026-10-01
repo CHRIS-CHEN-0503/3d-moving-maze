@@ -80,10 +80,11 @@
     return faces.sort((a, b) => a.score - b.score || a.key.localeCompare(b.key)).slice(0, o.limits.wallSections);
   }
   function plan(options) {
-    const o = normalize(options), wall = [], glow = [], floor = [];
+    const o = normalize(options), wall = [], glow = [], floor = [], relief=[];
     const { base, palette: p } = o;
     const stone = mix(p.wall, 0xffffff, .15), shadow = mix(p.wall, 0x17242b, .34), accent = mix(p.accent, p.wall, .35);
     const faces = base.motif === 'shop' || o.wallHeight < .65 ? [] : wallCandidates(o);
+    let richFaces=0;
     for (const f of faces) {
       const put = (u, v, width, height, color, rz = 0, batch = wall) => {
         const faceOffset = batch === glow ? .025 : .017;
@@ -163,6 +164,18 @@
           }
           break;
       }
+      // Wall-mounted silhouettes and recessed furniture; never loose loot,
+      // never a new collision, texture download, point light or animation loop.
+      if(o.rich&&richFaces++<(o.limits.wallSections===28?12:20)){
+        const solid=(u,v,w,h,depth,color,rz=0)=>{put(u,v,w,h,color,rz);const p=wall[wall.length-1];p.sz=depth;p.role='wall-sculpture';};
+        const round=(u,v,w,h,color)=>relief.push({x:f.axis==='x'?f.along+u*f.span:f.surface+f.sign*.075,y:v*o.wallHeight,z:f.axis==='x'?f.surface+f.sign*.075:f.along+u*f.span,sx:w*f.span,sy:h*o.wallHeight,sz:.12,ry:f.axis==='x'?0:-Math.PI/2,rz:0,color,wallInst:f.inst,role:'wall-sculpture'});
+        if(['hedge','vine','roots','bark'].includes(base.motif)){for(const side of [-1,1]){solid(side*.18,.57,.026,.5,.09,shadow,side*.2);round(side*.22,.65,.16,.1,accent);round(side*.14,.44,.12,.09,stone);}solid(0,.18,.7,.05,.1,shadow);}
+        else if(['shelves'].includes(base.motif)){solid(0,.48,.7,.63,.12,shadow);for(const v of [.31,.53,.75]){solid(0,v,.73,.05,.19,stone);for(let i=0;i<5;i++)solid(-.27+i*.13,v+.09,.055,.15+(i%2)*.03,.16,mix(p.accent,0x665378,i*.14));}}
+        else if(['conduit','vents','basalt'].includes(base.motif)){solid(0,.57,.54,.4,.12,shadow);for(let i=0;i<6;i++){const a=i*Math.PI/3;solid(Math.cos(a)*.15,.57+Math.sin(a)*.11,.055,.09,.16,accent,a);}solid(0,.57,.18,.16,.17,stone);solid(-.29,.42,.035,.43,.1,accent);solid(.29,.42,.035,.43,.1,accent);}
+        else if(['frost','echo','strata'].includes(base.motif)){for(let i=0;i<3;i++){solid(-.17+i*.17,.57,.08,.22+i*.07,.12,accent,(i-1)*.2);round(-.2+i*.2,.28,.13,.08,shadow);}solid(0,.81,.65,.04,.1,stone);}
+        else if(['wetland','tide'].includes(base.motif)){solid(0,.56,.6,.49,.11,shadow);for(const v of [.39,.51,.63,.75])solid(0,v,.58,.025,.14,accent);round(-.23,.32,.13,.05,stone);round(.24,.32,.13,.05,stone);}
+        else{solid(0,.57,.47,.52,.1,shadow);solid(0,.6,.31,.39,.13,accent);solid(0,.83,.56,.04,.16,stone);solid(-.27,.55,.025,.57,.12,stone);solid(.27,.55,.025,.57,.12,stone);round(0,.65,.11,.11,mix(p.accent,0xf4d89c,.4));}
+      }
       if (base.lamp && f.score % 3 === 0) {
         put(.29, .7, .09, .13, shadow);
         put(.29, .7, .038, .075, mix(p.accent, 0xf1eee4, .72), 0, glow);
@@ -172,6 +185,7 @@
     for (let z = 0; z < o.height; z++) for (let x = 0; x < o.width; x++) cells.push({ x, z, score: hash('floor:' + x + ':' + z, o.seed) });
     cells.sort((a, b) => a.score - b.score || a.z - b.z || a.x - b.x);
     for (const c of cells.slice(0, o.limits.floorCells)) {
+      if(o.exitCell&&c.x===o.exitCell.x&&c.z===o.exitCell.y)continue;
       const x = (c.x - (o.width - 1) / 2) * o.cell, z = (c.z - (o.height - 1) / 2) * o.cell;
       const light = c.score % 2 === 0, flip = (c.score >>> 2) % 2 === 0, offset = ((c.score >>> 4) % 3 - 1) * .15 * o.cell;
       const tileColor = mix(p.ground, light ? 0xd6d5cb : 0x343f40, base.motif === 'shop' ? .035 : .11);
@@ -184,8 +198,8 @@
         addFloor(flip ? sx * .25 : offset, flip ? offset : sz * .25, flip ? .016 : sx, flip ? sz : .016, mix(p.ground, 0x25353a, .17));
       }
     }
-    const instances = wall.length + glow.length + floor.length;
-    return { style: o.style, wall, glow, floor, stats: { wallSections: faces.length, floorCells: Math.min(cells.length, o.limits.floorCells), instances, drawCalls: [wall, glow, floor].filter(a => a.length).length, triangles: instances * 12 } };
+    const instances = wall.length + glow.length + floor.length+relief.length;
+    return { style: o.style, wall, glow, floor, relief, stats: { wallSections: faces.length, floorCells: Math.min(cells.length, o.limits.floorCells), instances, drawCalls: [wall, glow, floor,relief].filter(a => a.length).length, triangles: (instances-relief.length) * 12+relief.length*100 } };
   }
   function build(THREE, options) {
     if (!THREE?.InstancedMesh || !THREE?.Group) throw new TypeError('MazeAtmosphere requires THREE');
@@ -196,11 +210,11 @@
     const own = resource => { resources.add(resource); resource.addEventListener('dispose', () => released.add(resource)); return resource; };
     const geometry = own(new THREE.BoxGeometry(1, 1, 1));
     const position = new THREE.Vector3(), scale = new THREE.Vector3(), rotation = new THREE.Quaternion(), euler = new THREE.Euler(), matrix = new THREE.Matrix4(), color = new THREE.Color();
-    function batch(parts, parent, basic, name) {
+    function batch(parts, parent, basic, name,shape=geometry) {
       if (!parts.length) return;
       const material = own(basic ? new THREE.MeshBasicMaterial({ color: 0xffffff }) : new THREE.MeshLambertMaterial({ color: 0xffffff }));
       // 燈罩只是會受深度遮擋的明亮嵌片，沒有額外點光源／透明光暈。
-      const mesh = new THREE.InstancedMesh(geometry, material, parts.length); mesh.name = name; mesh.userData.role = 'scenery';
+      const mesh = new THREE.InstancedMesh(shape, material, parts.length); mesh.name = name; mesh.userData.role = 'scenery';
       for (let i = 0; i < parts.length; i++) {
         const p = parts[i]; position.set(p.x, p.y, p.z); scale.set(p.sx, p.sy, p.sz);
         rotation.setFromEuler(euler.set(0, p.ry, p.rz, 'YXZ')); matrix.compose(position, rotation, scale);
@@ -215,6 +229,7 @@
       parent.add(mesh);
     }
     batch(data.wall, wallRoot, false, 'wall-relief-batch'); batch(data.glow, wallRoot, true, 'wall-lamp-inlay-batch'); batch(data.floor, floorRoot, false, 'floor-inlay-batch');
+    if(data.relief.length)batch(data.relief,wallRoot,false,'rounded-wall-sculpture-batch',own(new THREE.SphereGeometry(.5,10,6)));
     let disposed = false;
     return {
       wallRoot, floorRoot, stats: Object.freeze({ ...data.stats }),

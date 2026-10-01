@@ -53,6 +53,7 @@ function harness(run) {
   h.exit = () => {
     const g = h.context.G, point = h.context.cellToWorld(g.exitCell.x, g.exitCell.y);
     g.px = point.x; g.pz = point.z; h.context.TowerMode.reachExit();
+    if(h.get('towerDialog').buttons.some(b=>b.dataset.tower==='exit-confirm'))h.click('exit-confirm');
   };
   return h;
 }

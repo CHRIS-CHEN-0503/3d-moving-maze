@@ -227,9 +227,14 @@ test('朗讀期間降低背景音樂與道具音效，結束後恢復原本音�
   const AudioEng={ctx:{currentTime:0}};
   for(const name of ['musicGain','fxGain','itemGain'])AudioEng[name]={gain:{setTargetAtTime:value=>levels[name]=value}};
   const voice={listen:fn=>render=fn,configure(){}};
-  vm.runInNewContext(readFileSync(new URL('../assets/voice-settings.js',import.meta.url),'utf8'),{window:{GameVoice:voice},document,AudioEng,CFG:{speechOn:1,speechVoice:''}});
+  const env=vm.createContext({document,AudioEng,CFG:{speechOn:1,speechVoice:''},GameVoice:voice});env.window=env;
+  vm.runInContext(readFileSync(new URL('../assets/audio-settings.js',import.meta.url),'utf8'),env);env.MazeAudioSettings.connect(AudioEng);
+  vm.runInContext(readFileSync(new URL('../assets/voice-settings.js',import.meta.url),'utf8'),env);
   render({supported:true,enabled:true,voices:[],speaking:true});assert.deepEqual(levels,{musicGain:.09,fxGain:.45,itemGain:.16});
   render({supported:true,enabled:true,voices:[],speaking:false});assert.deepEqual(levels,{musicGain:.32,fxGain:.8,itemGain:.4});
+  env.MazeAudioSettings.set('music',50);env.MazeAudioSettings.set('effects',0);
+  render({supported:true,enabled:true,voices:[],speaking:true});assert.deepEqual(levels,{musicGain:.045,fxGain:0,itemGain:0});
+  render({supported:true,enabled:true,voices:[],speaking:false});assert.deepEqual(levels,{musicGain:.16,fxGain:0,itemGain:0});
 });
 
 test('角色、環境、視角與多人玩法選擇讀出名稱',()=>{

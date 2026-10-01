@@ -23,8 +23,8 @@
   const BASE_GEAR=Object.freeze([
     gear('longsword','巡塔長劍','weapon','blade',['swordsman'],1,12,.7,2.7,0,18),
     gear('greatsword','破陣雙手劍','weapon','blade',['swordsman'],2,20,1.15,3.2,0,28),
-    gear('arcane_staff','星紋法杖','weapon','staff',['mage'],2,3,.95,2.6,0,22,12,.08),
-    gear('spellbook','晨光法書','weapon','book',['healer'],2,2,1,2.5,0,18,6,.15),
+    gear('arcane_staff','星紋法杖','weapon','staff',['mage'],2,3,.95,8,0,22,12,.08),
+    gear('spellbook','晨光法書','weapon','book',['healer'],2,2,1,7.5,0,18,6,.15),
     gear('smith_hammer','鍛鐵短鎚','weapon','hammer',['smith'],1,8,.9,2.5,0,17),
     gear('warhammer','山岩重錘','weapon','hammer',['smith'],2,13,1.45,3,0,26),
     gear('cooking_pan','旅人鐵鍋','weapon','pan',['chef'],1,6,.85,2.5,0,16),
@@ -91,7 +91,7 @@
     skill('keen_sight','archer','鷹眼巡望',false,[3,4,5,6,7],25,'reveal','短暫辨識附近陷阱與路徑。'),
     skill('woodland_stride','archer','林間疾步',false,[8,11,14,17,20],35,'speed','附近隊友二十秒內移動加快。'),
     skill('ranger_ward','archer','葉幕守護',false,[15,20,25,30,35],35,'guard','八秒內以葉幕減輕自己受到的傷害。'),
-  ].concat(G.actives).map(s=>{const value=G.sixth(s),seconds=preparationSeconds(s.id);return [s.id,Object.freeze({...value,power:s.effect==='disarm'?Object.freeze(value.power.map(n=>Math.round((n+.5)*10)/10)):value.power,description:value.description+(seconds?' 準備 '+seconds+' 秒後生效。':'')})];})));
+  ].concat(G.actives).map(s=>{const value=G.sixth(s),seconds=preparationSeconds(s.id),ammo=s.job==='archer'&&s.attack?(['volley','great_arrow'].includes(s.effect)?3:1):0;return [s.id,Object.freeze({...value,ammo,power:s.effect==='disarm'?Object.freeze(value.power.map(n=>Math.round((n+.5)*10)/10)):value.power,description:value.description+(ammo?' 消耗箭矢 '+ammo+' 支。':'')+(seconds?' 準備 '+seconds+' 秒後生效。':'')})];})));
   const passive=(id,job,name,power,description)=>Object.freeze({id,job,name,power:Object.freeze(power),description});
   const PASSIVES=Object.freeze(Object.fromEntries([
     passive('might','swordsman','剛力',[4,6,8,10,12],'本人的普通攻擊更有力。'),
@@ -155,9 +155,10 @@
     state(n).growth=G.fresh(ids(n));
     n.equipment=actor(n,'hero').equipment;actor(n,'hero').equipment=null;n.charIdx=JOBS[job(n)].charIdx;
     n.gearBag=[];n.engine.shovels=0;n.engine.shovelCooldownMs=0;
+    if(ids(n).some(id=>job(n,id)==='archer'))n.bag.arrow=Math.max(n.bag.arrow,30);
     return {ok:true,message:'三個主動、兩個被動技能已確定。',effect:{loadouts:true}};
   });}
-  function addMember(run,member){if(enabled(run)){state(run).actors[member.id]=makeActor(run,member.id,member.profession);G.state(run).policies[member.id]=G.policy();}}
+  function addMember(run,member){if(enabled(run)){state(run).actors[member.id]=makeActor(run,member.id,member.profession);G.state(run).policies[member.id]=G.policy();if(member.profession==='archer')run.bag.arrow=Math.min(99,run.bag.arrow+15);}}
   function removeMember(run,id){if(!enabled(run))return true;if(id===state(run).active)return false;delete state(run).actors[id];const growth=G.state(run);delete growth.policies[id];delete growth.imprints[id];delete growth.nearby[id];for(const k of Object.keys(growth.nearby))growth.nearby[k]=growth.nearby[k].filter(x=>x!==id);for(const e of Object.values(state(run).enemy))if(e.tauntId===id){delete e.tauntId;delete e.tauntLeft;}return true;}
   function sync(run){if(!enabled(run))return;const s=state(run);run.hp=Math.min(maxHp(run),run.hp);if(s.active==='hero')s.heroHp=run.hp;else{const m=run.party.members.find(m=>m.id===s.active);if(m)m.hp=run.hp;}}
   function setHp(run,id,value){value=Math.max(0,Math.min(maxHp(run,id),value));if(id===state(run).active)run.hp=value;if(id==='hero')state(run).heroHp=value;else run.party.members.find(m=>m.id===id).hp=value;}
@@ -227,7 +228,16 @@
   }
   function heal(run,id,amount){const before=hp(run,id);setHp(run,id,before+amount);return hp(run,id)-before;}
   function gainXp(run,amount){const s=state(run),oldHero=s.level,beforeHero=hp(run,'hero');s.xp=Math.min(100000,s.xp+Math.max(0,Math.floor(amount)));const next=G.XP.filter(x=>s.xp>=x).length;s.level=Math.max(s.level,next);if(beforeHero>0)setHp(run,'hero',beforeHero+(s.level-oldHero)*3);for(const m of run.party.members){const old=m.level,before=hp(run,m.id);m.level=Math.max(m.level,Math.min(5,next));if(before>0)setHp(run,m.id,before+(m.level-old)*6);}G.awaken(run);sync(run);}
-  function fireArrow(run,id,monsterId,revision=run.revision){return C().transaction(run,revision,n=>{const a=actor(n,id),st=a?stats(n,id):null;if(!a||hp(n,id)<=0||a.attack>0||a.shot||GEAR[st.weapon?.kind]?.type!=='bow'||!P().monsterSpecs(n).some(m=>m.id===monsterId)||n.defeatedMonsters.includes(monsterId))return {ok:false,message:'弓箭尚未就緒。'};a.attack=st.interval;a.shot={target:monsterId,left:2,damage:st.damage};wear(n,id,st.weapon);return {ok:true,effect:{arrow:true,actorId:id,targetId:monsterId}};});}
+  const ranged=(run,id=state(run)?.active)=>!!actor(run,id)&&['bow','staff','book'].includes(GEAR[stats(run,id).weapon?.kind]?.type);
+  function fireProjectile(run,id,monsterId=null,revision=run.revision){return C().transaction(run,revision,n=>{
+    const a=actor(n,id),st=a?stats(n,id):null,type=GEAR[st?.weapon?.kind]?.type;
+    if(!a||hp(n,id)<=0||a.attack>0||a.shot||!['bow','staff','book'].includes(type)||monsterId!==null&&(!P().monsterSpecs(n).some(m=>m.id===monsterId)||n.defeatedMonsters.includes(monsterId)))return {ok:false,message:'遠程攻擊尚未就緒。'};
+    if(type==='bow'&&n.bag.arrow<1)return {ok:false,message:'箭袋空了！撿取箭矢或向商人補貨。'};
+    if(type==='bow')n.bag.arrow--;
+    a.attack=st.interval;a.shot={kind:type==='bow'?'arrow':'orb',target:monsterId,left:2,damage:type==='bow'?st.damage:st.spellDamage};wear(n,id,st.weapon);
+    return {ok:true,effect:{arrow:type==='bow',orb:type!=='bow',actorId:id,targetId:monsterId}};
+  });}
+  function fireArrow(run,id,monsterId=null,revision=run.revision){if(!actor(run,id)||GEAR[stats(run,id).weapon?.kind]?.type!=='bow')return {ok:false,run,message:'請先裝備弓。'};return fireProjectile(run,id,monsterId,revision);}
   function strike(run,monsterId,options={},revision){return C().transaction(run,revision,n=>{
     const id=options.memberId||state(n)?.active,a=actor(n,id),spec=P().monsterSpecs(n).find(m=>m.id===monsterId);
     if(!a||hp(n,id)<=0||!spec||n.defeatedMonsters.includes(monsterId))return {ok:false,message:'前方沒有可攻擊的怪物。'};
@@ -235,11 +245,12 @@
     if(options.skillId&&!skill)return {ok:false,message:'不存在的技能。'};
     if(skill&&(!a.skills.includes(skill.id)||!skill.attack))return {ok:false,message:'沒有這個攻擊技能。'};
     if(skill&&(!a.pending||a.pending.id!==skill.id||a.pending.left<=0||a.pending.targets.includes(monsterId)))return {ok:false,message:'請先施放技能，同一次施放不能重複命中。'};
-    if(options.shot&&(!a.shot||a.shot.target!==monsterId||a.shot.left<=0))return {ok:false,message:'這支箭已經失效。'};
+    if(options.shot&&(!a.shot||a.shot.target!==null&&a.shot.target!==monsterId||a.shot.left<=0))return {ok:false,message:'這次遠程攻擊已經失效。'};
+    if(!skill&&!options.shot&&ranged(n,id))return {ok:false,message:'請先發射，再由光彈或箭矢命中。'};
     if(!skill&&!options.shot&&a.attack>0)return {ok:false,message:'正在收招。'};
     const st=stats(n,id),l=G.skillLevel(n,id),status=state(n).enemy[monsterId]||{},boost=(buff(n,'rally',id)?.power||0)+(buff(n,'polish',id)?.power||0)+(buff(n,'oath_power',id)?.power||0);
     let damage=((skill?a.pending.damage:options.shot?a.shot.damage:st.damage)+(n.party.buffs.some(b=>b.id==='focus')?3:0))*(skill?skill.power[l-1]/100:1+pv(n,'might',id)/100)*(1+boost/100)*(1+(status.mark>0?.1:0));
-    if(skill&&['mage','healer'].includes(job(n,id)))damage*=1+st.magic;
+    if(skill&&['mage','healer'].includes(job(n,id))||options.shot&&a.shot.kind==='orb')damage*=1+st.magic;
     if(spec.kind==='crab'&&options.front===true)damage*=.55;
     if(skill?.effect==='blind'&&options.front===false)damage*=1.25;
     damage*=G.strikeMultiplier(n,id,monsterId,skill,options.front);
@@ -264,6 +275,7 @@
     const l=G.skillLevel(n,id),power=s.power[l-1],near=(options.nearby||ids(n)).filter(k=>ids(n).includes(k)),target=options.targetId||id;
     if(!near.includes(target))return {ok:false,message:'隊友太遠，請先靠近。'};
     if(s.attack&&!stats(n,id).weapon)return {ok:false,message:'武器已損壞，先換上專用武器。'};
+    if(s.ammo&&n.bag.arrow<s.ammo)return {ok:false,message:'需要 '+s.ammo+' 支箭矢，先補滿箭袋吧。'};
     if(Object.entries(s.cost).some(([k,v])=>n.party.ingredients[k]<v))return {ok:false,message:'材料不足：'+Object.entries(s.cost).map(([k,v])=>P().INGREDIENTS[k]+' '+v).join('、')};
     const effect={skill:skillId,kind:s.effect,actorId:id,targetId:target,power,level:l,attack:s.attack};
     if(['heal','barrier','ward','fortify','polish','repair'].includes(s.effect)&&hp(n,target)<=0)return {ok:false,message:'這位隊友需要先被扶起。'};
@@ -277,8 +289,9 @@
     if(s.effect==='fortress'&&n.party.journey.scrap<2)return {ok:false,message:'還需要兩份零件。'};
     if(s.effect==='feast'&&Object.values(n.party.ingredients).filter(v=>v>0).length<3)return {ok:false,message:'需要三種不同食材各一份。'};
     G.consumeCost(n,id,s.cost);
+    if(s.ammo)n.bag.arrow-=s.ammo;
     a.cooldowns[skillId]=s.effect==='daylight'?600:(s.effect==='cleanse'?power:s.cooldown)*(1-pv(n,'recovery',id)/100);
-    if(s.attack){const st=stats(n,id);a.pending={id:skillId,left:3,damage:['mage','healer'].includes(job(n,id))?st.spellDamage:st.damage,targets:[],worn:false};a.attack=st.interval;}
+    if(s.attack){const st=stats(n,id),paid=['mage','healer','archer'].includes(job(n,id));a.pending={id:skillId,left:3,damage:['mage','healer'].includes(job(n,id))?st.spellDamage:st.damage,targets:[],worn:paid};a.attack=st.interval;if(paid)wear(n,id,st.weapon);}
     const healing=(1+pv(n,'herbalism',id)/100+stats(n,id).heal)*(id==='hero'?1+.02*(level(n,id)-1):1);
     const support=1+stats(n,id).support;
     if(s.effect==='guard')setBuff(n,id,'guard',8,power*support);
@@ -332,7 +345,7 @@
       if(!Array.isArray(a.buffs)||a.buffs.length>BUFFS.length||new Set(a.buffs.map(b=>b.id)).size!==a.buffs.length||!a.buffs.every(b=>BUFFS.includes(b.id)&&num(b.left,0,600)&&num(b.power,0,200)))return null;
       let gear=null;if(id!==value.active){if(!a.equipment||Object.keys(a.equipment).length!==4)return null;gear={};for(const slot of SLOTS){const g=a.equipment[slot];if(g===null)gear[slot]=null;else{const v=C().validateGear(g),d=GEAR[v?.kind];if(!v||v.slot!==slot||!d?.jobs.includes(profession)||d.requiredLevel>(id==='hero'?value.level:party.members.find(m=>m.id===id).level))return null;gear[slot]=v;}}if(GEAR[gear.weapon?.kind]?.hands===2&&gear.shield)return null;}else if(a.equipment!==null)return null;
       const p=a.pending;if(p&&(!a.skills.includes(p.id)||!SKILLS[p.id].attack||!num(p.left,0,3)||!num(p.damage,0,250)||typeof p.worn!=='boolean'||!Array.isArray(p.targets)||p.targets.length>C().MAX_MONSTERS||new Set(p.targets).size!==p.targets.length||!p.targets.every(C().validMonsterId)))return null;
-      const shot=a.shot??null;if(shot&&(!C().validMonsterId(shot.target)||!num(shot.left,0,2)||!num(shot.damage,0,250)||profession!=='archer'))return null;
+      const shot=a.shot?{...a.shot,kind:a.shot.kind??'arrow'}:null;if(shot&&(!(shot.target===null||C().validMonsterId(shot.target))||!num(shot.left,0,2)||!num(shot.damage,0,250)||!['arrow','orb'].includes(shot.kind)||(shot.kind==='arrow'?profession!=='archer':!['mage','healer'].includes(profession))))return null;
       actors[id]={skills:[...a.skills],passives:[...a.passives],learned,equipment:gear,cooldowns:{...a.cooldowns},buffs:a.buffs.map(b=>({id:b.id,left:b.left,power:b.power})),attack:a.attack,hurt:a.hurt,tool:a.tool,autoLeft:a.autoLeft,autoRescue:a.autoRescue,roll:a.roll,pending:p?clone(p):null,shot:shot?clone(shot):null};
     }
     if(!value.enemy||Array.isArray(value.enemy)||Object.keys(value.enemy).length>C().MAX_MONSTERS)return null;
@@ -343,5 +356,5 @@
     return {removedTraps:[...value.removedTraps],version:1,xpScale:G.XP_SCALE,active:value.active,level:value.level,xp,heroHp:value.heroHp,switchLeft:value.switchLeft,actors,enemy,growth};
   }
   function validEquipment(run){if(!enabled(run))return true;const seen=new Set();for(const g of allGear(run)){if(seen.has(g.id))return false;seen.add(g.id);}const e=run.equipment,j=job(run);return Object.values(e).filter(Boolean).every(g=>GEAR[g.kind]?.jobs.includes(j)&&GEAR[g.kind].requiredLevel<=level(run))&&!(GEAR[e.weapon?.kind]?.hands===2&&e.shield);}
-  return Object.freeze({JOBS,GEAR,BASE_GEAR,TIER_NAMES,tierKind,gearPool,SKILLS,PASSIVES,SLOTS,PREPARATION,preparationSeconds,scale,state,enabled,ids,job,sex,level,actor,maxHp,hp,equipment,pv,teamPassive,buff,setBuff,draft,reorderSkills,preview,enable,addMember,removeMember,sync,setHp,switchActor,followerRecords,canLearn,learnCompanion,allGear,canEquip,equip,unequip,stats,wear,durabilityWarnings,hurt,heal,gainXp,fireArrow,strike,cast,food,speed,inflict,hungerScale,toolSpent,rescueChoice,tick,advance,validate,validEquipment,roll});
+  return Object.freeze({JOBS,GEAR,BASE_GEAR,TIER_NAMES,tierKind,gearPool,SKILLS,PASSIVES,SLOTS,PREPARATION,preparationSeconds,scale,state,enabled,ids,job,sex,level,actor,maxHp,hp,equipment,pv,teamPassive,buff,setBuff,draft,reorderSkills,preview,enable,addMember,removeMember,sync,setHp,switchActor,followerRecords,canLearn,learnCompanion,allGear,canEquip,equip,unequip,stats,wear,durabilityWarnings,hurt,heal,gainXp,ranged,fireProjectile,fireArrow,strike,cast,food,speed,inflict,hungerScale,toolSpent,rescueChoice,tick,advance,validate,validEquipment,roll});
 });

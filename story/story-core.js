@@ -36,6 +36,7 @@
     bell: Object.freeze({ id: 'bell', name: '驅怪鈴', description: '讓怪物退避 20 秒。', buyPrice: 18, sellPrice: 8, color: '#bda2ff' }),
     map: Object.freeze({ id: 'map', name: '魔法地圖', description: '完整揭露當下迷宮直到變形，之後重新探索；出口路線額外指引 18 秒。', buyPrice: 12, sellPrice: 5, color: '#6de5d7' }),
     feather: Object.freeze({ id: 'feather', name: '復甦羽', description: '受到致命傷時自動消耗，恢復 50 點生命。', buyPrice: 45, sellPrice: 20, color: '#fff1bb' }),
+    arrow: Object.freeze({ id: 'arrow', name: '箭矢', description: '射手的共用箭袋。普通弓射消耗一支，箭雨與世界樹之箭消耗三支。', buyPrice: 1, sellPrice: 0, color: '#b3d79b' }),
     coin: Object.freeze({ id: 'coin', name: '銅幣', description: '與塔中的冒險者購買物資。', buyPrice: null, sellPrice: null, color: '#efc05e' }),
   });
 
@@ -103,7 +104,7 @@
     const seed = Number.isInteger(opts.seed) && opts.seed > 0 && opts.seed <= 0xffffffff ? opts.seed : ((Date.now() >>> 0) || 1);
     return {
       stateVersion: STATE_VERSION, mode: 'tower', floor: 99, hp: MAX_HP, hunger: 100, coins: 24,
-      bag: { heal: 2, ration: 2, shield: 0, hourglass: 0, bell: 0, map: 1, feather: 0 },
+      bag: { heal: 2, ration: 2, shield: 0, hourglass: 0, bell: 0, map: 1, feather: 0, arrow: 0 },
       effects: { shield: 0, freeze: 0, repel: 0, reveal: 0 },
       engine: { shovels: 1, kites: 0, whistles: 0, shovelCooldownMs: 0, skillCooldownMs: 0 },
       claimed: [], floorElapsed: 0, warrior: null, hiredWarriors: [], defeatedMonsters: [],
@@ -234,6 +235,8 @@
     if (!run.bag || typeof run.bag !== 'object' || Array.isArray(run.bag) || !run.effects || typeof run.effects !== 'object' || Array.isArray(run.effects)) return null;
     const bag = {};
     for (const id of Object.keys(ITEMS).filter((key) => key !== 'coin')) {
+      // Old journeys get their initial quiver once, without resetting other inventory.
+      if (id === 'arrow' && !Object.hasOwn(run.bag,id)) { bag.arrow=run.party?.loadouts&&(run.party.profession==='archer'||run.party.members?.some(m=>m.profession==='archer'))?30:0; continue; }
       if (!Object.hasOwn(run.bag, id) || !validNumber(run.bag[id], 0, MAX_STACK, true)) return null;
       bag[id] = run.bag[id];
     }
@@ -511,6 +514,7 @@
     return transaction(run, expectedRevision, (next) => {
       if (!Object.hasOwn(next.bag, itemId) || next.bag[itemId] < 1) return { ok: false, message: '背包裡沒有這件道具。' };
       if (itemId === 'feather') return { ok: false, message: '復甦羽會在受到致命傷時自動保護你。' };
+      if (itemId === 'arrow') return { ok: false, message: '箭矢會在弓射時自動使用，不需要手動使用。' };
       const maximum=next.party?.loadouts?heroRules().maxHp(next):MAX_HP;
       if (itemId === 'heal' && next.hp >= maximum) return { ok: false, message: '生命已滿，先把療癒藥留著吧。' };
       if (itemId === 'ration' && next.hunger >= 100) return { ok: false, message: '飽食度已滿，暫時不需要乾糧。' };

@@ -213,9 +213,10 @@
       else if(result.effect.broken)ctx.toast('武器用壞了！可換上備用武器，或請鍛匠在營地修復。',2400,'武器壞了，找鍛匠修理吧');
       if(result.effect.stunned||skillId==='backstab'||skillId==='decisive_slash')m.windup=0;return result;
     }
-    function attack(){if(!live()||ctx.paused()||ctx.G.shifting||(modern()&&heroes.preparing())||(modern()?H.actor(r()).attack:skillLeft)>0)return;skillLeft=modern()?H.stats(r()).interval:X.attackInterval(r());ctx.audio.sfxSwing();ctx.swing();
+    function attack(){if(!live()||ctx.paused()||ctx.G.shifting||(modern()&&heroes.preparing())||(modern()?H.actor(r()).attack:skillLeft)>0)return;skillLeft=modern()?H.stats(r()).interval:X.attackInterval(r());
       const facing=ctx.player()?.rotation.y||0,target=ctx.monsters().filter(m=>{const p=m.model.position;return m.alive&&distance(p)<(modern()?H.stats(r()).reach:2.8)&&clear(p)&&Math.cos(Math.atan2(p.x-ctx.G.px,p.z-ctx.G.pz)-facing)>-.05;}).sort((a,b)=>distance(a.model.position)-distance(b.model.position))[0];
-      if(target){if(modern()&&H.GEAR[r().equipment.weapon?.kind]?.type==='bow')heroes.shoot(target);else applyHit(target);}else{if(modern()){H.actor(r()).attack=H.stats(r()).interval;ctx.save();}ctx.toast('前方沒有碰到怪物，靠近後再出手。',1200,false);}
+      if(modern()&&H.ranged(r())){heroes.shoot(target||null);return;}ctx.audio.sfxSwing();ctx.swing();
+      if(target)applyHit(target);else{if(modern()){H.actor(r()).attack=H.stats(r()).interval;ctx.save();}ctx.toast('前方沒有碰到怪物，靠近後再出手。',1200,false);}
     }
     function skill(){if(modern()){heroes.cast(H.actor(r()).skills[0]);return;}if(!live()||ctx.paused()||ctx.G.shifting||!ctx.G.running)return;const result=P.skill(r(),r().revision);if(!commit(result))return;ctx.audio.sfxUse();if(result.effect.skill==='mage')for(const m of ctx.monsters())if(m.alive&&distance(m.model.position)<4&&clear(m.model.position)){r().monsterStuns[m.id]=Math.max(r().monsterStuns[m.id]||0,2);m.windup=0;}ctx.save();hud();}
     function guard(m,dt){if(!live())return false;if(heroes?.blocker(m,dt))return true;
@@ -291,7 +292,7 @@
         if(a.model.userData.armR){const elapsed=(m.profession==='mage'?3:1.8)-m.cooldown;a.model.userData.armR.rotation.x=m.cooldown>0&&elapsed<.45?-Math.sin(elapsed/.45*Math.PI)*1.1:0;}
         if(!modern()&&m.profession==='healer'&&m.cooldown<=0&&r().hp<30&&r().party.ingredients.herb&&distance(a.model.position)<5){const result=ctx.core.transaction(r(),r().revision,n=>{n.party.ingredients.herb--;n.hp=Math.min(ctx.core.MAX_HP,n.hp+16);n.party.members.find(x=>x.id===m.id).cooldown=20;return {ok:true,message:'澄音用香草替你包紮了傷口。'};});commit(result);}
         if(enemy&&m.cooldown<=0&&!(modern()&&heroes.wantsSkill(m.id))&&(modern()||['swordsman','mage','scout'].includes(m.profession))&&Math.hypot(a.model.position.x-enemy.model.position.x,a.model.position.z-enemy.model.position.z)<(modern()?H.stats(r(),m.id).reach:m.profession==='mage'?6:2.4)){
-          a.model.rotation.y=Math.atan2(enemy.model.position.x-a.model.position.x,enemy.model.position.z-a.model.position.z);const bow=modern()&&H.GEAR[H.equipment(r(),m.id).weapon?.kind]?.type==='bow',result=bow?{ok:heroes.shoot(enemy,m.id)}:applyHit(enemy,m.id);if(result?.ok){root.CharacterMotion?.beginAction(a.model,'attack',.5);if(modern()&&!bow)root.TowerCombatMotion?.begin(a.model,'attack',H.stats(r(),m.id).interval);}
+          a.model.rotation.y=Math.atan2(enemy.model.position.x-a.model.position.x,enemy.model.position.z-a.model.position.z);const ranged=modern()&&H.ranged(r(),m.id),result=ranged?{ok:heroes.shoot(enemy,m.id)}:applyHit(enemy,m.id);if(result?.ok&&!ranged){root.CharacterMotion?.beginAction(a.model,'attack',.5);if(modern())root.TowerCombatMotion?.begin(a.model,'attack',H.stats(r(),m.id).interval);}
         }
       }
       if(modern()){for(const a of actors){root.TowerHeroVisuals.dress(T,a.model,H.equipment(r(),a.id),ctx.dispose);if(H.hp(r(),a.id)<=0){root.TowerCombatMotion?.cancel(a.model);continue;}root.TowerHeroVisuals.pose(a.model,H.actor(r(),a.id).attack,H.stats(r(),a.id).interval,false,dt);}heroes.tick(dt);}
@@ -312,7 +313,7 @@
     }
     function hud(){if(!enabled())return;
       const status=document.getElementById('towerGuardStatus');if(status){status.hidden=false;let button=status.querySelector('.party-status');if(!button){status.innerHTML='<button class="party-status" type="button"></button>';button=status.firstChild;button.onclick=()=>panel();}button.textContent=P.PROFESSIONS[modern()?H.job(r()):r().party.profession].name+' · 隊伍 '+(r().party.members.length+1)+'/'+Math.max(r().party.members.length+1,P.recruitLimit(r())+1)+(r().party.members.some(m=>m.hp<=0)?' · 同伴需要休息':'');}
-      const attack=document.getElementById('towerAttackBtn');if(attack&&live()&&!ctx.inDungeon()){const cd=modern()?H.actor(r()).attack:skillLeft;attack.disabled=cd>0;const label=r().equipment.weapon?'揮擊':'徒手';if(window.BattleDock)BattleDock.attackLabel(label,cd);else attack.textContent=label+(cd>0?' '+cd.toFixed(1):' X');}
+      const attack=document.getElementById('towerAttackBtn');if(attack&&live()&&!ctx.inDungeon()){const cd=modern()?H.actor(r()).attack:skillLeft,type=modern()?H.GEAR[H.stats(r()).weapon?.kind]?.type:null,bow=type==='bow',orb=['staff','book'].includes(type),label=bow?'射箭':orb?'光彈':r().equipment.weapon?'揮擊':'徒手';attack.disabled=cd>0;attack.title=bow?'箭矢 '+r().bag.arrow+'／99 · 每次射擊消耗一支':orb?'光彈發射即消耗武器耐久':'近戰命中才消耗武器耐久';if(window.BattleDock)BattleDock.attackLabel(label,cd,bow?'箭 '+r().bag.arrow:'');else attack.textContent=label+(cd>0?' '+cd.toFixed(1):bow?' · 箭 '+r().bag.arrow:' X');}
       if(modern())heroes.hud();
       const skillButton=document.getElementById('towerProfessionBtn');if(skillButton){skillButton.hidden=!live()||modern();skillButton.disabled=r().party.cooldown>0||ctx.paused();skillButton.textContent=r().party.cooldown>0?'準備 '+Math.ceil(r().party.cooldown)+'秒':P.PROFESSIONS[r().party.profession].skill+' C';}
       const talk=document.getElementById('towerTalkBtn');if(near&&live()&&talk){talk.disabled=false;talk.hidden=ctx.paused();talk.ariaLabel=near.kind==='camp'?'營地料理（R）':near.kind==='boss'?'操作機關（R）':near.kind==='site'?'探索機關（R）':'邀請同伴（R）';}

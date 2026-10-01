@@ -2,24 +2,25 @@
 (function(root,factory){const api=factory();if(typeof module==='object'&&module.exports)module.exports=api;root.TowerCombatMotion=api;})(globalThis,function(){
   'use strict';
   const clamp=x=>Math.max(0,Math.min(1,Number(x)||0));
-  const REST=Object.freeze({rx:-.25,ry:0,rz:-.08,lx:0,ly:0,lz:.05,wx:.25,wy:0,wz:.12,lwx:.25,lwy:0,lwz:-.12,lean:0,tilt:0,bookLift:0,bookTilt:0,knee:0});
+  const REST=Object.freeze({rx:-.25,ry:0,rz:-.08,lx:0,ly:0,lz:.05,wx:.25,wy:0,wz:.12,lwx:.25,lwy:0,lwz:-.12,wpx:0,wpy:0,wpz:0,lpx:0,lpy:0,lpz:0,lean:0,tilt:0,bookLift:0,bookTilt:0,bookPush:0,knee:0});
   const WEAPONS=Object.freeze({
-    longsword:[[{rx:-.55,ry:-.55,rz:-.5,wx:.5,wy:-.7,wz:-.8},{rx:-1.35,ry:.45,rz:.35,wx:1.55,wy:.65,wz:.5},{rx:-.7,rz:.55,wx:1.2,wy:.8}],
-      [{rx:-1.5,rz:-.2,wx:.2,wz:-.2},{rx:-1.05,ry:-.35,wx:1.8,wy:-.3,wz:-.45,lean:.12},{rx:-.6,rz:-.3,wx:1.4}]],
+    // Blade is +Y, character faces +Z. First: high diagonal cut; second: level forward thrust.
+    longsword:[[{rx:-2.1,ry:-.35,rz:-.62,wx:-.4,wy:-.3,wz:-.85,wpy:.12,tilt:-.07},{rx:-1.0,ry:.25,rz:.48,wx:1.9,wy:.15,wz:.85,wpz:.15,lean:.13,tilt:.08},{rx:-.55,rz:.72,wx:2.3,wy:.3,wz:1.1,wpy:-.1,lean:.1}],
+      [{rx:-.7,ry:-.2,rz:-.16,wx:Math.PI/2,wz:0,wpz:-.12,lean:-.07},{rx:-1.6,ry:0,rz:0,wx:Math.PI/2,wz:0,wpz:.5,lean:.18},{rx:-1.15,rz:-.08,wx:Math.PI/2,wpz:.22,lean:.09}]],
     greatsword:[[{rx:-1.45,lx:-1.3,rz:.55,lz:-.85,wx:.05},{rx:-.9,lx:-.95,rz:.65,lz:-.85,wx:1.75,lean:.18},{rx:-.6,lx:-.75,rz:.65,lz:-.85,wx:1.45}],
       [{rx:-.75,lx:-.7,rz:.25,lz:-.7,wy:-.6,wz:-.6},{rx:-1.1,lx:-1,rz:.7,lz:-.95,wx:1.6,wy:.65,wz:.65,tilt:.1},{rx:-.7,lx:-.65,rz:.8,lz:-1,wx:1.4,wy:.5}]],
     smith_hammer:[[{rx:-1.5,rz:-.25,wx:.12},{rx:-.75,rz:.1,wx:1.85,lean:.16},{rx:-.6,wx:1.35}],
       [{rx:-.5,ry:-.6,rz:-.55,wx:.55,wz:-.7},{rx:-1.2,ry:.35,rz:.4,wx:1.5,wz:.6,tilt:.1},{rx:-.55,rz:.35,wx:1.2}]],
     warhammer:[[{rx:-1.8,lx:-1.65,rz:.6,lz:-.9,wx:.02,lean:-.08,knee:.15},{rx:-.7,lx:-.65,rz:.65,lz:-.9,wx:1.95,lean:.23,knee:.2},{rx:-.6,lx:-.6,rz:.65,lz:-.9,wx:1.5}],
       [{rx:-.65,lx:-.55,rz:.3,lz:-.65,wx:.65,wy:-.55,wz:-.35},{rx:-1,lx:-.9,rz:.75,lz:-1,wx:1.7,wy:.5,wz:.3,tilt:.16},{rx:-.65,lx:-.6,rz:.8,lz:-1,wx:1.25,wy:.4}]],
-    cooking_pan:[[{rx:-.65,ry:-.5,rz:-.45,wx:.45,wz:-.8},{rx:-1.1,ry:.5,rz:.3,wx:1.65,wz:.65},{rx:-.65,rz:.4,wx:1.3}],
-      [{rx:-.55,rz:-.2,wx:.5,wz:.2},{rx:-1.55,rz:.1,wx:.95,wy:.2,lean:.1},{rx:-1,wx:1.2,wz:-.2}]],
-    twin_daggers:[[{rx:-.8,lx:-.3,rz:-.35,lz:.3,wx:.6,lwx:.3},{rx:-1.45,lx:-.8,rz:.1,lz:.4,wx:1.65,lwx:1.2,lean:.08},{rx:-.65,lx:-1.4,rz:-.25,lz:.05,wx:.9,lwx:1.6}],
-      [{rx:-.3,lx:-.8,rz:-.3,lz:.35,wx:.3,lwx:.6},{rx:-.8,lx:-1.45,rz:-.4,lz:-.1,wx:1.2,lwx:1.65,lean:.08},{rx:-1.4,lx:-.65,rz:-.05,lz:.25,wx:1.6,lwx:.9}]],
-    arcane_staff:[[{rx:-1.2,lx:-1,rz:.5,lz:-.75,wx:.15},{rx:-1.15,lx:-1,rz:.65,lz:-.9,wx:1.15,lean:.07},{rx:-.75,lx:-.6,rz:.65,lz:-.85,wx:.7}],
-      [{rx:-.5,lx:-.4,rz:.55,lz:-.7,wx:.5,wz:-.3},{rx:-1.4,lx:-1.1,rz:.65,lz:-.9,wx:.85,wz:.2},{rx:-1,lx:-.7,rz:.65,lz:-.85,wx:.35}]],
-    spellbook:[[{rx:-.95,lx:-1,rz:.5,lz:-.5,bookLift:.04,bookTilt:-.12},{rx:-1.55,lx:-1,rz:-.25,lz:-.5,wx:1.1,bookLift:.1,bookTilt:.12},{rx:-1.2,lx:-1,rz:.15,lz:-.5,bookLift:.05}],
-      [{rx:-1,lx:-1.1,rz:.5,lz:-.5,bookLift:.13,bookTilt:-.18},{rx:-1.25,lx:-1.3,rz:.65,lz:-.65,bookLift:.2,bookTilt:.16},{rx:-1,lx:-1.1,rz:.5,lz:-.5,bookLift:.1}]],
+    cooking_pan:[[{rx:-.65,ry:-.8,rz:-.7,wx:1.1,wy:-.8,wz:-1},{rx:-1.1,ry:.65,rz:.45,wx:1.55,wy:.7,wz:.9,tilt:.12},{rx:-.65,rz:.6,wx:1.5,wy:1,wz:1.2}],
+      [{rx:-.4,rz:-.2,wx:1.8,wpz:-.08},{rx:-1.7,rz:.1,wx:.75,wy:.2,wpz:.25,lean:.1},{rx:-1.2,wx:1,wz:-.2}]],
+    twin_daggers:[[{rx:-1,lx:-1,rz:-.65,lz:.65,wx:.7,lwx:.7,wz:-.9,lwz:.9},{rx:-1.3,lx:-1.3,rz:.4,lz:-.4,wx:1.7,lwx:1.7,wz:.8,lwz:-.8,lean:.08},{rx:-.65,lx:-.65,rz:.55,lz:-.55,wx:2,lwx:2}],
+      [{rx:-.55,lx:-1.1,wx:1.57,lwx:1.57,wpz:-.1},{rx:-1.6,lx:-.65,wx:1.57,lwx:1.57,wpz:.34,lpz:-.08,lean:.13},{rx:-.7,lx:-1.6,wx:1.57,lwx:1.57,wpz:-.08,lpz:.34,lean:.08}]],
+    arcane_staff:[[{rx:-1.7,lx:-1.25,rz:.45,lz:-.75,wx:.15,wpy:.12},{rx:-1.3,lx:-1,rz:.55,lz:-.85,wx:1.57,wpz:.16,lean:.05},{rx:-1,lx:-.75,rz:.55,lz:-.75,wx:1.25}],
+      [{rx:-1.1,lx:-.65,rz:.55,lz:-.55,wx:.05,wpy:.2},{rx:-1.4,lx:-1.2,rz:.5,lz:-.85,wx:1.57,wpz:.26},{rx:-1.05,lx:-.75,rz:.55,lz:-.75,wx:1.2}]],
+    spellbook:[[{rx:-1,lx:-1,rz:.5,lz:-.5,bookLift:.13,bookTilt:-.2},{rx:-1.65,lx:-1.1,rz:-.25,lz:-.5,bookLift:.18,bookTilt:.12,bookPush:.18},{rx:-1.15,lx:-1,rz:.15,lz:-.5,bookLift:.07}],
+      [{rx:-1.05,lx:-1.05,rz:.45,lz:-.45,bookLift:.08,bookTilt:-.16},{rx:-1.45,lx:-1.45,rz:.55,lz:-.55,bookLift:.28,bookTilt:.08,bookPush:.3},{rx:-1,lx:-1.1,rz:.5,lz:-.5,bookLift:.1,bookPush:.1}]],
     elven_bow:[[{rx:-1.45,lx:-1.1,ry:-.15,ly:.65,wx:0,lwx:.9},{rx:-1.5,lx:-1.3,ry:.1,ly:.9,wx:0,lwx:1.1,lean:-.05},{rx:-1.35,lx:-.65,ly:.25,wx:.15}],
       [{rx:-1.3,lx:-1.1,rz:-.1,lz:.2,ly:.65,wx:0},{rx:-1.4,lx:-1.35,rz:-.2,lz:.25,ly:.95,wx:0,lean:.03},{rx:-1.25,lx:-.7,ly:.2,wx:.1}]],
     unarmed:[[{rx:-.55,rz:-.3},{rx:-1.55,rz:0,lean:.1},{rx:-.65}], [{lx:-.55,lz:.3},{lx:-1.55,lz:0,lean:.1},{lx:-.65}]]

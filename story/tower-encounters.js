@@ -53,6 +53,12 @@
     const [itemCount, foodCount, storyCount] = COUNTS[size];
     return { itemCount, foodCount, storyCount, total: itemCount + foodCount + storyCount };
   }
+  function arrowLoot(run,size=core().floorConfig(run.floor).size){
+    if(!Object.hasOwn(COUNTS,size)||!run.party?.loadouts||!(run.party.profession==='archer'||run.party.members.some(m=>m.profession==='archer')))return [];
+    // Separate from ordinary items and deterministic across reloads/maze shifts.
+    const count=Math.ceil((size-5)/4);
+    return Array.from({length:count},(_,i)=>({id:'arrows:'+run.floor+':'+i,kind:'arrow',quantity:10}));
+  }
   function merchantOffers(floor, seed, modern=false) {
     const C = core(), random = randomFor(floor, seed, 0x24181), ids = Object.keys(MERCHANTS);
     for (let i = ids.length - 1; i > 0; i--) { const j = Math.floor(random() * (i + 1)); [ids[i], ids[j]] = [ids[j], ids[i]]; }
@@ -62,7 +68,7 @@
       const H=typeof module==='object'&&module.exports?require('./tower-heroes-core.js'):globalThis.TowerHeroes;
       if(modern)for(const merchant of ids)kinds[merchant]=H.gearPool(floor).filter(k=>kinds[merchant].includes(H.GEAR[k].baseKind));
       const old=MERCHANTS[id],entry=modern?{...old,equipmentKinds:kinds[id],greeting:'我是'+old.name+'，這裡有專用裝備與旅途補給。'}:old;
-      return { ...entry, equipmentKinds: [...entry.equipmentKinds], supplies: [...entry.supplies], gear: entry.equipmentKinds.map(kind => {
+      return { ...entry, equipmentKinds: [...entry.equipmentKinds], supplies: [...entry.supplies,...(modern?['arrow']:[])], gear: entry.equipmentKinds.map(kind => {
         const gear = C.createGear(kind, floor, seed, `shop:${floor}:${id}:${kind}`, false);
         return { kind, gear, price: C.gearPrice(gear) };
       }) };
@@ -232,5 +238,5 @@
       return { ok: true, message: '已放棄本層委託，尚未領取的報酬不會保留。' };
     });
   }
-  return Object.freeze({ MERCHANTS, EXPLORERS, QUEST_TYPES, newAdventure, validateAdventure, floorLootCounts, merchantOffers, buySupply, sellSupply, buyMerchantGear, chestOffer, openChest, questReward, explorerIdentity, explorerOffer, acceptQuest, questProgress, claimQuestReward, abandonQuest });
+  return Object.freeze({ MERCHANTS, EXPLORERS, QUEST_TYPES, newAdventure, validateAdventure, floorLootCounts, arrowLoot, merchantOffers, buySupply, sellSupply, buyMerchantGear, chestOffer, openChest, questReward, explorerIdentity, explorerOffer, acceptQuest, questProgress, claimQuestReward, abandonQuest });
 });

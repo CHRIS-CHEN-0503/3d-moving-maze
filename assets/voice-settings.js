@@ -4,9 +4,7 @@
   let voiceSignature='';
   function save(){CFG.speechOn=Number(on.value);CFG.speechVoice=select.value;saveCfg();voice.configure({enabled:!!CFG.speechOn,voice:CFG.speechVoice});}
   function render(state){
-    if(AudioEng.musicGain&&AudioEng.ctx)AudioEng.musicGain.gain.setTargetAtTime(state.speaking?.09:.32,AudioEng.ctx.currentTime,.12);
-    if(AudioEng.fxGain&&AudioEng.ctx)AudioEng.fxGain.gain.setTargetAtTime(state.speaking?.45:.8,AudioEng.ctx.currentTime,.08);
-    if(AudioEng.itemGain&&AudioEng.ctx)AudioEng.itemGain.gain.setTargetAtTime(state.speaking?.16:.4,AudioEng.ctx.currentTime,.08);
+    window.MazeAudioSettings?.duck(state.speaking);
     const chosen=CFG.speechVoice,signature=JSON.stringify([chosen,state.voices.map(v=>[v.voiceURI,v.name,v.lang])]);
     if(signature!==voiceSignature){
       voiceSignature=signature;select.replaceChildren();

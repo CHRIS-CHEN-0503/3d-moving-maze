@@ -6,6 +6,9 @@
   const L=()=>typeof module==='object'&&module.exports?require('./tower-lighting-core.js'):globalThis.TowerLighting;
   const H=()=>typeof module==='object'&&module.exports?require('./tower-heroes-core.js'):globalThis.TowerHeroes;
   const G=()=>typeof module==='object'&&module.exports?require('./tower-hero-growth.js'):globalThis.TowerHeroGrowth;
+  const B=()=>typeof module==='object'&&module.exports?require('./tower-floor-lords.js'):globalThis.TowerFloorLords;
+  const Loot=()=>typeof module==='object'&&module.exports?require('./tower-loot.js'):globalThis.TowerLoot;
+  const Re=()=>typeof module==='object'&&module.exports?require('./tower-reinforcements.js'):globalThis.TowerReinforcements;
   const own=(o,k)=>Object.hasOwn(o,k), num=(v,a,b,int=false)=>Number.isFinite(v)&&v>=a&&v<=b&&(!int||Number.isInteger(v));
   const PROFESSIONS=Object.freeze({
     swordsman:{name:'劍士',person:'蒼衡',gender:'male',color:0x5594c1,skill:'守護架勢',description:'近戰傷害較高。技能：六秒內減傷一半；劍士隊友會替你攔下近身怪物。',cooldown:20},
@@ -49,6 +52,7 @@
     const guard=next.warrior;
     next.party={version:1,profession,sex:gender,members:[],joined:[],ingredients:{root:3,mushroom:2,herb:2,nectar:0,meat:0,shell:1},meals:emptyStock(RECIPES),buffs:[],cooldown:0,guardLeft:0,trapWard:0,slowLeft:0,health:{},poise:{},boss:newBoss(next.floor),journey:X().newJourney(next.floor)};
     if(L())next.party.light=L().newState();
+    next.party.loot=Loot().fresh();next.party.reinforcements=Re().fresh();
     if(guard){const m={id:guard.offerId,profession:'swordsman',sex:'male',level:guard.strength,hp:28+guard.strength*6,cooldown:0,hurtLeft:0};next.party.members.push(m);next.party.joined.push(m.id);}
     next.warrior=null;next.revision++;
     return {ok:true,run:next,message:guard?'原有護衛已成為劍士隊友，不必重新支付費用。':'冒險職業已選定。'};
@@ -68,14 +72,15 @@
     if(!Array.isArray(value.buffs)||value.buffs.length>2||new Set(value.buffs.map(b=>b?.id)).size!==value.buffs.length||!value.buffs.every(b=>b&&own(BUFFS,b.id)&&num(b.floors,1,3,true)))return null;
     for(const k of ['cooldown','guardLeft','trapWard','slowLeft'])if(!num(value[k],0,30))return null;
     const dict=(v,max)=>v&&typeof v==='object'&&!Array.isArray(v)&&Object.keys(v).length<=C().MAX_MONSTERS&&Object.keys(v).every(id=>C().validMonsterId(id)&&!defeated.includes(id)&&num(v[id],0,max));
-    if(!dict(value.health,200)||!dict(value.poise,5))return null;
+    if(!dict(value.health,240)||!dict(value.poise,5))return null;
+    const loot=Loot()?.validate(value.loot,floor,defeated),reinforcements=Re()?.validate(value.reinforcements,floor);if(!loot||!reinforcements)return null;
     const boss=X().validateBoss(value.boss,floor,value.journey===undefined),journey=X().validateJourney(value.journey,floor);
     if(value.light!==undefined&&!L())return null; // Never silently discard saved fuel if a script failed to load.
     const light=L()?.validate(value.light,floor);
     if(boss===undefined||!journey||L()&&!light)return null;
     const loadouts=value.loadouts===undefined?undefined:H()?.validate(value.loadouts,{profession:value.profession,members});
     if(value.loadouts!==undefined&&!loadouts)return null;
-    return {version:1,profession:value.profession,sex:gender,members,joined:[...value.joined],ingredients:{...value.ingredients},meals:{...value.meals},buffs:value.buffs.map(b=>({...b})),cooldown:value.cooldown,guardLeft:value.guardLeft,trapWard:value.trapWard,slowLeft:value.slowLeft,health:{...value.health},poise:{...value.poise},boss,journey,...(light?{light}:{}),...(loadouts?{loadouts}:{})};
+    return {version:1,profession:value.profession,sex:gender,members,joined:[...value.joined],ingredients:{...value.ingredients},meals:{...value.meals},buffs:value.buffs.map(b=>({...b})),cooldown:value.cooldown,guardLeft:value.guardLeft,trapWard:value.trapWard,slowLeft:value.slowLeft,health:{...value.health},poise:{...value.poise},boss,journey,loot,reinforcements,...(light?{light}:{}),...(loadouts?{loadouts}:{})};
   }
   function transact(run,revision,fn){return C().transaction(run,revision,next=>!next.party?{ok:false,message:'尚未選擇冒險職業。'}:fn(next,next.party));}
   function recruitOffer(run){
@@ -124,11 +129,12 @@
     const gear=(p.loadouts?H().ids(n).flatMap(id=>Object.values(H().equipment(n,id)).filter(Boolean)):Object.values(n.equipment).filter(Boolean)).filter(g=>g.durability>0);if(!gear.some(g=>g.durability<g.maxDurability))return {ok:false,message:'沒有可保養的裝備；完全損壞請到鍛匠工坊修復。'};
     n.coins-=cost;gear.forEach(g=>g.durability=Math.min(g.maxDurability,g.durability+Math.round(4*C().durabilityMultiplier(g.kind))));return {ok:true,message:'已保養穿戴中的裝備，破損裝備需另行修復。'};
   });}
-  function defs(){return {...C().MONSTERS,...MONSTERS};}
+  function defs(){return {...C().MONSTERS,...MONSTERS,...B().defs()};}
   function monsterSpecs(run){
     const f=run.floor,config=C().floorConfig(f,run.seed),count=config.monsterCount;
     const pool=f>=90?['mushroom','clockmite']:f>=70?['mushroom','crab','moth','clockmite']:['mushroom','crab','moth','flower',...config.monsterTypes];
-    return Array.from({length:count},(_,i)=>{const kind=pool[hash(run.seed,`monster:${f}:${i}`)%pool.length],def=defs()[kind],strength=Math.min(5,def.strength+config.monsterStrengthBonus);return {id:`monster-${i}`,kind,def,strength,maxHp:18+strength*8+Math.floor((99-f)/8)};});
+    const result=Array.from({length:count},(_,i)=>{const kind=pool[hash(run.seed,`monster:${f}:${i}`)%pool.length],def=defs()[kind],strength=Math.min(5,def.strength+config.monsterStrengthBonus);return {id:`monster-${i}`,kind,def,strength,maxHp:18+strength*8+Math.floor((99-f)/8)};});
+    const lord=B().spec(run);if(lord)result.push(lord);return result.concat(Re().specs(run));
   }
   function strike(run,id,options={},revision){if(run.party?.loadouts)return H().strike(run,id,options,revision);return transact(run,revision,(n,p)=>{
     const spec=monsterSpecs(n).find(m=>m.id===id);if(!spec||n.defeatedMonsters.includes(id))return {ok:false,message:'這隻怪物已經倒下了。'};
@@ -141,8 +147,8 @@
     let broken=null;if(!member&&w){X().wear(n,w);if(w.durability===0){broken=w;n.equipment.weapon=null;}}
     const hp=Math.max(0,(p.health[id]??spec.maxHp)-damage);p.health[id]=hp;
     let stunned=false;if(!member&&w&&!p.poise[id]){n.monsterStuns[id]=Math.min(2,.7+w.bonus*.3);p.poise[id]=4;stunned=true;}
-    const drops={};if(hp===0){n.defeatedMonsters.push(id);delete p.health[id];delete p.poise[id];delete n.monsterStuns[id];n.coins=Math.min(999999,n.coins+8+spec.strength*2);Object.assign(drops,MONSTERS[spec.kind]?.drop||{shell:1});for(const[k,v]of Object.entries(drops))p.ingredients[k]=Math.min(99,p.ingredients[k]+v);}
-    return {ok:true,message:hp===0?`擊敗${spec.def.name}。${Object.keys(drops).map(k=>`獲得${INGREDIENTS[k]}`).join('，')}。`:`命中${spec.def.name}。`,effect:{target:'monster',damage,hp,dead:hp===0,broken,stunned,drops}};
+    let drops=[];if(hp===0){n.defeatedMonsters.push(id);delete p.health[id];delete p.poise[id];delete n.monsterStuns[id];n.coins=Math.min(999999,n.coins+8+spec.strength*2);drops=Loot().recordKill(n,spec,options.lootCell);}
+    return {ok:true,message:hp===0?`擊敗${spec.def.name}。`:`命中${spec.def.name}。`,effect:{target:'monster',damage,hp,dead:hp===0,broken,stunned,drops,lord:!!spec.lord}};
   });}
   function hurtMember(run,id,amount,revision){if(run.party?.loadouts)return transact(run,revision,n=>H().hurt(n,id,amount));return transact(run,revision,(n,p)=>{
     const m=p.members.find(x=>x.id===id);if(!m||m.hp<=0||!num(amount,0,100))return {ok:false,message:'無效的隊友傷害。'};
@@ -163,8 +169,8 @@
     for(const k of Object.keys(p.poise)){p.poise[k]=Math.max(0,p.poise[k]-dt);if(!p.poise[k])delete p.poise[k];}
     if(p.boss?.started&&!p.boss.done)p.boss.clock+=dt;
   }
-  function advance(next){if(!next.party)return;L()?.advance(next);if(next.party.loadouts)H().advance(next);const p=next.party;p.health={};p.poise={};p.boss=newBoss(next.floor);p.journey={...X().newJourney(next.floor),scrap:p.journey?.scrap||0};p.buffs=p.buffs.map(b=>({...b,floors:b.floors-1})).filter(b=>b.floors>0);p.slowLeft=0;}
-  const canDescend=run=>!run.party?.boss||run.party.boss.done;
+  function advance(next){if(!next.party)return;L()?.advance(next);if(next.party.loadouts)H().advance(next);const p=next.party;p.health={};p.poise={};p.loot=Loot().fresh();p.reinforcements=Re().fresh();p.boss=newBoss(next.floor);p.journey={...X().newJourney(next.floor),scrap:p.journey?.scrap||0};p.buffs=p.buffs.map(b=>({...b,floors:b.floors-1})).filter(b=>b.floors>0);p.slowLeft=0;}
+  const canDescend=run=>(!run.party?.boss||run.party.boss.done)&&B().defeated(run);
   const bossPhase=run=>X().phase(run),mirrorTarget=(run,index)=>X().target(run,index),bossAction=(run,index,revision)=>X().bossAction(run,index,revision);
   return Object.freeze({PROFESSIONS,NAMES,person,sex,recruitLimit,INGREDIENTS,RECIPES,BUFFS,MONSTERS,BOSS_FLOORS,enable,validate,has,memberMax,recruitOffer,recruit,dismiss,gather,cook,eat,camp,defs,monsterSpecs,strike,hurtMember,skill,reduceDamage,tick,advance,canDescend,bossPhase,mirrorTarget,bossAction});
 });

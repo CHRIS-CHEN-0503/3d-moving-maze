@@ -1,9 +1,9 @@
 /* 移動迷宮專用錄音索引：音檔只在需要播放時才下載。 */
 (function(root,factory){
-  const api=factory(typeof module==='object'&&module.exports?require('./voice-catalog.js'):root.MazeVoiceCatalog,typeof module==='object'&&module.exports?require('./role-voices.js'):root.MazeRoleVoices);
+  const api=factory(typeof module==='object'&&module.exports?require('./voice-catalog.js'):root.MazeVoiceCatalog,typeof module==='object'&&module.exports?require('./role-voices.js'):root.MazeRoleVoices,typeof module==='object'&&module.exports?require('./character-voices.js'):root.MazeCharacterVoices);
   if(typeof module==='object'&&module.exports)module.exports=api;
   if(root)root.MazeVoicePack=api;
-})(typeof globalThis!=='undefined'?globalThis:this,function(catalog,roles){
+})(typeof globalThis!=='undefined'?globalThis:this,function(catalog,roles,characters){
   'use strict';
   const saleTracks={};
   for(const [seconds,spoken] of [[15,'十五'],[20,'二十'],[25,'二十五']])saleTracks['shop.sale.clear.'+seconds]=Object.freeze({src:'./assets/voice/sale-clear-'+seconds+'.mp3',text:'大拍賣！限時'+seconds+'秒，快來搶購！',spokenText:'大拍賣！限時'+spoken+'秒，快來搶購！'});
@@ -23,12 +23,13 @@
     'explorer.sena':Object.freeze({src:'./assets/voice/explorer-sena.mp3',text:'從塔頂看過的流星，我一顆都記得。希望下一次，能站在塔外仰望。'}),
     'alert.monster':Object.freeze({src:'./assets/voice/alert-monster.mp3',text:'小心，附近有怪物。留意地上的紅圈，準備閃避，或請護衛攔住牠。'}),
   };
-  const tracks=Object.freeze({...originalTracks,...roles?.tracks,...roles?.overrides});
+  const lords=typeof module==='object'&&module.exports?require('../story/tower-floor-lords.js'):globalThis.TowerFloorLords;
+  const tracks=Object.freeze({...originalTracks,...roles?.tracks,...roles?.overrides,...characters?.tracks,...lords?.tracks});
   function get(id){return typeof id==='string'&&Object.hasOwn(tracks,id)?tracks[id]:null;}
   const normalize=s=>String(s||'').replace(/[\p{Extended_Pictographic}\uFE0F\u200D]/gu,'').replace(/\s+/g,'').replace(/[·・]/g,'・');
-  const byText=new Map();for(const [id,track] of Object.entries(tracks))if(!id.startsWith('role.'))byText.set(normalize(track.text),id);
+  const byText=new Map();for(const [id,track] of Object.entries(tracks))if(!id.startsWith('role.')&&track.category!=='character-bark')byText.set(normalize(track.text),id);
   const exactText=new Map();const spokenKey=s=>normalize(s).replace(/[。！？!?，,；;：:]/g,'');
-  for(const [id,track] of Object.entries(tracks))if(!id.startsWith('role.'))exactText.set(spokenKey(track.text),id);
+  for(const [id,track] of Object.entries(tracks))if(!id.startsWith('role.')&&track.category!=='character-bark')exactText.set(spokenKey(track.text),id);
   function exact(text,gender){const base=exactText.get(spokenKey(text));if(!base)return null;const id=roles?.variants?.[base]?.[gender]||base;return {asset:id,text:tracks[id].text};}
   const keys=[...byText.keys()].filter(Boolean).sort((a,b)=>b.length-a.length);
   const pattern=new RegExp(keys.map(k=>k.replace(/[.*+?^${}()|[\]\\]/g,'\\$&')).join('|'),'gu');

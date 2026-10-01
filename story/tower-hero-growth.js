@@ -5,7 +5,7 @@
   const C=()=>typeof module==='object'&&module.exports?require('./story-core.js'):globalThis.TowerCore;
   const P=()=>typeof module==='object'&&module.exports?require('./tower-party-core.js'):globalThis.TowerPartyCore;
   const copy=v=>JSON.parse(JSON.stringify(v)),num=(v,a,b)=>Number.isFinite(v)&&v>=a&&v<=b;
-  const XP_SCALE=10,XP=Object.freeze([0,70,180,350,580,860,1220,1660,2190,2810].map(n=>n*XP_SCALE));
+  const XP_SCALE=7.5,XP=Object.freeze([0,70,180,350,580,860,1220,1660,2190,2810].map(n=>Math.round(n*XP_SCALE)));
   const STRATEGIES=Object.freeze({attack:{name:'積極攻擊',description:'優先輸出技能，必要時救援或治療。'},support:{name:'優先輔助',description:'優先治療、護盾與增益，再找機會攻擊。'},survive:{name:'保命優先',description:'優先救援、自保與牽制，再進行攻擊。'}});
   function setStrategy(run,id,strategy){return C().transaction(run,run.revision,n=>{const p=state(n).policies[id];if(!p||!Object.hasOwn(STRATEGIES,strategy))return {ok:false,message:'請選擇有效的隊員與策略。'};p.strategy=strategy;p.thinkLeft=0;return {ok:true,message:'戰鬥策略：'+STRATEGIES[strategy].name};});}
   const active=(id,job,name,attack,power,cooldown,effect,description,cost={})=>({id,job,name,attack,power:Array(6).fill(power),cooldown,effect,description,cost,unique:true});

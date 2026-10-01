@@ -96,8 +96,9 @@
 
   function buildHand(T, skin) {
     const group = new T.Group(), material = new T.MeshLambertMaterial({color: skin, flatShading: true});
-    const palm = new T.Mesh(new T.BoxGeometry(.17,.22,.12), material); palm.position.y=.18;group.add(palm);
-    const fingers = new T.Mesh(new T.BoxGeometry(.15,.13,.08),material);fingers.position.set(0,.33,.045);group.add(fingers);
+    const sculpt=globalThis.CharacterSculpt;
+    const palm = new T.Mesh(sculpt?sculpt.ellipsoid(T,.17,.22,.12):new T.BoxGeometry(.17,.22,.12), material); palm.position.y=.18;group.add(palm);
+    const fingers = new T.Mesh(sculpt?sculpt.capsule(T,.15,.13,.08):new T.BoxGeometry(.15,.13,.08),material);fingers.position.set(0,.33,.045);group.add(fingers);
     group.name='first-person-reaching-hand';group.visible=false;return group;
   }
 

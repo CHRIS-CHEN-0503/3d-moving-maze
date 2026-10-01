@@ -57,8 +57,8 @@ test('profession abilities require resources and persist cooldown; reductions do
   for(const job of Object.keys(P.PROFESSIONS)){let r=fresh(job);r.hp=20;r.hunger=20;r.equipment.weapon.durability=1;const result=P.skill(r);assert.equal(result.ok,true,job);assert.ok(result.run.party.cooldown>0);assert.equal(P.skill(result.run).ok,false);assert.ok(C.validateSave(result.run));}
   let r=P.skill(fresh()).run;assert.equal(C.takeDamage(r,10).run.hp,55);assert.equal(C.takeDamage(r,10,'hunger').run.hp,50);
 });
-test('all floors keep timing formula and bounded deterministic nine-monster roster',()=>{
-  const kinds=new Set();for(let f=99;f>=1;f--){const r=floor(fresh(),f),spec=P.monsterSpecs(r),config=C.floorConfig(f,r.seed);assert.equal(spec.length,config.monsterCount);assert.ok(spec.length>=config.monsterMin&&spec.length<=config.monsterMax);assert.equal(config.shiftSeconds,150-(99-f));assert.deepEqual(spec,P.monsterSpecs(r));spec.forEach(m=>{kinds.add(m.kind);assert.equal(m.strength,Math.min(5,m.def.strength+config.monsterStrengthBonus));if(f>=90)assert.equal(m.strength,1);});}assert.equal(Object.keys(P.defs()).length,9);assert.ok([...Object.keys(P.defs())].every(k=>kinds.has(k)));
+test('all floors keep timing and deterministic originals, plus exactly one lord on chapter finales',()=>{
+  const kinds=new Set();for(let f=99;f>=1;f--){const r=floor(fresh(),f),spec=P.monsterSpecs(r),regular=spec.filter(m=>!m.lord),lords=spec.filter(m=>m.lord),config=C.floorConfig(f,r.seed);assert.equal(regular.length,config.monsterCount);assert.equal(lords.length,f===1||f%10===0?1:0);assert.ok(regular.length>=config.monsterMin&&regular.length<=config.monsterMax);assert.equal(config.shiftSeconds,150-(99-f));assert.deepEqual(spec,P.monsterSpecs(r));spec.forEach(m=>{kinds.add(m.kind);assert.equal(m.strength,m.lord?m.def.strength:Math.min(5,m.def.strength+config.monsterStrengthBonus));if(f>=90&&!m.lord)assert.equal(m.strength,1);});}assert.equal(Object.keys(P.defs()).length,19);assert.ok([...Object.keys(P.defs())].every(k=>kinds.has(k)));
 });
 test('enemy population survives saving, defeats and maze changes without rerolling',()=>{
   for(const f of [99,97,89,69,59,39,1]){
@@ -71,12 +71,12 @@ test('legacy party combat saves accept the expanded eleven-monster population',(
   const seed=Array.from({length:100},(_,i)=>i+1).find(s=>C.floorConfig(1,s).monsterCount===11);assert.ok(seed);
   let r=floor(P.enable(C.newRun({seed}),'swordsman').run,1);
   const roster=P.monsterSpecs(r);for(const m of roster){const hit=P.strike(r,m.id);assert.ok(hit.ok);r=hit.run;}
-  assert.equal(Object.keys(r.party.health).length,11);assert.ok(C.validateSave(JSON.stringify(r)));
+  assert.equal(Object.keys(r.party.health).length,12,'Eleven originals and the chapter lord retain damage');assert.ok(C.validateSave(JSON.stringify(r)));
 });
 test('90/80 maze bosses need telegraphed cycles and two seals; rewards are idempotent',()=>{
   for(const f of [90,80]){let r=floor(fresh(),f);assert.equal(P.canDescend(r),false);r=P.bossAction(r,0).run;assert.equal(P.bossPhase(r),'warning');assert.equal(P.bossAction(r,0).ok,false);r=C.tickEffects(r,9).run;assert.equal(P.bossPhase(r),'rest');
     for(let i=0;i<2;i++)for(let turn=0;turn<4&&!r.party.boss.seals[i];turn++){const result=P.bossAction(r,i);assert.equal(result.ok,true);r=result.run;}
-    assert.equal(r.party.boss.done,true);assert.ok(P.canDescend(r));const money=r.coins;assert.equal(P.bossAction(r,1).ok,false);assert.equal(r.coins,money);assert.ok(C.validateSave(r));
+    assert.equal(r.party.boss.done,true);assert.equal(P.canDescend(r),false,'The floor lord also guards the stairs');r.defeatedMonsters.push('monster-11');assert.ok(P.canDescend(r));const money=r.coins;assert.equal(P.bossAction(r,1).ok,false);assert.equal(r.coins,money);assert.ok(C.validateSave(r));
   }
 });
 test('legacy saves and active dungeons keep old state; parent boss clock pauses in dungeon',()=>{

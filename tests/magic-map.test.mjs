@@ -59,13 +59,13 @@ for(const size of [7,9,11,13,15,19,25])test(size+' 格：魔法地圖額外生�
   const positions=[...c.G.items,...c.G.foods].map(i=>i.x+','+i.z);assert.equal(new Set(positions).size,positions.length);
   assert.ok(!positions.includes('0,0'));assert.ok(!positions.includes((size-1)+','+(size-1)));
 });
-test('劇情變形只補額外魔法地圖，不重生普通道具／食物、不累積地圖模型',()=>{
-  const {c}=spawning(13,false,true);c.spawnItems();
-  const ordinary=c.G.items.filter(i=>!i.magicMap),foods=c.G.foods,oldMap=c.G.items.find(i=>i.magicMap);ordinary[0].taken=true;oldMap.taken=true;
+test('劇情不自然生成魔法地圖或補給，變形也不偷偷補生',()=>{
+  const {c,config}=spawning(13,false,true);config.itemCount=0;config.foodCount=0;c.spawnItems();
+  const foods=c.G.foods;assert.equal(c.G.items.length,0);assert.equal(foods.length,0);
   c.TowerMode.preserveFloorPickups=()=>true;
   const count=c.itemGroup.children.length;
-  for(let i=0;i<4;i++){c.spawnItems();assert.equal(c.G.items.filter(i=>i.magicMap).length,2);assert.equal(c.itemGroup.children.length,count);}
-  assert.ok(c.G.items.includes(ordinary[0]));assert.equal(ordinary[0].taken,true);assert.equal(c.G.foods,foods);assert.ok(!c.G.items.includes(oldMap));
+  for(let i=0;i<4;i++){c.spawnItems();assert.equal(c.G.items.length,0);assert.equal(c.itemGroup.children.length,count);}
+  assert.equal(c.G.foods,foods);
 });
 test('道具數量的最小／最大設定均保留原配額，重建也只額外增加地圖',()=>{
   for(const size of [11,13,25])for(const amount of [3,6,12]){

@@ -147,9 +147,9 @@
   }
   function describeQuest(q, run) {
     const C = core(), types = {
-      defeat: ['清除路障', '請讓護衛擊敗指定的守路怪物。'], escort: ['護送迷途旅人', '帶我一起走到本層出口，請不要把我丟下。'],
+      defeat: ['清除路障', run.party?.loadouts?'請與隊友擊敗指定的守路怪物。':'請讓護衛擊敗指定的守路怪物。'], escort: ['護送迷途旅人', '帶我一起走到本層出口，請不要把我丟下。'],
       relic: ['遺失的記憶', '幫我找回散落在迷宮中的記憶碎片。'], donate: ['旅人的急需', `請交付 ${q.goal} 份${C.ITEMS[q.target]?.name || '補給'}，讓我能繼續走下去。`],
-      survey: ['繪製迷宮', '走訪三個不同的迷宮格，替我記下道路。'], shift: ['觀察高塔心跳', '陪我安全經歷一次迷宮變形。'], stun: ['爭取逃脫時間', '用武器擊暈指定怪物一次，替旅人爭取空檔。'],
+      survey: ['繪製迷宮', '走訪三個不同的迷宮格，替我記下道路。'], shift: ['觀察高塔心跳', '陪我安全經歷一次迷宮變形。'], stun: ['爭取逃脫時間', run.party?.loadouts?'擊敗指定怪物，或用技能擊暈、束縛牠，替旅人爭取空檔。':'用武器擊暈指定怪物一次，替旅人爭取空檔。'],
     };
     return { ...q, title: types[q.type][0], description: types[q.type][1], reward: questReward(run.floor, run.seed,!!run.party?.loadouts), explorer: explorerIdentity(run.floor, run.seed) };
   }
@@ -169,7 +169,7 @@
     if (donations.length) candidates.push('donate');
     const defeatable = party ? alive[0] : run.warrior && run.warrior.mode === 'escort' ? alive.find(m => C.monsterStrength(m.kind, run.floor) < run.warrior.strength) : null;
     if (defeatable) candidates.push('defeat');
-    if (alive.length && run.equipment && run.equipment.weapon) candidates.push('stun');
+    if (!run.party?.loadouts && alive.length && run.equipment && run.equipment.weapon) candidates.push('stun');
     const type = candidates[Math.floor(random() * candidates.length)], target = type === 'defeat' ? defeatable.id : type === 'stun' ? alive[0].id : type === 'donate' ? donations[Math.floor(random() * donations.length)] : type === 'relic' ? `relic:${run.floor}:${run.seed}` : type === 'escort' ? 'exit' : type === 'survey' ? 'cells' : 'walls';
     const goal = type === 'donate' ? Math.min(run.bag[target], 1 + Math.floor(random() * 3)) : type === 'survey' ? 3 : 1;
     const id = `quest:${run.floor}:${run.seed}:${type}:${target}:${goal}`;
@@ -187,13 +187,15 @@
   }
   function questProgress(run, event, data = {}) {
     const existing = run.adventure && run.adventure.quest;
-    if (!existing || existing.status !== 'active' || event !== existing.type) return failure(run, '目前沒有符合的進行中委託。');
+    const modernControl=run.party?.loadouts&&existing?.type==='stun'&&['defeat','root'].includes(event);
+    if (!existing || existing.status !== 'active' || (event !== existing.type&&!modernControl)) return failure(run, '目前沒有符合的進行中委託。');
     return transaction(run, undefined, next => {
       const q = next.adventure.quest;
       let key;
-      if (event === 'defeat' || event === 'stun') {
+      if (event === 'defeat' || event === 'stun' || event==='root') {
         if ((data.monsterId || data.id) !== q.target || (event === 'defeat' && !next.defeatedMonsters.includes(q.target))) return { ok: false, message: '這不是委託指定的怪物。' };
         if (event === 'stun' && !(next.monsterStuns && next.monsterStuns[q.target] > 0)) return { ok: false, message: '指定怪物尚未被擊暈。' };
+        if(event==='root'&&!(next.party?.loadouts?.enemy[q.target]?.root>0))return {ok:false,message:'指定怪物尚未被束縛。'};
         key = q.target;
       } else if (event === 'relic') {
         if (data.id !== q.target) return { ok: false, message: '這不是遺失的記憶碎片。' };

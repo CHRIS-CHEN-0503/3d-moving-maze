@@ -28,7 +28,7 @@
 @media(max-width:600px) and (orientation:portrait) {.party-professions {grid-template-columns:repeat(2,minmax(0,1fr))}}
 
 /* A single small lighting shortcut, separate from the weapon and profession skill. */
-#towerLightBtn {display:grid;place-items:center;flex:none;width:40px;height:40px;padding:8px;border:1px solid #d4b78066;border-radius:9px;background:#283642;color:#c9c3af;cursor:pointer;pointer-events:auto;touch-action:manipulation}
+#towerLightBtn {display:grid;place-items:center;flex:none;width:40px;height:40px;padding:0;box-sizing:border-box;border:1px solid #d4b78066;border-radius:9px;background:#283642;color:#c9c3af;cursor:pointer;pointer-events:auto;touch-action:manipulation}
 #towerLightBtn[hidden],#towerLightStatus[hidden] {display:none!important}
 #towerLightBtn svg,.tower-light-card svg {width:24px;height:24px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
 #towerLightBtn[data-light="torch"] {color:#ffce80;background:#4c3d2c}

@@ -3,12 +3,12 @@ import { access, readFile, stat } from 'node:fs/promises';
 import vm from 'node:vm';
 
 const html = await readFile(new URL('../index.html', import.meta.url), 'utf8');
-for(const asset of ['maze-sight-core','maze-sight']){
+for(const asset of ['character-sculpt','character-face','character-voices','audio-settings','maze-sight-core','maze-sight']){
   new vm.Script(await readFile(new URL(`../assets/${asset}.js`,import.meta.url),'utf8'),{filename:asset+'.js'});
   assert.ok(html.includes(`src="./assets/${asset}.js?v=`),`缺少視野模組：${asset}`);
 }
 
-for(const asset of ['tower-team-tactics','tower-encounter-alert','tower-combat-motion','tower-menu-voice','tower-hero-growth','tower-growth-runtime','tower-lighting-core','tower-lighting-runtime','tower-heroes-core','tower-heroes-icons','tower-heroes-visuals','tower-heroes-runtime']){
+for(const asset of ['tower-floor-lords','tower-loot','tower-reinforcements','tower-stairs','tower-monster-sense','tower-combat-intent','tower-team-tactics','tower-encounter-alert','tower-combat-motion','tower-menu-voice','tower-hero-growth','tower-growth-runtime','tower-lighting-core','tower-lighting-runtime','tower-heroes-core','tower-heroes-icons','tower-heroes-visuals','tower-heroes-runtime']){
   new vm.Script(await readFile(new URL(`../story/${asset}.js`,import.meta.url),'utf8'),{filename:asset+'.js'});
   assert.ok(html.includes(`src="story/${asset}.js?v=`),`缺少照明模組：${asset}`);
 }

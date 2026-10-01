@@ -57,7 +57,7 @@ test('設定彈窗取代收合：戰鬥技能不隱藏，背包與日誌常駐�
   const css=readFileSync(new URL('../assets/play-controls.css',import.meta.url),'utf8');
   assert.doesNotMatch(css,/#gameScreen:not\(\.actions-open\)[^{]+\{visibility:hidden/);
   const dock=readFileSync(new URL('../assets/battle-dock.js',import.meta.url),'utf8'),skin=readFileSync(new URL('../assets/battle-dock.css',import.meta.url),'utf8');
-  assert.ok(dock.includes("['towerBagBtn','towerJournalBtn','viewToggle']"));
+  assert.ok(dock.includes("['towerBagBtn','towerJournalBtn','viewToggle','towerQuestBtn']"));
   assert.ok(dock.includes("['heroQuickBar','heroSkillBar','towerProfessionBtn','towerAttackBtn','actionsToggle']"));
   assert.match(skin,/flex-direction:column-reverse/);assert.match(skin,/flex-direction:row-reverse/);assert.match(skin,/#heroSkillBar[^}]*overflow-x:auto/);
 });

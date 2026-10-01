@@ -204,7 +204,7 @@ test('粒子逐顆消失時釋放材質，共用幾何等最後一顆消失才�
 test('揮擊模型同層重用、換層完整釋放，沒有舊動畫跨場景回呼', () => {
   const motion = createRequire(import.meta.url)('../assets/character-motion.js'), scene = new THREE.Scene();
   const context = vm.createContext({
-    THREE, window: { CharacterMotion: motion }, CharacterMotion: motion, scene,
+    THREE, window: { CharacterMotion: motion }, CharacterMotion: motion, CharacterSculpt:createRequire(import.meta.url)('../assets/character-sculpt.js'), scene,
     G: { running: true, charIdx: 4 }, AudioEng: { sfxSwing() {} }, _texCache: {}, spriteCache: {}, makePickupMarker: {},
     requestAnimationFrame() { throw new Error('揮擊不得另建動畫回呼'); },
   });

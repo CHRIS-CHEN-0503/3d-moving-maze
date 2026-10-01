@@ -144,7 +144,7 @@ test('clearMazeAtmosphere 重複呼叫安全，不移除主牆或改碰撞盒', 
 test('手機觸控走低批次預算，劇情使用當層專屬色盤而非一般城堡色盤', () => {
   const style = { style: 'ice', palette: { wall: 0xc4e2e5, ground: 0xbfd6dd, accent: 0xe0fbff }, seed: 54321 };
   const h = harness({ coarse: true, towerStyle: style }); h.run('buildWalls(theme)');
-  const expected = MazeAtmosphere.plan({ ...options(h), ...style, quality: 'low' });
+  const expected = MazeAtmosphere.plan({ ...options(h), ...style, quality: 'low', rich:true, exitCell:h.context.G.exitCell });
   assert.deepEqual(plain(h.atmosphere.stats), expected.stats);
   assert.ok(h.atmosphere.stats.wallSections <= 28 && h.atmosphere.stats.floorCells <= 80);
   const mesh = h.atmosphere.wallRoot.children.find(object => object.name === 'wall-relief-batch');

@@ -42,13 +42,14 @@
     if (!T || !T.Group || !T.Mesh || !T.MeshLambertMaterial) throw new TypeError('TowerCharacters 需要 deps.THREE。');
     const materials = new Map(), geometries = new Map();
     const material = color => {
-      if (!materials.has(color)) materials.set(color, new T.MeshLambertMaterial({ color, flatShading: true }));
+      if (!materials.has(color)) materials.set(color, new T.MeshLambertMaterial({ color, flatShading: false }));
       return materials.get(color);
     };
     const geometry = (kind, args) => {
       const key = kind + ':' + args.join(',');
       if (!geometries.has(key)) {
-        if(rounded&&kind==='BoxGeometry'&&T.Shape&&Math.min(...args)>=.09){
+        if(rounded&&kind==='BoxGeometry'&&globalThis.CharacterSculpt){geometries.set(key,globalThis.CharacterSculpt.roundedBox(T,...args));}
+        else if(rounded&&kind==='BoxGeometry'&&T.Shape&&Math.min(...args)>=.09){
           const [w,h,d]=args,b=Math.min(.018,Math.min(...args)*.12),s=new T.Shape();
           s.moveTo(-w/2+b,-h/2+b);s.lineTo(w/2-b,-h/2+b);s.lineTo(w/2-b,h/2-b);s.lineTo(-w/2+b,h/2-b);s.closePath();
           const geo=new T.ExtrudeGeometry(s,{depth:d-2*b,bevelEnabled:true,bevelThickness:b,bevelSize:b,bevelSegments:1,steps:1});
@@ -76,8 +77,8 @@
   function figure(k, options) {
     const g = new k.T.Group();
     const { width = .62, legHeight = .55, bodyY = .97, headY = 1.58, shirt, pants, skin = 0xe5b593 } = options;
-    const body = k.box(g, [width, .64, .37], shirt, 'torso', 0, bodyY, 0);
-    const head = k.box(g, [.53, .49, .48], skin, 'head', 0, headY, 0);
+    const body=k.T.Mesh&&globalThis.CharacterSculpt?new k.T.Mesh(globalThis.CharacterSculpt.torso(k.T,width,.64,.39),new k.T.MeshLambertMaterial({color:shirt})):k.box(g,[width,.64,.37],shirt,'torso',0,bodyY,0);if(!body.parent){body.position.y=bodyY;body.name='sculpted-torso';g.add(body);}
+    const head=k.sphere(g,[1,12,8],skin,'sculpted-head',0,headY,0);head.scale.set(.27,.275,.24);
     const eyes=[];
     for (const side of [-1, 1]) eyes.push(k.box(g, [.066, .085, .025], 0x222b34, 'eye', side * .12, headY + .03, .253));
     const limbs = {};
@@ -92,7 +93,7 @@
       k.box(leg, [.26, .03, .35], 0x222b34, 'boot-sole', 0, -legHeight + .015, .055);
       limbs['arm' + suffix] = arm; limbs['leg' + suffix] = leg;
     }
-    g.userData = { ...limbs, body, head, modelFamily: 'tower-original', frontAxis: '+Z' };
+    g.userData = { ...limbs, body, head, modelFamily: 'tower-original', frontAxis: '+Z',sculpted:true };
     if(globalThis.CharacterFace)globalThis.CharacterFace.attach(k.T,g,g,eyes,headY);
     return g;
   }

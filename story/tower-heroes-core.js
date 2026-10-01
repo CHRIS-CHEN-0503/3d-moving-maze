@@ -8,7 +8,7 @@
   const own=(o,k)=>Object.hasOwn(o,k),num=(n,a,b,int=false)=>Number.isFinite(n)&&n>=a&&n<=b&&(!int||Number.isInteger(n));
   const clone=v=>JSON.parse(JSON.stringify(v)),SLOTS=Object.freeze(['helmet','armor','weapon','shield']);
   // Approved preparation proposals, each increased by 0.5 seconds. Other skills remain instant.
-  const PREPARATION=Object.freeze({starfall:1.5,star_ring:1.9,decisive_slash:1.3,whirlwind:.8,dawn_sanctuary:1.3,revive:1.5,moving_fortress:1.1,barricade:1,hero_feast:1.3,daylight:1.1,worldtree_arrow:1.5});
+  const PREPARATION=Object.freeze({starfall:1.5,star_ring:1.9,decisive_slash:1.3,whirlwind:.8,dawn_sanctuary:1.3,revive:1.5,moving_fortress:1.1,barricade:1,hero_feast:1.3,worldtree_arrow:1.5});
   const preparationSeconds=id=>PREPARATION[id]||0;
   const JOBS=Object.freeze({
     swordsman:{name:'劍士',armor:'heavy',starter:'longsword',color:'#89bce1',charIdx:2},
@@ -60,7 +60,7 @@
     skill('starfall','mage','星隕術',true,[200,225,250,275,300],25,'starfall','蓄力後轟擊前方可見的小範圍。'),
     skill('frost_field','mage','寒霜結界',false,[20,25,30,35,40],26,'frost','六秒內使附近怪物緩速。'),
     skill('barrier','mage','護身結界',false,[10,15,20,25,30],30,'barrier','替指定隊友吸收傷害，最多十秒。'),
-    skill('daylight','mage','日光術',false,[3,3.5,4,4.5,5],600,'daylight','照亮迷宮十分鐘，等級提升照明範圍。'),
+    skill('thorn_growth','mage','棘蔓生長',true,[90,110,130,150,170],20,'thorns','前方棘蔓刺傷一隻可見怪物，束縛移動三秒；怪物仍可攻擊。'),
     skill('backstab','scout','背身突襲',true,[70,80,90,100,110],10,'blind','干擾怪物轉向；背後命中可中斷蓄力。'),
     skill('throw_blade','scout','牽制飛刃',true,[45,55,65,75,85],10,'slow','投出飛刃，使怪物短暫緩速。'),
     skill('path_eye','scout','探路之眼',false,[3,4,5,6,7],25,'reveal','短暫看見附近陷阱與通道，不永久揭露地圖。'),
@@ -142,10 +142,11 @@
     return {skills:sets[hash(seed,identity+':skills')%sets.length],passives:[passives[first],passives[second]]};
   }
   function reorderSkills(run,id,order,revision=run.revision){return C().transaction(run,revision,n=>{const a=actor(n,id);if(!a||!Array.isArray(order)||order.length!==a.skills.length||new Set(order).size!==order.length||!order.every(k=>a.skills.includes(k)))return {ok:false,message:'只能排列這位人物已擁有的技能。'};a.skills=[...order];return {ok:true};});}
+  function showHeadgear(run,id,visible,revision=run.revision){return C().transaction(run,revision,n=>{const a=actor(n,id);if(!a||typeof visible!=='boolean')return {ok:false,message:'找不到這位隊員。'};a.showHelmet=visible;return {ok:true,message:visible?'顯示頭部裝備':'顯示原本髮型，裝備防禦仍保留。'};});}
   function makeActor(run,id,profession){
     const draw=draft(run.seed,profession,id==='hero'?'hero':profession),j=JOBS[profession],head={heavy:'heavy_helm',light:'light_hood',robe:'rune_crown'}[j.armor],body={heavy:'heavy_armor',light:'light_armor',robe:'robe'}[j.armor];
     const make=kind=>C().createGear(kind,run.floor,run.seed,id+':starter:'+kind);
-    return {...draw,learned:null,equipment:{helmet:make(head),armor:make(body),weapon:make(j.starter),shield:GEAR[j.starter].hands===1?make('buckler'):null},cooldowns:Object.fromEntries(draw.skills.map(s=>[s,0])),buffs:[],attack:0,hurt:0,tool:0,autoLeft:0,autoRescue:false,roll:0,pending:null,shot:null};
+    return {...draw,learned:null,showHelmet:true,equipment:{helmet:make(head),armor:make(body),weapon:make(j.starter),shield:GEAR[j.starter].hands===1?make('buckler'):null},cooldowns:Object.fromEntries(draw.skills.map(s=>[s,0])),buffs:[],attack:0,hurt:0,tool:0,autoLeft:0,autoRescue:false,roll:0,pending:null,shot:null};
   }
   function preview(run,offer){return makeActor(run,offer.id,offer.profession);}
   function enable(run){return C().transaction(run,run.revision,n=>{
@@ -263,9 +264,10 @@
     }
     const enemy=state(n).enemy[monsterId]||(state(n).enemy[monsterId]={}),duration=(2+l*.4)*(1+pv(n,'resonance',id)/100);
     if(['slow','splash','binding','great_arrow'].includes(effect)){enemy.slow=duration;enemy.slowPower=.2+l*.04;}
+    if(effect==='thorns')enemy.root=3;
     if(effect==='blind')enemy.blind=duration;if(effect==='weak')enemy.weak=.15+l*.04;if(effect==='mark')enemy.mark=6;
-    if(remaining===0){n.defeatedMonsters.push(monsterId);delete n.party.health[monsterId];delete n.party.poise[monsterId];delete n.monsterStuns[monsterId];delete state(n).enemy[monsterId];n.coins=Math.min(999999,n.coins+8+spec.strength*2);for(const[k,v]of Object.entries(P().MONSTERS[spec.kind]?.drop||{shell:1}))n.party.ingredients[k]=Math.min(99,n.party.ingredients[k]+v);gainXp(n,5+spec.strength*2);}
-    return {ok:true,message:remaining===0?'擊敗 '+spec.def.name:'命中 '+spec.def.name,effect:{target:'monster',targetId:monsterId,damage,hp:remaining,dead:remaining===0,stunned,repel:effect==='repel',broken:w?.durability===0?w:null}};
+    let drops=[];if(remaining===0){n.defeatedMonsters.push(monsterId);delete n.party.health[monsterId];delete n.party.poise[monsterId];delete n.monsterStuns[monsterId];delete state(n).enemy[monsterId];n.coins=Math.min(999999,n.coins+8+spec.strength*2);const Loot=typeof module==='object'&&module.exports?require('./tower-loot.js'):globalThis.TowerLoot;drops=Loot.recordKill(n,spec,options.lootCell);gainXp(n,5+spec.strength*2);}
+    return {ok:true,message:remaining===0?'擊敗 '+spec.def.name:'命中 '+spec.def.name,effect:{target:'monster',targetId:monsterId,damage,hp:remaining,dead:remaining===0,drops,lord:!!spec.lord,stunned,rooted:effect==='thorns'&&remaining>0,repel:effect==='repel',broken:w?.durability===0?w:null}};
   });}
   function cast(run,skillId,options={},revision){return C().transaction(run,revision,n=>{
     const id=options.actorId||state(n)?.active,a=actor(n,id),s=SKILLS[skillId];
@@ -324,17 +326,28 @@
     for(const id of ids(run)){const a=actor(run,id);if(a.pending){a.pending.left-=dt;if(a.pending.left<=0)a.pending=null;}if(a.shot){a.shot.left-=dt;if(a.shot.left<=0)a.shot=null;}for(const key of ['attack','hurt','tool','autoLeft'])a[key]=Math.max(0,a[key]-dt);for(const key of a.skills)a.cooldowns[key]=Math.max(0,a.cooldowns[key]-dt);for(const b of a.buffs){if(b.id==='regen'&&hp(run,id)>0)heal(run,id,Math.min(dt,b.left)*b.power);b.left=Math.max(0,b.left-dt);}a.buffs=a.buffs.filter(b=>b.left>0);
       if(pv(run,'tool_supply',id)&&hp(run,id)>0&&a.tool===0&&run.engine.shovels<1){run.engine.shovels=1;a.tool=pv(run,'tool_supply',id);}
     }
-    for(const e of Object.values(s.enemy))for(const key of ['slow','blind','mark','tauntLeft','relay','relayCooldown','relayWeak'])if(e[key])e[key]=Math.max(0,e[key]-dt);sync(run);
+    for(const e of Object.values(s.enemy))for(const key of ['slow','root','blind','mark','tauntLeft','relay','relayCooldown','relayWeak'])if(e[key])e[key]=Math.max(0,e[key]-dt);sync(run);
   }
   function advance(run){if(!enabled(run))return;state(run).enemy={};state(run).removedTraps=[];for(const a of Object.values(state(run).actors))a.shot=null;gainXp(run,8);}
   const BUFFS=['guard','barrier','ward','rally','speed','polish','fortify','stealth','smoke','stomach','regen','daylight','slow','intercept','path_eye','oath_power','fortress','sanctuary','escape'];
   function validate(value,party){
-    if(!value||value.version!==1||!(value.xpScale===undefined||value.xpScale===G.XP_SCALE)||!num(value.level,1,10,true)||!num(value.xp,0,100000,true)||!num(value.heroHp,0,60+(value.level-1)*3)||!num(value.switchLeft,0,1))return null;
+    if(!value||value.version!==1||!(value.xpScale===undefined||value.xpScale===10||value.xpScale===G.XP_SCALE)||!num(value.level,1,10,true)||!num(value.xp,0,100000,true)||!num(value.heroHp,0,60+(value.level-1)*3)||!num(value.switchLeft,0,1))return null;
+    // Replace the retired random skill without deleting a save, changing order,
+    // refunding resources or retaining its old ten-minute skill cooldown.
+    value=clone(value);
+    for(const a of Object.values(value.actors||{}))if(Array.isArray(a?.skills)&&a.skills.includes('daylight')){
+      if(a.skills.includes('thorn_growth'))return null;
+      a.skills=a.skills.map(k=>k==='daylight'?'thorn_growth':k);
+      a.cooldowns={...a.cooldowns,thorn_growth:0};delete a.cooldowns.daylight;
+      if(a.learned==='daylight')a.learned='thorn_growth';
+    }
+    if(value.growth?.choices!==undefined){if(!Array.isArray(value.growth.choices))return null;value.growth.choices=value.growth.choices.map(k=>k==='daylight'?'thorn_growth':k);}
     const growth=G.validate(value.growth,party);if(!growth)return null;
     const expected=['hero',...party.members.map(m=>m.id)];if(!expected.includes(value.active)||!value.actors||Array.isArray(value.actors)||Object.keys(value.actors).length!==expected.length)return null;
     const actors={};for(const id of expected){
       const a=value.actors[id],profession=id==='hero'?party.profession:party.members.find(m=>m.id===id).profession;
-      if(!a||!Array.isArray(a.skills)||a.skills.length<3||a.skills.length>(id==='hero'?7:4)||new Set(a.skills).size!==a.skills.length||!a.skills.every(s=>own(SKILLS,s)&&SKILLS[s].job===profession&&(id==='hero'||!SKILLS[s].unique))||!a.skills.some(s=>SKILLS[s].attack)||!a.skills.some(s=>!SKILLS[s].attack))return null;
+      if(a&&a.showHelmet!==undefined&&typeof a.showHelmet!=='boolean')return null;
+      if(!a||!Array.isArray(a.skills)||a.skills.length<3||a.skills.length>(id==='hero'?7:4)||new Set(a.skills).size!==a.skills.length||!a.skills.every(s=>own(SKILLS,s)&&SKILLS[s].job===profession&&(id==='hero'||!SKILLS[s].unique))||!a.skills.some(s=>SKILLS[s].attack)||profession!=='mage'&&!a.skills.some(s=>!SKILLS[s].attack))return null;
       if(profession==='healer'&&!a.skills.some(s=>['herbal_heal','revive'].includes(s)))return null;
       if(!Array.isArray(a.passives)||a.passives.length<2||a.passives.length>(id==='hero'?6:3)||new Set(a.passives).size!==a.passives.length||!a.passives.every(s=>own(PASSIVES,s)&&PASSIVES[s].job===profession&&(id==='hero'||!PASSIVES[s].unique)))return null;
       const learned=a.learned??null;
@@ -346,15 +359,15 @@
       let gear=null;if(id!==value.active){if(!a.equipment||Object.keys(a.equipment).length!==4)return null;gear={};for(const slot of SLOTS){const g=a.equipment[slot];if(g===null)gear[slot]=null;else{const v=C().validateGear(g),d=GEAR[v?.kind];if(!v||v.slot!==slot||!d?.jobs.includes(profession)||d.requiredLevel>(id==='hero'?value.level:party.members.find(m=>m.id===id).level))return null;gear[slot]=v;}}if(GEAR[gear.weapon?.kind]?.hands===2&&gear.shield)return null;}else if(a.equipment!==null)return null;
       const p=a.pending;if(p&&(!a.skills.includes(p.id)||!SKILLS[p.id].attack||!num(p.left,0,3)||!num(p.damage,0,250)||typeof p.worn!=='boolean'||!Array.isArray(p.targets)||p.targets.length>C().MAX_MONSTERS||new Set(p.targets).size!==p.targets.length||!p.targets.every(C().validMonsterId)))return null;
       const shot=a.shot?{...a.shot,kind:a.shot.kind??'arrow'}:null;if(shot&&(!(shot.target===null||C().validMonsterId(shot.target))||!num(shot.left,0,2)||!num(shot.damage,0,250)||!['arrow','orb'].includes(shot.kind)||(shot.kind==='arrow'?profession!=='archer':!['mage','healer'].includes(profession))))return null;
-      actors[id]={skills:[...a.skills],passives:[...a.passives],learned,equipment:gear,cooldowns:{...a.cooldowns},buffs:a.buffs.map(b=>({id:b.id,left:b.left,power:b.power})),attack:a.attack,hurt:a.hurt,tool:a.tool,autoLeft:a.autoLeft,autoRescue:a.autoRescue,roll:a.roll,pending:p?clone(p):null,shot:shot?clone(shot):null};
+      actors[id]={skills:[...a.skills],passives:[...a.passives],learned,showHelmet:a.showHelmet!==false,equipment:gear,cooldowns:{...a.cooldowns},buffs:a.buffs.map(b=>({id:b.id,left:b.left,power:b.power})),attack:a.attack,hurt:a.hurt,tool:a.tool,autoLeft:a.autoLeft,autoRescue:a.autoRescue,roll:a.roll,pending:p?clone(p):null,shot:shot?clone(shot):null};
     }
     if(!value.enemy||Array.isArray(value.enemy)||Object.keys(value.enemy).length>C().MAX_MONSTERS)return null;
-    const enemy={};for(const[k,e]of Object.entries(value.enemy)){if(!C().validMonsterId(k)||!e||Object.keys(e).some(key=>!['slow','slowPower','blind','weak','mark','tauntLeft','tauntId','relay','relayCooldown','relayWeak','relayOwner'].includes(key))||Object.entries(e).some(([key,v])=>['tauntId','relayOwner'].includes(key)?!expected.includes(v):!num(v,0,60)))return null;enemy[k]={...e};}
+    const enemy={};for(const[k,e]of Object.entries(value.enemy)){if(!C().validMonsterId(k)||!e||Object.keys(e).some(key=>!['slow','slowPower','root','blind','weak','mark','tauntLeft','tauntId','relay','relayCooldown','relayWeak','relayOwner'].includes(key))||Object.entries(e).some(([key,v])=>['tauntId','relayOwner'].includes(key)?!expected.includes(v):!num(v,0,key==='root'?3:60)))return null;enemy[k]={...e};}
     if(!Array.isArray(value.removedTraps)||value.removedTraps.length>30||!value.removedTraps.every(s=>typeof s==='string'&&s.length<100))return null;
     // Migrate existing progress once; preserve levels/skills and fractional progress.
-    const xp=Math.min(100000,value.xp*(value.xpScale===G.XP_SCALE?1:G.XP_SCALE));
+    const xp=Math.min(100000,value.xp*(value.xpScale===undefined?10:1));
     return {removedTraps:[...value.removedTraps],version:1,xpScale:G.XP_SCALE,active:value.active,level:value.level,xp,heroHp:value.heroHp,switchLeft:value.switchLeft,actors,enemy,growth};
   }
   function validEquipment(run){if(!enabled(run))return true;const seen=new Set();for(const g of allGear(run)){if(seen.has(g.id))return false;seen.add(g.id);}const e=run.equipment,j=job(run);return Object.values(e).filter(Boolean).every(g=>GEAR[g.kind]?.jobs.includes(j)&&GEAR[g.kind].requiredLevel<=level(run))&&!(GEAR[e.weapon?.kind]?.hands===2&&e.shield);}
-  return Object.freeze({JOBS,GEAR,BASE_GEAR,TIER_NAMES,tierKind,gearPool,SKILLS,PASSIVES,SLOTS,PREPARATION,preparationSeconds,scale,state,enabled,ids,job,sex,level,actor,maxHp,hp,equipment,pv,teamPassive,buff,setBuff,draft,reorderSkills,preview,enable,addMember,removeMember,sync,setHp,switchActor,followerRecords,canLearn,learnCompanion,allGear,canEquip,equip,unequip,stats,wear,durabilityWarnings,hurt,heal,gainXp,ranged,fireProjectile,fireArrow,strike,cast,food,speed,inflict,hungerScale,toolSpent,rescueChoice,tick,advance,validate,validEquipment,roll});
+  return Object.freeze({JOBS,GEAR,BASE_GEAR,TIER_NAMES,tierKind,gearPool,SKILLS,PASSIVES,SLOTS,PREPARATION,preparationSeconds,scale,state,enabled,ids,job,sex,level,actor,maxHp,hp,equipment,pv,teamPassive,buff,setBuff,draft,reorderSkills,showHeadgear,preview,enable,addMember,removeMember,sync,setHp,switchActor,followerRecords,canLearn,learnCompanion,allGear,canEquip,equip,unequip,stats,wear,durabilityWarnings,hurt,heal,gainXp,ranged,fireProjectile,fireArrow,strike,cast,food,speed,inflict,hungerScale,toolSpent,rescueChoice,tick,advance,validate,validEquipment,roll});
 });

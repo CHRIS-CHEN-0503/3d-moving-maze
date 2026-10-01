@@ -13,7 +13,7 @@ function harness(floor=84,options={}){
   let nextCell=1;
   const ui=context.TowerPartyRuntime.create({THREE:T,G,core:C,text:String,action:(label,key,id,disabled)=>`${label}|${key}|${id}|${disabled}`,dialog:(...args)=>dialog=args,
     transact:result=>{if(!result.ok||failSave)return false;run=result.run;return true;},save:()=>!failSave,toast:message=>messages.push(message),audio:{sfxHit:()=>hits++,sfxSwing(){},sfxUse(){},sfxGuardBlock(){}},quest(){},
-    run:()=>run,paused:()=>paused,inDungeon:()=>false,world:()=>world,monsters:()=>monsters,traders:()=>[],player:()=>player,
+    run:()=>run,paused:()=>paused,inDungeon:()=>false,world:()=>world,monsters:()=>monsters,traders:()=>[],player:()=>player,camera:options.camera,
     clear:()=>!wall,followClear:options.followClear,cell:(cx,cy)=>({cx,cy,x:cx*4,z:cy*4}),worldToCell:(x,z)=>({x:Math.round(x/4),y:Math.round(z/4)}),chooseCell:()=>({cx:nextCell,cy:0,x:nextCell++*4,z:0}),makeText:()=>new T.Group(),follow:(a,dt,speed,stop,target)=>{followTargets.push(target);return false;},dispose:()=>{},damage:()=>{},bind:()=>{},swing:()=>swings++,
   });
   // Early-floor non-combat fixtures keep enemies outside the camp; combat tests use 84F.
@@ -33,6 +33,12 @@ test('failed durable combat commit cannot hide enemy, charge durability or award
 });
 test('camp cooking is unavailable away from camp or through walls, meals remain usable',()=>{
   const h=harness(99);h.G.px=40;const before=h.run.party.ingredients.root;h.ui.handle('party-cook','stew');assert.equal(h.run.party.ingredients.root,before);h.G.px=0;h.wall=true;h.ui.handle('party-cook','stew');assert.equal(h.run.party.ingredients.root,before);h.wall=false;h.ui.handle('party-cook','stew');assert.equal(h.run.party.meals.stew,1);h.G.px=40;h.ui.handle('party-eat','stew');assert.equal(h.run.party.meals.stew,0);
+});
+test('camera obstruction preserves soft cheeks and transparent detail materials after returning to view',()=>{
+  const camera={position:new T.Vector3(0,1,0)},h=harness(99,{camera:()=>camera}),station=h.ui.reserved().find(s=>s.kind==='recruit');
+  const material=new T.MeshLambertMaterial({color:0xce8877,transparent:true,opacity:.48,depthWrite:false}),cheek=new T.Mesh(new T.SphereGeometry(.03,6,4),material);station.model.add(cheek);
+  camera.position.copy(station.model.position);camera.position.y=1;h.ui.tick(.01,100);assert.equal(material.opacity,.48*.16);assert.equal(material.depthWrite,false);
+  camera.position.set(0,8,-20);h.ui.tick(.01,200);assert.equal(material.opacity,.48);assert.equal(material.transparent,true);assert.equal(material.depthWrite,false);
 });
 test('boss stations and recruitment have reserved cells, map coordinates and proximity gates',()=>{
   const h=harness(90);assert.equal(h.ui.reserved().filter(x=>x.kind==='boss').length,2);assert.ok(h.ui.markers().every(m=>Number.isInteger(m.cx)&&Number.isInteger(m.cy)));assert.equal(h.ui.interact(),false);

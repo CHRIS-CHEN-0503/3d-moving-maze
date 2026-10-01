@@ -2,8 +2,8 @@
 (function(root,factory){const api=factory();if(typeof module==='object'&&module.exports)module.exports=api;root.CombatAudio=api;})(globalThis,function(){
   'use strict';
   const RATE=22050;
-  const ACTIONS=Object.freeze({slash:.3,bow:.25,metal:.24,magic:.48,frost:.45,heal:.55,shield:.4,scan:.4,smoke:.32,cook:.45,forge:.42,device:.38,drink:.32,charge:.65,burst:.48,equip:.2,'hit-metal':.25,'hit-magic':.32});
-  const SKILL_SOUNDS=Object.freeze({arrow:'bow',binding:'bow',volley:'bow',great_arrow:'bow',cleave:'slash',circle:'slash',blind:'slash',stun:'metal',stagger:'metal',splash:'cook',bolt:'magic',weak:'magic',slow:'slash',mark:'metal',shock:'burst',repel:'burst',starfall:'magic',star_ring:'magic',decisive:'slash',guard:'shield',barrier:'shield',ward:'shield',fortify:'forge',fortress:'shield',rally:'shield',speed:'cook',polish:'forge',stealth:'smoke',smoke:'smoke',stomach:'cook',meal:'cook',soup:'cook',feast:'cook',heal:'heal',revive:'heal',cleanse:'heal',sanctuary:'heal',reveal:'scan',escape:'scan',disarm:'device',daylight:'magic',repair:'forge',frost:'frost',taunt:'metal',barricade:'device'});
+  const ACTIONS=Object.freeze({slash:.3,bow:.25,metal:.24,magic:.48,frost:.45,heal:.55,shield:.4,scan:.4,smoke:.32,cook:.45,forge:.42,device:.38,drink:.32,charge:.65,burst:.48,thunder:.8,thorns:.65,meteor:.75,equip:.2,'hit-metal':.25,'hit-magic':.32});
+  const SKILL_SOUNDS=Object.freeze({arrow:'bow',binding:'bow',volley:'bow',great_arrow:'bow',cleave:'slash',circle:'slash',blind:'slash',stun:'metal',stagger:'metal',splash:'cook',bolt:'magic',weak:'magic',slow:'slash',mark:'metal',shock:'thunder',thorns:'thorns',repel:'burst',starfall:'meteor',star_ring:'meteor',decisive:'slash',guard:'shield',barrier:'shield',ward:'shield',fortify:'forge',fortress:'shield',rally:'shield',speed:'scan',polish:'forge',stealth:'smoke',smoke:'smoke',stomach:'cook',meal:'cook',soup:'heal',feast:'cook',heal:'heal',revive:'heal',cleanse:'heal',sanctuary:'heal',reveal:'scan',escape:'scan',disarm:'device',daylight:'heal',repair:'forge',frost:'frost',taunt:'metal',barricade:'device'});
   const skillKind=skill=>SKILL_SOUNDS[skill?.effect]||'magic';
   const hitKind=weapon=>['staff','book'].includes(weapon?.type)?'hit-magic':['blade','daggers','hammer','pan'].includes(weapon?.type)?'hit-metal':'hit';
   const itemKind=id=>({heal:'drink',ration:'cook',shield:'shield',hourglass:'scan',bell:'metal',map:'scan'}[id]||'device');
@@ -31,6 +31,9 @@
       if(kind==='drink')sample=(Math.sin(tau*(360*t+40*Math.sin(t*18)*t))*.28+low*.8)*Math.sin(Math.PI*p);
       if(kind==='charge')sample=(Math.sin(tau*(120*t+240*t*t*.65/duration))*.35+tone(360)*.14+low*.6)*p;
       if(kind==='burst')sample=(low*2+Math.sin(tau*(100*t-70*t*t))*.4+air*.16*Math.exp(-t*25))*Math.exp(-t*5);
+      if(kind==='thunder')sample=air*.6*Math.exp(-t*28)+low*2.4*Math.exp(-t*3.5)+tone(66)*.3*Math.exp(-t*5)+air*.16*Math.pow(Math.max(0,Math.cos(tau*19*t)),8)*Math.exp(-t*6);
+      if(kind==='thorns')sample=(air*.33*Math.pow(Math.max(0,Math.cos(tau*13*t)),12)+low*.9+Math.sin(tau*(320*t-190*t*t))*.28)*Math.sin(Math.PI*p);
+      if(kind==='meteor')sample=(air*.25*Math.exp(-t*9)+low*2*Math.exp(-t*4)+Math.sin(tau*(150*t-95*t*t))*.44)*Math.sin(Math.PI*Math.min(1,p*2));
       data[i]=sample*attack*tail;peak=Math.max(peak,Math.abs(data[i]));
     }
     // Consistent short, readable foley. The shared effects bus controls volume.

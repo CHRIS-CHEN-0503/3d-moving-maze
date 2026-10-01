@@ -135,9 +135,9 @@ test('beginNew creates a valid save and renders opening prose rather than an obj
   assert.doesNotMatch(h.get('towerDialog').innerHTML, /\[object Object\]/);
   assert.equal(h.context.CFG.mazeSize, 11, 'Temporary story settings must restore normal-mode configuration');
   assert.equal(h.context.TowerMode.preserveFloorPickups(), true, 'The live runtime must protect pickups after the floor has started');
-  assert.equal(h.context.lastStartSettings.itemCount, 1);
-  assert.equal(h.context.lastStartSettings.foodCount, 1);
-  assert.equal(h.context.TowerMode.itemConfig().total, 4, 'Floor 99 has two original and two story pickups, not the old 16+ drops');
+  assert.equal(h.context.lastStartSettings.itemCount, 0);
+  assert.equal(h.context.lastStartSettings.foodCount, 0);
+  assert.equal(h.context.TowerMode.itemConfig().total, 0, 'Story floors contain no naturally scattered pickups');
 });
 
 for (const merchantId of ['tieLing', 'jinHe', 'lanZhou']) {
@@ -209,11 +209,13 @@ test('repeated stair contact descends once, and floor 1 produces the chosen stor
   const original = catalog.TowerCore.newRun({ seed: 765 }); original.floor = 2; original.floorsCleared = 97;
   original.chronicle = catalog.TowerNarrative.newChronicle(2); original.chronicle.clues.push('clue:heart');
   const h = harness(original); h.context.TowerMode.open(); h.click('continue'); h.click('close'); h.context.TowerMode.reachExit();
+  assert.equal(h.save().floor,2,'Entering the stairs asks before leaving');h.click('exit-confirm');
   assert.equal(h.save().floor, 1); assert.equal(h.save().floorsCleared, 98);
   assert.equal(h.context.TowerMode.preserveFloorPickups(), false, 'The next floor must be allowed to create its initial pickups');
   const before = h.save(); h.context.TowerMode.reachExit(); h.context.TowerMode.reachExit();
   assert.deepEqual(h.save(), before, 'Repeated collision callbacks must not advance more than one floor');
   h.click('descend'); if (h.context.TowerMode.paused) h.click('close'); h.context.TowerMode.reachExit();
+  h.click('exit-confirm');
   assert.equal(h.save().floor, 1); h.click('story-next'); h.click('story-next'); h.click('story-finish');
   const ending = h.context.TowerNarrative.ENDINGS[0]; h.click('ending', ending.id);
   assert.equal(h.save().status, 'won'); assert.equal(h.save().floorsCleared, 99); assert.ok(h.context.TowerCore.validateSave(h.save()));

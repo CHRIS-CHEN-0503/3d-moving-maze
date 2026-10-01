@@ -60,7 +60,7 @@
       for(const merchant of ctx.traders())addSource({...merchant,x:merchant.x+.75,z:merchant.z+.65},'lantern',0xffd28b,'行商營地');
       const count=Math.min(6,2+Math.floor(G.mazeW/5));
       for(let i=0;i<count;i++){const p=ctx.chooseCell(random,used);addSource(p,profile.style,profile.color,profile.name);}
-      if(!ctx.inDungeon())for(let i=0;i<L.supplyCount(G.mazeW);i++){
+      if(!ctx.inDungeon()&&!root.TowerLoot)for(let i=0;i<L.supplyCount(G.mazeW);i++){
         const id='light-supply-'+i,p=ctx.chooseCell(random,used),model=supplyModel();model.position.set(p.x,0,p.z);model.visible=!r().party.light.gathered.includes(id);group.add(model);supplies.push({...p,id,model,retry:0});
       }
       lastFuel=r().party.light.fuel;lastDaylight=r().party.light.daylight;updateVisual(0,true);hud();
@@ -80,8 +80,8 @@
       if(button.dataset.icon!==symbol){button.dataset.icon=symbol;button.innerHTML=icon(symbol);}
       button.title=status()+' · 點擊直接'+(symbol==='daylight'?'施放日光術':'使用火把')+'（L）';button.setAttribute('aria-label',symbol==='daylight'?'施放日光術':'使用火把');line.textContent=status();
     }
-    function quickUse(){if(!ready()||ctx.paused?.())return false;if(L.canCast(r())){if(r().party.light.daylight>0){ctx.toast('日光術仍在照明。',1500,false);return false;}if(root.TowerHeroes?.enabled(r())){const H=root.TowerHeroes,id=H.ids(r()).find(id=>H.hp(r(),id)>0&&H.actor(r(),id).skills.includes('daylight'));if(id)return ctx.castDaylight?.(id);return false;}}
-      const result=L.canCast(r())?L.daylight(r(),r().revision):L.torch(r(),r().revision);if(!ctx.transact(result)){if(result.message)ctx.toast(result.message,2000,result.message);return false;}ctx.audio.sfxAction?.(L.canCast(r())?'magic':'smoke');updateVisual(0,true);hud();ctx.toast(result.message,1800,result.message);return true;
+    function quickUse(){if(!ready()||ctx.paused?.())return false;if(L.canCast(r())&&r().party.light.daylight>0){ctx.toast('日光術仍在照明。',1500,false);return false;}
+      const mage=L.canCast(r()),result=mage?L.daylight(r(),r().revision):L.torch(r(),r().revision);if(!ctx.transact(result)){if(result.message)ctx.toast(result.message,2000,result.message);return false;}if(mage){if(!ctx.daylightCast?.())ctx.audio.sfxAction?.('magic');}else ctx.audio.sfxAction?.('smoke');updateVisual(0,true);hud();ctx.toast(result.message,1800,mage?false:result.message);return true;
     }
     function merchantCard(id){
       if(!enabled()||!Object.hasOwn(r().party.light.bought,id))return '';
@@ -90,7 +90,7 @@
     }
     function panel(quiet=false){
       if(!ready())return;const run=r(),l=run.party.light;panelRevision=run.revision;
-      const body='<div class="tower-grid tower-light-grid"><article class="tower-item tower-light-card">'+icon('torch')+'<h3>火把 · 五分鐘</h3><p>持有 '+l.torches+' 支'+(l.fuel>0?' · 目前餘量 '+time(l.fuel):'')+'</p><p>木枝 '+l.wood+' · 布條 '+l.cloth+'<br>沒有現成火把時，直接消耗木枝、布條各一份點燃，無須先製作。</p>'+ctx.action(l.lit?'熄滅並保留燃料':l.fuel>0?'重新點燃':'點燃火把','light-torch',null,!l.lit&&(l.daylight>0||!l.fuel&&!l.torches&&(!l.wood||!l.cloth)))+'</article><article class="tower-item tower-light-card">'+icon('daylight')+'<h3>日光術 · 十分鐘</h3><p>光照範圍比火把更大。需要隊伍中仍能行動、且擁有日光術的術士。</p><p>'+(l.daylight>0?'剩餘 '+time(l.daylight):L.canCast(run)?'隊伍可以施放日光術。':'隊伍目前沒有能施法的術士。')+'</p>'+ctx.action('施放日光術','light-daylight',null,!L.canCast(run)||l.cooldown>0)+'</article></div><p class="tower-copy">直接點左側照明小圖，或按 L 使用。擁有日光術時小圖會換成日光術。日光術期間火把不耗燃料；閱讀、暫停與離線時不計時。</p><p class="tower-copy">營地與行商有固定照明；材料每層僅採集一次，變形不會補生。行商也會販售火把。</p>';
+      const body='<div class="tower-grid tower-light-grid"><article class="tower-item tower-light-card">'+icon('torch')+'<h3>火把 · 五分鐘</h3><p>持有 '+l.torches+' 支'+(l.fuel>0?' · 目前餘量 '+time(l.fuel):'')+'</p><p>木枝 '+l.wood+' · 布條 '+l.cloth+'<br>沒有現成火把時，直接消耗木枝、布條各一份點燃，無須先製作。</p>'+ctx.action(l.lit?'熄滅並保留燃料':l.fuel>0?'重新點燃':'點燃火把','light-torch',null,!l.lit&&(l.daylight>0||!l.fuel&&!l.torches&&(!l.wood||!l.cloth)))+'</article><article class="tower-item tower-light-card">'+icon('daylight')+'<h3>日光術 · 十分鐘</h3><p>光照範圍比火把更大。這是術士的自帶本領，不占技能格；隊伍中有能行動的術士就能使用。</p><p>'+(l.daylight>0?'剩餘 '+time(l.daylight):L.canCast(run)?'隊伍可以施放日光術。':'隊伍目前沒有能施法的術士。')+'</p>'+ctx.action('施放日光術','light-daylight',null,!L.canCast(run)||l.cooldown>0)+'</article></div><p class="tower-copy">直接點左側照明小圖，或按 L 使用。有術士時小圖會換成日光術。日光術期間火把不耗燃料；閱讀、暫停與離線時不計時。</p><p class="tower-copy">營地與行商有固定照明；照明材料可從打敗怪物後的掉落取得，行商也會販售火把。</p>';
       ctx.dialog('照明工具 · 暫停中','帶著光繼續前進',status(),body,ctx.action('裝備背包','bag')+ctx.action('回到迷宮','close'),{silent:quiet,summary:'照明工具。點左側小圖直接使用，火把五分鐘；日光術十分鐘。'});
     }
     function handle(key,id){
@@ -104,15 +104,15 @@
         if(key==='light-craft')result=L.craft(r(),panelRevision);
         if(key==='light-torch')result=L.torch(r(),panelRevision);
         if(key==='light-daylight'){
-          if(root.TowerHeroes?.enabled(r())){const H=root.TowerHeroes,id=H.ids(r()).find(id=>H.hp(r(),id)>0&&H.actor(r(),id).skills.includes('daylight'));ctx.close();if(id)ctx.castDaylight?.(id);return true;}
           result=L.daylight(r(),panelRevision);
         }
       }
       if(!result)return true;
       if(ctx.transact(result)){
-        ctx.audio.sfxAction?.(key==='light-daylight'?'magic':key==='light-torch'?'smoke':'device');updateVisual(0,true);hud();
+        if(key!=='light-daylight')ctx.audio.sfxAction?.(key==='light-torch'?'smoke':'device');updateVisual(0,true);hud();
         if(key==='light-buy')ctx.trade(true);else if(key==='light-craft')panel(true);else ctx.close();
-        ctx.toast(result.message,2000,result.message);
+        if(key==='light-daylight'&&!ctx.daylightCast?.())ctx.audio.sfxAction?.('magic');
+        ctx.toast(result.message,2000,key==='light-daylight'?false:result.message);
       }
       return true;
     }
@@ -122,7 +122,7 @@
       if(nearClock<=0||force){nearClock=.15;nearSources=sources.filter(p=>distance(p)<10.5&&clear(p)).sort((a,b)=>distance(a)-distance(b)).slice(0,2);}
       // A distant lamp is a beacon, not free illumination of the whole corridor.
       const ambientRadius=nearSources.reduce((value,p)=>Math.max(value,10.5-distance(p)*1.15),profile.radius);
-      const heroes=root.TowerHeroes,dayRange=r().party?.loadouts?Math.max(3,...heroes.ids(r()).map(id=>heroes.buff(r(),'daylight',id)?.power||0))*4:15;
+      const heroes=root.TowerHeroes,dayRange=r().party?.loadouts?Math.min(20,12+Math.max(0,...heroes.ids(r()).filter(id=>heroes.job(r(),id)==='mage').map(id=>heroes.level(r(),id)-1))):15;
       range=Math.max(ambientRadius,mode==='daylight'?dayRange:mode==='torch'?10:profile.radius);
       // Keep the player clear when the third-person camera is pulled back. The
       // extra distance belongs to the camera, not to the player's sight range.

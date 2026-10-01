@@ -28,7 +28,7 @@ function harness(run) {
   h.start = () => { h.context.TowerMode.open(); h.click('continue'); if (h.context.TowerMode.paused) h.click('close'); };
   h.approach = model => { h.context.G.px = model.position.x + .6; h.context.G.pz = model.position.z; h.tick(.2); };
   h.interact = model => { h.approach(model); assert.equal(h.get('towerTalkBtn').disabled, false); h.get('towerTalkBtn').onclick(); };
-  h.exit = () => { const g = h.context.G, p = h.context.cellToWorld(g.exitCell.x, g.exitCell.y); g.px = p.x; g.pz = p.z; h.context.TowerMode.reachExit(); };
+  h.exit = () => { const g = h.context.G, p = h.context.cellToWorld(g.exitCell.x, g.exitCell.y); g.px = p.x; g.pz = p.z; h.context.TowerMode.reachExit(); if(h.get('towerDialog').buttons.some(b=>b.dataset.tower==='exit-confirm'))h.click('exit-confirm'); };
   h.finishReader = () => { for (let page = 0; page < 3 && h.get('towerDialog').buttons.some(b => b.dataset.tower === 'story-next'); page++) h.click('story-next'); h.click('story-finish'); };
   return h;
 }

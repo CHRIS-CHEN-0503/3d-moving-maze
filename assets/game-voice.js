@@ -142,7 +142,7 @@
     env.document?.addEventListener?.('visibilitychange',()=>{if(env.document.hidden)stop();});
     env.addEventListener?.('pagehide',()=>stop(true));refresh();
     function replay(){return lastStory?.asset?playAsset(lastStory.asset,lastStory.text,{replace:true,story:true,after:lastStory.after,speaker:lastStory.speaker}):say(lastStory?.text||'',{replace:true,story:true,speaker:lastStory?.speaker});}
-    return {configure,status,listen,refresh,readPanel,stop,announce:(text,replace=false)=>say(text,{replace,speaker:/(?:^|[。！!，,\s])(?:已)?(?:獲得|取得|使用|裝備|卸下|穿戴|賣出|修復|修理|打造|製作|烹飪|享用)/.test(clean(text))?characterSpeaker():{}}),announceAsset:(id,text,replace=false)=>playAsset(id,text,{replace}),announceAssets:(ids,text)=>playAsset(ids[0],text,{replace:true,continuation:ids.slice(1)}),replay,preview:()=>say('你好，我會陪你探索迷宮。準備好了，就一起出發吧！',{replace:true})};
+    return {configure,status,listen,refresh,readPanel,stop,announce:(text,replace=false)=>say(text,{replace,speaker:/(?:^|[。！!，,\s])(?:已)?(?:獲得|取得|使用|裝備|卸下|穿戴|賣出|修復|修理|打造|製作|烹飪|享用)/.test(clean(text))?characterSpeaker():{}}),announceAsset:(id,text,replace=false,speaker={})=>playAsset(id,text,{replace,speaker}),announceAssets:(ids,text)=>playAsset(ids[0],text,{replace:true,continuation:ids.slice(1)}),replay,preview:()=>say('你好，我會陪你探索迷宮。準備好了，就一起出發吧！',{replace:true})};
   }
   return {create,clean,chunks,chooseVoice,panelText};
 });

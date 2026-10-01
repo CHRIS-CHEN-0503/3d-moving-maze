@@ -31,7 +31,7 @@
     return {version:1,torches:value.torches,wood:value.wood,cloth:value.cloth,fuel:value.fuel,lit:value.lit,daylight:value.daylight,cooldown:value.cooldown,gathered:[...value.gathered],bought:{...value.bought}};
   }
   const heroes=()=>typeof module==='object'&&module.exports?require('./tower-heroes-core.js'):globalThis.TowerHeroes;
-  const canCast=run=>run.party?.loadouts?heroes().ids(run).some(id=>heroes().hp(run,id)>0&&heroes().actor(run,id).skills.includes('daylight')):!!run.party&&(run.party.profession==='mage'||run.party.members.some(m=>m.profession==='mage'&&m.hp>0));
+  const canCast=run=>run.party?.loadouts?heroes().ids(run).some(id=>heroes().hp(run,id)>0&&heroes().job(run,id)==='mage'):!!run.party&&(run.party.profession==='mage'||run.party.members.some(m=>m.profession==='mage'&&m.hp>0));
   const tx=(run,revision,fn)=>C().transaction(run,revision,n=>n.party?fn(n,n.party.light):{ok:false,message:'請先選擇冒險職業。'});
   function craft(run,revision){return tx(run,revision,(n,l)=>{
     if(!l.wood||!l.cloth)return {ok:false,message:'需要一份木枝和一份布條。'};
@@ -44,7 +44,7 @@
     if(!l.fuel){if(l.torches)l.torches--;else if(l.wood>0&&l.cloth>0){l.wood--;l.cloth--;}else return {ok:false,message:'需要一份木枝與布條，或向商人購買火把。'};l.fuel=TORCH_SECONDS;}
     l.lit=true;return {ok:true,message:'使用 火把'};
   });}
-  function daylight(run,revision){if(run.party?.loadouts){const H=heroes(),id=H.ids(run).find(id=>H.hp(run,id)>0&&H.actor(run,id).skills.includes('daylight'));return H.cast(run,'daylight',{actorId:id},revision);}return tx(run,revision,(n,l)=>{
+  function daylight(run,revision){return tx(run,revision,(n,l)=>{
     if(!canCast(n))return {ok:false,message:'需要主角或仍能行動的術士同伴。'};
     if(l.cooldown>0)return {ok:false,message:'日光術尚未結束，無須重複施放。'};
     l.daylight=DAYLIGHT_SECONDS;l.cooldown=DAYLIGHT_COOLDOWN;

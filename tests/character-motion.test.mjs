@@ -12,7 +12,7 @@ const source=readFileSync(new URL('../assets/character-motion.js',import.meta.ur
 function functionSource(name,text=html){const start=text.indexOf('function '+name+'(');assert.ok(start>=0);return text.slice(start,text.indexOf('\n}',start)+2);}
 const types=['boy','girl','boy','girl','robot','cat'];
 function figure(index=0){
-  const context=vm.createContext({THREE,window:{CharacterMotion:motion},CharacterMotion:motion});
+  const context=vm.createContext({THREE,window:{CharacterMotion:motion},CharacterMotion:motion,CharacterSculpt:require('../assets/character-sculpt.js')});
   vm.runInContext(functionSource('buildCharacter'),context);
   return context.buildCharacter({type:types[index],shirt:0x345678,pants:0x293849,skin:0xd3ac88,hair:0x40302a});
 }
@@ -77,7 +77,7 @@ test('六職業的真實左右手一致，轉身與奔跑揮擊時握柄不脫�
     assert.ok(u.armR.position.x<0&&u.armL.position.x>0,'+Z 正面時右手 -X、左手 +X');
     assert.ok(u.legR.position.x<0&&u.legL.position.x>0);
     u.hasWeapon=u.hasShield=true;
-    const budget=meshBudget(model);assert.ok(budget.meshes<55&&budget.triangles<1800,'可玩角色保持輕量');
+    const budget=meshBudget(model);assert.ok(budget.meshes<55&&budget.triangles<6500,'圓潤雕塑維持明確面數上限，無額外燈光或貼圖');
     for(let angle=0;angle<8;angle++){
       model.rotation.y=angle*Math.PI/4;motion.beginAction(model,'attack',.8);
       for(let frame=0;frame<12;frame++){

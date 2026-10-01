@@ -23,7 +23,7 @@
   let mainClue = null, rift = null, dungeonObjects = [], nearbyJourney = null, exploredCells = new Set(), reader = null, sideReader = null;
   let pendingDungeonShift = null;
   let hazards = [], hazardSlow = 1, hazardGrace = 3;
-  const color = { heal: 0xff719a, ration: 0xe7b86c, shield: 0x5edfff, hourglass: 0xcda5ff, bell: 0xffd677, map: 0x85e9ac, feather: 0xeaf6ff, coin: 0xffd76a };
+  const color = { heal: 0xff719a, ration: 0xe7b86c, shield: 0x5edfff, hourglass: 0xcda5ff, bell: 0xffd677, map: 0x85e9ac, feather: 0xeaf6ff, coin: 0xffd76a, arrow:0xb3d79b };
   // 十區使用獨立色盤與建築輪廓；只有當層載入，不預載九十九個場景。
   const ENVIRONMENTS = [
     [0x658598,0x9aafbd,0xa3a9ae,0x9beded,'spire'],
@@ -300,8 +300,9 @@
   function canCollectOriginal(id) { return !active || !run.claimed.includes(id); }
   function itemConfig() { return inDungeon()?{itemCount:0,foodCount:0,storyCount:0,total:0}:E.floorLootCounts(floorConfig.size); }
   function preserveFloorPickups() { return active && floorStarted; }
+  function occupiedCells(){return [...traders,...loot,...dungeonObjects,...hazards,...(partyUI?.reserved()||[]),...(lightingUI?.reserved()||[]),...[warriorNpc,explorer,chest,relic,mainClue,rift].filter(Boolean)].map(item=>item.cx+','+item.cy);}
   function reservedCells() {
-    return floorStarted?[...traders,...loot,...dungeonObjects,...hazards,...(partyUI?.reserved()||[]),...(lightingUI?.reserved()||[]),...[warriorNpc,explorer,chest,relic,mainClue,rift].filter(Boolean)].map(item=>item.cx+','+item.cy):[];
+    return floorStarted?occupiedCells():[];
   }
   function collectedOriginal(id) {
     if (!active || !run || inDungeon() || run.claimed.includes(id)) return;
@@ -657,6 +658,19 @@
     partyUI?.build(random,used);
     lightingUI?.build(random,used);
     buildHazards(used);
+    syncArrowLoot(used);
+  }
+  function syncArrowLoot(occupied){
+    if(!modern()||inDungeon())return;
+    const offers=E.arrowLoot(run,G.mazeW).filter(o=>!loot.some(l=>l.id===o.id)&&!run.claimed.includes(o.id));if(!offers.length)return;
+    const used=new Set(['0,0',G.exitCell.x+','+G.exitCell.y,...(occupied||[]),...occupiedCells()]);
+    for(const m of monsters){const c=worldToCell(m.model.position.x,m.model.position.z);used.add(c.x+','+c.y);}
+    const random=mulberry32(floorSeed()^0xa11f0);
+    for(const offer of offers){const point=chooseCell(random,used),model=new THREE.Group(),icon=new THREE.Group();
+      const wood=new THREE.MeshLambertMaterial({color:0xc6a274}),steel=new THREE.MeshLambertMaterial({color:0xc7ded7}),leaf=new THREE.MeshLambertMaterial({color:0x83b67d});
+      for(const x of [-.14,0,.14]){const shaft=new THREE.Mesh(new THREE.CylinderGeometry(.025,.025,.85,6),wood);shaft.position.set(x,0,0);icon.add(shaft);const tip=new THREE.Mesh(new THREE.ConeGeometry(.07,.18,4),steel);tip.position.set(x,.51,0);icon.add(tip);const feather=new THREE.Mesh(new THREE.BoxGeometry(.1,.17,.025),leaf);feather.position.set(x,-.3,0);icon.add(feather);}
+      const tie=new THREE.Mesh(new THREE.BoxGeometry(.45,.09,.08),wood);tie.position.y=-.06;icon.add(tie);icon.position.y=1;model.add(icon);model.add(makePickupMarker(color.arrow,'箭矢 ×'+offer.quantity));model.position.set(point.x,0,point.z);world.add(model);loot.push({...offer,...point,model,icon});
+    }
   }
   function buildHazards(used) {
     const H=window.TowerHazards,offer=dungeonOffer();
@@ -912,6 +926,7 @@
     const portal=cellToWorld(G.exitCell.x,G.exitCell.y);if(Math.hypot(G.px-portal.x,G.pz-portal.z)>2.2)exitDeclined=false;
     tickHazards(dt);if(paused||run.status!=='playing')return;
     if(inDungeon()){if(modern())partyUI?.tick(dt,now);tickDungeon(dt,now);return;}
+    syncArrowLoot();
     const pc=worldToCell(G.px,G.pz),cellKey=pc.x+','+pc.y;
     if(cellKey!==lastSurveyCell){lastSurveyCell=cellKey;questEvent('survey',pc);exploredCells.add(cellKey);}
     if(rift&&!rift.model.visible&&exploredCells.size>=3){const result=D.discover(run);if(result.ok){run=result.run;rift.model.visible=true;save();showToast('牆縫裡出現了異色裂隙，小地圖「裂」標記可找到入口。',4000);}}
@@ -920,10 +935,10 @@
     for (const item of loot) {
       if (!item.model.visible) continue;
       item.icon.position.y=1+Math.sin(now*.003+item.cx)*.12;item.icon.rotation.y+=dt;
-      if (Math.hypot(G.px-item.x,G.pz-item.z)<1.05) {
+      if (Math.hypot(G.px-item.x,G.pz-item.z)<1.05&&hasClearPath(G.px,G.pz,item.x,item.z)) {
         if(item.kind==='ingredient'){if(hasClearPath(G.px,G.pz,item.x,item.z)&&transact(P.gather(run,item.id,item.ingredient,run.revision))){item.model.visible=false;AudioEng.sfxPickup();showToast('獲得'+P.INGREDIENTS[item.ingredient],1800,'獲得 '+P.INGREDIENTS[item.ingredient]);questEvent('collect',{id:item.id});}continue;}
-        const result=C.collect(run,item.kind,item.kind==='coin'?8:1);
-        if(result.ok){run=result.run;run.claimed.push(item.id);item.model.visible=false;AudioEng.sfxPickup();showToast('取得 '+C.ITEMS[item.kind].name+(item.kind==='coin'?' +8':'')+'。'+(C.ITEMS[item.kind].description||''),1800,'獲得 '+C.ITEMS[item.kind].name);save();}
+        const amount=item.kind==='coin'?8:item.quantity||1,result=C.collect(run,item.kind,amount);
+        if(result.ok){run=result.run;run.claimed.push(item.id);item.model.visible=false;AudioEng.sfxPickup();showToast('取得 '+C.ITEMS[item.kind].name+(amount>1?' +'+amount:'')+'。'+(C.ITEMS[item.kind].description||''),1800,'獲得 '+C.ITEMS[item.kind].name);save();}
       }
     }
     nearest=traders.find(n=>Math.hypot(G.px-n.x,G.pz-n.z)<2.6&&hasClearPath(G.px,G.pz,n.x,n.z))||null;
@@ -1224,7 +1239,7 @@
   function inventory(quiet=false) {
     if(!active||G.shifting||run.status!=='playing')return;
     syncEngine();
-    const cards=(run.party&&lightingUI?'<article class="tower-item"><h3>照明工具</h3><p>火把五分鐘 · 日光術十分鐘</p>'+action('照明與製作','light-panel')+'</article>':'')+Object.entries(C.ITEMS).filter(([id])=>id!=='coin').map(([id,item])=>'<article class="tower-item"><h3>'+text(item.name)+' <span>×'+(run.bag[id]||0)+'</span></h3><p>'+text(item.description||item.desc||'高塔冒險補給')+'</p>'+action(id==='feather'?'瀕死自動使用':'使用','use',id,!run.bag[id]||id==='feather')+'</article>').join('');
+    const cards=(run.party&&lightingUI?'<article class="tower-item"><h3>照明工具</h3><p>火把五分鐘 · 日光術十分鐘</p>'+action('照明與製作','light-panel')+'</article>':'')+Object.entries(C.ITEMS).filter(([id])=>id!=='coin'&&(id!=='arrow'||modern())).map(([id,item])=>'<article class="tower-item"><h3>'+text(item.name)+' <span>×'+(run.bag[id]||0)+'</span></h3><p>'+text(item.description||item.desc||'高塔冒險補給')+'</p>'+action(id==='arrow'?'射擊自動消耗':id==='feather'?'瀕死自動使用':'使用','use',id,!run.bag[id]||['arrow','feather'].includes(id))+'</article>').join('');
     const stats=C.equipmentStats(run),worn=Object.values(run.equipment).filter(Boolean).map(g=>gearCard(g,true)).join(''),stored=run.gearBag.map(g=>gearCard(g)).join('');
     if(modern()){dialog('旅人背包 · 暫停中','生存補給','裝備、技能與隊員切換請開啟隊伍管理。','<div class="tower-grid">'+cards+'</div>',action('隊伍與逐人裝備','hero-panel',Heroes.state(run).active)+action('料理','party-kitchen')+action('回到迷宮','close'),{silent:quiet===true,summary:'生存補給。選擇道具，或開啟隊伍管理。'});return;}
     if(run.party){
@@ -1241,7 +1256,7 @@
     if(nearestWarrior){warriorDialog();return;}
     if(!active||G.shifting||!nearest||run.status!=='playing')return;
     syncEngine();
-    const cards=(lightingUI?.merchantCard(nearest.id)||'')+nearest.offer.supplies.map(id=>{const item=C.ITEMS[id];return '<article class="tower-item"><h3>'+text(item.name)+'</h3><p>'+text(item.description)+' · 持有 '+run.bag[id]+'</p>'+action('買 '+item.buyPrice+' 幣','buy',id)+action('賣出','sell',id,!run.bag[id])+'</article>';}).join('');
+    const cards=(lightingUI?.merchantCard(nearest.id)||'')+nearest.offer.supplies.map(id=>{const item=C.ITEMS[id],quantity=id==='arrow'?Math.min(10,99-run.bag.arrow):1;return '<article class="tower-item"><h3>'+text(item.name)+'</h3><p>'+text(item.description)+' · 持有 '+run.bag[id]+'</p>'+action('買'+(id==='arrow'?' '+quantity+' 支':'')+' · '+item.buyPrice*quantity+' 幣','buy',id,quantity===0||run.coins<item.buyPrice*quantity)+(id==='arrow'?'':action('賣出','sell',id,!run.bag[id]))+'</article>';}).join('');
     const gear=nearest.offer.gear.map(({kind,gear,price})=>'<article class="tower-item tower-gear-card"><h3>'+text(gear.name)+'</h3><p>'+text(gearDescription(gear))+'</p>'+action(run.adventure.claimed.includes('stock:'+run.floor+':'+nearest.id+':'+kind)?'本層已售出':'購買 '+price+' 幣','buy-gear',kind,run.adventure.claimed.includes('stock:'+run.floor+':'+nearest.id+':'+kind)||run.coins<price)+'</article>').join('');
     const stockVoice='出售：'+[...nearest.offer.gear.map(g=>gearSpeech(g.gear)),...nearest.offer.supplies.map(id=>C.ITEMS[id].name),...(run.party?.light?['火把']:[])].join('、')+'。選擇物品購買或賣出。';
     const voiceSummary=nearest.name+'。'+stockVoice;
@@ -1374,7 +1389,7 @@
     if(key==='rehire-confirm'){hireWarrior(id,true);return;}
     if(key==='buy'||key==='sell'||key==='buy-gear'){
       if(!active||!G.running||!nearest||Math.hypot(G.px-nearest.x,G.pz-nearest.z)>=2.6||!hasClearPath(G.px,G.pz,nearest.x,nearest.z))return;
-      const result=key==='buy-gear'?E.buyMerchantGear(run,nearest.id,id,run.revision):E[key==='buy'?'buySupply':'sellSupply'](run,nearest.id,id,1,run.revision);
+      const quantity=key==='buy'&&id==='arrow'?Math.min(10,99-run.bag.arrow):1,result=key==='buy-gear'?E.buyMerchantGear(run,nearest.id,id,run.revision):E[key==='buy'?'buySupply':'sellSupply'](run,nearest.id,id,quantity,run.revision);
       if(transact(result)){trade(true);window.GameVoice?.announce((key==='sell'?'賣出 ':'獲得 ')+(C.ITEMS[id]?.name||C.GEAR[id]?.name||'裝備'),true);}return;
     }
   }

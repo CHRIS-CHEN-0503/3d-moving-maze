@@ -74,10 +74,10 @@
   }
   function pose(model,remaining,interval,fp=false,dt=0){const right=model.userData.armR,left=model.userData.armL,kind=model.userData.heroWeapon;if(!right||!left)return;
     if(root.TowerCombatMotion){
-      const p=root.TowerCombatMotion.update(model,dt),T=root.THREE,q=model.userData.heroWrist||(model.userData.heroWrist=new T.Quaternion()),e=model.userData.heroWristEuler||(model.userData.heroWristEuler=new T.Euler());
+      const p=root.TowerCombatMotion.update(model,dt),T=root.THREE,q=model.userData.heroWrist||(model.userData.heroWrist=new T.Quaternion()),e=model.userData.heroWristEuler||(model.userData.heroWristEuler=new T.Euler()),offset=model.userData.heroWristOffset||(model.userData.heroWristOffset=new T.Vector3());
       right.rotation.set(p.rx,p.ry,p.rz);left.rotation.set(p.lx,p.ly,p.lz);model.rotation.x=p.lean;model.rotation.z=p.tilt;
       for(const part of model.userData.heroPieces||[]){part.visible=!fp||part.parent===right||part.parent===left||part.userData.baseKind==='spellbook';
-        if(part.userData.baseKind===kind){if(kind==='spellbook'){part.position.set(0,1.04+p.bookLift,.49);part.rotation.set(p.bookTilt,0,0);}else{const l=part.parent===left;e.set(l?p.lwx:p.wx,l?p.lwy:p.wy,l?p.lwz:p.wz);q.setFromEuler(e);part.quaternion.copy(part.parent.quaternion).invert().multiply(q);}}
+        if(part.userData.baseKind===kind){if(kind==='spellbook'){part.position.set(0,1.04+p.bookLift,.49+p.bookPush);part.rotation.set(p.bookTilt,0,0);}else{const l=part.parent===left;offset.set(l?p.lpx:p.wpx,l?p.lpy:p.wpy,l?p.lpz:p.wpz).applyQuaternion(q.copy(part.parent.quaternion).invert());part.position.set(0,-.36,.13).add(offset);e.set(l?p.lwx:p.wx,l?p.lwy:p.wy,l?p.lwz:p.wz);q.setFromEuler(e);part.quaternion.copy(part.parent.quaternion).invert().multiply(q);}}
       }
       if(model.userData.legL)model.userData.legL.rotation.x-=p.knee;if(model.userData.legR)model.userData.legR.rotation.x+=p.knee;return;
     }

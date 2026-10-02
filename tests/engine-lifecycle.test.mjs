@@ -51,6 +51,15 @@ test('場景重建釋放私有貼圖、材質和幾何，只處理一次，保�
   }
 });
 
+test('instanced scene objects release their own GPU buffers as well as shared geometry once',()=>{
+  const scene=new THREE.Group(),geometry=new THREE.BoxGeometry(),material=new THREE.MeshBasicMaterial(),counts={mesh:0,geometry:0,material:0};
+  geometry.addEventListener('dispose',()=>counts.geometry++);material.addEventListener('dispose',()=>counts.material++);
+  for(let i=0;i<3;i++){const m=new THREE.InstancedMesh(geometry,material,4);m.addEventListener('dispose',()=>counts.mesh++);scene.add(m);}
+  const context=vm.createContext({_texCache:{},spriteCache:{},makePickupMarker:{}});vm.runInContext(slice('function disposeSceneObject(root)','let sceneEpoch='),context);context.disposeSceneObject(scene);
+  assert.deepEqual(counts,{mesh:3,geometry:1,material:1});
+  const load=towerSource.slice(towerSource.indexOf('  function loadFloor('),towerSource.indexOf('  function floorFacts('));assert.ok(load.indexOf('partyUI?.reset()')<load.indexOf('try { startGame()'));
+});
+
 function lifecycle() {
   let now = 0;
   let nextId = 0;

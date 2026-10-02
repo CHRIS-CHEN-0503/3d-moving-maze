@@ -20,12 +20,13 @@
   const GEAR_KINDS = ['helmet', 'armor', 'shield', 'bat', 'pan', 'staff'];
   const QUEST_TYPES = ['defeat', 'escort', 'relic', 'donate', 'survey', 'shift', 'stun'];
   const DONATIONS = ['heal', 'ration', 'map'];
-  const COUNTS = { 7: [1, 1, 2], 9: [1, 2, 3], 11: [2, 2, 4], 13: [2, 3, 5], 15: [3, 3, 6], 17: [3, 4, 7], 19: [4, 4, 8] };
+  const COUNTS = { 7: [1, 1, 2], 9: [1, 2, 3], 11: [2, 2, 4], 13: [2, 3, 5], 15: [3, 3, 6], 17: [3, 4, 7], 19: [4, 4, 8], 21: [4, 5, 9] };
   const integer = (value, low, high) => Number.isInteger(value) && value >= low && value <= high;
+  const validFloor = floor => integer(floor, 1, 99) || integer(floor, -50, -1);
   const validId = value => typeof value === 'string' && value.length > 0 && value.length <= 96;
   const uniqueIds = (value, max) => Array.isArray(value) && value.length <= max && value.every(validId) && new Set(value).size === value.length;
   function randomFor(floor, seed, salt) {
-    if (!integer(floor, 1, 99) || !integer(seed, 1, 0xffffffff)) throw new RangeError('無效的樓層或旅程種子。');
+    if (!validFloor(floor) || !integer(seed, 1, 0xffffffff)) throw new RangeError('無效的樓層或旅程種子。');
     let state = (seed ^ Math.imul(floor, 7919) ^ salt) >>> 0;
     return () => { state = (state + 0x6d2b79f5) >>> 0; let n = Math.imul(state ^ state >>> 15, state | 1); n ^= n + Math.imul(n ^ n >>> 7, n | 61); return ((n ^ n >>> 14) >>> 0) / 4294967296; };
   }
@@ -36,12 +37,13 @@
   }
   function newAdventure() { return { version: 1, claimed: [], quest: null }; }
   function validateAdventure(value, floor) {
+    if (floor !== undefined && !validFloor(floor)) return null;
     if (value === undefined) return newAdventure();
     if (!value || typeof value !== 'object' || Array.isArray(value) || value.version !== 1 || !uniqueIds(value.claimed, 128)) return null;
     let quest = null;
     if (value.quest !== null) {
       const q = value.quest;
-      if (!q || typeof q !== 'object' || Array.isArray(q) || !validId(q.id) || !validId(q.target) || !integer(q.floor, 1, 99) || (floor !== undefined && q.floor !== floor)) return null;
+      if (!q || typeof q !== 'object' || Array.isArray(q) || !validId(q.id) || !validId(q.target) || !validFloor(q.floor) || (floor !== undefined && q.floor !== floor)) return null;
       if (!QUEST_TYPES.includes(q.type) || !['active', 'ready', 'claimed'].includes(q.status) || !integer(q.goal, 1, 3) || !integer(q.progress, 0, q.goal) || !uniqueIds(q.events, 32)) return null;
       if ((q.status === 'active' && q.progress >= q.goal) || (q.status !== 'active' && q.progress !== q.goal)) return null;
       quest = { id: q.id, floor: q.floor, type: q.type, status: q.status, target: q.target, goal: q.goal, progress: q.progress, events: [...q.events] };
@@ -122,7 +124,8 @@
     if (random() >= .2) return null;
     const id = `chest:${floor}:${seed}`;
     if (random() < .35) return { id, outcome: 'trap', damage: 12 + Math.floor((99 - floor) / 10), gear: null };
-    const pool=modern?Object.keys(C.GEAR).filter(k=>!GEAR_KINDS.includes(k)&&C.GEAR[k].tier<=(floor>=70?1:floor>=40?2:3)):GEAR_KINDS,kind=pool[Math.floor(random()*pool.length)];
+    const H=modern?(typeof module==='object'&&module.exports?require('./tower-heroes-core.js'):globalThis.TowerHeroes):null;
+    const pool=modern?H.gearPool(floor):GEAR_KINDS,kind=pool[Math.floor(random()*pool.length)];
     return { id, outcome: 'gear', damage: 0, gear: C.createGear(kind, floor, seed, id, true) };
   }
   function openChest(run, chestId, expectedRevision, invulnerable = false) {
@@ -139,7 +142,8 @@
   function questReward(floor, seed, modern=false) {
     const C = core(), random = randomFor(floor, seed, 0x257ca), coins = 12 + Math.floor((99 - floor) / 6);
     if (random() < .45) {
-      const pool=modern?Object.keys(C.GEAR).filter(k=>!GEAR_KINDS.includes(k)&&C.GEAR[k].tier<=(floor>=70?1:floor>=40?2:3)):GEAR_KINDS,kind=pool[Math.floor(random()*pool.length)];
+      const H=modern?(typeof module==='object'&&module.exports?require('./tower-heroes-core.js'):globalThis.TowerHeroes):null;
+      const pool=modern?H.gearPool(floor):GEAR_KINDS,kind=pool[Math.floor(random()*pool.length)];
       return { coins, items: {}, gear: C.createGear(kind, floor, seed, `quest-reward:${floor}:${seed}`, true) };
     }
     const id = ['heal', 'ration', 'shield', 'hourglass'][Math.floor(random() * 4)];
@@ -147,11 +151,12 @@
   }
   function describeQuest(q, run) {
     const C = core(), types = {
-      defeat: ['清除路障', run.party?.loadouts?'請與隊友擊敗指定的守路怪物。':'請讓護衛擊敗指定的守路怪物。'], escort: ['護送迷途旅人', '帶我一起走到本層出口，請不要把我丟下。'],
-      relic: ['遺失的記憶', '幫我找回散落在迷宮中的記憶碎片。'], donate: ['旅人的急需', `請交付 ${q.goal} 份${C.ITEMS[q.target]?.name || '補給'}，讓我能繼續走下去。`],
-      survey: ['繪製迷宮', '走訪三個不同的迷宮格，替我記下道路。'], shift: ['觀察高塔心跳', '陪我安全經歷一次迷宮變形。'], stun: ['爭取逃脫時間', run.party?.loadouts?'擊敗指定怪物，或用技能擊暈、束縛牠，替旅人爭取空檔。':'用武器擊暈指定怪物一次，替旅人爭取空檔。'],
+      defeat: ['清除路障', run.party?.loadouts?'與隊友擊敗指定的守路怪物，再回來領取報酬。':'讓護衛擊敗指定的守路怪物，再回來領取報酬。'], escort: ['護送迷途旅人', '帶我到本層出口，在樓梯旁等我跟上。領取報酬後再下樓。'],
+      relic: ['遺失的記憶', '找到本層的委託記憶碎片，靠近拾取後回來交件；不是章節主線印記。'], donate: ['旅人的急需', `備齊 ${q.goal} 份${C.ITEMS[q.target]?.name || '補給'}，回到我身旁交付。`],
+      survey: ['繪製迷宮', '接下委託後，走訪三個不同的迷宮格，再回來告訴我。'], shift: ['觀察高塔心跳', '接下委託後，安全經歷一次迷宮變形，再回來領取報酬。'], stun: ['爭取逃脫時間', run.party?.loadouts?'擊敗指定怪物，或用技能擊暈、束縛牠，再回來領取報酬。':'用武器擊暈指定怪物一次，再回來領取報酬。'],
     };
-    return { ...q, title: types[q.type][0], description: types[q.type][1], reward: questReward(run.floor, run.seed,!!run.party?.loadouts), explorer: explorerIdentity(run.floor, run.seed) };
+    const explorer=explorerIdentity(run.floor,run.seed),nextStep=q.status==='ready'?'到'+explorer.name+'身旁領取報酬。':q.status==='claimed'?'報酬已領取，可以繼續探索。':types[q.type][1];
+    return { ...q, title: types[q.type][0], description: types[q.type][1], nextStep,leaveWarning:'委託與尚未領取的報酬，只保留在目前這一層。', reward: questReward(run.floor, run.seed,!!run.party?.loadouts), explorer };
   }
   function explorerOffer(run) {
     const C = core(), random = randomFor(run.floor, run.seed, 0x5b31e);

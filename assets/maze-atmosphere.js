@@ -1,6 +1,7 @@
 /* 原創迷宮建築細節：只附著既有牆／地板，不參與碰撞、拾取或遊戲亂數。
  * build(THREE, {wallBoxes,width,height,cell,wallHeight,style,palette,seed,quality})
  * palette 可覆寫 {wall,ground,accent}；quality: low 或 balanced。
+ * wallMap / floorMap 可借用引擎快取材質，模組絕不複製或釋放來源貼圖。
  * wallRoot 掛在 wallMesh 下以跟隨升降，floorRoot 直接掛 scene；重建前 dispose。
  * 打破牆時 removeWall(原 wallBox.inst)，不以可變陣列位置代替 inst。
  */
@@ -86,6 +87,7 @@
     const faces = base.motif === 'shop' || o.wallHeight < .65 ? [] : wallCandidates(o);
     let richFaces=0;
     for (const f of faces) {
+      const furnished=!!o.rich&&richFaces++<(o.limits.wallSections===28?12:20);
       const put = (u, v, width, height, color, rz = 0, batch = wall) => {
         const faceOffset = batch === glow ? .025 : .017;
         batch.push({ x: f.axis === 'x' ? f.along + u * f.span : f.surface + f.sign * faceOffset,
@@ -97,7 +99,7 @@
       put(0, .085, .86, .065, shadow);
       put(0, .91, .86, .045, stone);
       put(-.39, .48, .025, .79, stone); put(.39, .48, .025, .79, stone);
-      switch (base.motif) {
+      if(!furnished)switch (base.motif) {
         case 'arch':
           put(0, .55, .62, .045, accent);
           put(-.25, .69, .025, .24, stone); put(.25, .69, .025, .24, stone);
@@ -166,15 +168,93 @@
       }
       // Wall-mounted silhouettes and recessed furniture; never loose loot,
       // never a new collision, texture download, point light or animation loop.
-      if(o.rich&&richFaces++<(o.limits.wallSections===28?12:20)){
-        const solid=(u,v,w,h,depth,color,rz=0)=>{put(u,v,w,h,color,rz);const p=wall[wall.length-1];p.sz=depth;p.role='wall-sculpture';};
-        const round=(u,v,w,h,color)=>relief.push({x:f.axis==='x'?f.along+u*f.span:f.surface+f.sign*.075,y:v*o.wallHeight,z:f.axis==='x'?f.surface+f.sign*.075:f.along+u*f.span,sx:w*f.span,sy:h*o.wallHeight,sz:.12,ry:f.axis==='x'?0:-Math.PI/2,rz:0,color,wallInst:f.inst,role:'wall-sculpture'});
-        if(['hedge','vine','roots','bark'].includes(base.motif)){for(const side of [-1,1]){solid(side*.18,.57,.026,.5,.09,shadow,side*.2);round(side*.22,.65,.16,.1,accent);round(side*.14,.44,.12,.09,stone);}solid(0,.18,.7,.05,.1,shadow);}
-        else if(['shelves'].includes(base.motif)){solid(0,.48,.7,.63,.12,shadow);for(const v of [.31,.53,.75]){solid(0,v,.73,.05,.19,stone);for(let i=0;i<5;i++)solid(-.27+i*.13,v+.09,.055,.15+(i%2)*.03,.16,mix(p.accent,0x665378,i*.14));}}
-        else if(['conduit','vents','basalt'].includes(base.motif)){solid(0,.57,.54,.4,.12,shadow);for(let i=0;i<6;i++){const a=i*Math.PI/3;solid(Math.cos(a)*.15,.57+Math.sin(a)*.11,.055,.09,.16,accent,a);}solid(0,.57,.18,.16,.17,stone);solid(-.29,.42,.035,.43,.1,accent);solid(.29,.42,.035,.43,.1,accent);}
-        else if(['frost','echo','strata'].includes(base.motif)){for(let i=0;i<3;i++){solid(-.17+i*.17,.57,.08,.22+i*.07,.12,accent,(i-1)*.2);round(-.2+i*.2,.28,.13,.08,shadow);}solid(0,.81,.65,.04,.1,stone);}
-        else if(['wetland','tide'].includes(base.motif)){solid(0,.56,.6,.49,.11,shadow);for(const v of [.39,.51,.63,.75])solid(0,v,.58,.025,.14,accent);round(-.23,.32,.13,.05,stone);round(.24,.32,.13,.05,stone);}
-        else{solid(0,.57,.47,.52,.1,shadow);solid(0,.6,.31,.39,.13,accent);solid(0,.83,.56,.04,.16,stone);solid(-.27,.55,.025,.57,.12,stone);solid(.27,.55,.025,.57,.12,stone);round(0,.65,.11,.11,mix(p.accent,0xf4d89c,.4));}
+      if(furnished){
+        // A composed wall bay, not a scatter of miniature objects. All pieces
+        // remain inside the wall height and within 0.19 m of its surface.
+        const solid=(u,v,w,h,depth,color,rz=0)=>{put(u,v,w,h,color,rz);const piece=wall[wall.length-1];piece.sz=depth;piece.role='wall-sculpture';piece.feature=base.motif;};
+        const round=(u,v,w,h,color,rz=0)=>relief.push({x:f.axis==='x'?f.along+u*f.span:f.surface+f.sign*.06,y:v*o.wallHeight,z:f.axis==='x'?f.surface+f.sign*.06:f.along+u*f.span,sx:w*f.span,sy:h*o.wallHeight,sz:.18,ry:f.axis==='x'?0:-Math.PI/2,rz,color,wallInst:f.inst,role:'wall-sculpture',feature:base.motif});
+        const arch=(u,v,w,h,color)=>{
+          for(let i=0;i<7;i++){
+            const a=(i+.5)*Math.PI/7,dx=-w*f.span*.5*Math.sin(a),dy=h*o.wallHeight*Math.cos(a);
+            solid(u+Math.cos(a)*w*.5,v+Math.sin(a)*h,Math.hypot(dx,dy)*Math.PI/7/f.span*1.09,.06,.14,color,Math.atan2(dy,dx));
+          }
+          solid(u-w*.5,v-.17,.063,.36,.15,color);solid(u+w*.5,v-.17,.063,.36,.15,color);
+        };
+        const shade=mix(p.wall,0x111d28,.58), metal=mix(p.accent,0xe8d9b3,.24), variant=f.score%3;
+        switch(base.motif){
+          case 'arch':
+            solid(0,.48,.62,.65,.035,shade);arch(0,.58,.64,.22,stone);
+            solid(0,.22,.77,.06,.2,accent);solid(0,.63,.055,.35,.06,shadow);
+            for(const s of [-1,1]){solid(s*.16,.53,.02,.3,.07,accent);solid(s*.22,.3,.09,.065,.12,stone);}
+            break;
+          case 'spire':
+            solid(0,.5,.53,.6,.04,shade);arch(0,.6,.56,.24,stone);
+            for(const s of [-1,0,1]){solid(s*.13,.5,.027,.42-Math.abs(s)*.08,.12,accent);solid(s*.13,.73,.08,.055,.13,metal,s*.25);}
+            solid(0,.19,.68,.05,.15,stone);solid(0,.27,.33,.018,.08,accent);
+            break;
+          case 'hedge':
+          case 'vine':
+            for(const s of [-1,1]){
+              solid(s*.23,.47,.035,.57,.11,shadow,s*.12);
+              solid(s*.15,.58,.21,.03,.1,shadow,s*.45);
+              round(s*.23,.73,.28,.18,accent,s*.2);round(s*.15,.47,.25,.17,mix(p.wall,0x304637,.24),s*-.25);
+            }
+            if(base.motif==='vine'){solid(0,.22,.68,.05,.15,stone);solid(0,.29,.58,.027,.1,shadow);solid(0,.82,.6,.035,.1,accent);}
+            else solid(0,.2,.68,.035,.12,shadow);
+            break;
+          case 'bark':
+          case 'roots':
+            round(-.19,.47,.13,.67,shadow,-.04);round(.2,.5,.12,.74,stone,.08);
+            solid(-.18,.51,.018,.62,.17,shade,-.04);solid(.18,.52,.018,.58,.17,shadow,.07);
+            for(const s of [-1,1]){solid(s*.12,.3,.35,.05,.14,shadow,s*.42);solid(s*.23,.75,.25,.036,.12,accent,s*-.55);}
+            if(base.motif==='roots'){round(-.15,.16,.47,.1,accent,.16);round(.16,.18,.41,.09,shadow,-.2);}
+            break;
+          case 'strata':
+          case 'basalt':
+            for(let i=0;i<5;i++)solid(-.27+i*.135,.48+(i%2)*.07,.1,.54+(i%3)*.065,.09+(i%2)*.08,i%2?shade:stone,(i-2)*.055);
+            for(let i=0;i<3;i++)solid((i-1)*.17,.32+i*.13,.24,.025,.18,accent,i%2?.15:-.12);
+            if(base.motif==='basalt')solid(.25,.49,.018,.38,.19,mix(p.accent,0x7e352b,.44),.08);
+            break;
+          case 'wetland':
+            solid(0,.3,.7,.045,.15,shade);solid(0,.41,.67,.034,.1,accent);
+            for(let i=0;i<5;i++){solid(-.26+i*.13,.51,.036,.46+(i%2)*.13,.11,i%2?shadow:stone,(i-2)*.04);solid(-.26+i*.13,.24,.045,.045,.13,shade);}
+            round(-.25,.23,.2,.07,mix(p.ground,0x24483d,.5));round(.23,.21,.23,.065,shadow);
+            break;
+          case 'tide':
+            solid(0,.52,.62,.57,.03,shade);arch(0,.6,.62,.2,stone);
+            for(const u of [-.18,0,.18])solid(u,.49,.032,.41,.14,accent);
+            for(const v of [.32,.43])solid(0,v,.58,.026,.17,mix(accent,0xdae5df,.3));
+            solid(0,.23,.77,.06,.19,stone);round(0,.25,.41,.04,shadow);
+            break;
+          case 'echo':
+          case 'frost':
+            for(let i=0;i<5;i++){const v=.31+(i%3)*.065;solid((i-2)*.12,v+.18,.065,.29+(i%2)*.18,.13,i%2?stone:accent,(i-2)*.16);solid((i-2)*.12,v,.12,.075,.09,shadow);}
+            if(base.motif==='frost'){round(-.22,.79,.24,.1,stone);round(.18,.77,.32,.11,accent);solid(-.2,.67,.024,.18,.13,accent,.08);solid(.2,.61,.028,.24,.12,stone,-.1);}
+            else{solid(0,.19,.7,.065,.18,shade);solid(0,.25,.57,.026,.17,accent);}
+            break;
+          case 'shelves':
+            solid(0,.5,.7,.63,.04,shade);
+            for(const u of [-.35,.35])solid(u,.51,.04,.66,.2,stone);
+            for(const v of [.24,.46,.68]){solid(0,v,.76,.045,.2,accent);for(let i=0;i<5;i++)solid(-.28+i*.14,v+.103,.072,.135+((i+variant)%3)*.018,.14,mix(metal,0x665378,((i+variant)%5)*.13),(i===variant?.07:0));}
+            solid(0,.84,.79,.065,.18,stone);
+            break;
+          case 'conduit':
+            solid(0,.53,.53,.49,.04,shade);
+            for(const s of [-1,1]){solid(s*.29,.48,.045,.6,.13,metal);solid(s*.29,.3,.07,.06,.18,shadow);solid(s*.29,.69,.07,.06,.18,shadow);}
+            for(let i=0;i<8;i++){const a=i*Math.PI/4;solid(Math.cos(a)*.16,.55+Math.sin(a)*.14,.055,.07,.17,accent,a);}
+            round(0,.55,.22,.2,stone);solid(0,.55,.07,.06,.19,shade);solid(0,.23,.7,.045,.12,shadow);
+            break;
+          case 'vents':
+            solid(0,.5,.68,.55,.045,shade);arch(0,.62,.6,.19,shadow);
+            for(let i=0;i<7;i++)solid(-.27+i*.09,.46,.038,.37,.17,stone);
+            solid(0,.22,.77,.055,.19,accent);solid(0,.34,.62,.02,.09,mix(accent,0xa53d1e,.55));
+            break;
+          case 'orbit':
+            solid(0,.49,.63,.61,.025,shade);
+            for(let i=0;i<5;i++){const u=(i-2)*.12,v=.34+(i%3)*.11;solid(u,v,.022,.31,.11,accent);solid(u+.035,v+.14,.085,.035,.14,metal);}
+            arch(0,.61,.66,.2,stone);solid(0,.2,.75,.045,.17,accent);
+            break;
+        }
       }
       if (base.lamp && f.score % 3 === 0) {
         put(.29, .7, .09, .13, shadow);
@@ -192,10 +272,32 @@
       let layer = 0;
       const addFloor = (dx, dz, sx, sz, color) => floor.push({ x: x + dx, y: .005 + layer++ * .00075, z: z + dz, sx, sy: .008, sz, ry: 0, rz: 0, color, wallInst: null, role: 'floor-inlay' });
       const sx = (flip ? .7 : .48) * o.cell, sz = (flip ? .48 : .7) * o.cell;
-      addFloor(flip ? 0 : offset, flip ? offset : 0, sx, sz, tileColor);
-      addFloor(flip ? 0 : offset, flip ? offset : 0, flip ? sx : .018, flip ? .018 : sz, mix(p.ground, 0x25353a, .23));
-      if (base.motif === 'shop' || ['arch', 'spire', 'shelves', 'conduit', 'orbit'].includes(base.motif)) {
-        addFloor(flip ? sx * .25 : offset, flip ? offset : sz * .25, flip ? .016 : sx, flip ? sz : .016, mix(p.ground, 0x25353a, .17));
+      if(o.rich&&base.motif!=='shop'){
+        // Four broad, low-contrast fragments per cell at most: a coherent
+        // surface rhythm instead of objects scattered down the walking lane.
+        const seam=mix(p.ground,0x283c3b,.2), inlay=mix(p.ground,p.accent,.21);
+        if(['hedge','vine','bark','roots','wetland'].includes(base.motif)){
+          addFloor(-.23*o.cell,offset,.22*o.cell,.57*o.cell,tileColor);
+          addFloor(.23*o.cell,-offset,.2*o.cell,.42*o.cell,mix(p.ground,0x314937,.14));
+          addFloor(-.26*o.cell,offset,.017,.49*o.cell,seam);
+          addFloor(.21*o.cell,-offset,.017,.37*o.cell,inlay);
+        }else if(['strata','basalt','echo','frost'].includes(base.motif)){
+          addFloor(-.13*o.cell,offset,.57*o.cell,.33*o.cell,tileColor);
+          addFloor(.2*o.cell,-.21*o.cell,.28*o.cell,.24*o.cell,inlay);
+          addFloor(-.12*o.cell,offset,.018,.29*o.cell,seam);
+          addFloor(.2*o.cell,-.21*o.cell,.21*o.cell,.016,seam);
+        }else{
+          addFloor(0,0,.86*o.cell,.78*o.cell,tileColor);
+          addFloor(0,-.27*o.cell,.72*o.cell,.027,inlay);
+          addFloor(-.28*o.cell,0,.024,.69*o.cell,inlay);
+          addFloor(.18*o.cell,0,.017,.74*o.cell,seam);
+        }
+      }else{
+        addFloor(flip ? 0 : offset, flip ? offset : 0, sx, sz, tileColor);
+        addFloor(flip ? 0 : offset, flip ? offset : 0, flip ? sx : .018, flip ? .018 : sz, mix(p.ground, 0x25353a, .23));
+        if (base.motif === 'shop' || ['arch', 'spire', 'shelves', 'conduit', 'orbit'].includes(base.motif)) {
+          addFloor(flip ? sx * .25 : offset, flip ? offset : sz * .25, flip ? .016 : sx, flip ? sz : .016, mix(p.ground, 0x25353a, .17));
+        }
       }
     }
     const instances = wall.length + glow.length + floor.length+relief.length;
@@ -212,9 +314,12 @@
     const position = new THREE.Vector3(), scale = new THREE.Vector3(), rotation = new THREE.Quaternion(), euler = new THREE.Euler(), matrix = new THREE.Matrix4(), color = new THREE.Color();
     function batch(parts, parent, basic, name,shape=geometry) {
       if (!parts.length) return;
-      const material = own(basic ? new THREE.MeshBasicMaterial({ color: 0xffffff }) : new THREE.MeshLambertMaterial({ color: 0xffffff }));
+      const borrowedMap=parent===floorRoot?options.floorMap:options.wallMap;
+      const material = own(basic ? new THREE.MeshBasicMaterial({ color: 0xffffff }) : new THREE.MeshLambertMaterial({ color: 0xffffff, map:borrowedMap?.isTexture?borrowedMap:null }));
       // 燈罩只是會受深度遮擋的明亮嵌片，沒有額外點光源／透明光暈。
-      const mesh = new THREE.InstancedMesh(shape, material, parts.length); mesh.name = name; mesh.userData.role = 'scenery';
+      // Instance matrices/colours are object-owned GPU buffers: releasing the
+      // geometry alone does not release them in Three's WebGLObjects cache.
+      const mesh = own(new THREE.InstancedMesh(shape, material, parts.length)); mesh.name = name; mesh.userData.role = 'scenery';
       for (let i = 0; i < parts.length; i++) {
         const p = parts[i]; position.set(p.x, p.y, p.z); scale.set(p.sx, p.sy, p.sz);
         rotation.setFromEuler(euler.set(0, p.ry, p.rz, 'YXZ')); matrix.compose(position, rotation, scale);

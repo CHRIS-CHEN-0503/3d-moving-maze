@@ -55,7 +55,7 @@ function trackResources(...roots) {
 function options(h) {
   const G = h.context.G;
   return { wallBoxes: G.wallBoxes, width: G.mazeW, height: G.mazeH, cell: G.cell, wallHeight: G.wallH,
-    style: theme.id, palette: { wall: theme.wall3d, ground: theme.floor }, seed: G.lvlIdx + 1, quality: 'balanced' };
+    style: theme.id, palette: { wall: theme.wall3d, ground: theme.floor }, seed: G.lvlIdx + 1, quality: 'balanced', rich:theme.id!=='shop' };
 }
 
 test('真實 buildWalls 把牆紋附著於升降牆，地板嵌紋留在地面', () => {

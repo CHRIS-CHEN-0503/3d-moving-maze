@@ -14,7 +14,8 @@
     lantern: Object.freeze({ title: '餘燼渡廊', description: '最後一段歸途沉在暗影裡。迷宮即將封閉，點亮三盞守路燈，讓迷失的人看見回家的方向。', objective: '點亮三盞守路燈，順序不限。', size: 9, timeLimit: 90, shiftSeconds: 20 }),
   });
   const number = (value, low, high, integer = false) => typeof value === 'number' && Number.isFinite(value) && value >= low && value <= high && (!integer || Number.isInteger(value));
-  const validFloor = floor => number(floor, 1, 99, true);
+  const towerFloor = floor => number(floor, 1, 99, true);
+  const validFloor = floor => towerFloor(floor) || number(floor, -50, -1, true);
   const validSeed = seed => number(seed, 1, 0xffffffff, true);
   function randomSource(floor, seed) {
     let value = (seed ^ Math.imul(floor, 0x7f4a7c15) ^ 0x49fc2397) >>> 0;
@@ -52,7 +53,9 @@
       shiftSeconds: Math.max(14, Math.round(spec.shiftSeconds * (1 - (tier - 1) * .08))) };
   }
   function rawOffer(floor, seed, catalogVersion = CATALOG_VERSION) {
-    if (!validFloor(floor) || !validSeed(seed) || floor > 95) return null;
+    // Underground chapters have their own main-line journey. The old tower
+    // rifts stay in their original catalogue; never index its plan at -1.
+    if (!towerFloor(floor) || !validSeed(seed) || floor > 95) return null;
     const random = randomSource(floor, seed);
     if (random() >= 0.28) return null;
     // Version 1 keeps its original pool, draw count, order, rewards and geometry seed.
@@ -89,7 +92,7 @@
     if (!value || typeof value !== 'object' || Array.isArray(value) || ![1, 2, 3].includes(value.version) || typeof value.discovered !== 'boolean' || !Array.isArray(value.history) || value.history.length > 99) return null;
     const history = [], ids = new Set();
     for (const item of value.history) {
-      if (!item || !validFloor(item.floor) || item.floor < floor || !['completed', 'abandoned', 'expired'].includes(item.outcome)) return null;
+      if (!item || !towerFloor(item.floor) || item.floor < floor || !['completed', 'abandoned', 'expired'].includes(item.outcome)) return null;
       const version = catalogVersion(item.catalogVersion);
       if (![1, 2, 3].includes(version) || version > value.version || item.floor === floor && version !== value.version) return null;
       const generated = rawOffer(item.floor, seed, version);

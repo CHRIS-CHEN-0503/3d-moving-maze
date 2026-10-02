@@ -13,7 +13,7 @@
   });
   function rng(seed){let s=seed>>>0;return()=>{s=(Math.imul(s,1664525)+1013904223)>>>0;return s/4294967296;};}
   function layout({floor,seed,size,blocked=[],count,allKinds=false}){
-    if(!Number.isInteger(floor)||floor<1||floor>95||!Number.isInteger(size)||size<5)return [];
+    if(!Number.isInteger(floor)||!(floor>=1&&floor<=95||floor>=-50&&floor<=-1)||!Number.isInteger(size)||size<5||size>21)return [];
     const random=rng(seed^Math.imul(floor,73129)),tier=Math.min(5,1+Math.floor((99-floor)/20));
     const pool=['spikes',...(allKinds||floor<=85?['vines']:[]),...(allKinds||floor<=65?['steam']:[]),...(allKinds||floor<=45?['rubble']:[])];
     const occupied=blocked.map(key=>key.split(',').map(Number)),candidates=[];

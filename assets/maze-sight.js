@@ -1,9 +1,11 @@
 /* Render-only, bounded fog/history batches. All temporary visibility is restored in finally. */
-(function(root){'use strict';const C=root.MazeSightCore;let state=null,layer=null,source=null,liveWalls=null,memoryWalls=null,fog=null,shade=null,last=0,revealed=false,frame=null,changed=[],batches=[];const hidden=new Set();
+(function(root){'use strict';const C=root.MazeSightCore;let state=null,layer=null,source=null,liveWalls=null,memoryWalls=null,fog=null,shade=null,last=0,revealed=false,frame=null,changed=[],batches=[];const hidden=new Set(),owned=new Set(),released=new Set();
   function active(){return !!frame&&!frame.fullVision&&['tp','top'].includes(frame.g.view);}
-  function reset(){restore();if(layer){layer.parent?.remove(layer);const materials=new Set(),geometries=new Set();layer.traverse(o=>{if(o.geometry)geometries.add(o.geometry);if(o.material)materials.add(o.material);});materials.forEach(m=>m.dispose());geometries.forEach(g=>g.dispose());}state=layer=source=frame=null;batches=[];last=0;revealed=false;}
-  function build(f){if(layer){layer.parent?.remove(layer);const mats=new Set(),geos=new Set();layer.traverse(o=>{if(o.geometry)geos.add(o.geometry);if(o.material)mats.add(o.material);});mats.forEach(m=>m.dispose());geos.forEach(g=>g.dispose());}const T=f.T,g=f.g,n=2*g.mazeW*g.mazeH+4;layer=new T.Group();layer.name='maze-sight-layer';layer.visible=false;f.scene.add(layer);batches=[];
-    const mesh=(geo,mat,count)=>{const m=new T.InstancedMesh(geo,mat,count);m.frustumCulled=false;m.count=0;layer.add(m);return m;};
+  function own(resource){if(!owned.has(resource)){owned.add(resource);resource.addEventListener('dispose',()=>released.add(resource));}return resource;}
+  function clearLayer(){layer?.parent?.remove(layer);for(const resource of owned)if(!released.has(resource))resource.dispose();layer?.clear();owned.clear();released.clear();layer=null;batches=[];}
+  function reset(){restore();clearLayer();state=source=frame=null;last=0;revealed=false;}
+  function build(f){clearLayer();const T=f.T,g=f.g,n=2*g.mazeW*g.mazeH+4;layer=new T.Group();layer.name='maze-sight-layer';layer.visible=false;f.scene.add(layer);
+    const mesh=(geo,mat,count)=>{const m=own(new T.InstancedMesh(own(geo),own(mat),count));m.frustumCulled=false;m.count=0;layer.add(m);return m;};
     liveWalls=mesh(f.wall.geometry.clone(),f.wall.material.clone(),n);
     // Remembered terrain is a quiet floor plan, not a second full-height grey maze.
     memoryWalls=mesh(new T.BoxGeometry(1,.08,1),new T.MeshBasicMaterial({color:0x354553,fog:false}),n);

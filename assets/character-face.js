@@ -8,12 +8,13 @@
     const brows=[detail(.09,.022,.022,-.13,.12,.265),detail(.09,.022,.022,.13,.12,.265)];
     const mouth=detail(.13,.035,.03,0,-.12,.247);
     const corners=[detail(.023,.045,.027,-.068,-.10,.261),detail(.023,.045,.027,.068,-.10,.261)];
-    const face={eyes,brows,mouth,corners,mood:'calm',phase:(model.id%19)*.27,reaction:'',left:0,time:null,width:1,lids:[],lips:[]};
+    const face={eyes,brows,mouth,corners,mood:'calm',phase:(model.id%19)*.27,reaction:'',left:0,time:null,width:1,lids:[],lips:[],pupils:[]};
     // 微小高光跟著眼睛眨動；共用一組材質／幾何，不使用臉部貼圖。
     const shineMaterial=new T.MeshBasicMaterial({color:robot?0xe0ffff:0xfff3df});
     const shineGeometry=new T.SphereGeometry(.014,6,4);shineGeometry.scale(.75,1,.35);
-    for(const eye of eyes){const shine=new T.Mesh(shineGeometry,shineMaterial);shine.name='eye-catchlight';shine.position.set(-.014,.021,.029);eye.add(shine);}
-    const white=new T.MeshLambertMaterial({color:robot?0xb1ffff:0xfff5df}),whiteGeo=new T.SphereGeometry(1,8,6);whiteGeo.scale(.052,.062,.018);face.whites=[];
+    const pupilMaterial=new T.MeshBasicMaterial({color:robot?0xe0ffff:0x192127}),pupilGeometry=new T.SphereGeometry(.02,6,4);pupilGeometry.scale(.76,1.2,.35);
+    for(const eye of eyes){const pupil=new T.Mesh(pupilGeometry,pupilMaterial);pupil.name='eye-pupil';pupil.position.z=.018;eye.add(pupil);face.pupils.push(pupil);const shine=new T.Mesh(shineGeometry,shineMaterial);shine.name='eye-catchlight';shine.position.set(-.011,.015,.026);eye.add(shine);}
+    const white=new T.MeshLambertMaterial({color:robot?0xb1ffff:0xfff5df}),whiteGeo=new T.SphereGeometry(1,8,6);whiteGeo.scale(.049,.047,.018);face.whites=[];
     for(const eye of eyes){if(model.userData.sculpted&&!robot)eye.position.z=surface(eye.position.x,eye.position.y-headY);const sclera=new T.Mesh(whiteGeo,white);sclera.name='eye-white';sclera.position.copy(eye.position);sclera.position.z-=.009;rig.add(sclera);face.whites.push(sclera);eye.scale.set(.78,.84,1);}
     if(!robot){const lidMaterial=new T.MeshLambertMaterial({color:0x916c5b}),lidGeometry=new T.TorusGeometry(.047,.007,4,12,Math.PI);for(const eye of eyes){const lid=new T.Mesh(lidGeometry,lidMaterial);lid.name='upper-eyelid';lid.position.copy(eye.position);lid.position.z+=.004;lid.scale.set(1.15,.72,.7);rig.add(lid);face.lids.push(lid);}const lipMaterial=new T.MeshLambertMaterial({color:0xb78274});for(const [y,w]of [[-.109,.105],[-.144,.115]]){const lip=detail(w,.018,.018,0,y,.26);lip.name='sculpted-lip';lip.material=lipMaterial;face.lips.push(lip);}}
     const teeth=detail(.09,.014,.008,0,-.113,.267);teeth.material=white;teeth.visible=false;face.teeth=teeth;
@@ -29,7 +30,7 @@
     f.mood=mood;
     const blink=((time+f.phase)%4.7)<.12;
     const hurt=mood==='hurt',focus=mood==='focus'||mood==='cast',happy=mood==='happy',alert=mood==='alert',talk=mood==='talk',tired=mood==='tired';
-    for(let i=0;i<f.eyes.length;i++){const lid=blink?.12:hurt?.38:focus?.65:happy?.68:alert?1.1:tired?.48:.84;f.eyes[i].scale.y=lid;f.whites[i].scale.y=lid/.84;}
+    for(let i=0;i<f.eyes.length;i++){const lid=blink?.12:hurt?.38:focus?.65:happy?.68:alert?1.1:tired?.48:.84;f.eyes[i].scale.y=lid;f.whites[i].scale.y=lid/.84;if(f.pupils?.[i])f.pupils[i].position.x=(focus?0:Math.sin(time*.7+f.phase)*.003);}
     f.brows[0].rotation.z=hurt?-.3:focus?-.3:happy?.2:alert?.3:0;
     f.brows[1].rotation.z=-f.brows[0].rotation.z;
     for(const b of f.brows)b.position.y=(f.browY??(f.browY=b.position.y))+(alert?.035:tired?-.025:0);
@@ -37,7 +38,7 @@
     for(let i=0;i<f.lids.length;i++){f.lids[i].scale.y=f.eyes[i].scale.y*.85;f.lids[i].rotation.z=focus?(i?-.15:.15):0;}
     for(let i=0;i<f.lips.length;i++){f.lips[i].scale.x=f.mouth.scale.x;f.lips[i].position.y=f.mouth.position.y+(i?-.018:.012)*f.mouth.scale.y;}
     f.teeth.visible=happy;for(const c of f.cheeks)c.visible=!hurt&&!tired;
-    for(const corner of f.corners)corner.visible=!hurt&&!focus&&!alert&&!talk;
+    for(const corner of f.corners)corner.visible=happy;
   }
   return Object.freeze({attach,update,react,moods});
 });

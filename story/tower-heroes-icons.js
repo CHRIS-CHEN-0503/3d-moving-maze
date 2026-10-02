@@ -1,4 +1,4 @@
-/* 71 original object illustrations. No emoji, font glyphs or external images. */
+/* Original object and ability illustrations. No emoji, font glyphs or external images. */
 (function(root,factory){const a=factory();if(typeof module==='object'&&module.exports)module.exports=a;if(root)root.TowerHeroIcons=a;})(typeof globalThis!=='undefined'?globalThis:this,function(){
   'use strict';
   const p=d=>'<path d="'+d+'"/>',circle=(x,y,r)=>'<circle cx="'+x+'" cy="'+y+'" r="'+r+'"/>',g=(s,t)=>'<g transform="'+t+'">'+s+'</g>';
@@ -110,9 +110,43 @@
     item_hourglass:p('M16 5h32v9q0 11-12 18 12 7 12 18v9H16v-9q0-11 12-18-12-7-12-18ZM13 5h38M13 59h38M23 49l9-10 9 10Z'),
     item_bell:p('M13 43h38L45 32V20q-13-19-26 0v12ZM8 44h48v7H8M25 53q7 12 14 0M29 9V3h6v6'),
     item_map:p('M5 12l18-6 18 7 18-6v45l-18 7-18-7-18 6ZM23 6v46m18-39v46M12 27l17 13 20-18m-6-1 6 1-1 7'),
+    item_feather:p('M10 56 47 9q-28-5-31 25L13 45q24 1 36-23l3-16-5 3M22 40l-2-15m11 3-2-11m-2 19 17-2m-7-11 13-2'),
+    item_arrow:p('M11 54 47 10M41 12l12-8-4 14-2-8ZM11 54l-5-12 7-9 5 12 12 2-8 9ZM19 44l8-10'),
+  });
+  // Underground mastery branches: action silhouettes rather than generic seals.
+  Object.assign(drawings,{
+    rift_cleaver:g(sword,'translate(-1 -2) rotate(42 32 32)')+p('M5 40h14v16H5Zm40-24h14v16H45ZM20 43l7-7m9-9 7-7M29 49l9 11m5-20 15 3'),
+    warbreaker_soul:p('M27 56V27l5-17 5 17v29M20 44h24M18 37Q4 26 15 8q0 13 10 14M46 37Q60 26 49 8q0 13-10 14M25 58h14'),
+    oath_counter:g(shield,'translate(-2 13) scale(.7)')+p('M34 12q23-12 25 10v12M52 27l7 7 4-9M36 56V26l5-11 5 11v30M30 45h21'),
+    undying_heart:p('M11 13q21-9 42 0v20Q49 50 32 59 15 50 11 33Z')+p('M32 24c-12-16-24 3 0 21 24-18 12-37 0-21ZM8 33h13l5-8 7 15 5-7h18'),
+    comet_cascade:g(star,'translate(35 37) scale(.4)')+g(star,'translate(16 29) scale(.36)')+g(star,'translate(-1 20) scale(.3)')+p('M9 4l26 31M23 3l21 28M5 17l17 20M10 58q24-12 46-2'),
+    celestial_resonance:circle(32,32,10)+p('M10 14q39-26 44 18T10 50q-12-27 17-43M7 39q21-20 49-13M14 8l4 4m31 40 5 5')+circle(13,16,4)+circle(52,40,4)+circle(23,56,3),
+    prism_resonance:p('m32 8 18 29-18 20L14 37Zm0 0v49M14 37h36M2 22l13 7m-13 8h9m43-18-8 9m7 16 9 5M32 2V0'),
+    triune_stars:g(star,'translate(19 -1) scale(.4)')+g(star,'translate(1 32) scale(.4)')+g(star,'translate(39 32) scale(.4)')+p('M13 29q-1-13 11-16m16 0q13 3 12 16M23 53q9 5 18 0'),
+    windward_march:g(boot,'translate(7 -1) scale(.48)')+g(boot,'translate(29 25) scale(.48)')+p('M3 32h25m-20 8h18m-13 8h14M39 9h19m-14 8h13M25 58h12'),
+    farstrider_pact:p('M5 11l18-6 18 7 18-6v43l-18 8-18-8-18 7ZM23 8v40m18-33v39M11 27l12 11 15-18 14 3')+g(leaf,'translate(30 32) scale(.4)'),
+    rift_mark:g(eye,'translate(9 13) scale(.72)')+p('M5 22V7h15m24 0h15v15M59 44v15H44M20 59H5V44M32 3l-5 12 10 4-7 10M29 42l7 5-5 14'),
+    hunt_chain:p('M6 24h16l-5-6m5 6-5 6M26 24h15l-5-6m5 6-5 6M45 24h15l-5-6m5 6-5 6M10 41l7-7 10 10-7 7Zm15 2 8-8 10 10-8 8Zm16 1 7-7 10 10-7 7Z'),
+    banquet_broth:p('M8 32h48q-4 23-24 23T8 32ZM4 26h56M10 4v17q0 8 8 8m-3-25v17m39-17v17q0 8-8 8m3-25v17M26 10q-5 7 0 14m11-14q-5 7 0 14'),
+    lasting_banquet:p('M8 44q24-14 48 0v9H8ZM5 58h54M23 5h18v5l-6 9 6 9v5H23v-5l6-9-6-9ZM27 28h10M13 16q-7 8 0 16m38-16q7 8 0 16'),
+    nourishing_brew:p('M13 25h27v25q-13 13-27 0Zm27 4q22-4 9 17h-9M10 23h33M21 5q-5 7 0 13m12-13q-5 7 0 13M17 31q10-5 19 0v8q-3 9-10 13-9-6-9-13Zm9 1v13m-5-7h10'),
+    hundred_flavor_heart:p('M32 32c-17-21-36 3 0 28 36-25 17-49 0-28ZM13 6h10v14H13m-3-10h16M33 4q-7 15 0 17t0-17M42 10q15-9 15 5t-15-5ZM26 42h12m-6-6v16'),
+    dawn_return:p('M5 51q12-13 26-7l15-15 10 6-20 23H5M21 18h22m-11-11v22M8 15l6 3m-2-14 5 5m39 6-6 3m2-14-5 5')+circle(32,18,14),
+    endless_dawn:p('M6 58V34q0-30 26-30t26 30v24M13 56V35q0-22 19-22t19 22v21M5 54q27-12 54 0')+circle(32,31,8)+p('M32 17v4m0 20v4M18 31h4m20 0h4'),
+    covenant_ward:g(shield,'translate(16 -1) scale(.55)')+p('M4 44l11-10 13 12-6 10H9Zm56 0L49 34 36 46l6 10h13M21 42l8-7 14 9M23 49l10 9 8-8M28 16h12m-6-6v15'),
+    eternal_covenant:p('M31 29C6 4-11 57 13 54c10-1 29-30 40-29 22 2 12 46-22 14M29 25q-6-18 10-20 10 10-7 22M12 49l-8-6m20-2 6 8m13-16 11 2'),
+    citadel_plating:p('M12 13q20-9 40 0v23Q49 51 32 59 15 51 12 36ZM16 20h13v12H16m19-12h13v12H35M20 37h11v13H20m15-13h9v10M25 5h14v8H25'),
+    walking_citadel:p('M9 8h10v9h8V5h10v12h8V8h10v32H9ZM9 26h46M24 40V29h16v11M14 43h13v8l-5 7H7v-8l7-4Zm24 0h13v7l7 5v4H38Z'),
+    soul_temper:g(hammer,'translate(13 -4) rotate(32 25 25) scale(.68)')+p('M7 43h45l8-9H40l-6 4H7ZM16 44v9l-7 6h39l-9-6v-9M19 35q-12-13 2-25-2 14 8 10 8 12-10 15'),
+    masterwork_legacy:p('M8 27h35l14-10v14l-13 9H19l-9-5ZM23 41v9l-9 7h35l-9-7v-9M5 12l7 6m46 25-5 8m-48-9 6 9')+g(star,'translate(17 -2) scale(.45)'),
+    worldroot_arrow:p('M32 5v36m-8-11 8 11 8-11M28 7l4-5 4 5M32 42l-9 8-12 1-8 8m29-17 9 8 12 1 8 8M24 49l-1 11m18-11 1 11M10 22q-6-14 11-14 1 14-11 14m44 0q6-14-11-14-1 14 11 14'),
+    evergreen_bow:p('M17 5q36 27 0 54V5M6 32h51m-9-8 9 8-9 8M31 17q-4-16 13-14 1 15-13 14M40 31q-1-15 16-13-3 14-16 13M31 46q0 16 16 14-2-14-16-14'),
+    pursuit_volley:p('M5 19h51m-11-8 11 8-11 8M10 36h49m-11-8 11 8-11 8M3 53h49m-11-8 11 8-11 8M6 12l7 7-7 7m9 3 7 7-7 7m-8 3 7 7-7 7'),
+    forest_symphony:g(leaf,'translate(-1 7) scale(.75)')+p('M36 18q16 13 0 27m8-35q23 21 0 42m8-49q24 28 0 56M4 55h14m-9-8v12'),
   });
   // Each tier keeps its recognizable whole object and adds its own inlaid trim.
-  for(const kind of ['longsword','greatsword','arcane_staff','spellbook','smith_hammer','warhammer','cooking_pan','twin_daggers','elven_bow','heavy_helm','heavy_armor','light_hood','light_armor','rune_crown','robe','buckler','round_shield','tower_shield'])for(const tier of [2,3])drawings[kind+'_t'+tier]=drawings[kind]+(tier===2?p('m45 42 5-5 5 5-5 5Z'):p('m43 38 7-7 7 7-7 7Zm-3 13 4-4 4 4-4 4m11 0 4-4 4 4-4 4'));
+  const tierInlay={2:p('m45 42 5-5 5 5-5 5Z'),3:p('m43 38 7-7 7 7-7 7Zm-3 13 4-4 4 4-4 4m11 0 4-4 4 4-4 4'),4:p('m43 44 7-12 7 12-7 12Zm7-12v24M38 43q-5 10 8 17m16-17q5 10-8 17'),5:circle(50,46,7)+p('M50 32v5m0 18v5M36 46h5m18 0h4M39 35l5 5m12 12 5 5M39 57l5-5m12-12 5-5')};
+  for(const kind of ['longsword','greatsword','arcane_staff','spellbook','smith_hammer','warhammer','cooking_pan','twin_daggers','elven_bow','heavy_helm','heavy_armor','light_hood','light_armor','rune_crown','robe','buckler','round_shield','tower_shield'])for(const tier of [2,3,4,5])drawings[kind+'_t'+tier]=drawings[kind]+tierInlay[tier];
   function svg(id){if(!drawings[id])return '';return '<svg class="hero-icon" viewBox="0 0 64 64" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><g fill="#284957" fill-opacity=".75" stroke="#f6db9e" stroke-width="2.8" stroke-linecap="round" stroke-linejoin="round">'+drawings[id]+'</g></svg>';}
   return Object.freeze({svg,ids:Object.freeze(Object.keys(drawings))});
 });

@@ -7,8 +7,8 @@ const require=createRequire(import.meta.url),C=require('../story/story-core.js')
 function fresh(floor=99,job='swordsman',seed=31415){const r=P.enable(C.newRun({seed}),job).run;r.floor=floor;r.floorsCleared=99-floor;r.chronicle=N.newChronicle(floor);P.advance(r);return r;}
 function complete(r){r=X.bossAction(r,0).run;const d=X.BOSSES[r.floor];for(let round=0;round<8&&!r.party.boss.done;round++)for(const t of [1,d.warning+d.strike+1]){r.party.boss.clock=round*d.cycle+t;for(let tries=0;tries<4;tries++)for(let i=0;i<d.count;i++){const result=X.bossAction(r,i);if(result.ok)r=result.run;}}return r;}
 test('all ten boss floors are solvable by all six professions, preserve timing and pay once',()=>{
-  assert.deepEqual(Object.keys(X.BOSSES).map(Number),[1,10,20,30,40,50,60,70,80,90]);
-  for(const floor of Object.keys(X.BOSSES).map(Number))for(const job of Object.keys(P.PROFESSIONS)){
+  assert.deepEqual(Object.keys(X.BOSSES).map(Number).filter(f=>f>0),[1,10,20,30,40,50,60,70,80,90]);
+  for(const floor of Object.keys(X.BOSSES).map(Number).filter(f=>f>0))for(const job of Object.keys(P.PROFESSIONS)){
     const r=fresh(floor,job),coins=r.coins;assert.equal(P.canDescend(r),false);const done=complete(r);
     assert.equal(done.party.boss.done,true,`${floor}/${job}`);assert.equal(done.coins,coins+35);assert.equal(P.canDescend(done),false,'Maze seals do not bypass the floor lord');done.defeatedMonsters.push('monster-11');assert.equal(P.canDescend(done),true);assert.ok(C.validateSave(done));
     assert.equal(X.bossAction(done,0).ok,false);assert.equal(C.floorConfig(floor).shiftSeconds,150-(99-floor));
@@ -54,13 +54,13 @@ test('all six optional sites have profession and no-cost time alternatives; rewa
   }assert.equal(seen.size,6);
 });
 test('forging is revision guarded, class-discounted, one immutable trait and two ranks only',()=>{
-  let r=fresh(99,'smith');r.coins=100;r.party.journey.scrap=30;const id=r.equipment.weapon.id,rev=r.revision;
+  let r=fresh(99,'smith');r.coins=100;r.party.journey.scrap=30;r.party.journey.materials.ironore=3;const id=r.equipment.weapon.id,rev=r.revision;
   r=X.forge(r,id,'durable',rev).run;assert.equal(r.coins,96);assert.equal(r.party.journey.scrap,27);assert.equal(X.forge(r,id,'durable',rev).ok,false);assert.equal(X.forge(r,id,'light').ok,false);
   r=X.forge(r,id,'durable').run;assert.equal(r.equipment.weapon.forge.level,2);assert.equal(X.forge(r,id,'durable').ok,false);assert.ok(C.validateSave(r));
-  let other=fresh();other.coins=100;other.party.journey.scrap=30;other=X.forge(other,other.equipment.weapon.id,'light').run;assert.equal(other.coins,92);assert.ok(Math.abs(X.attackInterval(other)-.72)<1e-9);
+  let other=fresh();other.coins=100;other.party.journey.scrap=30;other.party.journey.materials.toughfiber=3;other=X.forge(other,other.equipment.weapon.id,'light').run;assert.equal(other.coins,92);assert.ok(Math.abs(X.attackInterval(other)-.72)<1e-9);
 });
 test('durable gear consumes reserve first, repairs do not refill it; broken gear yields one scrap',()=>{
-  let r=fresh(84,'smith');r.coins=100;r.party.journey.scrap=30;const id=r.equipment.weapon.id;r=X.forge(r,id,'durable').run;
+  let r=fresh(84,'smith');r.coins=100;r.party.journey.scrap=30;r.party.journey.materials.ironore=1;const id=r.equipment.weapon.id;r=X.forge(r,id,'durable').run;
   const g=r.equipment.weapon,before=g.durability;X.wear(r,g);X.wear(r,g);assert.equal(g.durability,before);assert.equal(g.forge.reserve,0);X.wear(r,g);assert.equal(g.durability,before-1);
   r=P.camp(r,'repair').run;assert.equal(r.equipment.weapon.forge.reserve,0);
   r.equipment.weapon.durability=1;const scrap=r.party.journey.scrap;r=P.strike(r,P.monsterSpecs(r)[0].id).run;assert.equal(r.equipment.weapon,null);assert.equal(r.party.journey.scrap,scrap+1);

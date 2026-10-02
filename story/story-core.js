@@ -9,7 +9,9 @@
   const STATE_VERSION = 2;
   const MAX_HP = 60;
   const MAX_MONSTERS = 32; // Stable original/lord IDs plus the finite reinforcement roster; live caps are 10/15/20.
-  const validMonsterId = id => typeof id === 'string' && (/^monster-(0|[1-9]\d*)$/.test(id) && Number(id.slice(8)) < 12 || /^monster-r-[1-9]\d{0,5}-[0-2]$/.test(id));
+  const validMonsterId = (id, floor = 99) => typeof id === 'string' && (/^monster-(0|[1-9]\d*)$/.test(id) && Number(id.slice(8)) < (floor < 0 ? 13 : 12) || /^monster-r-[1-9]\d{0,5}-[0-2]$/.test(id));
+  const isFloor = floor => Number.isInteger(floor) && (floor >= 1 && floor <= 99 || floor >= -50 && floor <= -1);
+  const isUnderworld = run => !!run && run.floor < 0 && run.underworld?.version === 1;
   const MAX_COINS = 999999;
   const MAX_STACK = 99;
   // Late lookup keeps the browser's core → narrative → dungeons loading order safe.
@@ -18,6 +20,7 @@
   const partyRules = () => typeof module === 'object' && module.exports ? require('./tower-party-core.js') : globalThis.TowerPartyCore;
   const heroRules = () => typeof module === 'object' && module.exports ? require('./tower-heroes-core.js') : globalThis.TowerHeroes;
   const expeditionRules = () => typeof module === 'object' && module.exports ? require('./tower-expedition-core.js') : globalThis.TowerExpedition;
+  const underworldRules = () => typeof module === 'object' && module.exports ? require('./tower-underworld.js') : globalThis.TowerUnderworld;
   const GEAR = Object.freeze({
     helmet: Object.freeze({ kind: 'helmet', slot: 'helmet', name: '頭盔', defense: 2, stunSeconds: 0, buyPrice: 14 }),
     armor: Object.freeze({ kind: 'armor', slot: 'armor', name: '盔甲', defense: 4, stunSeconds: 0, buyPrice: 22 }),
@@ -70,8 +73,9 @@
   ]);
 
   function floorConfig(floor, seed = 1) {
-    if (!Number.isInteger(floor) || floor < 1 || floor > 99) throw new RangeError('樓層必須是 1 至 99 的整數。');
+    if (!isFloor(floor)) throw new RangeError('樓層必須是地上 1 至 99 或地下 1 至 50 的整數，不存在第零層。');
     if (!Number.isInteger(seed) || seed < 1 || seed > 0xffffffff) throw new RangeError('無效的旅程種子。');
+    if (floor < 0) return underworldRules().floorConfig(floor, seed);
     const chapter = CHAPTERS.find((entry) => floor <= entry.high && floor >= entry.low);
     const depth = 99 - floor;
     // Roll once per journey/floor, never per render, maze shift or reload.
@@ -169,7 +173,7 @@
     const name = item.name + (value.bonus ? ` +${value.bonus}` : '');
     const defense = item.slot === 'weapon' ? 0 : item.defense + value.bonus;
     if (value.name !== name || value.defense !== defense) return null;
-    const forge=value.forge===undefined?undefined:expeditionRules()?.validateForge(value.forge,item.slot);
+    const forge=value.forge===undefined?undefined:expeditionRules()?.validateForge(value.forge,item.slot,item);
     if(value.forge!==undefined&&!forge)return null;
     const upgrade=currentMultiplier/mult;
     const maxDurability=Math.round(value.maxDurability*upgrade),durability=value.durability===0?0:Math.max(1,Math.min(maxDurability,Math.round(value.durability*upgrade)));
@@ -226,12 +230,19 @@
     if (typeof run === 'string') { try { run = JSON.parse(run); } catch (_) { return null; } }
     if (!run || typeof run !== 'object' || Array.isArray(run) || ![1, STATE_VERSION].includes(run.stateVersion) || run.mode !== 'tower') return null;
     const legacyHealth = run.stateVersion === 1;
-    if (!validNumber(run.floor, 1, 99, true) || !validNumber(run.hp, 0, legacyHealth ? 100 : run.party?.loadouts?87:MAX_HP) || !validNumber(run.hunger, 0, 100) || !validNumber(run.coins, 0, MAX_COINS, true)) return null;
+    if (!isFloor(run.floor) || !validNumber(run.hp, 0, legacyHealth ? 100 : run.party?.loadouts?(isUnderworld(run)?102:87):MAX_HP) || !validNumber(run.hunger, 0, 100) || !validNumber(run.coins, 0, MAX_COINS, true)) return null;
+    let underworld;
+    if (run.floor < 0) {
+      const u = run.underworld, departed = u?.departed, P = partyRules();
+      if (!u || u.version !== 1 || !narrativeRules().ENDINGS.some(e => e.id === u.surfaceEnding) || run.chronicle?.ending !== u.surfaceEnding) return null;
+      if (departed !== null && (!departed || !validIds([departed.id], 1) || departed.id === 'hero' || !Object.hasOwn(P.PROFESSIONS, departed.profession) || !['male', 'female'].includes(departed.sex) || departed.name !== P.person(departed.profession, departed.sex) || !run.party?.joined?.includes(departed.id) || run.party?.members?.some(m => m.id === departed.id))) return null;
+      underworld = { version: 1, departed: departed === null ? null : { id: departed.id, profession: departed.profession, sex: departed.sex, name: departed.name }, surfaceEnding: u.surfaceEnding };
+    } else if (run.underworld !== undefined) return null;
     if (!validNumber(run.seed, 1, 0xffffffff, true) || !validNumber(run.revision, 0, Number.MAX_SAFE_INTEGER - 1, true) || !validNumber(run.charIdx, 0, 5, true)) return null;
     if (typeof run.name !== 'string' || !run.name.trim() || run.name.length > 24 || !['playing', 'won', 'dead'].includes(run.status)) return null;
-    if (!validNumber(run.elapsed, 0, 315360000) || !validNumber(run.floorsCleared, 0, 99, true)) return null;
-    if (run.status === 'dead' && run.hp !== 0 || run.status === 'playing' && run.hp <= 0 || run.status === 'won' && (run.floor !== 1 || run.hp <= 0)) return null;
-    if (run.floorsCleared !== (run.status === 'won' ? 99 : 99 - run.floor)) return null;
+    if (!validNumber(run.elapsed, 0, 315360000) || !validNumber(run.floorsCleared, 0, 149, true)) return null;
+    if (run.status === 'dead' && run.hp !== 0 || run.status === 'playing' && run.hp <= 0 || run.status === 'won' && (run.floor !== (underworld ? -50 : 1) || run.hp <= 0)) return null;
+    if (run.floorsCleared !== (underworld ? run.status === 'won' ? 149 : 99 + (-run.floor - 1) : run.status === 'won' ? 99 : 99 - run.floor)) return null;
     if (!run.bag || typeof run.bag !== 'object' || Array.isArray(run.bag) || !run.effects || typeof run.effects !== 'object' || Array.isArray(run.effects)) return null;
     const bag = {};
     for (const id of Object.keys(ITEMS).filter((key) => key !== 'coin')) {
@@ -268,7 +279,8 @@
     // Missing optional fields are v1 saves created before warrior contracts existed.
     const hiredWarriors = run.hiredWarriors === undefined ? [] : run.hiredWarriors;
     const defeatedMonsters = run.defeatedMonsters === undefined ? [] : run.defeatedMonsters;
-    if (!validIds(hiredWarriors, 99) || !validIds(defeatedMonsters, 128)) return null;
+    if (!validIds(hiredWarriors, 149) || !validIds(defeatedMonsters, 128)) return null;
+    if (defeatedMonsters.some(id => /^monster-\d+$/.test(id) && !validMonsterId(id, run.floor))) return null;
     let warrior = null;
     if (run.warrior !== undefined && run.warrior !== null) {
       const guard = run.warrior;
@@ -281,7 +293,7 @@
     const legacyEquipment = run.equipment === undefined && run.gearBag === undefined;
     const rawEquipment = legacyEquipment ? { helmet: null, armor: null, shield: null, weapon: createGear('staff', 99, run.seed, 'starter') } : run.equipment;
     const rawBag = legacyEquipment ? [] : run.gearBag;
-    if (!rawEquipment || Array.isArray(rawEquipment) || Object.keys(rawEquipment).length !== 4 || !Array.isArray(rawBag) || rawBag.length > 24) return null;
+    if (!rawEquipment || Array.isArray(rawEquipment) || Object.keys(rawEquipment).length !== 4 || !Array.isArray(rawBag) || rawBag.length > (underworld ? 28 : 24)) return null;
     const equipment = {}, gearBag = [], gearIds = new Set();
     for (const slot of EQUIPMENT_SLOTS) {
       if (!Object.hasOwn(rawEquipment, slot)) return null;
@@ -299,7 +311,7 @@
     if (!rawStuns || typeof rawStuns !== 'object' || Array.isArray(rawStuns) || Object.keys(rawStuns).length > 128) return null;
     const monsterStuns = {};
     for (const [id, seconds] of Object.entries(rawStuns)) {
-      if (!validIds([id], 1) || ['__proto__', 'constructor', 'prototype'].includes(id) || defeatedMonsters.includes(id) || !validNumber(seconds, Number.MIN_VALUE, 140)) return null;
+      if (!validIds([id], 1) || /^monster-\d+$/.test(id) && !validMonsterId(id, run.floor) || ['__proto__', 'constructor', 'prototype'].includes(id) || defeatedMonsters.includes(id) || !validNumber(seconds, Number.MIN_VALUE, 140)) return null;
       monsterStuns[id] = seconds;
     }
     const adventure = validateAdventure(run.adventure, run.floor);
@@ -309,7 +321,7 @@
     if (!chronicle || !expedition) return null;
     const party = run.party === undefined ? undefined : partyRules()?.validate(run.party, run.floor, defeatedMonsters,hiredWarriors);
     if (run.party !== undefined && !party) return null;
-    if(party?.loadouts&&!heroRules().validEquipment({party,equipment,gearBag}))return null;
+    if(party?.loadouts&&!heroRules().validEquipment({party,equipment,gearBag,floor:run.floor,underworld}))return null;
     if(party?.loadouts&&run.hp>heroRules().maxHp({party}))return null;
     return {
       // Preserve the old health percentage once; subsequent reads are already v2.
@@ -319,7 +331,7 @@
       engine, claimed: [...run.claimed], floorElapsed: run.floorElapsed,
       warrior, hiredWarriors: [...hiredWarriors], defeatedMonsters: [...defeatedMonsters],
       equipment, gearBag, monsterStuns, adventure,
-      chronicle, expedition, ...(party ? { party } : {}),
+      chronicle, expedition, ...(party ? { party } : {}), ...(underworld ? { underworld } : {}),
     };
   }
 
@@ -598,6 +610,44 @@
     });
   }
 
+  function startUnderworld(run, expectedRevision) {
+    const next = validateSave(run);
+    if (!next) return failure(run, '旅程資料不完整，請重新載入存檔。');
+    if (expectedRevision !== undefined && expectedRevision !== next.revision) return failure(run, '旅程已更新，請重新確認。');
+    if (next.underworld || next.status !== 'won' || next.floor !== 1 || !next.chronicle.ending || next.expedition.active) return failure(run, '請先完成地上高塔的結局，再開始地下遠征。');
+    const P = partyRules(), H = heroRules();
+    // The seed and sorted saved identities fix the choice before any scene or
+    // animation runs. Reloading the same ending can never reroll the farewell.
+    const candidates = [...(next.party?.members || [])].sort((a, b) => a.id < b.id ? -1 : a.id > b.id ? 1 : 0);
+    let choice = next.seed >>> 0;
+    for (const char of 'underworld:departure') choice = Math.imul(choice ^ char.charCodeAt(0), 16777619) >>> 0;
+    const companion = candidates.length ? candidates[choice % candidates.length] : null;
+    const departed = companion ? { id: companion.id, profession: companion.profession, sex: companion.sex, name: P.person(companion.profession, companion.sex) } : null;
+    const returned = [];
+    if (next.party?.loadouts) {
+      // A companion may have led the victorious party. Preserve each person's
+      // own equipment and HP before removing anyone; only a fallen hero gets 1 HP.
+      H.returnToHero(next);
+      // A completed tower's old overflow is not underground training. The
+      // separate surface snapshot still retains the original saved XP.
+      if(H.level(next,'hero')===10){const growth=typeof module==='object'&&module.exports?require('./tower-hero-growth.js'):globalThis.TowerHeroGrowth;H.state(next).xp=Math.min(H.state(next).xp,growth.XP[9]);}
+      if (companion) { returned.push(...Object.values(H.equipment(next, companion.id)).filter(Boolean)); next.gearBag.push(...returned); H.removeMember(next, companion.id); }
+    }
+    if (companion) next.party.members = next.party.members.filter(m => m.id !== companion.id);
+    next.underworld = { version: 1, departed, surfaceEnding: next.chronicle.ending };
+    next.floor = -1; next.status = 'playing'; next.floorsCleared = 99;
+    next.claimed = []; next.floorElapsed = 0; next.defeatedMonsters = []; next.monsterStuns = {}; next.adventure = newAdventure();
+    next.effects = { shield: 0, freeze: 0, repel: 0, reveal: 0 };
+    delete next.engine.sightMemory; delete next.engine.mapKnowledge;
+    next.expedition.discovered = false; next.expedition.active = null;
+    if (next.warrior?.mode === 'holding') next.warrior = null;
+    if (next.party) P.advance(next, { reward: false });
+    next.revision += 1;
+    const checked = validateSave(next);
+    if (!checked) return failure(run, '地下遠征資料尚未準備完成，原旅程已保留。');
+    return { ok: true, run: checked, message: departed ? `${departed.name}決定留下守望歸途，將裝備交還給你。地下遠征開始。` : '地下遠征開始。', effect: { underworld: true, departed, returnedGear: returned.map(g => g.id), floor: -1 } };
+  }
+
   function descend(run, expectedRevision) {
     return transaction(run, expectedRevision, (next) => {
       if (next.expedition.active) return { ok: false, message: '請先離開裂隙副本，再繼續往下探索。' };
@@ -608,21 +658,22 @@
       next.floorsCleared += 1;
       next.effects = { shield: 0, freeze: 0, repel: 0, reveal: 0 };
       next.claimed = []; next.floorElapsed = 0; next.defeatedMonsters = [];
-      delete next.engine.sightMemory;
+      delete next.engine.sightMemory; delete next.engine.mapKnowledge;
       next.monsterStuns = {}; next.adventure = newAdventure();
       next.expedition.discovered = false;
       if (next.warrior && next.warrior.mode === 'holding') next.warrior = null;
-      if (next.floor === 1) {
+      if (next.floor === 1 || next.floor === -50) {
         if(next.party){next.party.loot={version:1,rolled:[],entries:[]};next.party.reinforcements={version:1,shift:0,monsters:[]};next.party.health={};next.party.poise={};if(next.party.loadouts)next.party.loadouts.enemy={};}
+        if(next.floor===-50&&next.party?.loadouts)heroRules().gainXp(next,360);
         next.status = 'won';
-        return { ok: true, message: ENDING.text, effect: { ending: true } };
+        return { ok: true, message: next.floor < 0 ? '你們走完地下五十層，讓深處的回聲也找到了歸途。' : ENDING.text, effect: { ending: true, ...(next.floor < 0 ? { underworld: true } : {}) } };
       }
       next.floor -= 1;
       if (next.party) partyRules().advance(next);
       next.expedition.version = dungeonRules().CATALOG_VERSION;
-      return { ok: true, message: `抵達第 ${next.floor} 層。`, effect: { floor: next.floor } };
+      return { ok: true, message: next.floor < 0 ? `抵達地下第 ${-next.floor} 層。` : `抵達第 ${next.floor} 層。`, effect: { floor: next.floor } };
     });
   }
 
-  return Object.freeze({ STATE_VERSION, MAX_HP, MAX_MONSTERS, validMonsterId, ITEMS, GEAR, MONSTERS, CHAPTERS, OPENING, ENDING, EXCHANGES, floorConfig, newRun, validateSave, buy, sell, exchange, useItem, collect, takeDamage, tickEffects, descend, monsterStrength, warriorOffer, hireWarrior, interceptMonster, createGear, validateGear, durabilityMultiplier, gearPrice, equipmentStats, receiveGear, grantGear, equipGear, discardGear, buyGear, effectiveMonsterStrength, hitMonster, resolveHeldMonster, transaction, applyDamage, newAdventure, validateAdventure });
+  return Object.freeze({ STATE_VERSION, MAX_HP, MAX_MONSTERS, validMonsterId, isFloor, isUnderworld, ITEMS, GEAR, MONSTERS, CHAPTERS, OPENING, ENDING, EXCHANGES, floorConfig, newRun, validateSave, buy, sell, exchange, useItem, collect, takeDamage, tickEffects, startUnderworld, descend, monsterStrength, warriorOffer, hireWarrior, interceptMonster, createGear, validateGear, durabilityMultiplier, gearPrice, equipmentStats, receiveGear, grantGear, equipGear, discardGear, buyGear, effectiveMonsterStrength, hitMonster, resolveHeldMonster, transaction, applyDamage, newAdventure, validateAdventure });
 });

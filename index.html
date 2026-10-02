@@ -618,11 +618,13 @@ button:focus-visible,input:focus-visible{outline:3px solid #fff;outline-offset:3
 </style>
 <link rel="stylesheet" href="assets/game-polish.css?v=1.39.3">
 <link rel="stylesheet" href="assets/play-controls.css?v=1.42.1">
-<link rel="stylesheet" href="story/tower-party.css?v=1.43.3">
+<link rel="stylesheet" href="story/tower-party.css?v=1.48.0">
+<link rel="stylesheet" href="story/tower-cooperation.css?v=1.47.0">
 <link rel="stylesheet" href="story/tower-heroes.css?v=1.43.0">
 <link rel="stylesheet" href="story/tower-mobile.css?v=1.43.0">
 <link rel="stylesheet" href="story/tower-growth.css?v=1.42.0">
 <link rel="stylesheet" href="assets/battle-dock.css?v=1.43.3">
+<link rel="stylesheet" href="assets/adventure-polish.css?v=1.46.0">
 </head>
 <body>
 
@@ -920,6 +922,7 @@ button:focus-visible,input:focus-visible{outline:3px solid #fff;outline-offset:3
 <div class="modal" id="helpModal">
   <div class="m-card" style="text-align:left;font-size:.95rem;line-height:1.7;">
     <h3 style="text-align:center;"><span class="ui-icon icon-help inline-ui-icon" aria-hidden="true"></span>玩法說明</h3>
+    <p><a class="m-close" style="display:block;text-align:center;text-decoration:none" href="docs/職業裝備圖鑑.html" target="_blank" rel="noopener">劇情模式完整圖鑑：職業、連攜、技能、裝備與料理</a></p>
     <div class="help-visuals" aria-label="玩法重點圖示">
       <div class="help-visual"><span class="help-art help-art-controls" role="img" aria-label="左手搖桿移動，右手滑動旋轉視角"></span><strong>手機操作</strong></div>
       <div class="help-visual"><span class="help-art help-art-pickups" role="img" aria-label="真正可拾取物有發光地面圈和垂直光柱"></span><strong>光圈＋光柱＝可拾取</strong></div>
@@ -976,34 +979,37 @@ button:focus-visible,input:focus-visible{outline:3px solid #fff;outline-offset:3
 </div>
 
 <script src="./lib/three.min.js"></script>
-<script src="./assets/character-sculpt.js?v=1.43.3"></script>
-<script src="./assets/character-face.js?v=1.43.3"></script>
+<script src="./assets/character-sculpt.js?v=1.44.0"></script>
+<script src="./assets/character-face.js?v=1.44.0"></script>
 <script src="./assets/character-motion.js?v=1.43.3"></script>
-<script src="./assets/maze-atmosphere.js?v=1.43.3"></script>
+<script src="./assets/maze-atmosphere.js?v=1.44.0"></script>
 <script src="./assets/pickup-objects.js"></script>
 <script src="./assets/native-symbols.js"></script>
 <script src="./assets/game-rules.js?v=1.36.0"></script>
 <script src="./assets/gameplay-rules.js?v=1.36.0"></script>
 <script src="./assets/magic-map.js?v=1.42.0"></script>
 <script src="./assets/maze-sight-core.js?v=1.42.0"></script>
-<script src="./assets/maze-sight.js?v=1.43.0"></script>
-<script src="./assets/maze-materials.js?v=1.36.0"></script>
+<script src="./assets/maze-sight.js?v=1.44.0"></script>
+<script src="./assets/maze-materials.js?v=1.44.0"></script>
+<script src="./assets/render-quality.js?v=1.44.0"></script>
+<script src="./assets/camera-comfort.js?v=1.45.0"></script>
 <script src="./assets/voice-catalog.js?v=1.33.0"></script>
 <script src="./assets/role-voices.js?v=1.35.5"></script>
 <script src="./assets/character-voices.js?v=1.43.3"></script>
-<script src="story/tower-floor-lords.js?v=1.43.3"></script>
+<script src="story/tower-underworld.js?v=1.45.0"></script>
+<script src="story/tower-floor-lords.js?v=1.46.0"></script>
 <script src="./assets/voice-pack.js?v=1.43.3"></script>
 <script src="./assets/audio-settings.js?v=1.43.3"></script>
 <script src="./assets/game-voice.js?v=1.43.3"></script>
 <script src="./assets/maze-stone-audio.js?v=1.34.2"></script>
-<script src="./assets/combat-audio.js?v=1.43.3"></script>
+<script src="./assets/combat-audio.js?v=1.46.0"></script>
 <script>
 'use strict';
 /* =====================================================
    3D移動迷宮 — 給小朋友的變形迷宮冒險
    ===================================================== */
 const $=id=>document.getElementById(id);
-const GAME_VERSION='1.43.3';
+const GAME_VERSION='1.48.0';
 
 /* ---------- 設定（後台可調） ---------- */
 const DEFAULT_CFG={teamSize:2,shiftMin:3,itemCount:6,foodCount:4,hungerMin:3,stunSec:3,pingSec:3,smellCells:3,mazeSize:13,magicMap:0,duelMin:5,unpaidRate:100,musicOn:1,speechOn:1,speechVoice:'',apiUrl:'',roomMax:3,rounds:3,goodsCount:16,shopCollect:1,shopMin:2.5,cartFull:400,views:{fp:1,tp:1,top:1},broker:'wss://broker.emqx.io:8084/mqtt'};
@@ -1391,6 +1397,8 @@ function disposeSceneObject(root){
     disposed.add(resource); resource.dispose();
   };
   root.traverse(object=>{
+    // InstancedMesh owns GPU instance buffers independently of its geometry.
+    if(object.isInstancedMesh)release(object);
     // THREE.Sprite 的 geometry 是函式庫共用資源，不屬於單一場景。
     if(!object.isSprite)release(object.geometry);
     const materials=Array.isArray(object.material)?object.material:[object.material];
@@ -1432,7 +1440,7 @@ function fitRenderer(){
 function initRenderer(){
   const canvas=$('c3d');
   renderer=new THREE.WebGLRenderer({canvas,antialias:true});
-  renderer.setPixelRatio(Math.min(window.devicePixelRatio||1,matchMedia('(pointer:coarse)').matches?1.35:1.75));
+  MazeQuality.connect(renderer,{mobile:matchMedia('(pointer:coarse)').matches,dpr:window.devicePixelRatio||1});
   renderer.outputColorSpace=THREE.SRGBColorSpace;
   camera=new THREE.PerspectiveCamera(70,1,0.1,300);
   fitRenderer();
@@ -1506,8 +1514,9 @@ function buildMazeAtmosphere(theme){
     wallBoxes:G.wallBoxes,width:G.mazeW,height:G.mazeH,cell:G.cell,wallHeight:G.wallH,
     style:tower?tower.style:theme.id,
     palette:tower?tower.palette:{wall:theme.wall3d||theme.wall,ground:theme.floor},
-    seed:tower?tower.seed:(MP.on?MP.seed:G.lvlIdx+1),rich:!!tower,exitCell:tower?G.exitCell:null,
-    quality:window.matchMedia&&window.matchMedia('(pointer:coarse)').matches?'low':'balanced'
+    seed:tower?tower.seed:(MP.on?MP.seed:G.lvlIdx+1),rich:theme.id!=='shop',exitCell:tower?G.exitCell:null,
+    quality:window.matchMedia&&window.matchMedia('(pointer:coarse)').matches?'low':'balanced',
+    wallMap:makeTex(theme.wallTex),floorMap:makeTex(theme.floorTex==='lava'?'rock':(theme.floorTex||'tile'))
   });
   wallMesh.add(mazeAtmosphere.wallRoot);
   scene.add(mazeAtmosphere.floorRoot);
@@ -1782,7 +1791,7 @@ function makePickupMarker(color,label){
 <script>
 'use strict';
 /* =====================================================
-   角色建造（方塊小人，會擺手走路）
+   角色建造（圓弧雕塑小人，共用表情與動作）
    ===================================================== */
 function buildCharacter(cd){
   const g=new THREE.Group();
@@ -1813,10 +1822,9 @@ function buildCharacter(cd){
     const tail=box(0.09,0.09,0.5,cd.hair); tail.position.set(0,0.85,-0.4); tail.rotation.x=0.6; g.add(tail);
     const nose=new THREE.Mesh(new THREE.BoxGeometry(0.08,0.06,0.05),M(0xef9a9a)); nose.position.set(0,-.07,0.26); headRig.add(nose);
   }else{
-    const hairTop=soft(.57,.27,.52,cd.hair);hairTop.name='hair-crown';hairTop.position.set(0,.22,-.015);headRig.add(hairTop);
-    if(cd.type==='girl'){
-      [-0.33,0.33].forEach(ex=>{const pig=limb(.16,.4,.18,cd.hair);pig.name='hair-side';pig.position.set(ex,0,-0.05);headRig.add(pig);});
-    }
+    const haircut=sculpt.hair(THREE,{job:cd.heroJob||'classic',sex:cd.heroSex||(cd.type==='girl'?'female':'male')});
+    for(const [name,geometry]of [['hair-crown',haircut.crown],['profession-hair',haircut.drape]]){const part=new THREE.Mesh(geometry,M(cd.hair));part.name=name;part.userData.continuousHair=true;headRig.add(part);}
+    for(const braid of haircut.braids){const part=new THREE.Mesh(braid.geometry,M(cd.hair));part.name='profession-hair';part.userData.braidSide=braid.side;headRig.add(part);}
   }
   // 手
   const armL=limb(.17,.5,.18,cd.type==='robot'?0x90a4ae:cd.skin);armL.position.set(.42,1.12,0);armL.geometry.translate(0,-.18,0);
@@ -1838,17 +1846,17 @@ function buildCharacter(cd){
     const boot=bevel(.24,.18,.34,0x354757);boot.position.set(0,-.45,.065);leg.add(boot);
     const sole=box(.25,.035,.35,0x192b37);sole.position.set(0,-.525,.065);leg.add(sole);
   }
-  const belt=bevel(.61,.055,.38,0x405167);belt.position.y=.7;g.add(belt);
-  const buckle=box(.09,.07,.03,0xe3c486);buckle.position.set(0,.7,.21);g.add(buckle);
-  const collar=box(.22,.05,.025,0xe5dfc9);collar.position.set(0,1.23,.191);g.add(collar);
+  const baseClothing=[body],wear=(part,name)=>{part.name=name;part.userData.baseClothing=true;baseClothing.push(part);g.add(part);return part;};
+  const belt=new THREE.Mesh(new THREE.TorusGeometry(.266,.025,5,20),M(0x405167));belt.rotation.x=Math.PI/2;belt.scale.y=.63;belt.position.y=.7;wear(belt,'base-belt');
+  const buckle=bevel(.09,.065,.035,0xe3c486);buckle.position.set(0,.7,.19);wear(buckle,'base-buckle');
+  const collar=box(.22,.05,.025,0xe5dfc9);collar.position.set(0,1.23,.191);wear(collar,'base-collar');
   for(const side of [-1,1]){
-    const lapel=box(.1,.21,.025,0xe5dfc9);lapel.position.set(side*.095,1.15,.2);lapel.rotation.z=side*.25;g.add(lapel);
+    const lapel=box(.1,.21,.025,0xe5dfc9);lapel.position.set(side*.095,1.15,.2);lapel.rotation.z=side*.25;wear(lapel,'base-lapel');
     if(cd.type!=='cat'&&cd.type!=='robot'){const ear=soft(.085,.14,.115,cd.skin);ear.name='human-ear';ear.position.set(side*.265,-.01,-.005);headRig.add(ear);}
   }
-  const seam=box(.018,.29,.018,0x405167);seam.position.set(0,.98,.189);g.add(seam);
+  const seam=box(.018,.29,.018,0x405167);seam.position.set(0,.98,.189);wear(seam,'base-seam');g.userData.baseClothing=baseClothing;
   if(cd.type==='boy'||cd.type==='girl'){
     const nose=soft(.075,.085,.085,cd.skin);nose.name='sculpted-nose';nose.position.set(0,-.055,.255);headRig.add(nose);
-    const fringe=soft(.3,.15,.11,cd.hair);fringe.name='hair-fringe';fringe.position.set(-.075,.19,.215);fringe.rotation.z=-.18;headRig.add(fringe);
   }
   if(window.CharacterFace)CharacterFace.attach(THREE,g,headRig,faceEyes,0,cd.type==='robot');
   const shade=new THREE.Mesh(new THREE.CircleGeometry(.37,16),new THREE.MeshBasicMaterial({color:0x132434,transparent:true,opacity:.17,depthWrite:false}));shade.rotation.x=-Math.PI/2;shade.position.y=.013;shade.name='contact-shadow';g.add(shade);
@@ -2233,9 +2241,10 @@ function pickFoodType(){
 /* 飽足感 */
 function updateSatietyBar(){
   const v=Math.max(0,Math.min(100,G.satiety));
-  $('satietyFill').style.width=v+'%';
-  $('satietyFill').style.background=v<=25?'#ef5350':(v<=50?'#ffa726':'#8bc34a');
-  $('satietyPct').textContent=Math.ceil(v)+'%'+(v<=50?' 🐢':'');
+  const width=(Math.round(v*5)/5)+'%',color=v<=25?'#ef5350':(v<=50?'#ffa726':'#8bc34a'),caption=Math.ceil(v)+'%'+(v<=50?' 🐢':'');
+  if(updateSatietyBar.width!==width){$('satietyFill').style.width=width;updateSatietyBar.width=width;}
+  if(updateSatietyBar.color!==color){$('satietyFill').style.background=color;updateSatietyBar.color=color;}
+  if($('satietyPct').textContent!==caption)$('satietyPct').textContent=caption;
 }
 function applyFood(f){
   AudioEng.sfxEat();
@@ -2819,6 +2828,12 @@ function updateCamera(dt){
     if(Number.isFinite(ceiling))camera.position.y=Math.min(camera.position.y,ceiling);
     // 旋轉與平滑跟隨也必須檢查，避免繞過轉角時鏡頭插入側牆。
     if(G.wallH>=hh-.3){const ox=camera.position.x-G.px,oz=camera.position.z-G.pz,len=Math.hypot(ox,oz);if(len>.001){const safe=cameraClearDist(ox/len,oz/len,len);if(safe<len){camera.position.x=G.px+ox/len*safe;camera.position.z=G.pz+oz/len*safe;}}}
+    // Being above a wall is not enough: the sightline to the actor can still
+    // cross its top. Clip that 3D segment without revealing anything behind it.
+    if(window.MazeCameraComfort?.constrainOrbit){
+      const focus=camera.userData.mazeOrbitFocus||(camera.userData.mazeOrbitFocus=new V3());
+      focus.set(G.px,1.5,G.pz);MazeCameraComfort.constrainOrbit(focus,camera.position,G.wallBoxes,G.wallH,.18);
+    }
     camera.lookAt(G.px,1.5,G.pz);
   }else{ // top（滾輪 / 雙指 / ＋－按鈕可拉近拉遠）
     const owl=performance.now()<G.owlUntil;
@@ -3822,22 +3837,24 @@ function startGame(){
 /* =====================================================
    主迴圈
    ===================================================== */
-let lastT=0,mapAcc=0,chipAcc=0;
+let lastT=0,mapAcc=0,chipAcc=0,lastPausedRender=0;
 function sightFrame(){return {T:THREE,g:G,scene,wall:wallMesh,atmosphere:mazeAtmosphere,fullVision:isShop(),radius:Math.max(.8,(window.TowerMode?.lightRadius?.()||G.cell*5)/G.cell),objects:()=>{
   const list=[],containers=new Set([itemGroup,window.TowerMode?.sightRoot?.()]);
   const visit=o=>{if(!o||o===wallMesh||o===floorMesh||o===playerGroup||o===compass3D||o===camera||o===mazeAtmosphere?.floorRoot||o.name==='maze-sight-layer'||o.isLight)return;if(containers.has(o)||['tower-party-scene','tower-lighting'].includes(o.name)){o.children.forEach(visit);return;}list.push(o);};
   for(const o of scene.children)if(o===envGroup)o.children.forEach(visit);else visit(o);return list;
 }};}
-function renderMaze(){if(window.MazeSight&&wallMesh)MazeSight.render(sightFrame(),renderer,camera);else renderer.render(scene,camera);}
+function renderMaze(){MazeCameraComfort.render(playerGroup,camera,G.view,()=>{if(window.MazeSight&&wallMesh)MazeSight.render(sightFrame(),renderer,camera);else renderer.render(scene,camera);});}
 function loop(tms){
   requestAnimationFrame(loop);
   if(!renderer)return;
-  const t=tms/1000, dt=Math.min(0.05,t-lastT||0.016); lastT=t;
-  if(!$('gameScreen').classList.contains('active'))return;
-  if(window.TowerMode&&TowerMode.active&&TowerMode.paused){renderMaze();return;}
+  const t=tms/1000,rawDt=t-lastT,dt=Math.min(0.05,rawDt||0.016);lastT=t;
+  const screenActive=$('gameScreen').classList.contains('active'),storyPaused=!!(window.TowerMode?.active&&TowerMode.paused);
+  MazeQuality.frame(rawDt*1000,screenActive&&!storyPaused&&!document.hidden&&!G.shifting);
+  if(!screenActive||document.hidden)return;
+  if(storyPaused){if(tms-lastPausedRender>=80){lastPausedRender=tms;renderMaze();}return;}
   if(G.running&&!G.shifting){
     G.elapsed=(performance.now()-G.startTime)/1000-G.timeOffset;
-    $('hudTime').textContent=fmtTime(G.elapsed);
+    const clockText=fmtTime(G.elapsed);if($('hudTime').textContent!==clockText)$('hudTime').textContent=clockText;
   }
   if(G.running&&!G.frozen&&G.hungerOn){
     G.satiety=Math.max(0,G.satiety-G.drainPerSec*(jobPerk('drainMul')||1)*dt); // 耐力王餓得慢
@@ -5132,43 +5149,54 @@ window.addEventListener('pagehide',()=>{AudioEng.shiftSound?.stop();AudioEng.com
 <script src="assets/voice-settings.js?v=1.43.3"></script>
 <script src="assets/capture-core.js?v=1.36.0"></script>
 <script src="assets/capture-mode.js?v=1.36.0"></script>
-<script src="story/tower-hero-growth.js?v=1.43.3"></script>
-<script src="story/tower-heroes-core.js?v=1.43.3"></script>
-<script src="story/tower-heroes-icons.js?v=1.43.3"></script>
-<script src="story/tower-combat-motion.js?v=1.43.3"></script>
+<script src="story/tower-ascension-catalog.js?v=1.46.0"></script>
+<script src="story/tower-gear-tiers.js?v=1.46.0"></script>
+<script src="story/tower-hero-growth.js?v=1.48.0"></script>
+<script src="story/tower-heroes-core.js?v=1.47.0"></script>
+<script src="story/tower-heroes-icons.js?v=1.46.0"></script>
+<script src="story/tower-combat-motion.js?v=1.46.0"></script>
 <script src="story/tower-menu-voice.js?v=1.42.4"></script>
-<script src="story/tower-heroes-visuals.js?v=1.43.3"></script>
-<script src="story/tower-skill-effects.js?v=1.43.3"></script>
-<script src="story/tower-growth-runtime.js?v=1.43.3"></script>
+<script src="story/tower-heroes-visuals.js?v=1.46.0"></script>
+<script src="story/tower-skill-effects.js?v=1.46.0"></script>
+<script src="story/tower-growth-runtime.js?v=1.46.0"></script>
 <script src="story/tower-team-tactics.js?v=1.42.6"></script>
 <script src="story/tower-combat-intent.js?v=1.43.3"></script>
-<script src="story/tower-heroes-runtime.js?v=1.43.3"></script>
-<script src="story/story-core.js?v=1.43.3"></script>
-<script src="story/tower-narrative.js"></script>
-<script src="story/tower-side-stories.js"></script>
-<script src="story/tower-dungeons.js?v=1.43.0"></script>
-<script src="story/tower-hazards.js?v=1.35.0"></script>
-<script src="story/tower-encounters.js?v=1.43.3"></script>
-<script src="story/tower-characters.js?v=1.43.3"></script>
+<script src="story/tower-equipment-compare.js?v=1.44.0"></script>
+<script src="story/tower-heroes-runtime.js?v=1.47.0"></script>
+<script src="story/tower-cooperation-core.js?v=1.47.0"></script>
+<script src="story/tower-cooperation-runtime.js?v=1.47.0"></script>
+<script src="story/story-core.js?v=1.47.0"></script>
+<script src="story/tower-narrative.js?v=1.45.0"></script>
+<script src="story/tower-side-stories.js?v=1.45.0"></script>
+<script src="story/tower-dungeons.js?v=1.45.0"></script>
+<script src="story/tower-hazards.js?v=1.45.0"></script>
+<script src="story/tower-encounters.js?v=1.46.0"></script>
+<script src="story/tower-characters.js?v=1.43.4"></script>
 <script src="story/tower-audio.js"></script>
-<script src="story/tower-expedition-core.js?v=1.42.0"></script>
-<script src="story/tower-lighting-core.js?v=1.43.3"></script>
-<script src="story/tower-loot.js?v=1.43.3"></script>
-<script src="story/tower-reinforcements.js?v=1.43.3"></script>
+<script src="story/tower-materials.js?v=1.48.0"></script>
+<script src="story/tower-expedition-core.js?v=1.48.0"></script>
+<script src="story/tower-lighting-core.js?v=1.45.0"></script>
+<script src="story/tower-loot.js?v=1.48.0"></script>
+<script src="story/tower-reinforcements.js?v=1.48.0"></script>
 <script src="story/tower-stairs.js?v=1.43.3"></script>
-<script src="story/tower-monster-sense.js?v=1.43.3"></script>
-<script src="story/tower-party-core.js?v=1.43.3"></script>
-<script src="story/tower-party-runtime.js?v=1.43.3"></script>
-<script src="story/tower-lighting-runtime.js?v=1.43.3"></script>
+<script src="story/tower-monster-sense.js?v=1.44.0"></script>
+<script src="story/tower-party-core.js?v=1.48.0"></script>
+<script src="story/tower-resource-icons.js?v=1.48.0"></script>
+<script src="story/tower-forge-icons.js?v=1.47.0"></script>
+<script src="story/tower-party-runtime.js?v=1.48.0"></script>
+<script src="story/tower-lighting-runtime.js?v=1.47.0"></script>
 <script src="story/tower-encounter-alert.js?v=1.42.5"></script>
-<script src="story/tower-mode.js?v=1.43.3"></script>
+<script src="story/tower-combat-readability.js?v=1.44.0"></script>
+<script src="story/tower-field-guide.js?v=1.46.0"></script>
+<script src="story/tower-creature-art.js?v=1.44.0"></script>
+<script src="story/tower-mode.js?v=1.48.0"></script>
 <script src="assets/room-lifecycle.js?v=1.36.0"></script>
 <script src="assets/shop-collection-core.js?v=1.31.0"></script>
 <script src="assets/shop-collection.js?v=1.31.0"></script>
 <script src="assets/shop-chaos.js?v=1.34.0"></script>
 <script src="assets/shop-sale.js?v=1.33.0"></script>
 <script src="assets/tag-rage.js"></script>
-<script src="assets/battle-dock.js?v=1.43.3"></script>
+<script src="assets/battle-dock.js?v=1.44.0"></script>
 <script src="assets/mobile-controls.js?v=1.42.1"></script>
 </body>
 </html>

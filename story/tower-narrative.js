@@ -5,6 +5,7 @@
   if (root) root.TowerNarrative = api;
 })(typeof globalThis !== 'undefined' ? globalThis : this, function () {
   'use strict';
+  const underground=()=>typeof module==='object'&&module.exports?require('./tower-underworld.js'):globalThis.TowerUnderworld;
   const freeze = value => { if (value && typeof value === 'object') { Object.values(value).forEach(freeze); Object.freeze(value); } return value; };
   const CHAPTERS = freeze([
     { id:'summoning',high:99,mid:95,low:90,title:'第一章・雲上沒有來路',objective:'查明召喚陣為何認得你的聲音。',clueId:'clue:summoning',clueName:'回聲銅扣',clueText:[
@@ -184,21 +185,27 @@
       '伊芙畫出不把誰當成中心的新地圖，洛恩與奧倫設立可被所有旅人檢查的維護台。米菈開了一間只收藏自願投稿故事的小書屋，星奈在塔頂標記每個世界不同的星空。名字不再被拿去計價，記憶不是燃料，地底熱流獨自支撐著明亮的門。',
       '你先回家，再於另一個晴朗日子接受朋友的邀請。踏回塔中時，沒有聲音宣布召喚完成，只有伊芙朝你揮手說好久不見。你知道自己隨時可以轉身，所以也能真心決定多留一會兒。高塔終於學會，真正的連結不靠困住誰來證明。' ]},
   ]);
-  const sceneIds = new Set(SCENES.map(scene => scene.id)), clueIds = new Set(CHAPTERS.map(chapter => chapter.clueId));
-  function checkFloor(floor) { if (!Number.isInteger(floor) || floor < 1 || floor > 99) throw new RangeError('樓層必須為 1 至 99。'); }
-  function chapterForFloor(floor) { checkFloor(floor); return CHAPTERS.find(chapter => floor <= chapter.high && floor >= chapter.low); }
-  function newChronicle(floor=99) { checkFloor(floor); return {version:1,read:[],clues:CHAPTERS.filter(chapter=>chapter.low>floor).map(chapter=>chapter.clueId),ending:null}; }
+  let catalogueSource,catalogueData={chapters:CHAPTERS,scenes:SCENES,sceneIds:new Set(SCENES.map(s=>s.id)),clueIds:new Set(CHAPTERS.map(c=>c.clueId))};
+  function catalogue(){const u=underground();if(u!==catalogueSource){catalogueSource=u;const chapters=Object.freeze([...CHAPTERS,...(u?.CHAPTERS||[])]),scenes=Object.freeze([...SCENES,...(u?.SCENES||[])]);catalogueData={chapters,scenes,sceneIds:new Set(scenes.map(s=>s.id)),clueIds:new Set(chapters.map(c=>c.clueId))};}return catalogueData;}
+  const allChapters=()=>catalogue().chapters,allScenes=()=>catalogue().scenes;
+  const totalSceneCount=()=>allScenes().length;
+  const isFloor=floor=>Number.isInteger(floor)&&(floor>=1&&floor<=99||underground()?.isFloor(floor));
+  const floorLabel=floor=>floor<0?'地下 '+(-floor)+' 層':'第 '+floor+' 層';
+  function checkFloor(floor) { if (!isFloor(floor)) throw new RangeError('樓層必須為 1 至 99，或地下 -1 至 -50。'); }
+  function chapterForFloor(floor) { checkFloor(floor); return allChapters().find(chapter => floor <= chapter.high && floor >= chapter.low); }
+  function newChronicle(floor=99) { checkFloor(floor); return {version:1,read:[],clues:allChapters().filter(chapter=>chapter.low>floor).map(chapter=>chapter.clueId),ending:null}; }
   function validList(list, ids) { return Array.isArray(list) && list.length <= ids.size && new Set(list).size === list.length && list.every(id => ids.has(id)); }
   function validateChronicle(value, floor) {
-    if (!Number.isInteger(floor) || floor<1 || floor>99) return null;
+    if (!isFloor(floor)) return null;
     if (value === undefined) return newChronicle(floor);
+    const {scenes,chapters,sceneIds,clueIds}=catalogue();
     if (!value || typeof value!=='object' || Array.isArray(value) || value.version!==1 || !validList(value.read,sceneIds) || !validList(value.clues,clueIds)) return null;
-    if (value.read.some(id=>SCENES.find(scene=>scene.id===id).floor<floor) || value.clues.some(id=>CHAPTERS.find(chapter=>chapter.clueId===id).mid<floor)) return null;
-    if (value.ending!==null && (!ENDINGS.some(ending=>ending.id===value.ending) || floor!==1 || !value.clues.includes('clue:heart'))) return null;
+    if (value.read.some(id=>scenes.find(scene=>scene.id===id).floor<floor) || value.clues.some(id=>chapters.find(chapter=>chapter.clueId===id).mid<floor)) return null;
+    if (value.ending!==null && (!ENDINGS.some(ending=>ending.id===value.ending) || floor!==1&&floor>0 || !value.clues.includes('clue:heart'))) return null;
     return {version:1,read:[...value.read],clues:[...value.clues],ending:value.ending};
   }
-  function scenesForFloor(floor) { checkFloor(floor); return SCENES.filter(scene=>scene.floor===floor); }
-  function unlockedScenes(floor) { checkFloor(floor); return SCENES.filter(scene=>scene.floor>=floor); }
+  function scenesForFloor(floor) { checkFloor(floor); return allScenes().filter(scene=>scene.floor===floor); }
+  function unlockedScenes(floor) { checkFloor(floor); return allScenes().filter(scene=>scene.floor>=floor); }
   function availableScenes(run) {
     if (!run) return [];
     const chronicle=validateChronicle(run.chronicle,run.floor);
@@ -209,13 +216,36 @@
   function objective(run) {
     const chapter=chapterForFloor(run.floor),chronicle=validateChronicle(run.chronicle,run.floor);
     if (!chronicle) return '故事紀錄無法讀取，請重新載入旅程。';
-    if (chronicle.ending) return '歸途已開啟，你的選擇已寫入故事。';
-    if (chronicle.clues.includes(chapter.clueId)) return run.floor===1?'前往塔心，選擇高塔的未來。':'已取得'+chapter.clueName+'，繼續前往第 '+chapter.low+' 層章末門。';
-    if (run.floor>chapter.mid) return chapter.objective+' 第 '+chapter.mid+' 層起可尋找'+chapter.clueName+'。';
-    return '尋找主線印記「'+chapter.clueName+'」；第 '+chapter.low+' 層出口需要它才能開啟。';
+    if (run.floor<0&&run.status==='won') return underground().ENDING.description;
+    if (chronicle.ending&&run.floor>0) return '歸途已開啟，你的選擇已寫入故事。';
+    if (chronicle.clues.includes(chapter.clueId)) return run.floor===1?'前往塔心，選擇高塔的未來。':run.floor===-50?'解除原初門庭機關、擊敗樓層主，從歸途門返回地面。':'已取得'+chapter.clueName+'，繼續前往'+floorLabel(chapter.low)+'章末門。';
+    if (run.floor>chapter.mid) return chapter.objective+' '+floorLabel(chapter.mid)+'起可尋找'+chapter.clueName+'。';
+    return '尋找主線印記「'+chapter.clueName+'」；'+floorLabel(chapter.low)+'出口需要它才能開啟。';
+  }
+  // A two-sentence recap for returning players. Only the current chapter and
+  // already collected clue affect this view; it neither reads a scene nor
+  // changes saves, and deliberately keeps future revelations out of menus.
+  const RECAPS=freeze({
+    summoning:['你在第九十九層醒來，卻沒答應到這裡。先找出高塔召喚你的原因。','銅扣記下了你曾經喊出的求助。高塔把求助誤當成同意，才把你帶來。'],
+    garden:['庭園看起來像故鄉，但屋門仍通往迷宮。你需要辨認真正的回家方向。','種籽回應的是旅人自己的心願。你可以還沒決定，也不能替別人選故鄉。'],
+    roots:['樹根記著旅人的名字。你和伊芙、洛恩正在追查失散的人去了哪裡。','木環證明失散的人仍在塔裡。舊規則也寫明：離開不必換掉自己的記憶。'],
+    echo:['水晶會模仿旅人說話，甚至替人回答「願意」。你要讓每個人自己回答。','水晶分清了不同人的聲音。銅扣缺掉的步驟，是先詢問對方是否願意。'],
+    library:['你找到了維護者奧倫。他承認曾跳過詢問救人；原始手冊卻少了一頁。','殘頁證明緊急命令只是暫時辦法。奧倫留下恢復詢問的補註，卻沒有解除緊急狀態。'],
+    mist:['旅人的記憶還在，但有人想不起自己的過去。你正尋找名字與記憶的連結。','水珠證明高塔記錯了記憶的主人。找回正確的名字，就能把故事還給本人。'],
+    frost:['鐘一直停在救援那一晚。你需要找到救援早已完成的紀錄，才能停止召喚。','鐘簧留下「所有避難者已安全送達」的紀錄。三短一長，就是被忽略的完成訊號。'],
+    clockwork:['緊急狀態可以解除，但接線仍把「求助」當成「願意」。你要修正接引順序。','齒輪已接回詢問、確認、接引的順序。接下來去爐心查明記憶為什麼被列成燃料。'],
+    furnace:['塔把旅人記憶列進燃料清單。你要確認回家是否真的得犧牲記憶。','火種證明高塔靠地熱運轉。記憶只是導航資料，可以還給旅人，不必燃燒。'],
+    heart:['歸途裝置已修好。最後的門要聽每位旅人自己回答，而不是再次替大家決定。','你取得歸途星印。帶它到第一層，讓每個人選擇去留，再決定高塔的未來。'],
+  });
+  function brief(run){
+    if(!run||!isFloor(run.floor))return null;
+    const chronicle=validateChronicle(run.chronicle,run.floor);if(!chronicle)return null;
+    const chapter=chapterForFloor(run.floor),clueFound=chronicle.clues.includes(chapter.clueId);
+    const ending=run.floor<0?(run.status==='won'?underground().ENDING:null):chronicle.ending&&ENDINGS.find(e=>e.id===chronicle.ending);
+    return {title:chapter.title,recap:ending?ending.description:(chapter.recaps||RECAPS[chapter.id])[clueFound?1:0],next:objective(run),clueFound,landmark:run.party?floorLabel(chapter.low)+'：取得本章印記、完成迷宮機關，並擊敗樓層主後才能'+(chapter.low===1?'打開歸途。':chapter.low===-50?'完成地下旅程、返回地面。':'下樓。'):floorLabel(chapter.low)+'：帶著本章印記開門。'};
   }
   function canDescend(run) {
-    if (!run || !Number.isInteger(run.floor) || run.floor<1 || run.floor>99) return false;
+    if (!run || !isFloor(run.floor)) return false;
     const chapter=chapterForFloor(run.floor),chronicle=validateChronicle(run.chronicle,run.floor);
     return !!chronicle && (run.floor!==chapter.low || chronicle.clues.includes(chapter.clueId));
   }
@@ -228,7 +258,7 @@
     next.revision=run.revision+1;return {...result,run:next};
   }
   function readScene(run,id) { return change(run,next=>{
-    const scene=SCENES.find(entry=>entry.id===id);
+    const scene=allScenes().find(entry=>entry.id===id);
     if (!scene || !availableScenes(next).some(entry=>entry.id===id)) return {ok:false,message:'請先抵達故事所在樓層並取得本章主線印記。'};
     if (next.chronicle.read.includes(id)) return {ok:false,message:'這段故事已記錄，可在故事回顧重讀。'};
     next.chronicle.read.push(id);return {ok:true,message:'已記錄：'+scene.title+'。'};
@@ -245,5 +275,5 @@
     if (next.chronicle.ending!==null) return {ok:false,message:'本次旅程的結局已經選定。'};
     next.chronicle.ending=id;return {ok:true,message:ending.title,effect:{ending:id}};
   }); }
-  return freeze({CHAPTERS,SCENES,ENDINGS,newChronicle,validateChronicle,scenesForFloor,unlockedScenes,availableScenes,chapterForFloor,objective,canDescend,readScene,collectClue,chooseEnding});
+  return freeze({CHAPTERS,SCENES,ENDINGS,allChapters,allScenes,totalSceneCount,newChronicle,validateChronicle,scenesForFloor,unlockedScenes,availableScenes,chapterForFloor,objective,brief,canDescend,readScene,collectClue,chooseEnding});
 });

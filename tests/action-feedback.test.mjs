@@ -3,10 +3,10 @@ import assert from 'node:assert/strict';
 import {createRequire} from 'node:module';
 import {readFileSync} from 'node:fs';
 import vm from 'node:vm';
-const require=createRequire(import.meta.url),A=require('../assets/combat-audio.js'),H=require('../story/tower-heroes-core.js'),C=require('../story/story-core.js'),P=require('../story/tower-party-core.js'),R=require('../story/tower-hero-growth.js'),T=require('../lib/three.min.js');
+const require=createRequire(import.meta.url),A=require('../assets/combat-audio.js'),H=require('../story/tower-heroes-core.js'),C=require('../story/story-core.js'),P=require('../story/tower-party-core.js'),R=require('../story/tower-hero-growth.js'),N=require('../story/tower-narrative.js'),T=require('../lib/three.min.js');
 const code=file=>readFileSync(new URL('../'+file,import.meta.url),'utf8');
-test('all 49 active skills and usable items map to original bounded audio; sound families are distinct',()=>{
-  assert.equal(Object.keys(H.SKILLS).length,49);
+test('all 63 surface and underground active skills map to bounded audio; sound families are distinct',()=>{
+  assert.equal(Object.keys(H.SKILLS).length,63);
   for(const s of Object.values(H.SKILLS)){assert.ok(A.SKILL_SOUNDS[s.effect],s.id);assert.ok(A.ACTIONS[A.skillKind(s)],s.id);}
   for(const id of R.itemIds)assert.ok(A.ACTIONS[A.itemKind(id)],id);
   const waves=[];
@@ -33,12 +33,18 @@ function fixture(skill,options={}){
   let run;
   for(let seed=1;seed<500;seed++){
     run=H.enable(P.enable(C.newRun({seed}),skill.job,options.sex||'male').run).run;
+    if(skill.ascension){
+      H.gainXp(run,R.XP[8]);run.floor=1;run.floorsCleared=99;run.status='won';run.chronicle=N.newChronicle(1);run.chronicle.clues=N.CHAPTERS.map(c=>c.clueId);run.chronicle.ending='release';P.advance(run,{reward:false});
+      run=C.startUnderworld(run).run;H.gainXp(run,100000);const result=R.chooseUltimate(run,'hero',skill.ascension.base);assert.ok(result.ok);run=result.run;break;
+    }
     if(skill.unique)H.gainXp(run,28100);
     if(H.actor(run).skills.includes(skill.id))break;
   }
   assert.ok(H.actor(run).skills.includes(skill.id),skill.id);
   let target='hero',actors=[];
   if(skill.effect==='revive'){
+    run.coins=9999;
+    if(C.isUnderworld(run))for(let floor=-1;floor>=-50;floor--){run.floor=floor;run.floorsCleared=99+(-floor-1);P.advance(run,{reward:false});if(P.recruitOffer(run))break;}
     run=P.recruit(run,P.recruitOffer(run).id).run;target=run.party.members[0].id;H.setHp(run,target,0);
     const model=new T.Group();model.position.set(1,0,0);actors=[{id:target,model}];
   }
@@ -63,7 +69,7 @@ test('every successful active skill emits action audio and geometry; failed repe
     const f=fixture(s);assert.equal(f.runtime.cast(s.id,f.target),true,s.id);
     assert.ok(f.sounds.includes(H.preparationSeconds(s.id)?'charge':A.skillKind(s)),s.id);
     assert.equal(f.motion().action,H.preparationSeconds(s.id)||s.effect==='disarm'?'charge':'skill',s.id);
-    assert.equal(f.motion().family,require('../story/tower-combat-motion.js').FAMILIES[s.effect],s.id);
+    assert.equal(f.motion().family,s.presentation?.motion||require('../story/tower-combat-motion.js').FAMILIES[s.effect],s.id);
     assert.ok(f.runtime.effectStats().groups>0,s.id);assert.ok(C.validateSave(f.run()),s.id);
     const before=f.sounds.length;f.runtime.cast(s.id,f.target);assert.equal(f.sounds.length,before,s.id+' failed cast');
     f.runtime.reset();assert.equal(f.runtime.effectStats().groups,0);

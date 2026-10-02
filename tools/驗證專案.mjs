@@ -3,17 +3,26 @@ import { access, readFile, stat } from 'node:fs/promises';
 import vm from 'node:vm';
 
 const html = await readFile(new URL('../index.html', import.meta.url), 'utf8');
-for(const asset of ['character-sculpt','character-face','character-voices','audio-settings','maze-sight-core','maze-sight']){
+for(const asset of ['camera-comfort','render-quality','character-sculpt','character-face','character-voices','audio-settings','maze-sight-core','maze-sight']){
   new vm.Script(await readFile(new URL(`../assets/${asset}.js`,import.meta.url),'utf8'),{filename:asset+'.js'});
   assert.ok(html.includes(`src="./assets/${asset}.js?v=`),`缺少視野模組：${asset}`);
 }
 
-for(const asset of ['tower-floor-lords','tower-loot','tower-reinforcements','tower-stairs','tower-monster-sense','tower-combat-intent','tower-team-tactics','tower-encounter-alert','tower-combat-motion','tower-menu-voice','tower-hero-growth','tower-growth-runtime','tower-lighting-core','tower-lighting-runtime','tower-heroes-core','tower-heroes-icons','tower-heroes-visuals','tower-heroes-runtime']){
+for(const asset of ['tower-cooperation-core','tower-cooperation-runtime','tower-resource-icons','tower-forge-icons','tower-ascension-catalog','tower-gear-tiers','tower-underworld','tower-creature-art','tower-field-guide','tower-combat-readability','tower-equipment-compare','tower-floor-lords','tower-loot','tower-reinforcements','tower-stairs','tower-monster-sense','tower-combat-intent','tower-team-tactics','tower-encounter-alert','tower-combat-motion','tower-menu-voice','tower-hero-growth','tower-growth-runtime','tower-lighting-core','tower-lighting-runtime','tower-heroes-core','tower-heroes-icons','tower-heroes-visuals','tower-heroes-runtime']){
   new vm.Script(await readFile(new URL(`../story/${asset}.js`,import.meta.url),'utf8'),{filename:asset+'.js'});
   assert.ok(html.includes(`src="story/${asset}.js?v=`),`缺少照明模組：${asset}`);
 }
 assert.ok(html.indexOf('src="story/tower-lighting-core.js')<html.indexOf('src="story/tower-party-core.js'),'照明規則必須先於隊伍規則載入');
 assert.ok(html.indexOf('src="story/tower-lighting-runtime.js')<html.indexOf('src="story/tower-mode.js'),'照明畫面必須先於劇情引擎載入');
+assert.ok(html.indexOf('src="story/tower-underworld.js')<html.indexOf('src="story/tower-floor-lords.js'),'地下設定必須先於楼層主載入');
+assert.ok(html.indexOf('src="story/tower-ascension-catalog.js')<html.indexOf('src="story/tower-hero-growth.js'),'進階招式必須先於成長規則載入');
+assert.ok(html.indexOf('src="story/tower-gear-tiers.js')<html.indexOf('src="story/tower-heroes-core.js'),'裝備階級必須先於人物規則載入');
+assert.ok(html.indexOf('src="story/tower-heroes-core.js')<html.indexOf('src="story/tower-cooperation-core.js'),'連攜定義必須在技能規則之後載入');
+assert.ok(html.indexOf('src="story/tower-cooperation-runtime.js')<html.indexOf('src="story/tower-mode.js'),'連攜控制必須先於劇情引擎載入');
+assert.ok(html.includes('story/tower-cooperation.css?v='),'連攜按鈕需要獨立且有限的版面');
+for(const asset of ['story-atlas-rules','story-atlas-items','story-atlas-cooperation','story-atlas']){
+  new vm.Script(await readFile(new URL(`../docs/${asset}.js`,import.meta.url),'utf8'),{filename:asset+'.js'});
+}
 
 for (const asset of ['battle-dock','pickup-objects','native-symbols','room-lifecycle','shop-collection-core','shop-collection','shop-chaos','shop-sale','tag-rage','mobile-controls','magic-map','maze-materials','gameplay-rules']) {
   new vm.Script(await readFile(new URL(`../assets/${asset}.js`, import.meta.url), 'utf8'), {filename:asset+'.js'});

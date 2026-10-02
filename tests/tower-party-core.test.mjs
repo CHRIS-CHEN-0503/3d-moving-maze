@@ -24,9 +24,9 @@ test('recruitment is deterministic, revision-checked, paid once, and capped at f
   const id=r.party.members[0].id;r=P.dismiss(r,id).run;assert.equal(r.party.members.length,2);assert.ok(r.party.joined.includes(id));
   assert.equal(P.recruit(r,P.recruitOffer(r).id).ok,true);
 });
-test('eight recipes debit ingredients, give chef two portions, cap stacks and prevent stale spending',()=>{
-  assert.equal(Object.keys(P.RECIPES).length,8);
-  for(const id of Object.keys(P.RECIPES)){let r=fresh('chef');for(const k of Object.keys(r.party.ingredients))r.party.ingredients[k]=30;const before=structuredClone(r);const result=P.cook(r,id,r.revision);assert.equal(result.ok,true);assert.equal(result.run.party.meals[id],2);for(const[k,n]of Object.entries(P.RECIPES[id].cost))assert.equal(result.run.party.ingredients[k],30-n);assert.deepEqual(r,before);assert.equal(P.cook(result.run,id,r.revision).ok,false);result.run.party.meals[id]=99;assert.equal(P.cook(result.run,id).ok,false);}
+test('surface recipes debit ingredients, preserve legacy chef double portions, cap stacks and prevent stale spending',()=>{
+  assert.equal(Object.keys(P.RECIPES).length,23);assert.equal(Object.keys(P.availableRecipes(fresh())).length,18);
+  for(const id of Object.keys(P.availableRecipes(fresh()))){let r=fresh('chef');for(const k of Object.keys(r.party.ingredients))r.party.ingredients[k]=30;const before=structuredClone(r);const result=P.cook(r,id,r.revision);assert.equal(result.ok,true);assert.equal(result.run.party.meals[id],2);for(const[k,n]of Object.entries(P.RECIPES[id].cost))assert.equal(result.run.party.ingredients[k],30-n);assert.deepEqual(r,before);assert.equal(P.cook(result.run,id,r.revision).ok,false);result.run.party.meals[id]=99;assert.equal(P.cook(result.run,id).ok,false);}
   const r=fresh();r.party.ingredients.root=0;assert.equal(P.cook(r,'stew').ok,false);
 });
 test('food buffs refresh without stacking, expire after three descents and can revive companions',()=>{
@@ -58,7 +58,7 @@ test('profession abilities require resources and persist cooldown; reductions do
   let r=P.skill(fresh()).run;assert.equal(C.takeDamage(r,10).run.hp,55);assert.equal(C.takeDamage(r,10,'hunger').run.hp,50);
 });
 test('all floors keep timing and deterministic originals, plus exactly one lord on chapter finales',()=>{
-  const kinds=new Set();for(let f=99;f>=1;f--){const r=floor(fresh(),f),spec=P.monsterSpecs(r),regular=spec.filter(m=>!m.lord),lords=spec.filter(m=>m.lord),config=C.floorConfig(f,r.seed);assert.equal(regular.length,config.monsterCount);assert.equal(lords.length,f===1||f%10===0?1:0);assert.ok(regular.length>=config.monsterMin&&regular.length<=config.monsterMax);assert.equal(config.shiftSeconds,150-(99-f));assert.deepEqual(spec,P.monsterSpecs(r));spec.forEach(m=>{kinds.add(m.kind);assert.equal(m.strength,m.lord?m.def.strength:Math.min(5,m.def.strength+config.monsterStrengthBonus));if(f>=90&&!m.lord)assert.equal(m.strength,1);});}assert.equal(Object.keys(P.defs()).length,19);assert.ok([...Object.keys(P.defs())].every(k=>kinds.has(k)));
+  const kinds=new Set();for(let f=99;f>=1;f--){const r=floor(fresh(),f),spec=P.monsterSpecs(r),regular=spec.filter(m=>!m.lord),lords=spec.filter(m=>m.lord),config=C.floorConfig(f,r.seed);assert.equal(regular.length,config.monsterCount);assert.equal(lords.length,f===1||f%10===0?1:0);assert.ok(regular.length>=config.monsterMin&&regular.length<=config.monsterMax);assert.equal(config.shiftSeconds,150-(99-f));assert.deepEqual(spec,P.monsterSpecs(r));spec.forEach(m=>{kinds.add(m.kind);assert.equal(m.strength,m.lord?m.def.strength:Math.min(5,m.def.strength+config.monsterStrengthBonus));if(f>=90&&!m.lord)assert.equal(m.strength,1);});}const surfaceDefs=Object.values(P.defs()).filter(d=>!d.underworld);assert.equal(surfaceDefs.length,19);assert.ok(surfaceDefs.every(d=>kinds.has(d.id)));
 });
 test('enemy population survives saving, defeats and maze changes without rerolling',()=>{
   for(const f of [99,97,89,69,59,39,1]){

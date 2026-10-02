@@ -1,0 +1,63 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import {createRequire} from 'node:module';
+const require=createRequire(import.meta.url),C=require('../story/story-core.js'),P=require('../story/tower-party-core.js'),H=require('../story/tower-heroes-core.js'),G=require('../story/tower-hero-growth.js'),N=require('../story/tower-narrative.js'),D=require('../story/tower-dungeons.js'),A=require('../story/tower-ascension-catalog.js');
+const fresh=(job='mage',seed=1)=>H.enable(P.enable(C.newRun({seed,name:'續章成長'}),job).run).run;
+const valid=r=>assert.ok(C.validateSave(r),'save remains valid');
+function won(r){r.floor=1;r.floorsCleared=98;r.adventure=C.newAdventure();r.expedition=D.newExpedition();r.chronicle=N.newChronicle(1);r.chronicle.ending='keeper';P.advance(r,{reward:false});r.chronicle.clues.push(N.chapterForFloor(1).clueId);r.party.boss.started=true;r.party.boss.done=true;r.party.boss.seals.fill(true);r.defeatedMonsters.push('monster-11');const result=C.descend(r);assert.ok(result.ok,result.message);Object.assign(r,result.run);return r;}
+function underground(job='mage',seed=1){const result=C.startUnderworld(won(fresh(job,seed)));assert.ok(result.ok,result.message);return result.run;}
+function add(r,job='swordsman',level=1,id='ally'){const m={id,profession:job,sex:'female',level,hp:28+level*6,cooldown:0,hurtLeft:0};r.party.members.push(m);r.party.joined.push(id);H.addMember(r,m);valid(r);return id;}
+function nextOrdinary(r,id){const a=H.actor(r,id);return Object.values({...H.SKILLS,...H.PASSIVES}).find(s=>s.job===H.job(r,id)&&!s.unique&&![...a.skills,...a.passives].includes(s.id)).id;}
+
+test('expanded levels are underground only and first ten XP thresholds stay identical',()=>{
+  assert.deepEqual(G.XP.slice(0,10),[0,525,1350,2625,4350,6450,9150,12450,16425,21075]);
+  const surface=fresh();add(surface);H.gainXp(surface,100000);assert.equal(H.level(surface,'hero'),10);assert.equal(H.level(surface,'ally'),5);assert.ok(G.record(surface).awakening);assert.equal(G.available(surface,'ally'),1);assert.equal(G.availableUltimate(surface,'ally'),false);valid(surface);
+  const r=underground();add(r);H.gainXp(r,100000);assert.equal(H.level(r,'hero'),15);assert.equal(H.level(r,'ally'),10);assert.equal(H.maxHp(r,'hero'),102);assert.equal(H.maxHp(r,'ally'),88);assert.equal(G.record(r).awakening,null);assert.equal(G.record(r,'ally').awakening,null);assert.equal(G.skillLevel(r,'hero'),6);assert.equal(G.skillLevel(r,'ally'),6);valid(r);
+});
+test('companions preserve their own earned XP and do not inherit hero levels',()=>{
+  const r=underground();H.gainXp(r,G.XP[11]);add(r,'chef',2);const before=H.experience(r,'ally');H.gainXp(r,100);assert.equal(H.experience(r,'ally'),before+100);assert.equal(H.level(r,'ally'),2);assert.equal(H.level(r,'hero'),12);valid(r);
+  H.setHp(r,'hero',0);H.setHp(r,'ally',0);H.gainXp(r,G.XP[9]);assert.equal(H.hp(r,'hero'),0);assert.equal(H.hp(r,'ally'),0);assert.equal(H.level(r,'ally'),10);r.status='dead';valid(r);
+});
+test('three ordinary choices and exactly one job ultimate for each underground companion',()=>{
+  for(const job of Object.keys(H.JOBS)){let r=underground();const id=add(r,job);H.gainXp(r,G.XP[9]);assert.equal(G.available(r,id),3);for(let i=0;i<3;i++){const result=G.choose(r,nextOrdinary(r,id),id);assert.ok(result.ok,result.message);r=result.run;}assert.equal(G.available(r,id),0);assert.equal(G.choose(r,nextOrdinary(r,id),id).ok,false);assert.equal(G.ultimateOptions(r,id).length,2);const key=G.ultimateOptions(r,id)[job.length%2].id,result=G.chooseUltimate(r,id,key);assert.ok(result.ok,result.message);r=result.run;assert.equal(G.record(r,id).awakening,key);assert.equal(G.chooseUltimate(r,id,G.ultimateOptions(r,id)[0].id).ok,false);assert.equal(H.actor(r,id).skills.length+H.actor(r,id).passives.length,9);valid(r);}
+});
+test('legacy companion level-four learned skill migrates once without new skills, HP or gear',()=>{
+  let r=fresh();add(r,'swordsman',4);r=H.learnCompanion(r,'ally',nextOrdinary(r,'ally')).run;const skill=H.actor(r,'ally').learned,before=structuredClone(H.actor(r,'ally'));G.state(r).version=1;delete G.state(r).members;delete r.party.members[0].xp;
+  const restored=C.validateSave(r);assert.ok(restored);assert.deepEqual(H.actor(restored,'ally'),before);assert.deepEqual(G.record(restored,'ally').choices,[skill]);assert.equal(H.experience(restored,'ally'),G.XP[3]);assert.equal(G.available(restored,'ally'),0);assert.deepEqual(C.validateSave(restored),restored);
+});
+test('all fourteen ultimate branches preserve choice and receive only level twelve and fifteen continuations',()=>{
+  for(const base of Object.keys(A.BRANCHES)){let r=underground(A.BRANCHES[base].job);H.gainXp(r,G.XP[9]);assert.equal(G.availableUltimate(r),true);r=G.chooseUltimate(r,'hero',base).run;assert.equal(H.actor(r).skills.length+H.actor(r).passives.length,6);H.gainXp(r,G.XP[11]-H.experience(r));assert.ok(H.actor(r).skills.includes(A.BRANCHES[base].steps[0].id));assert.equal(H.actor(r).skills.length+H.actor(r).passives.length,7);H.gainXp(r,G.XP[14]-H.experience(r));assert.ok(H.actor(r).passives.includes(A.BRANCHES[base].steps[1].id));assert.equal(H.actor(r).skills.length+H.actor(r).passives.length,8);const saved=JSON.stringify(r);H.gainXp(r,0);H.gainXp(r,0);assert.equal(JSON.stringify(r),saved);valid(r);}
+});
+test('legacy surface awakening stays chosen through underground entry and later continuations',()=>{
+  let r=fresh('mage');H.gainXp(r,G.XP[9]);const base=G.record(r).awakening;won(r);H.state(r).xp=90000;const entered=C.startUnderworld(r);assert.ok(entered.ok,entered.message);r=entered.run;assert.equal(H.experience(r),G.XP[9]);assert.equal(G.record(r).awakening,base);assert.equal(G.availableUltimate(r),false);H.gainXp(r,0);assert.equal(H.level(r,'hero'),10);H.gainXp(r,G.XP[14]-G.XP[9]);assert.deepEqual(G.branches(base,15).filter(k=>[...H.actor(r).skills,...H.actor(r).passives].includes(k)),A.BRANCHES[base].steps.map(s=>s.id));valid(r);
+});
+test('adversarial future, cross-branch, duplicate and foreign progression are rejected',()=>{
+  let r=underground('mage');add(r,'healer');H.gainXp(r,G.XP[14]);r=G.chooseUltimate(r,'hero','star_ring').run;r=G.chooseUltimate(r,'ally','life_covenant').run;valid(r);
+  for(const change of [n=>G.record(n).awakening='life_covenant',n=>G.record(n,'ally').awakening='star_ring',n=>G.record(n,'ally').choices.push('comet_cascade'),n=>G.state(n).members.intruder=G.freshRecord(),n=>G.record(n).choices.push('not_real'),n=>H.actor(n).passives.push('triune_stars'),n=>H.actor(n,'ally').skills.push('comet_cascade'),n=>n.party.members[0].level=11,n=>n.party.members[0].xp=-1,n=>H.state(n).level=16]){const forged=structuredClone(r);change(forged);assert.equal(C.validateSave(forged),null);}
+  const late=structuredClone(r);H.state(late).level=11;H.setHp(late,'hero',60);assert.equal(C.validateSave(late),null);
+});
+test('ultimate cooldowns, recipe histories and rescue triggers are isolated per actor',()=>{
+  let r=underground('chef');add(r,'chef');H.gainXp(r,G.XP[9]);r=G.chooseUltimate(r,'hero','many_flavors').run;r=G.chooseUltimate(r,'ally','many_flavors').run;G.record(r).tasteLeft=80;G.recipe(r,'stew');G.recipe(r,'broth');assert.equal(G.record(r).tasteLeft,80);assert.equal(G.record(r,'ally').tasteLeft,90);assert.deepEqual(G.record(r).tastes,['stew','broth']);assert.deepEqual(G.record(r,'ally').tastes,[]);valid(r);
+  let heal=underground('healer');add(heal,'healer');H.gainXp(heal,G.XP[9]);heal=G.chooseUltimate(heal,'hero','life_covenant').run;heal=G.chooseUltimate(heal,'ally','life_covenant').run;G.record(heal).covenant=180;H.setHp(heal,'ally',2);assert.equal(G.beforeDamage(heal,'ally',20,'monster'),1);assert.equal(G.record(heal).covenant,180);assert.equal(G.record(heal,'ally').covenant,180);valid(heal);
+});
+test('AI may use owned ultimates but never materials without per-actor consent',()=>{
+  let r=underground('smith');add(r,'mage');H.gainXp(r,G.XP[9]);r=G.chooseUltimate(r,'hero','moving_fortress').run;r=G.chooseUltimate(r,'ally','star_ring').run;G.state(r).policies.ally.strategy='attack';const choice=G.aiChoice(r,'ally',['hero','ally'],true);assert.equal(choice.skill,'star_ring');assert.ok(H.cast(r,choice.skill,{actorId:'ally',nearby:['hero','ally']}).ok);
+  const a=H.actor(r);for(const key of a.skills)a.cooldowns[key]=key==='moving_fortress'?0:100;r.party.ingredients.shell=10;r.party.journey.scrap=10;assert.equal(G.aiChoice(r,'hero',['hero','ally'],true),null);G.state(r).policies.hero.materials=true;assert.equal(G.aiChoice(r,'hero',['hero','ally'],true).skill,'moving_fortress');valid(r);
+});
+test('underground gear gates tier four and five and never accepts them on the surface',()=>{
+  let r=underground('mage');H.gainXp(r,G.XP[6]);const g=C.createGear('arcane_staff_t4',-1,r.seed,'deep');r.gearBag.push(g);assert.equal(H.canEquip(r,'hero',g),false);H.gainXp(r,G.XP[7]-H.experience(r));assert.equal(H.canEquip(r,'hero',g),true);valid(r);const equipped=H.equip(r,'hero',g.id);assert.ok(equipped.ok,equipped.message);r=equipped.run;valid(r);assert.ok(H.gearPool(-1).includes('arcane_staff_t4'));assert.ok(!H.gearPool(-1).includes('arcane_staff_t5'));assert.ok(H.gearPool(-21).includes('arcane_staff_t5'));const s=fresh();H.gainXp(s,G.XP[9]);s.gearBag.push(g);assert.equal(H.canEquip(s,'hero',g),false);assert.equal(C.validateSave(s),null);
+});
+test('ordinary fifty-floor underground campaign reaches fifteen from eight without altering surface XP',()=>{
+  const r=underground();H.gainXp(r,G.XP[7]);const total=50*(9*15*5+360);H.gainXp(r,total);assert.equal(H.level(r,'hero'),15);const surface=fresh();H.advance(surface);assert.equal(H.experience(surface),8);const under=underground();H.advance(under);assert.equal(H.experience(under),360);
+});
+test('level-fifteen tier-five enhanced gear and mastered casts stay inside actual save bounds',t=>{
+  let pendingMax=0,buffMax=0,hitMax=0,cases=0;
+  for(const branch of Object.values(A.BRANCHES))for(const weapon of Object.values(H.GEAR).filter(g=>g.tier===5&&g.slot==='weapon'&&g.jobs.includes(branch.job))){
+    let r=underground(branch.job);H.gainXp(r,G.XP[14]);r=G.chooseUltimate(r,'hero',branch.id).run;
+    for(let i=0;i<3;i++){const prefer=['spell_precision','tempered_edge','steady_aim','last_stand','shield_mastery','herbalism'],pool=Object.values(H.PASSIVES).filter(s=>!s.unique&&s.job===branch.job&&!H.actor(r).passives.includes(s.id));pool.sort((a,b)=>(prefer.includes(b.id)?1:0)-(prefer.includes(a.id)?1:0));r=G.choose(r,pool[0].id).run;}
+    add(r,'swordsman',10);for(const slot of H.SLOTS){const defs=Object.values(H.GEAR).filter(g=>g.tier===5&&g.slot===slot&&g.jobs.includes(branch.job)&&(slot!=='shield'||weapon.hands===1));const def=slot==='weapon'?weapon:defs.sort((a,b)=>b.defense-a.defense)[0];if(!def)continue;let gear;for(let i=0;i<50;i++){gear=C.createGear(def.kind,-50,r.seed,'bound-'+slot+i,true);if(gear.bonus===3)break;}assert.equal(gear.bonus,3);r=C.grantGear(r,gear).run;const equipped=H.equip(r,'hero',gear.id);assert.ok(equipped.ok,equipped.message);r=equipped.run;}
+    if(G.has(r,'artisan_soul')){r.party.journey.scrap=99;r=G.imprint(r,'hero',r.equipment.weapon.id,true).run;}
+    for(const key of H.actor(r).skills){let n=structuredClone(r);for(const k in n.party.ingredients)n.party.ingredients[k]=99;n.party.journey.scrap=99;n.bag.arrow=99;n.hunger=1;H.setHp(n,'hero',20);H.setHp(n,'ally',20);if(H.SKILLS[key].effect==='revive')H.setHp(n,'ally',0);n.equipment.weapon.durability=1;const result=H.cast(n,key,{targetId:H.SKILLS[key].effect==='revive'?'ally':'hero',nearby:['hero','ally']});assert.ok(result.ok,key+': '+result.message);n=result.run;pendingMax=Math.max(pendingMax,H.actor(n).pending?.damage||0);for(const a of Object.values(H.state(n).actors))buffMax=Math.max(buffMax,...a.buffs.map(b=>b.power),0);valid(n);if(H.SKILLS[key].attack){const enemy=P.monsterSpecs(n)[0],hit=H.strike(n,enemy.id,{skillId:key,front:false});assert.ok(hit.ok,key);hitMax=Math.max(hitMax,hit.effect.damage);valid(hit.run);}cases++;}
+  }
+  assert.ok(pendingMax<250);assert.ok(buffMax<=200);t.diagnostic(JSON.stringify({cases,pendingMax,buffMax,hitMax}));
+});

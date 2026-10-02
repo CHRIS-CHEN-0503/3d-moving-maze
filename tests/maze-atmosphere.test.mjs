@@ -193,3 +193,44 @@ test('高塔覆寫色盤可套用副本顏色，不影響造型及已配置數�
   assert.notEqual(normal.wall[0].color, alternate.wall[0].color);
   assert.deepEqual(normal.wall.map(({ color, ...part }) => part), alternate.wall.map(({ color, ...part }) => part));
 });
+
+test('精緻建築仍附牆、保留樓梯孔，十七區域的手機上限包含所有立體曲面', () => {
+  const signatures=new Set();
+  for(const style of Object.keys(atmosphere.STYLES))for(const quality of ['low','balanced']){
+    const options=grid(39,style,{quality,rich:true,exitCell:{x:19,y:19}}),data=atmosphere.plan(options),handle=atmosphere.build(THREE,options);
+    const byInst=new Map(options.wallBoxes.map(wall=>[wall.inst,wall])),r=resources(handle);
+    assert.ok(data.stats.drawCalls<=4);
+    assert.ok(data.stats.triangles<=(quality==='low'?14000:24000),style+' '+quality+' '+data.stats.triangles);
+    assert.ok(data.relief.length<=80);
+    assert.equal(r.meshes.reduce((sum,mesh)=>sum+mesh.count*(mesh.geometry.index.count/3),0),data.stats.triangles,'預算必須是實際繪製三角面');
+    for(const part of [...data.wall,...data.glow,...data.relief]){
+      const box=bounds(part),wall=byInst.get(part.wallInst);
+      assert.ok(box.min.y>=0&&box.max.y<=options.wallHeight,style+' no roof silhouette');
+      assert.ok(box.min.x>=wall.minX-.19&&box.max.x<=wall.maxX+.19&&box.min.z>=wall.minZ-.19&&box.max.z<=wall.maxZ+.19,style+' no obstruction');
+    }
+    for(const part of data.floor){const box=bounds(part);assert.ok(box.max.y<=.012);assert.ok(Math.abs(part.x)>1.9||Math.abs(part.z)>1.9,'樓梯孔不能被地板裝飾蓋住');}
+    if(quality==='low')signatures.add(JSON.stringify([...data.wall,...data.relief].map(({color,feature,...part})=>part)));
+    const original=data.wall.find(part=>part.role==='wall-sculpture');
+    if(original){handle.removeWall(original.wallInst);for(const mesh of handle.wallRoot.children){const parts=mesh.name==='rounded-wall-sculpture-batch'?data.relief:mesh.name==='wall-lamp-inlay-batch'?data.glow:data.wall;const matrix=new THREE.Matrix4();for(let i=0;i<parts.length;i++){mesh.getMatrixAt(i,matrix);if(parts[i].wallInst===original.wallInst)assert.equal(matrix.determinant(),0);}}}
+    handle.dispose();handle.dispose();
+  }
+  assert.equal(signatures.size,17,'建築輪廓差異不是只換顏色');
+});
+
+test('牆面與地板雕飾借用原材質，換層清理不會釋放引擎共享貼圖',()=>{
+  const wallMap=new THREE.Texture(),floorMap=new THREE.Texture();let disposed=0;
+  for(const texture of [wallMap,floorMap])texture.addEventListener('dispose',()=>disposed++);
+  const handle=atmosphere.build(THREE,grid(13,'spire',{rich:true,wallMap,floorMap}));
+  for(const mesh of handle.wallRoot.children)assert.equal(mesh.material.map,mesh.material.isMeshBasicMaterial?null:wallMap);
+  for(const mesh of handle.floorRoot.children)assert.equal(mesh.material.map,floorMap);
+  handle.dispose();handle.dispose();assert.equal(disposed,0);
+  wallMap.dispose();floorMap.dispose();assert.equal(disposed,2);
+});
+
+test('換層清理派發每個合批物件的 dispose，才能釋放個體矩陣與顏色緩衝區',()=>{
+  for(const externalFirst of [false,true]){
+    const handle=atmosphere.build(THREE,grid(13,'garden',{rich:true})),meshes=[...handle.wallRoot.children,...handle.floorRoot.children],counts=new Map();
+    for(const mesh of meshes){counts.set(mesh,0);mesh.addEventListener('dispose',()=>counts.set(mesh,counts.get(mesh)+1));if(externalFirst)mesh.dispose();}
+    handle.dispose();handle.dispose();assert.ok(meshes.length>=3);for(const n of counts.values())assert.equal(n,1,'物件資源清理一次，包含外部提前清理');
+  }
+});

@@ -129,7 +129,7 @@ test('身分查詢不改出現率及任務抽選，增加怪物也不改探索�
 });
 
 test('探索者身分拒絕無效樓層或種子，邊界輸入仍可穩定產生',()=>{
-  for(const floor of [undefined,null,'60',0,100,-1,1.5,NaN,Infinity])assert.throws(()=>E.explorerIdentity(floor,1),RangeError);
+  for(const floor of [undefined,null,'60',0,100,-51,1.5,NaN,Infinity])assert.throws(()=>E.explorerIdentity(floor,1),RangeError);
   for(const seed of [undefined,null,'1',0,-1,0x100000000,1.5,NaN,Infinity])assert.throws(()=>E.explorerIdentity(60,seed),RangeError);
   for(const floor of [1,99])for(const seed of [1,0xffffffff])assert.deepEqual(E.explorerIdentity(floor,seed),E.explorerIdentity(floor,seed));
 });

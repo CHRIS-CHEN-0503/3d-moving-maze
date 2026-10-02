@@ -1,0 +1,7 @@
+/* Conditional cooperative buttons sit above the skill row, never inside settings. */
+#heroCooperationBar{position:absolute;right:calc(18px + env(safe-area-inset-right) + var(--dock-size,60px));bottom:calc(20px + env(safe-area-inset-bottom) + var(--dock-size,60px));display:flex;gap:6px;max-width:min(340px,48vw);overflow-x:auto;overscroll-behavior:contain;z-index:27;pointer-events:auto;scrollbar-width:thin}
+#heroCooperationBar[hidden],body:not(.story-active) #heroCooperationBar{display:none!important}
+.cooperation-button{flex:0 0 auto;min-width:88px;min-height:52px;border:1px solid #dac38c;border-radius:12px;padding:4px 9px;background:linear-gradient(135deg,#385b64f5,#554b32f5);color:#fff3cb;display:grid;justify-items:center;gap:1px;font:600 11px/1.2 system-ui;touch-action:manipulation;box-shadow:inset 0 1px #fff3,0 2px 8px #0007}
+.cooperation-button small{font-size:10px;color:#d8e6da}.cooperation-button>.cooperation-icon{height:28px;width:38px;filter:none}.cooperation-button.is-charging{border-color:#ffe299;background:linear-gradient(135deg,#68705a,#55452c)}
+.cooperation-button:focus-visible{outline:3px solid #fff2ab;outline-offset:2px}
+@media(max-height:340px){#heroCooperationBar{bottom:calc(12px + env(safe-area-inset-bottom) + var(--dock-size,44px));max-width:42vw}.cooperation-button{min-height:46px;min-width:82px;padding:3px 6px}.cooperation-button>.cooperation-icon{height:22px;width:34px}}

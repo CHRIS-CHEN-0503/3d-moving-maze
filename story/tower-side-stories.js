@@ -183,8 +183,10 @@
   function recollection(kind) { return get(kind)?.record || null; }
   function completedEntries(run) {
     const history=run?.expedition?.history;
-    if (!Array.isArray(history) || !Number.isInteger(run.floor) || run.floor<1 || run.floor>99) return [];
-    return history.filter(entry=>entry && entry.outcome==='completed' && get(entry.kind) && Number.isInteger(entry.floor) && entry.floor>=run.floor && entry.floor<=get(entry.kind).maxFloor);
+    if (!Array.isArray(history) || !Number.isInteger(run.floor) || !(run.floor>=1&&run.floor<=99||run.floor>=-50&&run.floor<=-1)) return [];
+    // Tower recollections remain readable after entering the underworld, but
+    // invented negative-floor rifts must never unlock a recollection.
+    return history.filter(entry=>entry && entry.outcome==='completed' && get(entry.kind) && Number.isInteger(entry.floor) && entry.floor>=Math.max(1,run.floor) && entry.floor<=get(entry.kind).maxFloor);
   }
   function collectedStories(run) { const kinds=new Set(completedEntries(run).map(entry=>entry.kind));return Object.values(STORIES).filter(story=>kinds.has(story.kind)); }
   function echoesForScene(run,sceneId) {

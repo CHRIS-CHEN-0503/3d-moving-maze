@@ -4,7 +4,7 @@ import {createRequire} from 'node:module';
 import {readFileSync} from 'node:fs';
 import vm from 'node:vm';
 const require=createRequire(import.meta.url),M=require('../story/tower-combat-motion.js'),Vox=require('../story/tower-menu-voice.js'),H=require('../story/tower-heroes-core.js'),T=require('../lib/three.min.js');
-test('nine weapon types across three tiers alternate two distinct bounded tracks and return to rest',()=>{
+test('all weapon tiers alternate two distinct bounded tracks and return to rest',()=>{
  for(const kind of Object.keys(H.GEAR).filter(k=>H.GEAR[k].slot==='weapon')){
   assert.equal(M.WEAPONS[H.GEAR[kind].baseKind].length,2);const model={userData:{heroWeapon:kind}},poses=[];
   for(let i=0;i<3;i++){
@@ -19,7 +19,7 @@ test('nine weapon types across three tiers alternate two distinct bounded tracks
 test('all active skills have a motion family, preparation cancels without changing weapon alternation',()=>{
  for(const s of Object.values(H.SKILLS)){
   assert.ok(M.FAMILIES[s.effect],s.id);const model={userData:{heroWeapon:Object.keys(H.GEAR).find(k=>H.GEAR[k].slot==='weapon'&&H.GEAR[k].jobs.includes(s.job))}};
-  M.begin(model,'charge',1.5,s);M.update(model,.1);assert.equal(M.state(model).family,M.FAMILIES[s.effect]);
+  M.begin(model,'charge',1.5,s);M.update(model,.1);assert.equal(M.state(model).family,M.familyFor(s));
   M.cancel(model);assert.equal(M.state(model).action,'');M.begin(model,'skill',.85,s);
   for(let n=0;n<20;n++)assert.ok(Object.values(M.update(model,.05)).every(Number.isFinite),s.id);
   assert.deepEqual(M.state(model).counts,{});

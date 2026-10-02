@@ -6,9 +6,14 @@
   const N = window.TowerNarrative, D = window.TowerDungeons, S = window.TowerSideStories;
   const P = window.TowerPartyCore, Heroes=window.TowerHeroes, HeroVisual=window.TowerHeroVisuals;
   const Lords=window.TowerFloorLords,Loot=window.TowerLoot,Reinforcements=window.TowerReinforcements;
+  const Underworld=window.TowerUnderworld;
+  const reducedMotion=window.matchMedia?.('(prefers-reduced-motion: reduce)');
   const modern=()=>!!run?.party?.loadouts;
   let partyUI = null, lightingUI = null, lightingRig = null, pendingProfession = null, pendingHero = null, pendingSex = 'male', upgradingProfession = false;
   const SAVE = 'maze3d_tower_v1';
+  const SURFACE_CLEAR=SAVE+'_surface_clear_v1';
+  let pendingUnderworld=null,pendingUnderworldSource='',pendingUnderworldActive='';
+  const floorLabel=floor=>floor<0?'地下第 '+Math.abs(floor)+' 層':'第 '+floor+' 層';
   let run = null, active = false, paused = false, pauseAt = 0, modalFocus = null;
   let world = null, loot = [], monsters = [], traders = [], nearest = null;
   let warriorNpc = null, nearestWarrior = null, escort = null;
@@ -45,6 +50,10 @@
   function explorerName() { const person=explorerIdentity();return person.title+'・'+person.name; }
   function environmentSpec() {
     if(inDungeon())return sideStory(run.expedition.active.kind)?.palette||{archive:[0x718291,0xaea38f,0x9b9387,0xf1d29e,'books'],bells:[0x617b94,0x92aaba,0x8c99a8,0x91e5e7,'crystal'],lantern:[0x77748b,0xb8a58e,0x9a9295,0xffc878,'fire']}[run.expedition.active.kind];
+    if(floorConfig.underworld){
+      const base=ENVIRONMENTS[{roots:2,mist:5,library:4,furnace:8,heart:9}[floorConfig.environmentId]??9];
+      return [...base];
+    }
     return ENVIRONMENTS[Math.max(0, Math.min(9, floorConfig.chapter - 1))];
   }
   function atmosphereStyle() {
@@ -140,7 +149,7 @@
     else el('gameScreen').appendChild(leftHud);
     const hud = document.createElement('section');
     hud.id = 'towerHud'; hud.setAttribute('aria-label', '高塔生存狀態');
-    hud.innerHTML = '<div class="tower-hud-summary"><span class="tower-stat tower-floor-stat"><small>樓層</small><b id="towerFloor">99 F</b></span><span class="tower-hud-health"><span class="tower-stat"><small>生命</small><b id="towerHealth">'+C.MAX_HP+' / '+C.MAX_HP+'</b></span><progress id="towerHp" class="tower-health" max="'+C.MAX_HP+'" value="'+C.MAX_HP+'" aria-label="生命值"></progress></span><button type="button" id="towerHudToggle" aria-controls="towerHudDetails" aria-expanded="false" aria-label="展開生存資訊"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg></button></div><div id="towerHudDetails" hidden><div class="tower-hud-meta"><span id="towerChapter"></span><span class="tower-stat"><small>銅幣</small><b id="towerCoins">0</b></span></div><div id="towerGuardStatus" class="tower-guard-status" hidden></div></div>';
+    hud.innerHTML = '<div class="tower-hud-summary"><span class="tower-stat tower-floor-stat"><small>樓層</small><b id="towerFloor">99 F</b></span><span class="tower-hud-health"><span class="tower-stat"><small>生命</small><b id="towerHealth">'+C.MAX_HP+' / '+C.MAX_HP+'</b></span><progress id="towerHp" class="tower-health" max="'+C.MAX_HP+'" value="'+C.MAX_HP+'" aria-label="生命值"></progress></span><button type="button" id="towerHudToggle" aria-controls="towerHudDetails" aria-expanded="false" aria-label="展開生存資訊"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg></button></div><div id="towerHudDetails" hidden><div class="tower-hud-meta"><span id="towerChapter"></span><span class="tower-stat"><small>'+(window.TowerResourceIcons?.svg('coin')||'')+'銅幣</small><b id="towerCoins">0</b></span></div><div id="towerGuardStatus" class="tower-guard-status" hidden></div></div>';
     leftHud.appendChild(hud);
     const hurt=document.createElement('div');hurt.id='towerHurtGlow';hurt.setAttribute('aria-hidden','true');el('gameScreen').appendChild(hurt);
     const gearStatus=document.createElement('div');gearStatus.id='towerGearStatus';gearStatus.className='tower-gear-status';el('towerHudDetails').appendChild(gearStatus);
@@ -213,7 +222,7 @@
     }
     if(window.TowerLighting&&window.TowerLightingRuntime){
       lightingUI=window.TowerLightingRuntime.create({THREE,G,run:()=>run,active:()=>active,paused:()=>paused,world:()=>world,traders:()=>traders,player:()=>playerGroup,camera:()=>camera,dispose:disposeSceneObject,inDungeon,
-        environment:()=>({id:floorConfig.environmentId,rig:lightingRig}),clear:hasClearPath,cell:cellPoint,chooseCell,marker:makePickupMarker,daylightCast:()=>partyUI?.heroes.daylight(),
+        environment:()=>({id:floorConfig.environmentId,underworld:floorConfig.underworld===true,rig:lightingRig}),clear:hasClearPath,cell:cellPoint,chooseCell,marker:makePickupMarker,daylightCast:()=>partyUI?.heroes.daylight(),
         bind:bindActionBtn,action,dialog,transact,toast:showToast,audio:AudioEng,close:closeDialog,trade});
       lightingUI.install();
     }
@@ -254,7 +263,7 @@
       else window.GameVoice?.readPanel(el('towerDialog'));
     }
   }
-  function openBattleSettings(){if(!active||!G.running)return;dialog('旅程暫停中','遊戲設定','調整這台裝置的音量，關閉後繼續冒險。',window.MazeAudioSettings.controls()+'<div class="battle-settings-options">'+action('音樂：'+(G.muted?'關':'開'),'battle-music')+(modern()?action('技能排序','hero-order')+action('自動行動／快捷欄','hero-policy'):'')+'</div>',action('繼續遊戲','close')+action('離開遊戲','quit'),{summary:'遊戲設定。可以分別調整音樂與音效音量。'});}
+  function openBattleSettings(){if(!active||!G.running)return;dialog('旅程暫停中','遊戲設定','調整聲音與畫質，關閉後繼續冒險。',window.MazeAudioSettings.controls()+(window.MazeQuality?.controls()||'')+'<div class="battle-settings-options">'+action('音樂：'+(G.muted?'關':'開'),'battle-music')+(modern()?action('技能排序','hero-order')+action('自動行動／快捷欄','hero-policy'):'')+'</div>',action('繼續遊戲','close')+action('離開遊戲','quit'),{summary:'遊戲設定。可以調整音量、畫質與隊友行動。'});}
   function closeDialog() {
     if(pendingDungeonShift)return;
     pendingWarriorReplacement=null;
@@ -276,6 +285,36 @@
     try { return C.validateSave(JSON.parse(localStorage.getItem(SAVE) || 'null')); }
     catch (_) { return null; }
   }
+  function surfaceClear() {
+    const current=readSave();
+    if(current?.status==='won'&&current.floor===1)return current;
+    try{const saved=C.validateSave(JSON.parse(localStorage.getItem(SURFACE_CLEAR)||'null'));return saved?.status==='won'&&saved.floor===1?saved:null;}catch(_){return null;}
+  }
+  function underworldIntro(){
+    const cleared=surfaceClear();if(!cleared||!Underworld||!C.startUnderworld)return;
+    const result=C.startUnderworld(cleared,cleared.revision);
+    if(!result.ok){showToast(result.message||'目前無法開啟地下旅程，地上進度仍完整保留。');return;}
+    pendingUnderworld=result.run;pendingUnderworldSource=JSON.stringify(cleared);pendingUnderworldActive=localStorage.getItem(SAVE);
+    const departed=pendingUnderworld.underworld?.departed,job=departed?P.PROFESSIONS[departed.profession]?.name:'';
+    const farewell=departed?`${job||'同伴'}${departed.name?'・'+departed.name:''}搖了搖頭：「我答應陪你走出高塔。現在已經做到了，我想先回家休息。你們要平安回來。」你尊重這個決定，接過對方留下的裝備，好好道別。`:'沒有同伴需要道別。你收好裝備，決定親自查明樓梯下方的秘密。';
+    const current=readSave(),replaces=current&&current.status!=='won';
+    dialog('通關後的新篇章 · 地下五十層','門外，還有一條向下的路','你已經走出高塔。幾天後，一名旅人帶來消息：第 1 層樓主離開後，原本封閉的石壁竟露出隱藏樓梯。',prose(['高塔之下，還有一座更古老的地下城。這一次沒有召喚，也沒有強迫。帶著好奇，你決定回去看看。',farewell,'地下怪物更加強大。你可招募最多四名同伴，與主角組成五人隊伍。前四十層沿用最大的迷宮；最後十層還會更寬廣。'])+'<p class="tower-copy">承接地上通關時的等級、技能、裝備與補給。離隊只發生這一次；續玩不會再次抽選。'+(replaces?'目前另有未完成旅程，確認後會先備份，再切換成地下篇。':'地上通關存檔會另行保留。')+'</p>',action('先留在塔外','underworld-cancel')+action('帶著好奇，進入地下城','underworld-start'),{full:true});
+  }
+  function startUnderworld(){
+    if(!pendingUnderworld)return;
+    const cleared=surfaceClear(),candidate=C.validateSave(pendingUnderworld);
+    if(!cleared||!candidate){pendingUnderworld=null;open();return;}
+    if(JSON.stringify(cleared)!==pendingUnderworldSource||localStorage.getItem(SAVE)!==pendingUnderworldActive){pendingUnderworld=null;open();showToast('旅程已在其他地方更新，請重新確認地下篇，不會覆蓋新進度。',4000);return;}
+    // Stage both recoverable snapshots before replacing the active journey.
+    // A failed storage write never starts an unsaved underground expedition.
+    try{
+      const old=localStorage.getItem(SAVE);
+      localStorage.setItem(SURFACE_CLEAR,JSON.stringify(cleared));
+      if(old)localStorage.setItem(SAVE+'_before_underworld',old);
+      localStorage.setItem(SAVE,JSON.stringify(candidate));
+    }catch(_){showToast('無法備份並保存地下旅程，目前進度未變。請先騰出瀏覽器儲存空間。',4000);return;}
+    run=candidate;pendingUnderworld=null;floorStarted=false;enter();
+  }
   function syncEngine() {
     if (!run || !floorStarted) return;
     const now = paused ? pauseAt : performance.now();
@@ -292,12 +331,15 @@
       try{previous=raw?JSON.parse(raw):null;}catch(_){}
       if(run.party?.journey&&previous?.party&&!previous.party.journey&&C.validateSave(previous))localStorage.setItem(SAVE+'_before_expedition2',raw);
       if(run.party?.light&&previous?.party&&previous.party.light===undefined&&C.validateSave(previous))localStorage.setItem(SAVE+'_before_lighting',raw);
+      if(run.party?.journey?.materials&&previous?.party&&previous.party.journey?.materials===undefined&&C.validateSave(previous)&&!localStorage.getItem(SAVE+'_before_regional_crafting'))localStorage.setItem(SAVE+'_before_regional_crafting',raw);
       if(run.party?.loadouts?.growth&&previous?.party?.loadouts&&!previous.party.loadouts.growth&&C.validateSave(previous)&&!localStorage.getItem(SAVE+'_before_hero_growth'))localStorage.setItem(SAVE+'_before_hero_growth',raw);
+      if(run.party?.loadouts?.growth?.version===2&&previous?.party?.loadouts&&previous.party.loadouts.growth?.version!==2&&C.validateSave(previous)&&!localStorage.getItem(SAVE+'_before_underground_growth_v2'))localStorage.setItem(SAVE+'_before_underground_growth_v2',raw);
       if(run.party?.loadouts?.xpScale===10&&previous?.party?.loadouts&&previous.party.loadouts.xpScale===undefined&&C.validateSave(previous)&&!localStorage.getItem(SAVE+'_before_xp10'))localStorage.setItem(SAVE+'_before_xp10',raw);
       const previousGear=previous?[...(previous.gearBag||[]),...Object.values(previous.equipment||{}),...Object.values(previous.party?.loadouts?.actors||{}).flatMap(a=>Object.values(a?.equipment||{}))].filter(Boolean):[];
       if(previous&&C.validateSave(previous)&&previousGear.some(g=>g.durabilityVersion===undefined)&&!localStorage.getItem(SAVE+'_before_durability2'))localStorage.setItem(SAVE+'_before_durability2',raw);
       if(previous&&C.validateSave(previous)&&previousGear.some(g=>g.durabilityVersion===undefined||g.durabilityVersion===2)&&!localStorage.getItem(SAVE+'_before_durability3'))localStorage.setItem(SAVE+'_before_durability3',raw);
       if(previous&&C.validateSave(previous)&&previousGear.some(g=>g.durabilityVersion!==4)&&!localStorage.getItem(SAVE+'_before_durability4'))localStorage.setItem(SAVE+'_before_durability4',raw);
+      if(run.status==='won'&&run.floor===1&&C.validateSave(run))localStorage.setItem(SURFACE_CLEAR,JSON.stringify(run));
       localStorage.setItem(SAVE, JSON.stringify(run)); return true;
     }
     catch (_) { if (!saveFailed) { saveFailed = true; showToast('瀏覽器無法保存進度，請保持此分頁開啟。', 4000); } return false; }
@@ -315,9 +357,11 @@
   }
   function open(silent=false) {
     if(P&&(!window.TowerLighting||!window.TowerLightingRuntime||!Lords||!Loot||!Reinforcements)){dialog('載入尚未完成','冒險模組尚未載入','請重新整理網頁後再繼續。既有旅程不會被覆寫。','',action('回首頁','close'));return;}
-    const saved = readSave();
-    dialog('單人長篇冒險 · 高塔遠征', '倒轉高塔・第 99 層', '你在陌生的召喚陣中醒來。塔頂只有一扇向下的門。與同樣受困的旅人組隊、討伐怪物、採集食材，在移動的迷宮裡煮一頓熱飯，再一起尋找回家的路。', '<div class="tower-story-cover" role="img" aria-label="被召喚到雲上高塔的冒險者"></div>'+(saved&&!saved.party?.loadouts?'<p class="tower-copy">目前旅程是舊版規則，仍可繼續。要體驗三主動、兩被動與逐人裝備，請選「重新開始故事」；選好職業後會先備份舊旅程。</p>':'')+'<p class="tower-copy">七種職業 · 最多四人隊伍 · 八道料理 · 十座章末迷宮機關 · 職業探索與鍛造。第 90 至 10 層的整十樓層及第 1 層，各有專屬挑戰。</p><p class="tower-copy">沿用原本移動操作 · 每層自動保存（續玩回到當層入口） · 魔法地圖變形後重新探索。</p>',
-      (saved && saved.status !== 'won' ? action('繼續：第 ' + saved.floor + ' 層', 'continue') : saved&&N?action('回顧已完成故事','story-archive'):'') + action(saved ? '重新開始故事' : '建立主角', 'new') + action('回首頁', 'close'),{silent});
+    const saved = readSave(),cleared=surfaceClear(),underground=saved?.floor<0;
+    const unlock=cleared&&Underworld?'<section class="underworld-unlock"><small>已解鎖 · 通關後篇章</small><h3>石壁後的隱藏樓梯</h3><p>走出高塔不是唯一的答案。地下五十層，還留著無人聽見的聲音。</p><p>更強的怪物 · 最多五人隊伍 · 五座地下封印</p>'+action(underground&&saved.status!=='won'?'繼續地下旅程':'探索地下五十層',underground&&saved.status!=='won'?'continue':'underworld-intro')+'</section>':'';
+    dialog(cleared?'地上篇已完成 · 下一段旅程由你決定':'單人長篇冒險 · 高塔遠征', cleared?'倒轉高塔・歸途之外':'倒轉高塔・第 99 層', '你在陌生的召喚陣中醒來。塔頂只有一扇向下的門。與同樣受困的旅人組隊、討伐怪物、採集食材，在移動的迷宮裡煮一頓熱飯，再一起尋找回家的路。', '<div class="tower-story-cover" role="img" aria-label="被召喚到雲上高塔的冒險者"></div>'+(saved&&!saved.party?.loadouts?'<p class="tower-copy">目前旅程是舊版規則，仍可繼續。要體驗三主動、兩被動與逐人裝備，請選「重新開始故事」；選好職業後會先備份舊旅程。</p>':'')+'<p class="tower-copy">七種職業 · 地上四人／地下五人隊伍 · '+(P?.RECIPES?Object.keys(P.RECIPES).length:'多種')+' 道料理 · 合作連攜 · 職業探索與鍛造。第 90 至 10 層的整十樓層及第 1 層，各有專屬挑戰。</p><p class="tower-copy">沿用原本移動操作 · 每層自動保存（續玩回到當層入口） · 魔法地圖變形後重新探索。</p><p class="tower-copy">特定職業學會指定技能，並符合附近站位及視線條件時，可按連攜鈕發動合作招式；會消耗參與技能的冷卻及物資。</p><p><a class="tower-atlas-link" href="docs/職業裝備圖鑑.html" target="_blank" rel="noopener">開啟劇情完整圖鑑與連攜說明</a></p>',
+      (saved && saved.status !== 'won' ? action('繼續：' + floorLabel(saved.floor), 'continue') : saved&&N?action('回顧已完成故事','story-archive'):'') + action(saved ? '重新開始地上篇' : '建立主角', 'new') + action('回首頁', 'close'),{silent});
+    if(unlock)el('towerDialog').querySelector('.tower-dialog-content').insertAdjacentHTML('afterbegin',unlock);
   }
   function beginNew() {
     pendingHero=null;pendingSex='male';
@@ -327,7 +371,7 @@
   function chooseProfession(value,upgrade=false) {
     pendingProfession=value;upgradingProfession=upgrade;
     const introductions={swordsman:'持劍近戰，重裝與護盾保護同伴。',mage:'雙手法杖，擅長遠程法術與結界。',scout:'身形輕巧，雙短刃與陷阱探索。',chef:'體態厚實，鐵鍋與料理補給。',healer:'手持法書，治療、救援及弱化。',smith:'肩背壯實，短鎚或重錘與裝備修理。',archer:'修長精靈，長弓遠程射擊與牽制。'};
-    dialog('高塔遠征 · 建立角色','你想如何走出這座塔？','先選外觀與職業，下一步揭曉技能；男女能力相同。'+(value.warrior?'原有護衛會直接轉成劍士隊友，進度與費用保留。':''),'<div class="hero-create-fields"><label>冒險者稱呼 <input id="heroNameInput" maxlength="24" value="'+text(value.name)+'" aria-label="冒險者稱呼"></label><div class="hero-sex-picker" aria-label="角色外觀">'+['male','female'].map(s=>'<button type="button" class="tower-btn" data-tower="hero-sex" data-item="'+s+'" aria-pressed="'+(pendingSex===s)+'">'+(s==='male'?'男性外觀':'女性外觀')+'</button>').join('')+'</div></div><div class="tower-grid party-professions">'+Object.entries(P.PROFESSIONS).map(([id,job])=>'<article class="tower-item hero-profession-card">'+HeroVisual.portrait(id,pendingSex)+'<h3>'+text(job.name)+'</h3><p>'+text(introductions[id])+'</p>'+action('選擇'+job.name,'profession',id)+'</article>').join('')+'</div>',action('稍後再選','profession-cancel'),{heroCreation:true,summary:'請先選男女外觀，再選職業。'});
+    dialog('高塔遠征 · 建立角色','你想如何走出這座塔？','先選外觀與職業，下一步揭曉技能；男女能力相同。'+(value.warrior?'原有護衛會直接轉成劍士隊友，進度與費用保留。':''),'<div class="hero-create-fields"><label>冒險者稱呼 <input id="heroNameInput" maxlength="24" value="'+text(value.name)+'" aria-label="冒險者稱呼"></label><div class="hero-sex-picker" aria-label="角色外觀">'+['male','female'].map(s=>'<button type="button" class="tower-btn" data-tower="hero-sex" data-item="'+s+'" aria-pressed="'+(pendingSex===s)+'">'+(s==='male'?'男性外觀':'女性外觀')+'</button>').join('')+'</div></div><div class="tower-grid party-professions">'+Object.entries(P.PROFESSIONS).filter(([id])=>!(upgrade&&value.floor<0&&id==="archer")).map(([id,job])=>'<article class="tower-item hero-profession-card">'+HeroVisual.portrait(id,pendingSex)+'<h3>'+text(job.name)+'</h3><p>'+text(introductions[id])+'</p>'+action('選擇'+job.name,'profession',id)+'</article>').join('')+'</div>',action('稍後再選','profession-cancel'),{heroCreation:true,summary:'請先選男女外觀，再選職業。'});
   }
   function revealHero(){const value=pendingHero;if(!value)return;const a=value.party.loadouts?.actors.hero,job=value.party.profession;
     const list=a?[...a.skills,...a.passives].map(k=>{const s=Heroes.SKILLS[k]||Heroes.PASSIVES[k];return '<article>'+window.TowerHeroIcons.svg(k)+'<div><b>'+text(s.name)+'</b><small>'+(Heroes.SKILLS[k]?'主動技能':'被動技能')+'</small><p>'+text(s.description)+'</p></div></article>';}).join(''):'<p>'+text(P.PROFESSIONS[job].description)+'</p>';
@@ -350,6 +394,9 @@
     objectiveHint?.suspend();
     pendingDungeonShift=null;closeDialog(); floorStarted = false; reader=null;sideReader=null;
     lightingUI?.reset();
+    // Remove live effects before startGame disposes the old scene. Their
+    // manager-owned particle programs/textures must survive the floor change.
+    partyUI?.reset();
     floorConfig = C.floorConfig(run.floor,run.seed);
     const instance=dungeonOffer();
     if(instance)floorConfig={...floorConfig,size:instance.size,name:instance.title,shiftSeconds:instance.shiftSeconds,monsterCount:0,narrative:'',environmentId:sideStory(instance.kind)?.environmentId||{archive:'library',bells:'echo',lantern:'furnace'}[instance.kind]};
@@ -399,16 +446,20 @@
     const echoes=page===entry.paragraphs.length-1&&S?S.echoesForScene(run,id):[];
     const after=echoes.flatMap(e=>[e.title,e.text]).join('。');
     const narration=[!continuation&&!recorded?entry.title:'',entry.paragraphs[page],after].filter(Boolean).join('。');
-    dialog('倒轉高塔 · 第 '+entry.floor+' 層 · '+(page+1)+' / '+entry.paragraphs.length,entry.title,'',prose([entry.paragraphs[page]])+echoCards(echoes),storyActions,{asset:recorded,afterText:after,text:narration});
+    dialog('倒轉高塔 · '+floorLabel(entry.floor)+' · '+(page+1)+' / '+entry.paragraphs.length,entry.title,'',prose([entry.paragraphs[page]])+echoCards(echoes),storyActions,{asset:recorded,afterText:after,text:narration});
   }
   function journal() {
     if(!N||!run||G.shifting)return;
     const unlocked=N.availableScenes(run),chapter=N.chapterForFloor(run.floor);
-    const entries=unlocked.slice().reverse().map(s=>'<article class="tower-journal-entry"><div><small>第 '+s.floor+' 層 · '+(run.chronicle.read.includes(s.id)?'已讀':'未讀')+'</small><h3>'+text(s.title)+'</h3></div>'+action('閱讀','story-read',s.id)+'</article>').join('');
-    const clues=N.CHAPTERS.filter(c=>run.chronicle.clues.includes(c.clueId));
+    const brief=N.brief?.(run),growth=window.TowerFieldGuide?.progression(run);
+    const overview=brief?'<section class="adventure-brief"><div><small>目前線索</small><p>'+text(brief.recap)+'</p></div><div><small>接下來</small><p>'+text(brief.next)+'</p><small>'+text(brief.landmark)+'</small></div></section>':'';
+    const milestone=growth?'<p class="field-guide-hint">主角 '+growth.level+' 級 · '+text(growth.next)+(growth.nextLevelXp!==null?' 距離升級還需 '+growth.remainingXp+' 經驗。':'')+'</p>':'';
+    const entries=unlocked.slice().reverse().map(s=>'<article class="tower-journal-entry"><div><small>'+floorLabel(s.floor)+' · '+(run.chronicle.read.includes(s.id)?'已讀':'未讀')+'</small><h3>'+text(s.title)+'</h3></div>'+action('閱讀','story-read',s.id)+'</article>').join('');
+    const chapters=run.floor<0?N.allChapters():N.CHAPTERS;
+    const clues=chapters.filter(c=>run.chronicle.clues.includes(c.clueId));
     const history=(run.expedition?.history||[]).slice(-5).reverse().map(h=>'第 '+h.floor+' 層 · '+(sideStory(h.kind)?.title||{archive:'無聲信庫',bells:'逆時鐘室',lantern:'餘燼渡廊'}[h.kind])+' · '+({completed:'已完成',abandoned:'已退出',expired:'時間耗盡'}[h.outcome])).join('／');
     const collected=S?S.collectedStories(run):[],sideEntries='<h3 class="tower-section-title">旅途逸聞 '+collected.length+' / 6</h3><p class="tower-copy">完成劇情裂隙可留下永久手記；部分人物會在後續主線回應。不收集也能完成主線。</p>'+collected.map(s=>'<article class="tower-journal-entry"><div><small>'+text(s.title)+'</small><h3>'+text(s.record.title)+'</h3></div>'+action('重讀逸聞','side-story-read',s.kind)+'</article>').join('');
-    dialog('旅人的手記 · '+run.chronicle.read.length+' / 30 幕',chapter.title,N.objective(run),'<section class="tower-guard-summary"><h3>歸途印記 '+clues.length+' / 10</h3><p>'+text(clues.map(c=>c.clueName).join('、')||'第一枚線索仍在塔中等待。')+'</p></section>'+sideEntries+entries+(history?'<p class="tower-copy">裂隙紀錄：'+text(history)+'</p>':''),action(active?'回到迷宮':'回首頁','close')+(run.chronicle.ending?action('閱讀我的結局','ending-read'):'')+(active?(inDungeon()?action('副本目標','dungeon-brief'):action('探索者委託','quest')):''),{full:true});
+    dialog('旅人的手記 · '+run.chronicle.read.length+' / '+(run.floor<0?N.totalSceneCount():30)+' 幕',chapter.title,N.objective(run),overview+milestone+'<section class="tower-guard-summary"><h3>歸途印記 '+clues.length+' / '+chapters.length+'</h3><p class="tower-clue-list">'+(clues.map(c=>'<span>'+(window.TowerResourceIcons?.svg('clue')||'')+text(c.clueName)+'</span>').join('')||'第一枚線索仍在塔中等待。')+'</p></section>'+sideEntries+entries+(history?'<p class="tower-copy">裂隙紀錄：'+text(history)+'</p>':''),action(active?'回到迷宮':'回首頁','close')+(run.chronicle.ending?action('閱讀地上篇結局','ending-read'):'')+(run.floor===-50&&run.status==='won'?action('閱讀地下篇結局','underworld-ending'):'')+(active?(inDungeon()?action('副本目標','dungeon-brief'):action('探索者委託','quest')):''),{full:true});
   }
   function readSideStory(kind,page=0,source='record',continuation=false) {
     const story=sideStory(kind);if(!story||!['intro','record','outro'].includes(source))return;
@@ -557,7 +608,7 @@
     const sun = new THREE.DirectionalLight(0xffe4b3, 0.8); sun.position.set(-15, 28, 14); envGroup.add(sun);
     lightingRig=null;
     if(run.party?.light&&window.TowerLighting){
-      const light=window.TowerLighting.profile(floorConfig.environmentId);
+      const light=window.TowerLighting.profile(floorConfig.environmentId,floorConfig.underworld===true);
       scene.background.setHex(light.sky);scene.fog.color.setHex(light.sky);
       envGroup.children[0].intensity=light.hemi;envGroup.children[1].intensity=light.ambient;sun.intensity=light.sun;
       // Lava cracks remain a faint landmark, not a full-floor light source.
@@ -568,8 +619,14 @@
     floorMesh.material.color.setHex(ground);
     const span = G.mazeW * G.cell;
     // Keep the tower shell open: a solid cylinder cap would cover the recessed stairs.
-    const rim = new THREE.Mesh(new THREE.CylinderGeometry(span * 0.75, span * 0.77, 3, 12, 1, true), new THREE.MeshLambertMaterial({color: 0x31495d, side: THREE.DoubleSide}));
-    rim.position.y = -1.65; envGroup.add(rim);
+    const rim = new THREE.Mesh(new THREE.CylinderGeometry(span * 0.75, span * 0.77, floorConfig.underworld?18:3, 12, 1, true), new THREE.MeshLambertMaterial({color:floorConfig.underworld?wall:0x31495d, side: THREE.DoubleSide}));
+    rim.position.y = floorConfig.underworld?6:-1.65;envGroup.add(rim);
+    // An open vault keeps the free camera usable; rock teeth stay outside the
+    // playable maze and reuse the chapter material, never blocking a corridor.
+    if(floorConfig.underworld){
+      const rockMaterial=new THREE.MeshLambertMaterial({color:wall}),rockGeo=new THREE.ConeGeometry(2,6,5);
+      for(let i=0;i<10;i++){const angle=i/10*Math.PI*2,rock=new THREE.Mesh(rockGeo,rockMaterial);rock.position.set(Math.cos(angle)*span*.69,10,Math.sin(angle)*span*.69);rock.rotation.z=Math.PI;rock.scale.setScalar(.7+(i%3)*.15);envGroup.add(rock);}
+    }
     // 建築輪廓只在迷宮外，柱頂標示高塔朝下延伸；不增加即時陰影。
     const sceneryMaterial = new THREE.MeshLambertMaterial({color:accent});
     const stoneMaterial = new THREE.MeshLambertMaterial({color:wall});
@@ -638,7 +695,7 @@
     for (let i = 0; i < (partyMonsters?partyMonsters.length:floorConfig.monsterCount); i++) {
       const kind = partyMonsters?partyMonsters[i].kind:run.floor<=54&&i===floorConfig.monsterCount-1?'shardseer':floorConfig.monsterTypes[i % floorConfig.monsterTypes.length], def = partyMonsters?partyMonsters[i].def:C.MONSTERS[kind];
       const spec=partyMonsters?.[i],strength = spec?spec.strength:C.monsterStrength(kind, run.floor), id = spec?.id||'monster-' + i;
-      const point = spec?.reinforcement?cellPoint(spec.cx,spec.cy):chooseCell(random, used, Math.min(7, floorConfig.size - 1)), model = monsterModel(kind, strength);
+      const point = spec?.reinforcement?cellPoint(spec.cx,spec.cy):chooseCell(random, used, Math.min(7, floorConfig.size - 1)), model = monsterModel(kind, strength, def);
       const alive = !run.defeatedMonsters.includes(id);
       model.position.set(point.x, 0, point.z); model.visible = alive; model.userData.monsterId=id; world.add(model);
       monsters.push({ ...point, id, strength, kind, def, model, alive,lord:!!spec?.lord,maxHp:spec?.maxHp, path: [], pathLeft: i * .15, windup: 0, cooldown: 2, phase: i,voiceEvents:new Set() });
@@ -662,6 +719,7 @@
     if(!run.party||inDungeon())return;
     for(const entry of run.party.loot.entries){if(loot.some(l=>l.id===entry.id))continue;const point=cellPoint(entry.cx,entry.cy),model=new THREE.Group(),icon=new THREE.Group();model.position.set(point.x,0,point.z);model.name='combat-drop';
       if(entry.type==='ingredient')icon.add(partyUI.ingredientModel(entry.key));
+      else if(entry.type==='material')icon.add(partyUI.materialModel(entry.key));
       else if(entry.type==='gear'){const gear=HeroVisual.gear(THREE,entry.gear.kind);gear.scale.setScalar(.48);gear.updateMatrixWorld(true);const box=new THREE.Box3().setFromObject(gear),center=box.getCenter(new THREE.Vector3());gear.position.sub(center);icon.add(gear);}
       else if(entry.type==='fuel'){const wood=new THREE.Mesh(new THREE.CylinderGeometry(.07,.08,.75,6),new THREE.MeshLambertMaterial({color:0xa98a64}));wood.rotation.z=-.5;icon.add(wood);const cloth=new THREE.Mesh(new THREE.BoxGeometry(.35,.26,.18),new THREE.MeshLambertMaterial({color:0xe4d6b4}));cloth.position.set(.16,.12,0);icon.add(cloth);}
       else{const symbols={heal:'🧴',ration:'🍪',shield:'🛡️',hourglass:'⌛',bell:'🔔',map:'🗺️',feather:'🪶',arrow:'🏹'};icon.add(makeEmojiSprite(symbols[entry.key],.9));}
@@ -673,10 +731,20 @@
     const used=new Set(['0,0',G.exitCell.x+','+G.exitCell.y,...occupiedCells()]),pc=worldToCell(G.px,G.pz);for(let y=pc.y-1;y<=pc.y+1;y++)for(let x=pc.x-1;x<=pc.x+1;x++)used.add(x+','+y);
     for(const m of monsters.filter(m=>m.alive)){const c=worldToCell(m.model.position.x,m.model.position.z);used.add(c.x+','+c.y);}
     const random=mulberry32(floorSeed()^(run.party.reinforcements.shift+1)*7919),cells=Array.from({length:3},()=>{const p=chooseCell(random,used,2);return {x:p.cx,y:p.cy};}),result=Reinforcements.spawn(run,cells);if(!result.ok)return;run=result.run;
-    for(const spec of P.monsterSpecs(run).filter(m=>result.effect.reinforcements.some(n=>n.id===m.id))){const p=cellPoint(spec.cx,spec.cy),model=monsterModel(spec.kind,spec.strength);model.position.set(p.x,0,p.z);model.userData.monsterId=spec.id;world.add(model);monsters.push({...p,...spec,model,alive:true,path:[],pathLeft:.2,windup:0,cooldown:3,phase:monsters.length,voiceEvents:new Set()});}
+    for(const spec of P.monsterSpecs(run).filter(m=>result.effect.reinforcements.some(n=>n.id===m.id))){const p=cellPoint(spec.cx,spec.cy),model=monsterModel(spec.kind,spec.strength,spec.def);model.position.set(p.x,0,p.z);model.userData.monsterId=spec.id;world.add(model);monsters.push({...p,...spec,model,alive:true,path:[],pathLeft:.2,windup:0,cooldown:3,phase:monsters.length,voiceEvents:new Set()});}
     for(const m of monsters.filter(m=>!m.alive&&Reinforcements.validId(m.id))){m.model.parent?.remove(m.model);disposeSceneObject(m.model);}monsters=monsters.filter(m=>m.alive||!Reinforcements.validId(m.id));partyUI?.refreshMonsters();save();
   }
-  function lordVoice(m,event){if(!m.lord||m.voiceEvents.has(event))return false;const voice=window.GameVoice,status=voice?.status();if(!status?.enabled||!status.supported||status.speaking&&event!=='defeat')return false;const id='lord.'+m.def.environment+'.'+event,track=Lords.tracks[id];m.voiceEvents.add(event);voice.announceAsset(id,track.text,event==='defeat');return true;}
+  function lordVoice(m,event){
+    if(!m.lord||m.voiceEvents.has(event))return false;
+    const voice=window.GameVoice,status=voice?.status();
+    if(!status?.enabled||!status.supported||status.speaking&&event!=='defeat')return false;
+    m.voiceEvents.add(event);
+    if(m.def.recordedVoice===false){
+      const line=m.def.lines?.[['encounter','wounded','defeat'].indexOf(event)];
+      if(line)voice.announceAsset('underworld.'+m.def.id+'.'+event,line,event==='defeat',{npc:true,consistent:true,identity:m.def.id,gender:m.def.speaker==='serena'?'female':'male',age:'adult'});
+    }else{const id='lord.'+m.def.environment+'.'+event,track=Lords.tracks[id];if(track)voice.announceAsset(id,track.text,event==='defeat');}
+    return true;
+  }
   function buildHazards(used) {
     const H=window.TowerHazards,offer=dungeonOffer();
     if(!H||(offer&&offer.catalogVersion!==3))return;
@@ -708,9 +776,11 @@
       if(paused||run.status!=='playing')break;
     }
   }
-  function monsterModel(kind, strength) {
-    const lord=Object.values(Lords?.LORDS||{}).find(d=>d.id===kind);if(lord){const model=Lords.build(THREE,lord),tag=strengthTag(lord.name+'・樓層主',strength);tag.position.y=3;model.add(tag);model.userData.tag=tag;return model;}
-    const original=partyUI?.monsterModel(kind,strength);if(original)return original;
+  function monsterModel(kind, strength, regionalDef) {
+    const lord=Lords?.defs()[kind];if(lord){const model=Lords.build(THREE,lord),tag=strengthTag(lord.name+'・樓層主',strength);tag.position.y=3;model.add(tag);model.userData.tag=tag;return model;}
+    const def=regionalDef||P?.defs()[kind]||C.MONSTERS[kind],creature=window.TowerCreatureArt?.build(THREE,kind,def);
+    if(creature){const tag=strengthTag(def.name,strength);tag.position.y=2.3;creature.add(tag);creature.userData.tag=tag;return creature;}
+    const original=partyUI?.monsterModel(kind,strength,def);if(original)return original;
     const group = new THREE.Group(), type = ['clockmite','wisp','sentinel','hound'].indexOf(kind);
     const tint = C.MONSTERS[kind].color;
     const mat = new THREE.MeshLambertMaterial({color:tint});
@@ -864,7 +934,7 @@
   }
   function updateHud() {
     if (!active) return;
-    el('towerFloor').textContent = run.floor + ' F'; el('towerHealth').textContent = Math.ceil(run.hp) + ' / '+(modern()?Heroes.maxHp(run):C.MAX_HP);el('towerHp').max=modern()?Heroes.maxHp(run):C.MAX_HP;
+    el('towerFloor').textContent = run.floor<0?'B'+Math.abs(run.floor):run.floor + ' F'; el('towerHealth').textContent = Math.ceil(run.hp) + ' / '+(modern()?Heroes.maxHp(run):C.MAX_HP);el('towerHp').max=modern()?Heroes.maxHp(run):C.MAX_HP;
     el('towerHp').value = run.hp; el('towerCoins').textContent = run.coins;
     el('towerChapter').textContent = floorConfig.name;
     el('towerTalkBtn').disabled = !nearest && !nearestWarrior && !nearbyEncounter; el('towerTalkBtn').ariaLabel = nearbyEncounter ? (nearbyEncounter===chest?'開箱（R）':'對話（R）') : nearestWarrior ? '對話：聘請（R）' : nearest ? '對話：交易（R）' : '附近無人';
@@ -872,7 +942,7 @@
     el('towerGearStatus').textContent=Object.entries(run.equipment).map(([slot,gear])=>({helmet:'盔',armor:'甲',shield:'盾',weapon:'武'}[slot])+' '+(gear?gear.durability:'—')).join(' · ');
     el('towerAttackBtn').disabled = attackLeft > 0 || !run.equipment.weapon;if(window.BattleDock)BattleDock.attackLabel(!run.equipment.weapon?'徒手':'揮擊',attackLeft);else el('towerAttackBtn').textContent = !run.equipment.weapon?'需裝備武器':attackLeft > 0 ? '擊暈 ' + attackLeft.toFixed(1) : '擊暈 X';
     const effects = Object.entries(run.effects).filter(([,v])=>v>0).map(([k,v])=>({shield:'護盾',freeze:'定牆',repel:'驅怪',reveal:'出口路線'}[k])+' '+Math.ceil(v)+'秒');
-    el('towerObjective').textContent = nearestWarrior ? '戰士 '+nearestWarrior.offer.strength+'/5 · '+costText(nearestWarrior.offer.cost)+' · 點「聘請」查看契約' : effects.length ? effects.join(' · ') : nearest ? nearest.name + '：靠近後可購買／出售補給' : '找到金色傳送門，前往' + (run.floor > 1 ? '第 ' + (run.floor - 1) + ' 層' : '塔外');
+    el('towerObjective').textContent = nearestWarrior ? '戰士 '+nearestWarrior.offer.strength+'/5 · '+costText(nearestWarrior.offer.cost)+' · 點「聘請」查看契約' : effects.length ? effects.join(' · ') : nearest ? nearest.name + '：靠近後可購買／出售補給' : '找到樓梯，前往' + ([1,-50].includes(run.floor)?'歸途':floorLabel(run.floor-1));
     const q=run.adventure.quest;
     if(nearbyEncounter)el('towerObjective').textContent=nearbyEncounter===chest?'封印寶箱 · 可能藏著強化裝備，也可能是陷阱':explorerName()+' · 對話查看委託';
     else if(q&&q.status!=='claimed'&&!nearest&&!nearestWarrior)el('towerObjective').textContent=(E.explorerOffer(run)?.title||'探索者委託')+' · '+q.progress+'/'+q.goal+(q.status==='ready'?' · 報酬待領':'');
@@ -959,7 +1029,11 @@
     updateJourneyNearby();
     partyUI?.tick(dt,now);
     updateWarrior(dt,now);
-    for(const monster of monsters) updateMonster(monster,dt,now);
+    for(const monster of monsters){
+      updateMonster(monster,dt,now);
+      const cell=worldToCell(monster.model.position.x,monster.model.position.z),center=cellToWorld(cell.x,cell.y),half=G.cell/2-.08;
+      window.TowerCombatReadability?.update(THREE,monster,{dt,stunned:(run.monsterStuns[monster.id]||0)>0,visible:monster.model.visible&&(!window.MazeSight?.active()||MazeSight.visible(monster.model.position.x,monster.model.position.z)),reducedMotion:!!reducedMotion?.matches,bounds:{minX:center.x-half,minZ:center.z-half,maxX:center.x+half,maxZ:center.z+half}});
+    }
     updateBolts(dt);
     const threat=!nearest&&run.effects.repel<=0&&!(now<G.invisUntil)&&monsters.some(m=>m.alive&&hasClearPath(G.px,G.pz,m.model.position.x,m.model.position.z)&&!isHeld(m)&&!(run.monsterStuns[m.id]>0)&&(m.awarenessLeft>0||m.windup>0));
     encounterAlert?.update(threat,dt);
@@ -1016,7 +1090,7 @@
       }
       if(!repelled&&detected&&distance<=Math.min(7,profile.range)&&!hidden)return;
     }
-    if(!m.def.ranged&&m.windup>0){m.windup-=dt;if(m.windup<=0){if(!repelled&&distance<2.05&&hasClearPath(p.x,p.z,G.px,G.pz)){damage(monsterDamage);if(status)status.weak=0;}m.cooldown=2.3;}return;}
+    if(!m.def.ranged&&m.windup>0){m.windup-=dt;if(m.windup<=0){if(!repelled&&distance<2.05&&hasClearPath(p.x,p.z,G.px,G.pz)){m.cueRelease=(m.cueRelease||0)+1;damage(monsterDamage);if(status)status.weak=0;}m.cooldown=2.3;}return;}
     if(!m.def.ranged&&!repelled&&distance<1.85&&m.cooldown<=0&&hasClearPath(p.x,p.z,G.px,G.pz)){m.windup=.8;return;}
     if(distance>22)return;
     if(m.pathLeft<=0){
@@ -1050,6 +1124,7 @@
     if(bolts.length>=8||!world)return;
     const p=m.model.position,dx=m.aim.x-p.x,dz=m.aim.z-p.z,len=Math.hypot(dx,dz);if(len<.01)return;
     const model=new THREE.Mesh(new THREE.OctahedronGeometry(.22),new THREE.MeshBasicMaterial({color:0x84f1ff}));
+    m.cueRelease=(m.cueRelease||0)+1;
     model.position.set(p.x,1,p.z);world.add(model);bolts.push({model,owner:m.id,vx:dx/len*5,vz:dz/len*5,left:2.2,damage:m.def.damage*(modern()?1-Math.max(Heroes.state(run).enemy[m.id]?.weak||0,Heroes.state(run).enemy[m.id]?.relayWeak>0?.25:0):1)});if(modern()&&Heroes.state(run).enemy[m.id])Heroes.state(run).enemy[m.id].weak=0;AudioEng.sfxSwing();
   }
   function updateBolts(dt){
@@ -1235,7 +1310,7 @@
     else if(q.status==='ready')actions+=action('領取報酬','quest-reward',null,!nearExplorer());
     else if(q.status==='active'&&q.type==='donate')actions+=action('交付 '+q.goal+' 份'+C.ITEMS[q.target].name,'quest-donate',null,!nearExplorer()||run.bag[q.target]<q.goal);
     const person=explorerIdentity(),after=!q?[offer.title,copy,'完成報酬：'+rewardDescription(offer.reward),'繼續探索','接受委託'].join('。'):'';
-    dialog(explorerName(),q?.status==='claimed'?'感謝你的幫助':offer.title,copy,(!q?'<p class="tower-copy">'+text(person.greeting||'')+'</p>':'')+'<section class="tower-guard-summary"><h3>完成報酬</h3><p>'+text(rewardDescription(offer.reward))+'</p></section><p class="tower-copy">離開本層、保存回首頁或重整挑戰會解除未結案委託；報酬必須向探索者領取。進出口前會再次確認。裝備放入行囊後請自行穿戴。</p>',actions,{full:true,silent:quiet===true,asset:!q?'explorer.'+person.id:'',afterText:after,speaker:window.MazeRoleVoices?.profiles?.['explorer.'+person.id]});
+    dialog(explorerName(),q?.status==='claimed'?'感謝你的幫助':offer.title,copy,((q?.type||offer.type)==='relic'?'<p class="tower-copy">'+(window.TowerResourceIcons?.svg('questFragment')||'')+'委託記憶碎片</p>':'')+(!q?'<p class="tower-copy">'+text(person.greeting||'')+'</p>':'')+'<section class="tower-guard-summary"><h3>完成報酬</h3><p>'+text(rewardDescription(offer.reward))+'</p></section><p class="tower-copy">離開本層、保存回首頁或重整挑戰會解除未結案委託；報酬必須向探索者領取。進出口前會再次確認。裝備放入行囊後請自行穿戴。</p>',actions,{full:true,silent:quiet===true,asset:!q?'explorer.'+person.id:'',afterText:after,speaker:window.MazeRoleVoices?.profiles?.['explorer.'+person.id]});
   }
   function chestDialog() {
     if(!chest||!chest.model.visible)return;
@@ -1253,7 +1328,10 @@
   function inventory(quiet=false) {
     if(!active||G.shifting||run.status!=='playing')return;
     syncEngine();
-    const cards=(run.party&&lightingUI?'<article class="tower-item"><h3>照明工具</h3><p>火把五分鐘 · 日光術十分鐘</p>'+action('照明與製作','light-panel')+'</article>':'')+Object.entries(C.ITEMS).filter(([id])=>id!=='coin'&&(id!=='arrow'||modern())).map(([id,item])=>'<article class="tower-item"><h3>'+text(item.name)+' <span>×'+(run.bag[id]||0)+'</span></h3><p>'+text(item.description||item.desc||'高塔冒險補給')+'</p>'+action(id==='arrow'?'射擊自動消耗':id==='feather'?'瀕死自動使用':'使用','use',id,!run.bag[id]||['arrow','feather'].includes(id))+'</article>').join('');
+    const cards=(run.party&&lightingUI?'<article class="tower-item supply-light"><div><h3>照明工具</h3><p>火把五分鐘 · 日光術十分鐘</p></div>'+action('照明補給','light-panel')+'</article>':'')+Object.entries(C.ITEMS).filter(([id])=>id!=='coin'&&(id!=='arrow'||modern())).sort(([a],[b])=>Number(!!run.bag[b])-Number(!!run.bag[a])).map(([id,item])=>{
+      const guide=window.TowerFieldGuide?.item(id,run),owned=run.bag[id]||0;
+      return '<article class="tower-item supply-card'+(owned?'':' is-empty')+'">'+(window.TowerHeroIcons?.svg('item_'+id)||'')+'<h3>'+text(item.name)+' <span>×'+owned+'</span></h3><p>'+text(guide?.effect||item.description||item.desc||'高塔冒險補給')+'</p>'+(guide?'<details class="supply-guide"><summary>何時使用？</summary><p>'+text(guide.when)+'</p><small>'+text(guide.caution)+'</small></details>':'')+action(id==='arrow'?'射擊自動消耗':id==='feather'?'瀕死自動使用':'使用','use',id,!owned||['arrow','feather'].includes(id))+'</article>';
+    }).join('');
     const stats=C.equipmentStats(run),worn=Object.values(run.equipment).filter(Boolean).map(g=>gearCard(g,true)).join(''),stored=run.gearBag.map(g=>gearCard(g)).join('');
     if(modern()){dialog('旅人背包 · 暫停中','生存補給','裝備、技能與隊員切換請開啟隊伍管理。','<div class="tower-grid">'+cards+'</div>',action('隊伍與逐人裝備','hero-panel',Heroes.state(run).active)+action('查看任務','quest-view')+action('料理','party-kitchen')+action('回到迷宮','close'),{silent:quiet===true,summary:'生存補給。選擇道具，或開啟隊伍管理。'});return;}
     if(run.party){
@@ -1312,13 +1390,24 @@
       q=run.adventure.quest;exitDeclined=true;
       dialog('出口確認',q.status==='ready'?'還有委託報酬尚未領取':'本層還有進行中的委託','下降後會解除本層委託，尚未領取的報酬也會失去。你可以先繼續探索。','<p class="tower-copy">'+text(E.explorerOffer(run)?.title||'探索者委託')+' · '+q.progress+'/'+q.goal+'</p>',action('留在本層','close')+(q.status==='ready'&&nearExplorer()?action('領取報酬並下降','exit-reward'):'')+action('放棄委託並下降','exit-confirm'));return;
     }
-    if(!confirmed){exitDeclined=true;dialog('向下樓梯','要前往下一層嗎？','你可以留下探索、拾取掉落物或整理裝備。下降後本層怪物與未拾取物品不再保留。','',action('留在本層','close')+action(run.floor===1?'繼續前往歸途':'下降至第 '+(run.floor-1)+' 層','exit-confirm'));return;}
+    if(!confirmed){exitDeclined=true;dialog('出口確認',[1,-50].includes(run.floor)?'要結束這段旅程嗎？':'要前往下一層嗎？','你可以留下探索、拾取掉落物或整理裝備。離開後本層怪物與未拾取物品不再保留。','',action('留在本層','close')+action([1,-50].includes(run.floor)?'繼續前往歸途':'下降至'+floorLabel(run.floor-1),'exit-confirm'));return;}
     if(N&&run.floor===N.chapterForFloor(run.floor).low){const scene=N.scenesForFloor(run.floor).find(entry=>!run.chronicle.read.includes(entry.id));if(scene){exitDeclined=true;readStory(scene.id,false,0,true);return;}}
     if(N&&run.floor===1&&!run.chronicle.ending){exitDeclined=true;dialog('主線終章 · 由你決定','把這座塔帶往哪裡？','三條路都不必犧牲任何人。這一次，高塔會等待你的回答。','<div class="tower-grid">'+N.ENDINGS.map(ending=>'<article class="tower-item"><h3>'+text(ending.title)+'</h3><p>'+text(ending.description)+'</p>'+action('選擇這條歸途','ending',ending.id)+'</article>').join('')+'</div>',action('再想一想','close'),{full:true});return;}
-    syncEngine();const result=C.descend(run);
-    if(!transact(result))return;G.running=false;floorStarted=false;
-    if(run.status==='won'){const ending=N&&N.ENDINGS.find(e=>e.id===run.chronicle.ending);dialog('塔外的第一道晨光',ending?ending.title:'你找到了回家的路',ending?'九十九層的旅程，終於有了你的答案。':C.ENDING.text,ending?endingProse(ending):'<p class="tower-copy">99 層旅程完成。你保住的不只是自己的生命，還有其他旅人的希望。</p>',action('回到首頁','home'));return;}
-    dialog('本層探索完成','門後，是第 '+run.floor+' 層','下一層的迷宮更接近高塔心臟。補給與職業工具會隨你繼續旅程。','<p class="tower-copy">生命 '+Math.ceil(run.hp)+' · 銅幣 '+run.coins+' · 已自動保存</p>',action('繼續下降','descend')+action('保存並回首頁','home'));
+    syncEngine();const result=C.descend(run),wasStarted=floorStarted;
+    // The result has already cleared the old layout memory. Saving it must not
+    // copy the still-rendered floor's map back into the new floor's engine data.
+    floorStarted=false;
+    if(!transact(result)){floorStarted=wasStarted;return;}G.running=false;
+    if(run.status==='won'){
+      if(run.floor===-50){underworldEnding(true);return;}
+      const ending=N&&N.ENDINGS.find(e=>e.id===run.chronicle.ending);dialog('地上篇完成 · 塔外的第一道晨光',ending?ending.title:'你找到了回家的路',ending?'九十九層的旅程，終於有了你的答案。':C.ENDING.text,(ending?endingProse(ending):'<p class="tower-copy">99 層旅程完成。你保住的不只是自己的生命，還有其他旅人的希望。</p>')+'<section class="underworld-unlock"><h3>新的旅人帶來了消息</h3><p>塔內出現一條隱藏樓梯。回到「劇情模式」後，可以自行選擇進入地下篇。現在，先好好享受走出迷宮的晨光。</p></section>',action('結束旅程，回到首頁','home'));return;
+    }
+    dialog('本層探索完成','門後，是'+floorLabel(run.floor),run.floor<0?'地下的回聲越來越清楚。同伴、裝備與補給會一起前進。':'下一層的迷宮更接近高塔心臟。補給與職業工具會隨你繼續旅程。','<p class="tower-copy">生命 '+Math.ceil(run.hp)+' · 銅幣 '+run.coins+' · 已自動保存</p>',action('繼續下降','descend')+action('保存並回首頁','home'));
+  }
+  function underworldEnding(completed=false){
+    if(!Underworld||run?.floor!==-50||run.status!=='won')return;
+    const ending=Underworld.ENDING;
+    dialog('地下篇完成 · 五十層歸途',ending.title,'這次探索是你的選擇；現在，也由你決定回家。',prose(ending.paragraphs||[ending.text]),action(completed?'結束旅程，回到首頁':'回故事日誌',completed?'home':'journal'),{full:true});
   }
   function defeat() {
     if(!active)return;
@@ -1354,6 +1443,7 @@
   }
   function handleAction(key,id) {
     if(pendingDungeonShift){if(key==='dungeon-shift-retry')saveDungeonShift();return;}
+    if(key==='profession'&&upgradingProfession&&pendingProfession?.floor<0&&id==='archer'){showToast('這份舊旅程沿用原裝備規則；精靈射手請在新故事建立，避免替換既有裝備。');return;}
     if(key==='profession-cancel'){pendingProfession=pendingHero=null;upgradingProfession=false;open();return;}
     if(key==='hero-sex'&&pendingProfession){pendingProfession.name=(el('heroNameInput')?.value||pendingProfession.name).trim().slice(0,24)||'冒險者';if(['male','female'].includes(id))pendingSex=id;chooseProfession(pendingProfession,upgradingProfession);return;}
     if(key==='hero-create-back'&&pendingProfession){chooseProfession(pendingProfession,upgradingProfession);return;}
@@ -1370,6 +1460,10 @@
     if(key==='close'){closeDialog();return;}
     if(key==='new'){if(readSave()){dialog('重新開始確認','展開另一段高塔旅程？','選好職業後會先備份目前故事，再建立新技能與裝備旅程。其他模式與設定不變。','',action('保留目前進度','menu')+action('重新建立主角','new-confirm'));}else handleAction('new-confirm');return;}
     if(key==='menu'){open();return;}
+    if(key==='underworld-intro'){underworldIntro();return;}
+    if(key==='underworld-cancel'){pendingUnderworld=null;open();return;}
+    if(key==='underworld-start'){startUnderworld();return;}
+    if(key==='underworld-ending'){underworldEnding();return;}
     if(key==='new-confirm'){beginNew();return;}
     if(key==='continue'){run=readSave();if(run&&run.status==='playing')enter();else if(run&&run.status==='dead'){active=true;floorStarted=false;document.body.classList.add('story-active');defeat();}else open();return;}
     if(key==='descend'){loadFloor(false);return;}
@@ -1419,7 +1513,7 @@
   }
   function voiceProfile(){if(!active||!run?.party)return null;const job=modern()?Heroes.job(run):run.party.profession,gender=P.sex(run,modern()?Heroes.state(run).active:'hero');return {identity:'tower-'+(modern()?Heroes.state(run).active:'hero')+'-'+job+'-'+gender,gender,age:'adult'};}
   function toolUsed(){if(active&&modern()){Heroes.toolSpent(run);run.engine.shovels=G.shovels;}}
-  function movementScale(){if(!active||paused||G.shifting)return 1;const traits=run.party?window.TowerExpedition.traits(run):{speed:1,grip:0};return (modern()?Heroes.speed(run):1)*Math.min(1,hazardSlow+(traits.grip>0?.15:0))*(run.party?.slowLeft>0?(traits.grip>0?.8:.6):1)*traits.speed;}
+  function movementScale(){if(!active||paused||G.shifting)return 1;const traits=run.party?window.TowerExpedition.traits(run):{speed:1,grip:0};return (modern()?Heroes.speed(run):1)*Math.min(1,hazardSlow+(traits.grip>0?.15:0))*(run.party?.slowLeft>0?(traits.grip>0?.8:.6):1)*(modern()?1:traits.speed);}
   window.TowerMode = { openBattleSettings, sightRoot:()=>active?world:null, voiceProfile, toolUsed, get active(){return active;}, get paused(){return paused;}, get partyActive(){return active&&!!run?.party;}, temporaryMapRadius:()=>modern()?(Heroes.buff(run,'path_eye')?.power||0):0, lightRadius:()=>active?lightingUI?.radius():null, useProfessionSkill:()=>partyUI?.skill(), movementScale, open, beginNew, tick, floorSeed, atmosphereStyle, scheduleShift, updateShift, reachExit, defeat, requestQuit, canCollectOriginal, collectedOriginal, itemConfig, reservedCells, preserveFloorPickups, soundChanged, mapMarkers };
   install();
 })();

@@ -4,7 +4,7 @@
   const RATE=22050;
   const ACTIONS=Object.freeze({slash:.3,bow:.25,metal:.24,magic:.48,frost:.45,heal:.55,shield:.4,scan:.4,smoke:.32,cook:.45,forge:.42,device:.38,drink:.32,charge:.65,burst:.48,thunder:.8,thorns:.65,meteor:.75,equip:.2,'hit-metal':.25,'hit-magic':.32});
   const SKILL_SOUNDS=Object.freeze({arrow:'bow',binding:'bow',volley:'bow',great_arrow:'bow',cleave:'slash',circle:'slash',blind:'slash',stun:'metal',stagger:'metal',splash:'cook',bolt:'magic',weak:'magic',slow:'slash',mark:'metal',shock:'thunder',thorns:'thorns',repel:'burst',starfall:'meteor',star_ring:'meteor',decisive:'slash',guard:'shield',barrier:'shield',ward:'shield',fortify:'forge',fortress:'shield',rally:'shield',speed:'scan',polish:'forge',stealth:'smoke',smoke:'smoke',stomach:'cook',meal:'cook',soup:'heal',feast:'cook',heal:'heal',revive:'heal',cleanse:'heal',sanctuary:'heal',reveal:'scan',escape:'scan',disarm:'device',daylight:'heal',repair:'forge',frost:'frost',taunt:'metal',barricade:'device'});
-  const skillKind=skill=>SKILL_SOUNDS[skill?.effect]||'magic';
+  const skillKind=skill=>Object.hasOwn(ACTIONS,skill?.presentation?.sound)?skill.presentation.sound:SKILL_SOUNDS[skill?.effect]||'magic';
   const hitKind=weapon=>['staff','book'].includes(weapon?.type)?'hit-magic':['blade','daggers','hammer','pan'].includes(weapon?.type)?'hit-metal':'hit';
   const itemKind=id=>({heal:'drink',ration:'cook',shield:'shield',hourglass:'scan',bell:'metal',map:'scan'}[id]||'device');
   const chargeSeconds=value=>Number.isFinite(value)&&value>0?Math.min(4,Math.max(.1,Math.round(value*10)/10)):.65;

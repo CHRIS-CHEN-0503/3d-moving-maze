@@ -48,7 +48,7 @@
     function reset(){if(group){group.parent?.remove(group);ctx.dispose(group);}group=rig=carried=orb=profile=null;sources=[];supplies=[];lamps=[];nearSources=[];nearClock=0;panelRevision=null;}
     function build(random,used){
       reset();if(!enabled())return;
-      profile=L.profile(ctx.environment().id);rig=ctx.environment().rig;
+      profile=L.profile(ctx.environment().id,ctx.environment().underworld===true);rig=ctx.environment().rig;
       group=new T.Group();group.name='tower-lighting';ctx.world().add(group);
       // Keep a constant light count (no shader recompilation when walking past lamps).
       for(let i=0;i<3;i++){const light=new T.PointLight(0xffd19a,0,i===0?14:10.5,1.4);light.name='tower-light-slot-'+i;light.castShadow=false;group.add(light);lamps.push(light);}
@@ -90,7 +90,7 @@
     }
     function panel(quiet=false){
       if(!ready())return;const run=r(),l=run.party.light;panelRevision=run.revision;
-      const body='<div class="tower-grid tower-light-grid"><article class="tower-item tower-light-card">'+icon('torch')+'<h3>火把 · 五分鐘</h3><p>持有 '+l.torches+' 支'+(l.fuel>0?' · 目前餘量 '+time(l.fuel):'')+'</p><p>木枝 '+l.wood+' · 布條 '+l.cloth+'<br>沒有現成火把時，直接消耗木枝、布條各一份點燃，無須先製作。</p>'+ctx.action(l.lit?'熄滅並保留燃料':l.fuel>0?'重新點燃':'點燃火把','light-torch',null,!l.lit&&(l.daylight>0||!l.fuel&&!l.torches&&(!l.wood||!l.cloth)))+'</article><article class="tower-item tower-light-card">'+icon('daylight')+'<h3>日光術 · 十分鐘</h3><p>光照範圍比火把更大。這是術士的自帶本領，不占技能格；隊伍中有能行動的術士就能使用。</p><p>'+(l.daylight>0?'剩餘 '+time(l.daylight):L.canCast(run)?'隊伍可以施放日光術。':'隊伍目前沒有能施法的術士。')+'</p>'+ctx.action('施放日光術','light-daylight',null,!L.canCast(run)||l.cooldown>0)+'</article></div><p class="tower-copy">直接點左側照明小圖，或按 L 使用。有術士時小圖會換成日光術。日光術期間火把不耗燃料；閱讀、暫停與離線時不計時。</p><p class="tower-copy">營地與行商有固定照明；照明材料可從打敗怪物後的掉落取得，行商也會販售火把。</p>';
+      const body='<div class="tower-grid tower-light-grid"><article class="tower-item tower-light-card">'+icon('torch')+'<h3>火把 · 五分鐘</h3><p>持有 '+l.torches+' 支'+(l.fuel>0?' · 目前餘量 '+time(l.fuel):'')+'</p><p>'+(root.TowerResourceIcons?.svg('wood')||'')+'木枝 '+l.wood+' · '+(root.TowerResourceIcons?.svg('cloth')||'')+'布條 '+l.cloth+'<br>沒有現成火把時，直接消耗木枝、布條各一份點燃，無須先製作。</p>'+ctx.action(l.lit?'熄滅並保留燃料':l.fuel>0?'重新點燃':'點燃火把','light-torch',null,!l.lit&&(l.daylight>0||!l.fuel&&!l.torches&&(!l.wood||!l.cloth)))+'</article><article class="tower-item tower-light-card">'+icon('daylight')+'<h3>日光術 · 十分鐘</h3><p>光照範圍比火把更大。這是術士的自帶本領，不占技能格；隊伍中有能行動的術士就能使用。</p><p>'+(l.daylight>0?'剩餘 '+time(l.daylight):L.canCast(run)?'隊伍可以施放日光術。':'隊伍目前沒有能施法的術士。')+'</p>'+ctx.action('施放日光術','light-daylight',null,!L.canCast(run)||l.cooldown>0)+'</article></div><p class="tower-copy">直接點左側照明小圖，或按 L 使用。有術士時小圖會換成日光術。日光術期間火把不耗燃料；閱讀、暫停與離線時不計時。</p><p class="tower-copy">營地與行商有固定照明；照明材料可從打敗怪物後的掉落取得，行商也會販售火把。</p>';
       ctx.dialog('照明工具 · 暫停中','帶著光繼續前進',status(),body,ctx.action('裝備背包','bag')+ctx.action('回到迷宮','close'),{silent:quiet,summary:'照明工具。點左側小圖直接使用，火把五分鐘；日光術十分鐘。'});
     }
     function handle(key,id){
@@ -158,5 +158,5 @@
     }
     return {install,build,reset,tick,hud,panel,quickUse,handle,merchantCard,updateVisual,reserved:()=>[...sources,...supplies],radius:()=>enabled()?range:null};
   }
-  root.TowerLightingRuntime={create};
+  root.TowerLightingRuntime={create,icon};
 })(typeof globalThis!=='undefined'?globalThis:this);

@@ -7,20 +7,46 @@ const require=createRequire(import.meta.url),T=require('../lib/three.min.js'),C=
 const source=readFileSync(new URL('../story/tower-party-runtime.js',import.meta.url),'utf8');
 function harness(floor=84,options={}){
   let run=P.enable(C.newRun({seed:31415}),'swordsman').run;run.floor=floor;run.floorsCleared=99-floor;run.chronicle=N.newChronicle(floor);P.advance(run);
-  let paused=false,failSave=false,wall=false,swings=0,hits=0,world=new T.Group(),monsters=[],messages=[],dialog=null,followTargets=[];
+  let paused=false,failSave=false,wall=false,swings=0,hits=0,world=new T.Group(),monsters=[],messages=[],dialog=null,followTargets=[],labels=[];
   const player=new T.Group(),G={px:0,pz:0,running:true,shifting:false};
-  const context=vm.createContext({TowerPartyCore:options.partyCore||P,TowerExpedition:require('../story/tower-expedition-core.js'),TowerCharacters:V,document:{getElementById:()=>null}});vm.runInContext(source,context);
+  const context=vm.createContext({TowerMaterials:Object.hasOwn(options,'materials')?options.materials:require('../story/tower-materials.js'),TowerResourceIcons:require('../story/tower-resource-icons.js'),TowerPartyCore:options.partyCore||P,TowerExpedition:require('../story/tower-expedition-core.js'),TowerCharacters:V,TowerMonsterSense:require('../story/tower-monster-sense.js'),TowerFieldGuide:Object.hasOwn(options,'fieldGuide')?options.fieldGuide:require('../story/tower-field-guide.js'),document:{getElementById:()=>null}});vm.runInContext(source,context);
   let nextCell=1;
-  const ui=context.TowerPartyRuntime.create({THREE:T,G,core:C,text:String,action:(label,key,id,disabled)=>`${label}|${key}|${id}|${disabled}`,dialog:(...args)=>dialog=args,
+  const ui=context.TowerPartyRuntime.create({THREE:T,G,core:C,text:options.text||String,action:(label,key,id,disabled)=>`${label}|${key}|${id}|${disabled}`,dialog:(...args)=>dialog=args,
     transact:result=>{if(!result.ok||failSave)return false;run=result.run;return true;},save:()=>!failSave,toast:message=>messages.push(message),audio:{sfxHit:()=>hits++,sfxSwing(){},sfxUse(){},sfxGuardBlock(){}},quest(){},
     run:()=>run,paused:()=>paused,inDungeon:()=>false,world:()=>world,monsters:()=>monsters,traders:()=>[],player:()=>player,camera:options.camera,
-    clear:()=>!wall,followClear:options.followClear,cell:(cx,cy)=>({cx,cy,x:cx*4,z:cy*4}),worldToCell:(x,z)=>({x:Math.round(x/4),y:Math.round(z/4)}),chooseCell:()=>({cx:nextCell,cy:0,x:nextCell++*4,z:0}),makeText:()=>new T.Group(),follow:(a,dt,speed,stop,target)=>{followTargets.push(target);return false;},dispose:()=>{},damage:()=>{},bind:()=>{},swing:()=>swings++,
+    clear:()=>!wall,followClear:options.followClear,cell:(cx,cy)=>({cx,cy,x:cx*4,z:cy*4}),worldToCell:(x,z)=>({x:Math.round(x/4),y:Math.round(z/4)}),chooseCell:()=>({cx:nextCell,cy:0,x:nextCell++*4,z:0}),makeText:name=>{labels.push(name);return new T.Group();},follow:(a,dt,speed,stop,target)=>{followTargets.push(target);return false;},dispose:()=>{},damage:()=>{},bind:()=>{},swing:()=>swings++,
   });
   // Early-floor non-combat fixtures keep enemies outside the camp; combat tests use 84F.
   const spec=P.monsterSpecs(run)[0];if(spec){const model=ui.monsterModel(spec.kind,spec.strength)||new T.Group();if(!model.userData.body)model.userData.body=new T.Group();model.position.set(0,0,floor>84?24:2);monsters=[{...spec,model,alive:true,windup:0,cooldown:2}];}
   ui.build(()=>.5,new Set());
-  return {ui,G,player,world,monsters,messages,followTargets,get run(){return run;},set run(value){run=value;},get dialog(){return dialog;},get swings(){return swings;},get hits(){return hits;},set paused(v){paused=v;},set failSave(v){failSave=v;},set wall(v){wall=v;}};
+  return {ui,G,player,world,monsters,messages,followTargets,labels,get run(){return run;},set run(value){run=value;},get dialog(){return dialog;},get swings(){return swings;},get hits(){return hits;},set paused(v){paused=v;},set failSave(v){failSave=v;},set wall(v){wall=v;}};
 }
+test('bestiary keeps every creature in a closed compact card with actionable advice and no extra narration',()=>{
+  const h=harness(99),F=require('../story/tower-field-guide.js'),defs=P.defs(),before=JSON.stringify(h.run);
+  h.ui.panel('bestiary');const body=h.dialog[3];
+  assert.equal((body.match(/<details\b/g)||[]).length,Object.keys(defs).length);
+  assert.doesNotMatch(body,/<details[^>]*\bopen\b/);
+  for(const def of Object.values(defs)){const guide=F.monster(def);assert.ok(body.includes(guide.role),def.id);assert.ok(body.includes(guide.tell),def.id);assert.ok(body.includes(guide.counter),def.id);}
+  assert.equal(h.dialog[5].summary,'迷宮生物誌。了解怪物，收集材料。');assert.equal(h.messages.length,0);
+  assert.equal(JSON.stringify(h.run),before);
+  const fallback=harness(99,{fieldGuide:null});fallback.ui.panel('bestiary');
+  assert.ok(fallback.dialog[3].includes(Object.values(defs)[0].description));
+});
+test('bestiary escapes guide metadata, creature names and drop names before rendering',()=>{
+  const text=value=>String(value).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  const unsafe='<img src=x onerror=alert(1)>',names={...P.INGREDIENTS,shell:unsafe};
+  const defs=Object.fromEntries(Object.entries(P.defs()).map(([id,def])=>[id,{...def,name:unsafe}]));
+  const partyCore={...P,INGREDIENTS:names,defs:()=>defs},fieldGuide={monster:()=>({role:unsafe,tell:unsafe,counter:unsafe,range:unsafe,personality:unsafe,sensing:unsafe,gate:unsafe})};
+  const materials={...require('../story/tower-materials.js'),MATERIALS:{ironore:unsafe},ecology:()=>({name:unsafe,variants:Object.fromEntries(Object.keys(defs).map(id=>[id,{name:unsafe}]))}),dropPool:()=>[{type:'ingredient',key:'shell'},{type:'material',key:'ironore'}]};
+  const h=harness(99,{partyCore,fieldGuide,materials,text});h.ui.panel('bestiary');const body=h.dialog[3];
+  assert.doesNotMatch(body,/<img\b/);assert.ok(body.includes(text(unsafe)));
+  assert.ok(body.includes('可能掉落：'+text(unsafe)));assert.ok(body.includes('<b>前兆</b> '+text(unsafe)));assert.ok(body.includes('<b>應對</b> '+text(unsafe)));
+  assert.ok(body.includes('素材來自 '+text(unsafe)));assert.ok(body.includes(text(unsafe)+'、'+text(unsafe)),'both food and forge drop names escaped');
+});
+test('chapter mechanism scene labels use the same environment-specific names as their instructions',()=>{
+  const X=require('../story/tower-expedition-core.js');
+  for(const [floor,def] of Object.entries(X.BOSSES).filter(([f])=>Number(f)>0)){const h=harness(Number(floor));for(let i=0;i<def.count;i++)assert.ok(h.labels.includes(def.nodeName+' '+(i+1)),floor+' / '+i);}
+});
 test('four original silhouettes stay within mesh budgets without lights, textures or independent timers',()=>{
   const h=harness();assert.doesNotMatch(source,/\b(setInterval|setTimeout|requestAnimationFrame|TextureLoader)\s*\(/);
   for(const kind of Object.keys(P.MONSTERS)){const model=h.ui.monsterModel(kind,2);let meshes=0,triangles=0;model.traverse(o=>{assert.ok(!o.isLight);if(o.isMesh){meshes++;triangles+=(o.geometry.index?.count||o.geometry.attributes.position.count)/3;assert.equal(o.material.map,null);}});assert.ok(meshes<30,kind);assert.ok(triangles<5000,kind);assert.ok(model.userData.body);assert.ok(model.userData.ring);}
@@ -58,13 +84,13 @@ test('floor transitions invalidate old boss interactions before rebuilding the s
 });
 test('all chapter stations have bounded native geometry and scale their warning to the true damage radius',()=>{
   const X=require('../story/tower-expedition-core.js');
-  for(const floor of Object.keys(X.BOSSES).map(Number)){const h=harness(floor),bosses=h.ui.reserved().filter(x=>x.kind==='boss');assert.equal(bosses.length,X.BOSSES[floor].count);
+  for(const floor of Object.keys(X.BOSSES).map(Number).filter(f=>f>0)){const h=harness(floor),bosses=h.ui.reserved().filter(x=>x.kind==='boss');assert.equal(bosses.length,X.BOSSES[floor].count);
     h.run.party.boss.started=true;h.run.party.boss.clock=X.BOSSES[floor].warning+.1;h.ui.tick(.01,100);
     for(const s of bosses){let meshes=0,triangles=0;s.model.traverse(o=>{assert.ok(!o.isLight);if(o.isMesh){meshes++;triangles+=(o.geometry.index?.count||o.geometry.attributes.position.count)/3;assert.equal(o.material.map,null);}});assert.ok(meshes<32,`${floor}: ${meshes}`);assert.ok(triangles<5000,`${floor}: ${triangles}`);assert.equal(s.model.children.find(o=>o.name==='boss-warning').scale.x,X.danger(h.run,s.index).radius);}
   }
 });
 test('forge confirmations cannot spend from afar, through a wall, twice, or when durable save fails',()=>{
-  const h=harness(99);h.run.party.journey.scrap=30;h.run.coins=100;const id=h.run.equipment.weapon.id,key='durable|'+id;
+  const h=harness(99);h.run.party.journey.scrap=30;h.run.party.journey.materials.ironore=3;h.run.coins=100;const id=h.run.equipment.weapon.id,key='durable|'+id;
   h.ui.handle('party-forge-confirm',key);assert.equal(h.run.party.journey.scrap,30);
   h.G.px=40;h.ui.handle('party-forge-ask',key);h.ui.handle('party-forge-confirm',key);assert.equal(h.run.party.journey.scrap,30);
   h.G.px=0;h.wall=true;h.ui.handle('party-forge-ask',key);h.wall=false;h.ui.handle('party-forge-confirm',key);assert.equal(h.run.party.journey.scrap,30);

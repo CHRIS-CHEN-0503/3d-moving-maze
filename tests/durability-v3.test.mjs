@@ -36,7 +36,7 @@ test('source bounds stay strict; unknown versions and off-lattice maximums canno
 });
 test('migration retains forge traits and base repair price units, including broken rebuild surcharge',()=>{
   const run=fresh();run.coins=999;run.party.journey.scrap=99;const gear=run.equipment.weapon;gear.durability=0;
-  const q=X.repairQuote(run,gear.id),healthy=fresh();healthy.coins=999;healthy.party.journey.scrap=99;
+  const q=X.repairQuote(run,gear.id),healthy=fresh();healthy.coins=999;healthy.party.journey.scrap=99;healthy.party.journey.materials.ironore=3;
   const forged=X.forge(healthy,healthy.equipment.weapon.id,'durable');assert.ok(forged.ok);
   const old=oldGear(forged.run.equipment.weapon,2),migrated=C.validateGear(old);assert.deepEqual(migrated.forge,old.forge);
   assert.equal(q.coins,Math.ceil(q.normalCoins*1.5));

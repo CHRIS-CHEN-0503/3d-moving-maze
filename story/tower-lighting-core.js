@@ -17,10 +17,18 @@
     furnace:{name:'熔火石爐',style:'brazier',color:0xff9f66,sky:0x160d0b,ambient:.035,hemi:.055,sun:.025,radius:3.2},
     heart:{name:'歸途符燈',style:'rune',color:0xd5c4ff,sky:0x0c0d18,ambient:.025,hemi:.05,sun:.02,radius:2.8},
   }).map(([id,p])=>[id,Object.freeze(p)])));
-  const profile=id=>Object.hasOwn(PROFILES,id)?PROFILES[id]:PROFILES.echo;
+  const UNDERWORLD_PROFILES=Object.freeze(Object.fromEntries(Object.entries({
+    roots:{name:'根脈引路菌',style:'fungus',color:0xb4d48c,sky:0x080c0b,ambient:.022,hemi:.048,sun:.016,radius:2.8},
+    mist:{name:'渡渠浮燈',style:'lantern',color:0x8bd8dc,sky:0x070d12,ambient:.023,hemi:.048,sun:.016,radius:2.8},
+    library:{name:'封存頁燈',style:'rune',color:0xe5c49b,sky:0x100d13,ambient:.025,hemi:.05,sun:.018,radius:3},
+    furnace:{name:'餘溫礦晶',style:'crystal',color:0xd9a783,sky:0x110c0b,ambient:.022,hemi:.048,sun:.015,radius:2.7},
+    heart:{name:'原初門火',style:'brazier',color:0xc9bcf5,sky:0x0a0a13,ambient:.023,hemi:.05,sun:.018,radius:2.8},
+  }).map(([id,p])=>[id,Object.freeze(p)])));
+  const profile=(id,underworld=false)=>underworld===true&&Object.hasOwn(UNDERWORLD_PROFILES,id)?UNDERWORLD_PROFILES[id]:Object.hasOwn(PROFILES,id)?PROFILES[id]:PROFILES.echo;
   const supplyCount=size=>size<=9?1:size<=13?2:3;
   const newState=()=>({version:1,torches:2,wood:2,cloth:2,fuel:0,lit:false,daylight:0,cooldown:0,gathered:[],bought:Object.fromEntries(SHOPS.map(k=>[k,0]))});
   function validate(value,floor){
+    if(!Number.isInteger(floor)||!(floor>=1&&floor<=99||floor>=-50&&floor<=-1))return null;
     if(value===undefined)return newState(); // One-time migration; future saves persist spent supplies.
     if(!value||value.version!==1||typeof value.lit!=='boolean')return null;
     const number=(v,max,int=false)=>Number.isFinite(v)&&v>=0&&v<=max&&(!int||Number.isInteger(v));
@@ -70,5 +78,5 @@
   }
   function advance(next){const l=next.party?.light;if(l){l.gathered=[];l.bought=Object.fromEntries(SHOPS.map(k=>[k,0]));}}
   const portable=run=>run?.party?.light?.daylight>0?'daylight':run?.party?.light?.lit?'torch':'none';
-  return Object.freeze({TORCH_SECONDS,DAYLIGHT_SECONDS,DAYLIGHT_COOLDOWN,TORCH_PRICE,SHOP_STOCK,PROFILES,profile,supplyCount,newState,validate,canCast,craft,torch,daylight,buy,gather,tick,advance,portable});
+  return Object.freeze({TORCH_SECONDS,DAYLIGHT_SECONDS,DAYLIGHT_COOLDOWN,TORCH_PRICE,SHOP_STOCK,PROFILES,UNDERWORLD_PROFILES,profile,supplyCount,newState,validate,canCast,craft,torch,daylight,buy,gather,tick,advance,portable});
 });

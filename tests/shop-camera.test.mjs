@@ -4,6 +4,7 @@ import vm from 'node:vm';
 import {readFileSync} from 'node:fs';
 import {createRequire} from 'node:module';
 const THREE=createRequire(import.meta.url)('../lib/three.min.js');
+const comfort=createRequire(import.meta.url)('../assets/camera-comfort.js');
 const html=readFileSync(new URL('../index.html',import.meta.url),'utf8');
 function block(start,end){const a=html.indexOf(start),b=html.indexOf(end,a);assert.ok(a>=0&&b>a);return html.slice(a,b);}
 function fixture(size=13){
@@ -11,7 +12,7 @@ function fixture(size=13){
     G:{mazeW:size,mazeH:size,cell:4,view:'tp',px:0,pz:0,camYaw:0,camPitch:0,wallH:1.25,wallBoxes:[],visionUntil:0},
     CFG:{cameraDistance:7},camera:new THREE.PerspectiveCamera(70,1,.1,300),
     makeTex:()=>new THREE.Texture(),makeTextSprite:()=>new THREE.Sprite(),makeEmojiSprite:()=>new THREE.Sprite(),
-    disposeSceneObject(){},localStorage:{getItem:()=>null},window:{TowerMode:{active:true}},TowerMode:{active:true},
+    disposeSceneObject(){},localStorage:{getItem:()=>null},window:{TowerMode:{active:true},MazeCameraComfort:comfort},MazeCameraComfort:comfort,TowerMode:{active:true},
     performance:{now:()=>1000},updateTopMask(){}});
   vm.runInContext(block('function cameraDistance(', 'const runtimeConfigReady=')+
     block('function buildEnvironment(', '</script>')+

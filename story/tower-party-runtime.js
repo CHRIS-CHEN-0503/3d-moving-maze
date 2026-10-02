@@ -1,6 +1,67 @@
 /* Original low-poly expedition presentation. Uses the existing render/update loop. */
 (function(root){
   'use strict';
+  function portrait(job){const colors={swordsman:'#83b5dc',mage:'#b99bff',scout:'#82dfbf',chef:'#ffd69c',healer:'#b9e6c4',smith:'#cca383',archer:'#e4d796'},c=colors[job];const paths={swordsman:'M25 5 10 22l-4 5m4-9 9 8m-7-5 4 4',mage:'m12 26 9-18m-2-4 2 4 5 1-4 3 1 5-4-3-4 1 2-5-2-4Z',scout:'M6 14h20M8 14l4-7h8l5 7M9 18v6h14v-6m-10 1v2m6-2v2',chef:'M9 18c-9-7 1-14 7-8 6-6 16 1 7 8v9H9Zm1 6h12',healer:'M16 28V10M16 20C4 23 3 9 14 13m2 3C28 17 29 4 18 8',smith:'m7 27 13-14M14 8l5-5 10 10-5 5Z M6 23l4 4',archer:'M9 3q20 13 0 26V3M3 16h25m-5-4 5 4-5 4'};return '<svg class="party-glyph" viewBox="0 0 32 32" aria-hidden="true" style="color:'+c+'"><path d="'+paths[job]+'"/></svg>';}
+  function baseFoodArt(id){const mushroom=id==='mushroom',herb=id==='herb',root=id==='root',shell=id==='shell',meat=id==='meat',nectar=id==='nectar';return '<svg class="party-food" viewBox="0 0 64 48" aria-hidden="true">'+(mushroom?'<path fill="#f0dbc6" d="M27 19h10v23H27z"/><path fill="#c88fae" d="M8 23C9 0 54 0 56 23Z"/><circle fill="#ffeacd" cx="23" cy="16" r="3"/>':herb?'<path stroke="#4eaf81" stroke-width="4" d="M30 44 36 8"/><ellipse fill="#88cf9a" cx="22" cy="24" rx="13" ry="7"/><ellipse fill="#b8e29e" cx="42" cy="13" rx="12" ry="7"/>':root?'<path fill="#d6ac68" d="M14 18Q54 5 49 27T10 39Z"/><path stroke="#649b69" stroke-width="4" d="m47 16 10-8m-9 8 0-12"/>':shell?'<path fill="#bba690" d="M9 39Q3 1 32 5q29-4 23 34Z"/><path stroke="#816e59" fill="none" d="M32 7v29M17 12l8 23m22-23-8 23"/>':meat?'<path fill="#d7836c" d="M9 34Q5 8 29 10t26 24Q27 49 9 34"/><path stroke="#f9d5b9" fill="none" stroke-width="5" d="M18 27q9-12 24 2"/>':nectar?'<path fill="#e9b750" d="M31 3Q5 31 18 40t26 0Q57 31 31 3"/><path stroke="#ffeb9d" stroke-width="4" d="M24 30q-4 7 3 9"/>':'<ellipse fill="#dfb775" cx="32" cy="26" rx="26" ry="10"/><path fill="#7da3b1" d="M6 26q4 21 26 20 22 1 26-20Z"/><circle fill="#86c69b" cx="22" cy="23" r="5"/><circle fill="#e3a273" cx="39" cy="26" r="6"/><path stroke="#d8e9e1" fill="none" stroke-width="2" d="M22 14q-5-5 0-10m12 10q-5-5 0-10m12 10q-5-5 0-10"/>')+'</svg>';}
+  // Complete, original ingredient silhouettes are shared by kitchen and atlas.
+  function foodArt(id){
+    const art={
+      cloudcap:'<path fill="#dbd7dc" d="M28 23h9v19h-9Z"/><path fill="#d9e7ee" d="M7 25Q3 15 15 14 15 3 28 8 37 0 46 11 63 11 58 25Z"/><path fill="#fff5db" d="M13 18q12-7 19 0t22 0v7H13Z"/>',
+      sunseed:'<path fill="#75533b" d="m13 17 10-10 18 0 12 13-6 20-27 3-10-15Z"/><g fill="#f2cb66"><ellipse cx="24" cy="20" rx="5" ry="8" transform="rotate(-30 24 20)"/><ellipse cx="40" cy="20" rx="5" ry="8" transform="rotate(28 40 20)"/><ellipse cx="32" cy="34" rx="5" ry="8"/></g>',
+      inkcap:'<path fill="#c6bdd5" d="M28 23h9v19h-9Z"/><path fill="#665777" d="M7 28Q13 3 32 4q18 0 25 24Z"/><path fill="#a08db3" d="M15 23Q23 7 32 9v15Z"/><path stroke="#cfc6dd" stroke-width="2" d="M15 28v5m11-5v8m16-8v7m9-7v4"/>',
+      lotus:'<path fill="#cabba4" d="m13 8 36 10 3 19-9 8L8 29Z"/><ellipse fill="#f0dec3" cx="25" cy="24" rx="17" ry="19" transform="rotate(-22 25 24)"/><g fill="#a79885"><ellipse cx="19" cy="15" rx="3" ry="5"/><ellipse cx="30" cy="17" rx="3" ry="5"/><ellipse cx="17" cy="27" rx="3" ry="5"/><ellipse cx="29" cy="31" rx="3" ry="5"/></g>',
+      crystaljelly:'<path fill="#80d4d5" d="M10 35 16 13q16-14 32 0l7 22q-22 17-45 0Z"/><ellipse fill="#b9f2e5" cx="32" cy="14" rx="16" ry="8"/><path fill="#e9fff5" d="m20 12 8-5 4 8-9 5Z"/><path stroke="#aef7e8" stroke-width="3" d="m16 31 9 5m17-17 5 12"/>',
+      forestnut:'<path fill="#855432" d="M6 22Q18 3 30 21q5 16-12 23Q1 36 6 22Z"/><path fill="#cb9c59" d="M9 20q10 4 18 0-1 17-9 20Q8 31 9 20Z"/><path fill="#98683d" d="M35 10q17-6 23 12-2 18-14 20-15-6-9-32Z"/><path fill="#e1b978" d="M39 14q8-4 14 9-5 14-9 14-7-7-5-23Z"/>',
+      emberpepper:'<path fill="#d74932" d="M15 17Q48 2 47 20T9 44q17-10 6-27Z"/><path fill="#f0863f" d="M23 19q17-11 17 0T18 37q12-10 5-18Z"/><path stroke="#60885a" stroke-width="5" fill="none" d="M39 12q-4-13 10-10"/>',
+      frostberry:'<path stroke="#728e7b" stroke-width="4" d="M18 20 32 9l16 12M32 9V2"/><g fill="#8dbad9"><circle cx="18" cy="26" r="12"/><circle cx="43" cy="25" r="12"/><circle cx="31" cy="37" r="10"/></g><g fill="#e4f4f5"><path d="m11 19 4-5 6 2-2 6Zm27-2 5-4 5 4-5 3Zm-14 18 6-4 5 4-5 4Z"/></g>',
+      coppergrain:'<path stroke="#99734b" stroke-width="3" d="m13 42 30-36m-7 36 17-25"/><g fill="#d6a15c"><ellipse cx="20" cy="31" rx="7" ry="4" transform="rotate(35 20 31)"/><ellipse cx="29" cy="24" rx="7" ry="4" transform="rotate(35 29 24)"/><ellipse cx="34" cy="15" rx="7" ry="4" transform="rotate(35 34 15)"/><ellipse cx="45" cy="32" rx="7" ry="4" transform="rotate(35 45 32)"/><ellipse cx="48" cy="23" rx="7" ry="4" transform="rotate(35 48 23)"/></g>',
+      heartfruit:'<path fill="#e69178" d="M32 42C-7 20 13-8 32 10 52-8 73 20 32 42Z"/><path fill="#ffd498" d="M32 34q-18-14 0-22 18 8 0 22Z"/><path fill="#97be79" d="M32 9q-2-14 14-7-2 9-14 7Z"/>',
+      deeproot:'<path fill="#786882" d="M7 28q5-19 21-21 7 10 24 13 13 13-4 22-8-9-23-3Q5 43 7 28Z"/><path fill="#b394b1" d="m16 19 10-5 4 12-10 4Zm19 8 11 1 1 9-9-3Z"/><path stroke="#c7a8bd" fill="none" d="m5 26 10 3m36 7 9 5"/>',
+      blindshrimp:'<path fill="#d6bdd0" d="M48 8Q11-2 9 23q0 27 30 18L33 30Q18 35 19 23q0-10 20-5Z"/><path fill="#efe0df" d="m40 17 8-9 11 3-7 9Z"/><path stroke="#957894" stroke-width="2" fill="none" d="m13 17 9 3m-12 7 9-1m-6 9 9-5m-2 11 6-8M46 11 55 1m-9 10 14-3"/>',
+      nighttruffle:'<path fill="#554557" d="M12 10q18-13 36 0t5 28q-16 15-38 2T12 10Z"/><path stroke="#987a90" stroke-width="3" fill="none" d="m15 10 7 9-8 7 10 13m7-33-2 16 9 7-5 15m12-32-5 8 12 8"/>',
+      ashspice:'<path stroke="#b97965" stroke-width="3" d="m14 43 35-39"/><path fill="#b47166" d="M20 35Q-2 29 10 15q18-1 14 16ZM29 24q-7-23 9-24 9 16-6 25ZM35 23q19-19 27-4-8 16-27 8ZM24 37q26-11 27 4-17 10-27 0Z"/><path stroke="#dca785" stroke-width="2" d="m12 22 10 10m14-22-4 13m20-1-12 4m0 13-11-1"/>',
+      starjelly:'<path fill="#9a89c8" d="M10 34 17 12q15-10 30 0l7 22q-22 15-44 0Z"/><ellipse fill="#c4b9e8" cx="32" cy="13" rx="15" ry="6"/><path fill="#fff0bf" d="m32 17 4 7 9 1-6 6 2 8-9-4-8 4 1-9-6-5 9-1Z"/>'
+    };
+    return art[id]?'<svg class="party-food" viewBox="0 0 64 48" aria-hidden="true">'+art[id]+'</svg>':baseFoodArt(id);
+  }
+  function dishArt(id){
+    const drawings={
+      stew:'<path fill="#849eb2" d="M9 19h46v20q-23 14-46 0Z"/><ellipse fill="#ce9c63" cx="32" cy="20" rx="23" ry="9"/><path stroke="#64788e" stroke-width="4" fill="none" d="M9 24H3v12h6m46-12h6v12h-6"/><circle fill="#dcbd85" cx="23" cy="20" r="5"/><path fill="#a57284" d="M34 23q5-16 14 0Z"/>',
+      broth:'<path fill="#d6e5cf" d="M9 20h40v19q-20 12-40 0Z"/><path stroke="#b5ccb9" stroke-width="5" fill="none" d="M49 25q22-2 0 13"/><ellipse fill="#9caf70" cx="29" cy="20" rx="20" ry="7"/><path stroke="#cff2ae" stroke-width="3" d="m18 17 8 6m4-7 7 7"/>',
+      skewer:'<path stroke="#c1a17a" stroke-width="4" d="m8 44 45-37"/><path fill="#b28472" stroke="#e9bd6c" stroke-width="2" d="M12 30q-3-17 16-13L34 25ZM27 19q-3-17 16-13L49 14Z"/><path fill="#f5d68d" d="m17 31 5-6 5 3-6 6m13-17 6-6 4 4-6 5"/>',
+      crab:'<ellipse fill="#cedbd4" cx="32" cy="32" rx="29" ry="12"/><path fill="#dc8b70" d="M10 31q1-23 20-11 11-17 23 5-14 15-43 6Z"/><path stroke="#835b47" stroke-width="2" d="m21 18 6 12m11-14 6 12"/><path fill="#94c875" d="m12 27-7-10 14 4"/>',
+      soup:'<path fill="#dda971" d="M12 18h40v23q-20 10-40 0Z"/><ellipse fill="#f1d583" cx="32" cy="18" rx="20" ry="7"/><path stroke="#bf965b" stroke-width="3" d="m20 18 8 3m8-5 8 3"/><path stroke="#f8dfb6" fill="none" d="M25 8q-3-4 0-7m13 7q-3-4 0-7"/>',
+      bento:'<rect fill="#b47f55" x="5" y="7" width="54" height="36" rx="6"/><rect fill="#f0d9ae" x="9" y="11" width="22" height="28" rx="3"/><path stroke="#745443" stroke-width="3" d="M33 8v33m0-17h23"/><path fill="#9dc681" d="M38 13h15v6H38z"/><path fill="#d79376" d="M38 28h15v9H38z"/>',
+      salad:'<ellipse fill="#c7dcd0" cx="32" cy="32" rx="28" ry="13"/><path fill="#73b98b" d="M10 29q-7-22 13-14 1-19 15-6 23-8 17 11 9 24-20 16Z"/><path stroke="#c3e6a0" stroke-width="3" d="m15 19 14 12m5-17-3 16m19-8-16 10"/><circle fill="#dbb486" cx="24" cy="23" r="4"/>',
+        feast:'<ellipse fill="#b5c9c8" cx="32" cy="34" rx="31" ry="12"/><path fill="#d59c71" d="M8 28q8-25 26 0Z"/><path fill="#d4dec5" d="M32 20h26v15q-13 10-26 0Z"/><ellipse fill="#e9bd71" cx="45" cy="20" rx="13" ry="6"/><path fill="#82b680" d="m14 34 7-14 8 15Z"/>',
+        trail_bread:'<ellipse fill="#b5c1ad" cx="32" cy="35" rx="29" ry="10"/><path fill="#bf8d55" d="M9 31Q11 5 32 7t23 24q-23 14-46 0Z"/><path fill="#e7bf7c" d="M12 29Q15 11 32 12t20 17q-21 11-40 0Z"/><path stroke="#976747" stroke-width="2" d="m20 17 5 9m5-12 4 12m6-10 4 9"/><path fill="#6b9e69" d="M27 31q-16-14-16-2 7 10 16 2m0 0q10-15 15-5-3 9-15 5"/>',
+        honey_roast:'<path fill="#626e78" d="M3 11h58v27L32 46 3 38Z"/><path fill="#929a97" d="M7 15h50v19L32 41 7 34Z"/><path fill="#d6b47d" d="m13 22 12-8 11 10-12 9Z m20 10 10-9 11 7-12 9Z"/><path fill="#b18597" d="M29 22q7-15 19 2Zm-16 13q3-13 13-1Z"/><path fill="none" stroke="#f0c866" stroke-width="3" d="m13 26 14-5m-7 14 11-5m10-4 9 5"/>',
+        crab_pot:'<path fill="#976a54" d="M7 19h50l-3 23Q31 52 10 42Z"/><ellipse fill="#e1b976" cx="32" cy="20" rx="25" ry="9"/><path fill="none" stroke="#654939" stroke-width="4" d="M8 26H2v10h8m46-10h6v10h-8"/><path fill="#d38e74" d="M12 22q6-13 16-1l-5 6Zm20-4q8-11 17 2l-7 8Z"/><path fill="#f0d19b" d="m28 17 6-2 3 10-8 1Z"/>',
+        herbal_platter:'<ellipse fill="#cadac9" cx="32" cy="27" rx="30" ry="17"/><path fill="#83b68c" d="M9 20q9-15 16 0-7 16-16 0Zm29 9q15-12 18 1-7 15-18-1ZM27 12q12-7 16 1-7 8-16-1Z"/><path fill="#a8788f" d="M12 33q4-13 14 0ZM35 24q2-14 14 0Z"/><path fill="#f1d17b" d="M27 17q-8 11 0 13t0-13Z"/><path stroke="#e6edcf" stroke-width="2" d="m10 22 14 1m16 7 13 1"/>',
+        root_banquet:'<path fill="#5e897c" d="M8 16h48v26q-24 10-48 0Z"/><ellipse fill="#dab777" cx="32" cy="16" rx="24" ry="9"/><path fill="#bd9970" d="m11 14 14-4 5 11-12 3Z m26-1 11 2-3 11-9-3Z"/><path fill="#b57f9c" d="M25 16q4-12 13 1Z"/><path fill="none" stroke="#92b979" stroke-width="3" d="m18 16 24 3M18 29q8 10 26 1M10 36q18 13 44-1"/><path stroke="#96aaa1" fill="none" stroke-width="3" d="M8 23H2v12h6m48-12h6v12h-6"/>',
+        mist_broth:'<path fill="#bad8d5" d="M10 22h38v18q-19 10-38 0Z"/><ellipse fill="#94ba9d" cx="29" cy="22" rx="19" ry="7"/><path fill="none" stroke="#9fc6c4" stroke-width="5" d="M48 26q21-3 0 12"/><path fill="#e3c97a" d="m20 23 7-5 7 5-7 4Z"/><path fill="none" stroke="#e6f2df" stroke-width="2" d="M17 15q-10-5 0-11m12 11q-10-6 0-13m12 13q-10-5 0-11"/>',
+        ember_crab:'<ellipse fill="#657981" cx="32" cy="34" rx="30" ry="12"/><path fill="#e4926c" d="M10 29q5-25 23-13 17-8 23 15-25 14-46-2Z"/><path fill="#bd6a50" d="m8 23 12-7-1 14Zm37-4 10 8-12 5Z"/><path stroke="#704c3a" stroke-width="3" d="m21 17 5 13m7-15 5 18m8-11 4 11"/><path fill="none" stroke="#f2c665" stroke-width="3" d="M14 28q10-9 15 2t18-1"/>',
+        gate_feast:'<path fill="#b5c9bc" d="M2 22q30-13 60 0v15q-30 14-60 0Z"/><ellipse fill="#e2d9bb" cx="32" cy="22" rx="30" ry="10"/><path fill="#d99274" d="M5 22q6-18 20-4l-6 11Z"/><path fill="#8daf7a" d="m23 27 8-16 9 17Z"/><path fill="#7da9af" d="M40 17h20v15q-10 8-20 0Z"/><ellipse fill="#ebbf73" cx="50" cy="17" rx="10" ry="4"/><path fill="#eaca87" d="M29 1h6v10h-6Z"/><path fill="#fff1b5" d="M30 0h4v7h-4Z"/>'
+    };
+    Object.assign(drawings,{
+      trail_bread:'<ellipse fill="#bfd2d2" cx="32" cy="35" rx="29" ry="10"/><path fill="#d4a568" d="M7 32Q16 5 32 9t25 23q-23 13-50 0Z"/><path fill="#e4e7e8" d="M17 22q-3-9 7-8 5-8 11-1 10-3 12 9Z"/><path fill="#f7e9c9" d="M22 23h20l-3 8H25Z"/>',
+      honey_roast:'<ellipse fill="#c3d5bc" cx="32" cy="30" rx="29" ry="15"/><g fill="#d99f52"><ellipse cx="19" cy="26" rx="8" ry="10" transform="rotate(-25 19 26)"/><ellipse cx="37" cy="23" rx="8" ry="10" transform="rotate(25 37 23)"/><ellipse cx="34" cy="36" rx="10" ry="7"/></g><path stroke="#ffe3a0" stroke-width="3" fill="none" d="M13 25q6-7 15 2t20 0M27 35h12"/>',
+      herbal_platter:'<ellipse fill="#bfd0ca" cx="32" cy="31" rx="29" ry="14"/><path fill="#d5ba8d" d="M10 24q19-12 44 1v10q-21 12-44-1Z"/><path fill="#78617c" d="M14 25q5-23 19 0Zm21 4q4-25 17 0Z"/><path stroke="#c8b4c8" stroke-width="2" d="m20 19 5 5m17-5 4 7"/><path fill="#79a572" d="M22 33q-2-13 10-9-1 9-10 9Z"/>',
+      crab_pot:drawings.crab_pot+'<g fill="#efddc0" stroke="#ae9475" stroke-width="1.5"><ellipse cx="30" cy="17" rx="6" ry="7"/><path d="M28 14v2m4-2v2m-3 3v2"/></g>',
+      crystal_pudding:'<ellipse fill="#cee7df" cx="32" cy="37" rx="29" ry="9"/><path fill="#76c4c9" d="m13 32 6-19q13-11 26 0l6 19q-19 16-38 0Z"/><ellipse fill="#b8f1e4" cx="32" cy="13" rx="13" ry="6"/><path fill="#effffa" d="m24 9 6-4 7 5-6 6Z"/><path stroke="#c5f0e8" stroke-width="3" fill="none" d="M20 27q7 9 21 0"/>',
+      forest_roast:'<path fill="#8c6b52" d="M6 22h52l-5 19q-21 12-42 0Z"/><ellipse fill="#d9c091" cx="32" cy="22" rx="26" ry="10"/><g fill="#a46f43"><ellipse cx="18" cy="21" rx="6" ry="8" transform="rotate(-20 18 21)"/><ellipse cx="40" cy="23" rx="7" ry="8" transform="rotate(20 40 23)"/></g><path fill="#eed5a2" d="m24 16 8-3 5 12-9 3Z"/>',
+      ember_skewer:'<path stroke="#b49b7a" stroke-width="4" d="m7 43 48-38"/><path fill="#dc633b" d="M12 29q4-17 21-13-4 14-18 18Zm24-18q8-14 20-3-6 9-14 8Z"/><path fill="#ebc88a" d="m25 22 6-6 9 9-6 7Z"/><path stroke="#99664a" stroke-width="2" d="m29 20 7 7"/>',
+      frost_compote:'<path fill="#a6cbdb" d="M12 20h40v18q-20 17-40 0Z"/><ellipse fill="#b59acd" cx="32" cy="20" rx="20" ry="8"/><g fill="#dde5f4"><circle cx="21" cy="18" r="5"/><circle cx="32" cy="15" r="5"/><circle cx="42" cy="20" r="5"/></g><path fill="none" stroke="#efdca0" stroke-width="3" d="M15 23q11 5 28 0"/>',
+      copper_flatbread:'<ellipse fill="#a8bfc3" cx="32" cy="35" rx="29" ry="10"/><path fill="#bd8648" d="m18 8 9 3 10-6 6 8 11 2-1 11 6 8-10 5-2 7-13-1-8 3-7-7-12-2 2-11-4-6 10-6Z"/><path fill="#dfb66c" d="M16 20q16-13 32 0v13q-16 10-32-1Z"/><circle fill="#9b713e" cx="32" cy="25" r="7"/>',
+      heart_jam:'<path fill="#c39483" d="M15 12h34v31q-17 9-34 0Z"/><path fill="#e49b87" d="M19 18h26v22q-13 7-26 0Z"/><ellipse fill="#ead1a2" cx="32" cy="12" rx="19" ry="7"/><path fill="#ffe1ae" d="M32 37C10 24 26 19 32 25c6-6 22-1 0 12Z"/>',
+      root_banquet:drawings.root_banquet+'<path fill="#a28aab" d="m11 13 15-4 4 12-13 3Zm26-1 11 2-3 11-9-3Z"/>',
+      mist_broth:drawings.mist_broth+'<path fill="#e8bfda" d="M37 20q-12-10-17 0t11 5l-3-4q-7 2-4-2t10 3Z"/>',
+      ember_crab:'<ellipse fill="#b7c4c9" cx="32" cy="35" rx="30" ry="11"/><path fill="#dbc198" d="M9 24q23-14 46 0v10q-22 12-46 0Z"/><path fill="#786275" d="m12 23 4-9 9 2 4 9-8 6Zm19-3 9-9 11 5 1 12-14 4Z"/><path stroke="#c2a2b4" stroke-width="2" d="m17 17 5 6-4 4m24-12-3 7 7 4"/>',
+      ash_stew:'<path fill="#6c737a" d="M7 17h50v24q-25 13-50 0Z"/><ellipse fill="#cf9e72" cx="32" cy="18" rx="25" ry="9"/><path fill="#efd09f" d="m13 17 12-4 7 10-14 2Zm24-3 9 2-2 9-9-5Z"/><path fill="#a96963" d="M24 16q-13-10-10 2 7 7 10-2ZM35 19q12-10 13 1-6 7-13-1Z"/>',
+      gate_feast:'<path fill="#929bba" d="M4 22h56v17q-28 14-56 0Z"/><ellipse fill="#c1acd5" cx="32" cy="22" rx="28" ry="11"/><path fill="#f6dfaa" d="m21 12 3 7 8 1-6 5 2 8-7-4-7 4 2-8-6-5 8-1Zm23 3 2 5 6 1-4 4 1 6-5-3-5 3 1-6-4-4 6-1Z"/>'
+    });
+    return '<svg class="party-food" viewBox="0 0 64 48" aria-hidden="true">'+(drawings[id]||'')+'</svg>';
+  }
   function create(ctx){
     const P=root.TowerPartyCore,X=root.TowerExpedition,T=ctx.THREE,V=root.TowerCharacters,H=root.TowerHeroes;
     const modern=()=>!!r()?.party?.loadouts,records=()=>modern()?H.followerRecords(r()):r().party.members;
@@ -18,21 +79,62 @@
     const ring=(p,size,color)=>{const mesh=part(p,new T.TorusGeometry(size,.04,4,20),color,0,.07,0);mesh.rotation.x=Math.PI/2;return mesh;};
     function label(model,name,y=2.65){const tag=ctx.makeText(name);tag.position.y=y;tag.scale.set(1.65,.28,1);model.add(tag);model.userData.partyTag=tag;return tag;}
     function healthBar(model,color,y=2.15){const back=new T.Sprite(new T.SpriteMaterial({color:0x192939,depthWrite:false})),bar=new T.Sprite(new T.SpriteMaterial({color,depthWrite:false}));back.position.y=bar.position.y=y;back.scale.set(1,.08,1);bar.scale.set(.94,.055,1);back.renderOrder=1;bar.renderOrder=2;model.add(back,bar);model.userData.partyHp=bar;model.userData.partyHpBack=back;}
-    function portrait(job){const colors={swordsman:'#83b5dc',mage:'#b99bff',scout:'#82dfbf',chef:'#ffd69c',healer:'#b9e6c4',smith:'#cca383',archer:'#e4d796'},c=colors[job];const paths={swordsman:'M25 5 10 22l-4 5m4-9 9 8m-7-5 4 4',mage:'m12 26 9-18m-2-4 2 4 5 1-4 3 1 5-4-3-4 1 2-5-2-4Z',scout:'M6 14h20M8 14l4-7h8l5 7M9 18v6h14v-6m-10 1v2m6-2v2',chef:'M9 18c-9-7 1-14 7-8 6-6 16 1 7 8v9H9Zm1 6h12',healer:'M16 28V10M16 20C4 23 3 9 14 13m2 3C28 17 29 4 18 8',smith:'m7 27 13-14M14 8l5-5 10 10-5 5Z M6 23l4 4',archer:'M9 3q20 13 0 26V3M3 16h25m-5-4 5 4-5 4'};return '<svg class="party-glyph" viewBox="0 0 32 32" aria-hidden="true" style="color:'+c+'"><path d="'+paths[job]+'"/></svg>';}
-    function foodArt(id){const mushroom=id==='mushroom',herb=id==='herb',root=id==='root',shell=id==='shell',meat=id==='meat',nectar=id==='nectar';return '<svg class="party-food" viewBox="0 0 64 48" aria-hidden="true">'+(mushroom?'<path fill="#f0dbc6" d="M27 19h10v23H27z"/><path fill="#c88fae" d="M8 23C9 0 54 0 56 23Z"/><circle fill="#ffeacd" cx="23" cy="16" r="3"/>':herb?'<path stroke="#4eaf81" stroke-width="4" d="M30 44 36 8"/><ellipse fill="#88cf9a" cx="22" cy="24" rx="13" ry="7"/><ellipse fill="#b8e29e" cx="42" cy="13" rx="12" ry="7"/>':root?'<path fill="#d6ac68" d="M14 18Q54 5 49 27T10 39Z"/><path stroke="#649b69" stroke-width="4" d="m47 16 10-8m-9 8 0-12"/>':shell?'<path fill="#bba690" d="M9 39Q3 1 32 5q29-4 23 34Z"/><path stroke="#816e59" fill="none" d="M32 7v29M17 12l8 23m22-23-8 23"/>':meat?'<path fill="#d7836c" d="M9 34Q5 8 29 10t26 24Q27 49 9 34"/><path stroke="#f9d5b9" fill="none" stroke-width="5" d="M18 27q9-12 24 2"/>':nectar?'<path fill="#e9b750" d="M31 3Q5 31 18 40t26 0Q57 31 31 3"/><path stroke="#ffeb9d" stroke-width="4" d="M24 30q-4 7 3 9"/>':'<ellipse fill="#dfb775" cx="32" cy="26" rx="26" ry="10"/><path fill="#7da3b1" d="M6 26q4 21 26 20 22 1 26-20Z"/><circle fill="#86c69b" cx="22" cy="23" r="5"/><circle fill="#e3a273" cx="39" cy="26" r="6"/><path stroke="#d8e9e1" fill="none" stroke-width="2" d="M22 14q-5-5 0-10m12 10q-5-5 0-10m12 10q-5-5 0-10"/>')+'</svg>';}
-    function ingredientModel(id){const model=new T.Group();if(id==='mushroom'){part(model,new T.CylinderGeometry(.13,.16,.55,8),0xead8bc,0,.28,0);part(model,new T.SphereGeometry(.45,10,6,0,Math.PI*2,0,Math.PI/2),0xca8db8,0,.48,0);}else if(id==='root'){const bulb=ball(model,.33,0xcfac76,0,.25,0);bulb.scale.set(1.3,.7,.8);for(let i=0;i<3;i++){const leaf=box(model,.12,.45,.035,0x83b776,(i-1)*.1,.6,0);leaf.rotation.z=(i-1)*.6;}}else if(id==='herb'){for(let i=0;i<4;i++){const leaf=ball(model,.2,0x8bc79a,(i%2?1:-1)*.12,.2+i*.1,0);leaf.scale.set(1.2,.5,.4);}}else if(id==='nectar'){part(model,new T.ConeGeometry(.25,.4,8),0xecc05d,0,.4,0);ball(model,.25,0xecc05d,0,.15,0);}else if(id==='shell'){const m=ball(model,.35,0xcab196,0,.2,0);m.scale.y=.6;}else{const m=ball(model,.35,0xda9682,0,.2,0);m.scale.y=.55;}return model;}
-    function dishArt(id){
-      const drawings={
-        stew:'<path fill="#849eb2" d="M9 19h46v20q-23 14-46 0Z"/><ellipse fill="#ce9c63" cx="32" cy="20" rx="23" ry="9"/><path stroke="#64788e" stroke-width="4" fill="none" d="M9 24H3v12h6m46-12h6v12h-6"/><circle fill="#dcbd85" cx="23" cy="20" r="5"/><path fill="#a57284" d="M34 23q5-16 14 0Z"/>',
-        broth:'<path fill="#d6e5cf" d="M9 20h40v19q-20 12-40 0Z"/><path stroke="#b5ccb9" stroke-width="5" fill="none" d="M49 25q22-2 0 13"/><ellipse fill="#9caf70" cx="29" cy="20" rx="20" ry="7"/><path stroke="#cff2ae" stroke-width="3" d="m18 17 8 6m4-7 7 7"/>',
-        skewer:'<path stroke="#c1a17a" stroke-width="4" d="m8 44 45-37"/><path fill="#b28472" stroke="#e9bd6c" stroke-width="2" d="M12 30q-3-17 16-13L34 25ZM27 19q-3-17 16-13L49 14Z"/><path fill="#f5d68d" d="m17 31 5-6 5 3-6 6m13-17 6-6 4 4-6 5"/>',
-        crab:'<ellipse fill="#cedbd4" cx="32" cy="32" rx="29" ry="12"/><path fill="#dc8b70" d="M10 31q1-23 20-11 11-17 23 5-14 15-43 6Z"/><path stroke="#835b47" stroke-width="2" d="m21 18 6 12m11-14 6 12"/><path fill="#94c875" d="m12 27-7-10 14 4"/>',
-        soup:'<path fill="#dda971" d="M12 18h40v23q-20 10-40 0Z"/><ellipse fill="#f1d583" cx="32" cy="18" rx="20" ry="7"/><path stroke="#bf965b" stroke-width="3" d="m20 18 8 3m8-5 8 3"/><path stroke="#f8dfb6" fill="none" d="M25 8q-3-4 0-7m13 7q-3-4 0-7"/>',
-        bento:'<rect fill="#b47f55" x="5" y="7" width="54" height="36" rx="6"/><rect fill="#f0d9ae" x="9" y="11" width="22" height="28" rx="3"/><path stroke="#745443" stroke-width="3" d="M33 8v33m0-17h23"/><path fill="#9dc681" d="M38 13h15v6H38z"/><path fill="#d79376" d="M38 28h15v9H38z"/>',
-        salad:'<ellipse fill="#c7dcd0" cx="32" cy="32" rx="28" ry="13"/><path fill="#73b98b" d="M10 29q-7-22 13-14 1-19 15-6 23-8 17 11 9 24-20 16Z"/><path stroke="#c3e6a0" stroke-width="3" d="m15 19 14 12m5-17-3 16m19-8-16 10"/><circle fill="#dbb486" cx="24" cy="23" r="4"/>',
-        feast:'<ellipse fill="#b5c9c8" cx="32" cy="34" rx="31" ry="12"/><path fill="#d59c71" d="M8 28q8-25 26 0Z"/><path fill="#d4dec5" d="M32 20h26v15q-13 10-26 0Z"/><ellipse fill="#e9bd71" cx="45" cy="20" rx="13" ry="6"/><path fill="#82b680" d="m14 34 7-14 8 15Z"/>',
-      };
-      return '<svg class="party-food" viewBox="0 0 64 48" aria-hidden="true">'+drawings[id]+'</svg>';
+    function baseIngredientModel(id){const model=new T.Group();if(id==='mushroom'){part(model,new T.CylinderGeometry(.13,.16,.55,8),0xead8bc,0,.28,0);part(model,new T.SphereGeometry(.45,10,6,0,Math.PI*2,0,Math.PI/2),0xca8db8,0,.48,0);}else if(id==='root'){const bulb=ball(model,.33,0xcfac76,0,.25,0);bulb.scale.set(1.3,.7,.8);for(let i=0;i<3;i++){const leaf=box(model,.12,.45,.035,0x83b776,(i-1)*.1,.6,0);leaf.rotation.z=(i-1)*.6;}}else if(id==='herb'){for(let i=0;i<4;i++){const leaf=ball(model,.2,0x8bc79a,(i%2?1:-1)*.12,.2+i*.1,0);leaf.scale.set(1.2,.5,.4);}}else if(id==='nectar'){part(model,new T.ConeGeometry(.25,.4,8),0xecc05d,0,.4,0);ball(model,.25,0xecc05d,0,.15,0);}else if(id==='shell'){const m=ball(model,.35,0xcab196,0,.2,0);m.scale.y=.6;}else{const m=ball(model,.35,0xda9682,0,.2,0);m.scale.y=.55;}return model;}
+    function ingredientModel(id){
+      if(['root','mushroom','herb','nectar','shell','meat'].includes(id))return baseIngredientModel(id);
+      const model=new T.Group();model.userData.ingredient=id;
+      const orb=(s,c,x,y,z,sx=1,sy=1,sz=1)=>{const m=ball(model,s,c,x,y,z);m.scale.set(sx,sy,sz);return m;};
+      if(id==='cloudcap'||id==='inkcap'){
+        part(model,new T.CylinderGeometry(.1,.14,.45,8),id==='cloudcap'?0xe2dde1:0xc6bdd5,0,.23,0);
+        part(model,new T.SphereGeometry(.39,10,6,0,Math.PI*2,0,Math.PI/2),id==='cloudcap'?0xd9e7ee:0x665777,0,.45,0);
+        if(id==='cloudcap')for(const s of [-1,1])orb(.18,0xeaf2ef,s*.25,.49,0,1, .65,1);
+      }else if(id==='sunseed'||id==='forestnut'||id==='frostberry'){
+        const color={sunseed:0xf2cb66,forestnut:0xb78953,frostberry:0x8dbad9}[id];
+        for(let i=0;i<3;i++)orb(.18,color,Math.sin(i*2.1)*.2,.21,Math.cos(i*2.1)*.2,.8,id==='sunseed'?1.4:1,1);
+        if(id==='frostberry')for(let i=0;i<2;i++)orb(.065,0xe5f2f1,(i-.5)*.26,.39,.03);
+      }else if(id==='lotus'){
+        const piece=part(model,new T.CylinderGeometry(.31,.31,.24,10),0xe8d3b5,0,.2,0);piece.rotation.z=.4;
+        for(let i=0;i<4;i++)orb(.055,0xab947f,Math.sin(i*Math.PI/2)*.15,.33,Math.cos(i*Math.PI/2)*.15,1,.18,1);
+      }else if(id==='crystaljelly'||id==='starjelly'){
+        part(model,new T.CylinderGeometry(.2,.36,.4,10),id==='starjelly'?0xa190cd:0x81cfd0,0,.22,0);
+        part(model,new T.OctahedronGeometry(.12),id==='starjelly'?0xffe9b7:0xd8fbf0,0,.48,0);
+      }else if(id==='emberpepper'){
+        const pod=orb(.27,0xdc633b,0,.29,0,.6,1.4,.65);pod.rotation.z=.7;
+        const stem=part(model,new T.CylinderGeometry(.025,.04,.2,5),0x709861,.13,.53,0);stem.rotation.z=.7;
+      }else if(id==='coppergrain'){
+        for(let i=0;i<3;i++){const x=(i-1)*.13,stem=part(model,new T.CylinderGeometry(.022,.027,.5,5),0xa77e49,x,.25,0);stem.rotation.z=(i-1)*.25;for(let j=0;j<2;j++)orb(.1,0xd6a15c,x,.4+j*.13,0,.65,1.25,.7);}
+      }else if(id==='heartfruit'){
+        orb(.25,0xe69178,-.13,.32,0,.85,1,1);orb(.25,0xe69178,.13,.32,0,.85,1,1);
+        const tip=part(model,new T.ConeGeometry(.24,.3,8),0xe69178,0,.13,0);tip.rotation.z=Math.PI;
+        orb(.13,0x97be79,.1,.57,0,1.4,.3,.6);
+      }else if(id==='deeproot'||id==='nighttruffle'){
+        const color=id==='deeproot'?0x907d9b:0x655162;
+        orb(.31,color,0,.24,0,id==='deeproot'?1.4:1,.7,.9);
+        if(id==='nighttruffle')for(let i=0;i<3;i++)orb(.085,0x91738a,(i-1)*.15,.41,0,1,.4,1);
+      }else if(id==='blindshrimp'){
+        const tail=part(model,new T.TorusGeometry(.25,.095,5,10,Math.PI*1.5),0xd6bdd0,0,.18,0);tail.rotation.x=Math.PI/2;
+        const fin=part(model,new T.ConeGeometry(.14,.18,3),0xe8d6dd,.22,.18,0);fin.rotation.z=Math.PI/2;
+      }else if(id==='ashspice'){
+        for(let i=0;i<4;i++){const leaf=orb(.17,0xb47166,(i%2?1:-1)*.1,.15+i*.09,0,1.4,.3,.7);leaf.rotation.z=(i%2?1:-1)*.4;}
+      }else return baseIngredientModel(id);
+      return model;
+    }
+    function materialModel(id){
+      const model=new T.Group();model.userData.material=id;
+      if(id==='toughfiber'){
+        part(model,new T.CylinderGeometry(.23,.23,.48,10),0xb8c2a0,0,.26,0);
+        part(model,new T.CylinderGeometry(.245,.245,.11,10),0xa3865a,0,.23,0);
+      }else if(id==='crystalshard'){
+        for(let i=0;i<2;i++){const shard=part(model,new T.OctahedronGeometry(.34),i?0xac90cc:0x89d1dc,(i-.5)*.28,.36,0);shard.scale.set(.6,1.5,.65);shard.rotation.z=(i-.5)*.35;}
+      }else if(id==='abyssalloy'){
+        const ingot=part(model,new T.CylinderGeometry(.26,.34,.25,4),0x8b88a3,0,.17,0);ingot.rotation.y=Math.PI/4;ingot.scale.z=1.4;
+        part(model,new T.OctahedronGeometry(.09),0xc9bfdc,0,.36,0);
+      }else{
+        const color={ironore:0x829ba7,embercore:0x65545c,starore:0x817394}[id]||0x829ba7;
+        const rock=part(model,new T.DodecahedronGeometry(.36,0),color,0,.29,0);rock.scale.y=.85;
+        if(id==='embercore'||id==='starore')part(model,new T.OctahedronGeometry(.16),id==='embercore'?0xf4b85d:0xe5d6a6,.12,.48,.1);
+      }
+      return model;
     }
     function memberModel(job,level,identity='companion',gender=P.PROFESSIONS[job].gender){
       if(modern()&&ctx.makeHero){const m=ctx.makeHero(job,identity,gender);m.userData.partyProfession=job;return m;}
@@ -46,8 +148,8 @@
       if(job==='smith'){box(model,.12,.75,.12,0x806043,-.5,.65,.13);box(model,.48,.22,.22,0x93a5b3,-.5,1.08,.13);}
       return model;
     }
-    function monsterModel(kind,strength){
-      if(!P.MONSTERS[kind])return null;const def=P.MONSTERS[kind],model=new T.Group(),body=new T.Group();model.add(body);body.position.y=1;
+    function monsterModel(kind,strength,regionalDef){
+      if(!P.MONSTERS[kind])return null;const def=regionalDef||P.MONSTERS[kind],model=new T.Group(),body=new T.Group();model.add(body);body.position.y=1;
       if(kind==='mushroom'){part(body,new T.CylinderGeometry(.28,.38,1,8),0xe4d7be,0,-.4,0);part(body,new T.SphereGeometry(.86,12,7,0,Math.PI*2,0,Math.PI/2),def.color,0,.03,0);for(let i=0;i<5;i++)ball(body,.1,0xffe9c1,Math.cos(i*1.3)*.52,.42,Math.sin(i*1.3)*.52);}
       if(kind==='crab'){const shell=ball(body,.65,def.color,0,-.45,0);shell.scale.set(1.15,.6,1);for(const s of [-1,1]){for(let i=0;i<3;i++){const leg=box(body,.65,.09,.1,0x946d55,s*.7,-.7,(i-1)*.4);leg.rotation.z=s*.25;}ball(body,.3,0xd9b286,s*.7,-.3,.6);}}
       if(kind==='moth'){ball(body,.3,0x8b724a,0,0,0);for(const s of [-1,1]){const wing=ball(body,.6,def.color,s*.57,0,0);wing.scale.set(1,.13,.85);wing.name='party-wing';}}
@@ -69,7 +171,7 @@
       }else if(type==='tide'||type==='steam'){part(seal,new T.TorusGeometry(.35,.07,4,10),d.color);box(seal,.7,.08,.1,d.color,0,0,0);}
       else if(type==='frost'){const bowl=part(seal,new T.SphereGeometry(.4,8,6,0,Math.PI*2,0,Math.PI/2),0x6f8c9d);bowl.rotation.z=Math.PI;part(seal,new T.ConeGeometry(.22,.65,6),0xffbf75,0,.3,0);}
       else part(seal,new T.OctahedronGeometry(.42),d.color);
-      label(model,(type==='pulse'?'浮標':type==='frost'?'暖爐':type==='tide'?'水閘':type==='steam'?'壓力閥':type==='chase'?'定錨器':turner?'光針':'封印')+' '+(index+1),2.2);
+      label(model,(d.nodeName||'封印')+' '+(index+1),2.2);
       const warning=ring(model,1,d.color);warning.name='boss-warning';
       if(['tide','pulse'].includes(type)){const water=part(model,new T.CylinderGeometry(1,1,.045,24),0x548da3,0,.045,0);water.name='boss-water';water.material.transparent=true;water.material.opacity=.32;water.material.depthWrite=false;}
       for(let i=0;i<4;i++){
@@ -138,15 +240,23 @@
     }
     function refreshMonsters(){const specs=P.monsterSpecs(r());for(const m of ctx.monsters()){if(!m.model.userData.partyHp)healthBar(m.model,0xef9e81,m.lord?2.75:2.15);m.partyMaxHp=specs.find(s=>s.id===m.id)?.maxHp||m.maxHp||1;}}
     function safeCamp(){return live()&&(stations.some(s=>s.kind==='camp'&&distance(s)<2.8&&clear(s))||ctx.traders().some(s=>distance(s)<2.8&&clear(s)))&&!ctx.monsters().some(m=>m.alive&&distance(m.model.position)<4&&clear(m.model.position));}
+    function stockPanel(stock,labels,material=false){
+      const held=Object.entries(labels).filter(([key])=>(stock?.[key]||0)>0),total=held.reduce((n,[key])=>n+stock[key],0);
+      return '<details class="party-stock-panel"><summary>'+(material?'鍛造素材':'食材袋')+' · '+held.length+' 種／'+total+' 份<span>查看庫存</span></summary><div class="party-stocks">'+(held.length?held.map(([key,name])=>'<span title="'+esc((root.TowerMaterials?.[material?'MATERIAL_META':'INGREDIENT_META']?.[key]?.sources||[]).join('；'))+'">'+(material?root.TowerResourceIcons?.svg(key)||'':foodArt(key))+'<span>'+esc(name)+' <b>'+stock[key]+'</b></span></span>').join(''):'<p>還沒有收集到'+(material?'鍛造素材':'食材')+'。</p>')+'</div><small>已收集的材料會留在袋中；換環境後，新的怪物會提供不同素材。</small></details>';
+    }
+    function costLine(cost,material=false){
+      const stock=material?r().party.journey.materials:r().party.ingredients,labels=material?root.TowerMaterials?.MATERIALS||{}:P.INGREDIENTS;
+      return '<div class="party-costs" aria-label="'+(material?'鍛造素材需求':'食譜材料')+'">'+Object.entries(cost||{}).map(([key,need])=>{const have=stock?.[key]||0;return '<span class="party-cost'+(have<need?' missing':'')+'">'+(material?root.TowerResourceIcons?.svg(key)||'':foodArt(key))+'<span>'+esc(labels[key]||key)+' <b>'+have+'/'+need+'</b>'+(have<need?'<small>缺 '+(need-have)+'</small>':'')+'</span></span>';}).join('')+'</div>';
+    }
     function forgePanel(quiet=false){if(!enabled())return;pendingForge=pendingDismantle=pendingRepair=null;const run=r(),safe=safeCamp(),gear=X.allGear(run);
       if(!gear.some(g=>g.id===forgeSelected))forgeSelected=gear[0]?.id;
       const g=gear.find(g=>g.id===forgeSelected),draw=kind=>root.TowerHeroIcons?.svg(kind)||'';
       const list='<nav class="forge-picker" aria-label="選擇要處理的裝備">'+gear.map(item=>'<button class="tower-btn forge-pick" data-tower="party-forge-select" data-item="'+esc(item.id)+'" aria-pressed="'+(item.id===forgeSelected)+'">'+draw(item.kind)+'<span><b>'+esc(item.name)+'</b><small>'+ (item.durability===0?'已損壞': '耐久 '+item.durability+'/'+item.maxDurability)+'</small></span></button>').join('')+'</nav>';
       let detail='<p>尚無可處理的裝備。</p>';
-      if(g){const level=(g.forge?.level||0)+1,parts=level*3,coins=modern()?Math.ceil(level*8*(1-H.teamPassive(run,'economy')/100)):level*(P.has(run,'smith')?4:8),quote=X.repairQuote(run,g.id),choices=g.forge?[g.forge.trait]:Object.keys(X.TRAITS).filter(t=>t!=='grip'||g.slot!=='weapon');
-        detail='<section class="forge-detail" aria-label="選中裝備的作業"><header class="forge-piece">'+draw(g.kind)+'<div><h3>'+esc(g.name)+'</h3><p>耐久 '+g.durability+'/'+g.maxDurability+' · '+(g.forge?X.TRAITS[g.forge.trait].name+' '+g.forge.level+'/2':'尚未鍛造')+'</p></div></header><section class="forge-repair"><h3>'+(g.durability===0?'重建破損裝備':'修理裝備')+'</h3><p>'+(quote?quote.broken?'需有能行動的鍛匠；修理費為正常費用的 1.5 倍。':'補滿這件裝備的耐久，不補回耐用特性的保護次數。':'耐久完整，無需修理。')+'</p>'+ (quote?act('修復 · '+quote.parts+' 零件／'+quote.coins+' 幣','party-mend-ask',g.id,!safe||!quote.allowed||run.coins<quote.coins||run.party.journey.scrap<quote.parts):'')+'</section><h3>鍛造特性</h3><div class="party-forge-traits">'+choices.map(t=>'<section><div><b>'+esc(X.TRAITS[t].name)+'</b><p>'+esc(X.TRAITS[t].description)+'</p></div>'+act(level>2?'已達上限':(g.forge?'升級':'選擇')+X.TRAITS[t].name+' · '+parts+' 零件／'+coins+' 幣','party-forge-ask',t+'|'+g.id,!safe||g.durability===0||level>2||run.party.journey.scrap<parts||run.coins<coins)+'</section>').join('')+'</div><div class="forge-salvage">'+act('拆解 · 回收 '+X.salvageValue(g)+' 零件','party-dismantle-ask',g.id,!safe)+'</div></section>';
+      if(g){const quote=X.repairQuote(run,g.id),choices=X.forgeOptions(run,g);
+        detail='<section class="forge-detail" aria-label="選中裝備的作業"><header class="forge-piece">'+draw(g.kind)+'<div><h3>'+esc(g.name)+'</h3><p>耐久 '+g.durability+'/'+g.maxDurability+' · '+(g.forge?X.TRAITS[g.forge.trait].name+' '+g.forge.level+'/2':'尚未鍛造')+'</p></div></header><section class="forge-repair"><h3>'+(g.durability===0?'重建破損裝備':'修理裝備')+'</h3><p>'+(quote?quote.broken?'需有能行動的鍛匠；修理費為正常費用的 1.5 倍。':'補滿這件裝備的耐久，不補回耐用特性的保護次數。':'耐久完整，無需修理。')+'</p>'+ (quote?act('修復 · '+quote.parts+' 零件／'+quote.coins+' 幣','party-mend-ask',g.id,!safe||!quote.allowed||run.coins<quote.coins||run.party.journey.scrap<quote.parts):'')+'</section><h3>鍛造特性</h3><p>每件選一種，最多二級；地下限定特性會在進入地下探索後開放。</p><div class="party-forge-traits">'+choices.map(q=>'<section><div>'+(root.TowerForgeIcons?.svg(X.TRAITS[q.trait].icon)||'')+'<b>'+esc(q.name)+(q.underground?' · 地下限定':'')+'</b><p>'+esc(X.TRAITS[q.trait].description)+'</p>'+(!q.allowed?'<small>'+esc(q.reason)+'</small>':'')+costLine(q.materialCost,true)+'</div>'+act(q.level>2?'已達上限':(g.forge?'升級':'選擇')+q.name+' · '+q.parts+' 零件／'+q.coins+' 幣','party-forge-ask',q.trait+'|'+g.id,!safe||!q.allowed||!q.affordable)+'</section>').join('')+'</div><div class="forge-salvage">'+act('拆解 · 回收 '+X.salvageValue(g)+' 零件','party-dismantle-ask',g.id,!safe)+'</div></section>';
       }
-      ctx.dialog('營地工坊 · 暫停中','鍛匠工坊','零件 '+run.party.journey.scrap+'/99 · 銅幣 '+run.coins+(!safe?' · 請先靠近安全營地或行商。':' · 先選裝備，再選作業。'),'<div class="forge-workspace">'+list+detail+'</div>',act('料理與休息','party-kitchen')+act('裝備背包','bag')+act('回到迷宮','close'),{silent:quiet,workshop:true,summary:'鍛匠工坊。先選裝備，再選修理、鍛造或拆解。'});
+      ctx.dialog('營地工坊 · 暫停中','鍛匠工坊',(!safe?'請先靠近安全營地或行商。':'先選裝備，再選作業。'),'<p class="tower-resource-line">'+(root.TowerResourceIcons?.svg('scrap')||'')+'金屬零件 '+run.party.journey.scrap+'／99 '+(root.TowerResourceIcons?.svg('coin')||'')+'銅幣 '+run.coins+'</p>'+stockPanel(run.party.journey.materials,root.TowerMaterials?.MATERIALS||{},true)+'<div class="forge-workspace">'+list+detail+'</div>',act('料理與休息','party-kitchen')+act('裝備背包','bag')+act('回到迷宮','close'),{silent:quiet,workshop:true,summary:'鍛匠工坊。先選裝備，再選修理、鍛造或拆解。'});
     }
     function sitePanel(s){const done=r().party.journey.site.done,has=P.has(r(),s.offer.job);ctx.dialog('職業探索 · 暫停中',s.offer.name,s.offer.description,
       '<p class="tower-copy">'+esc(s.offer.reward)+' 另獲得八枚銅幣。這是可跳過的探索，不影響主線通關。</p><p class="tower-copy">'+(done?'此處已完成，不會再次給予獎勵。':'一般處理需在現場累積十二秒，途中仍有怪物與陷阱；離開、受傷或變形會中斷，可稍後接續。已完成 '+Math.floor(r().party.journey.site.progress)+' 秒。')+'</p>',
@@ -154,21 +264,29 @@
     function finishSite(s,method){const result=X.explore(r(),s.offer.id,method,r().revision);working=null;if(!commit(result))return false;if(result.effect.passage)ctx.passage?.(s);ctx.audio.sfxAction?.('device');ctx.close?.();return true;}
     function bossHelp(){if(!r()?.party?.boss)return;const d=X.BOSSES[r().floor];ctx.dialog('章末機關 · 暫停中',d.name,d.description,'<p class="tower-copy">'+esc(X.hint(r()))+'</p><p class="tower-copy">地面警戒圈標示危險範圍；黃光時退開，紅光時不可接近。操作只需靠近並按對話鈕。所有職業都能完成。整座迷宮的變形倒數維持原規則。</p>',act('回到迷宮','close'),{summary:d.description+' '+X.hint(r())});}
     function panel(kind='team',quiet=false){if(!enabled())return;if(kind==='team'&&modern()){heroes.panel(undefined,quiet);return;}
-      const run=r(),p=run.party;let body='',copy='四人小隊：主角加三名旅人。劍士就是護衛，占用一個隊友名額。';
+      const run=r(),p=run.party;let body='',copy=(run.floor<0?'地下五人小隊：主角加四名旅人。':'地上四人小隊：主角加三名旅人。')+'劍士就是護衛，占用一個隊友名額。';
       if(kind==='cook'){
         copy=safeCamp()?'營地很安全，可以烹飪、修理，或分享乾糧讓隊友恢復。':'在起點營地或行商身旁，且附近沒有怪物時才能烹飪、修理與休息。已做好的料理隨時可吃。';
-        body='<div class="party-stocks">'+Object.entries(P.INGREDIENTS).map(([id,name])=>'<span>'+foodArt(id)+esc(name)+' <b>'+p.ingredients[id]+'</b></span>').join('')+'</div><div class="tower-grid">'+Object.entries(P.RECIPES).map(([id,recipe])=>'<article class="tower-item party-recipe">'+dishArt(id)+'<h3>'+esc(recipe.name)+' ×'+p.meals[id]+'</h3><p>'+Object.entries(recipe.cost).map(([k,v])=>P.INGREDIENTS[k]+' '+v).join('、')+'</p><p>生命 +'+recipe.hp+' · 飽食 +'+recipe.hunger+(recipe.team?' · 隊友生命 +'+recipe.team:'')+(recipe.buff?'<br>'+P.BUFFS[recipe.buff]+'，持續三層':'')+'</p>'+act('烹飪','party-cook',id,!safeCamp()||Object.entries(recipe.cost).some(([k,v])=>p.ingredients[k]<v))+act('享用','party-eat',id,!p.meals[id])+'</article>').join('')+'</div>';
+        body=stockPanel(p.ingredients,P.INGREDIENTS)+'<p class="tower-copy">不同環境與怪物有各自的食材；帶著庫存能延續料理，換層不會重生食材。地下每十層開放一道新食譜。有學會一料雙份的隊員，才可能多做一份。</p><div class="tower-grid">'+Object.entries(P.availableRecipes(run)).map(([id,recipe])=>'<article class="tower-item party-recipe">'+dishArt(id)+'<h3>'+esc(recipe.name)+' ×'+p.meals[id]+'</h3>'+(recipe.requiredDepth?'<small>地下 B'+recipe.requiredDepth+' 起的專屬食譜</small>':'')+costLine(recipe.cost)+'<p>生命 +'+recipe.hp+' · 飽食 +'+recipe.hunger+(recipe.team?' · 隊友生命 +'+recipe.team:'')+(recipe.buff?'<br>'+P.BUFFS[recipe.buff]+'，持續三層':'')+'</p>'+(recipe.description?'<p>'+esc(recipe.description)+'</p>':'')+act('烹飪','party-cook',id,!safeCamp()||Object.entries(recipe.cost).some(([k,v])=>p.ingredients[k]<v))+act('享用','party-eat',id,!p.meals[id])+'</article>').join('')+'</div>';
       }else if(kind==='bestiary'){
-        copy='討伐可能留下物資，並非每次都掉落；需要靠近拾取。普通物資20%、少見12%、稀有6%、珍稀3%。留意怪物的個性與攻擊前兆，不必硬拚。';body='<div class="tower-grid">'+Object.entries(P.defs()).map(([id,m])=>{const sense=root.TowerMonsterSense?.profile(m);return '<article class="tower-item"><h3>'+esc(m.name)+'</h3><p>'+esc(m.description)+'</p>'+(sense?'<p>察敵範圍 '+sense.range+' 公尺 · '+esc(sense.personality)+'</p>':'')+'<p>可能掉落：'+Object.keys(P.MONSTERS[id]?.drop||{shell:1}).map(k=>P.INGREDIENTS[k]).join('、')+(id.startsWith('lord-')?'；另有50%機率掉裝備':'')+'</p></article>';}).join('')+'</div>';
+        copy='點開怪物，查看前兆與應對。討伐後靠近拾取物資；普通20%、少見12%、稀有6%、珍稀3%，不是每次都會掉落。';
+        body='<div class="tower-grid tower-bestiary">'+Object.entries(P.defs()).map(([id,m])=>{
+          const guide=root.TowerFieldGuide?.monster(m),sense=root.TowerMonsterSense?.profile(m);
+          const tactics=guide?'<p><b>前兆</b> '+esc(guide.tell)+'</p><p><b>應對</b> '+esc(guide.counter)+'</p>':'<p>'+esc(m.description)+'</p>';
+          const sensing=guide?'<p class="tower-bestiary-sense">察敵 '+esc(guide.range)+' 公尺 · '+esc(guide.personality)+'<br>'+esc(guide.sensing)+'</p>':sense?'<p>察敵 '+esc(sense.range)+' 公尺 · '+esc(sense.personality)+'</p>':'';
+          const materials=root.TowerMaterials,variant=materials?.ecology(run).variants[id],lord=id.startsWith('lord-');
+          const drops=materials?lord?'補給物資':variant?materials.dropPool(run,{kind:id}).map(d=>esc((d.type==='material'?materials.MATERIALS:P.INGREDIENTS)[d.key])).join('、')||'補給物資':'本環境不出現此種怪物；換環境會有不同的食材與素材。':Object.keys(P.MONSTERS[id]?.drop||{shell:1}).map(k=>esc(P.INGREDIENTS[k]||k)).join('、');
+          return '<details class="tower-item tower-bestiary-card"><summary><strong>'+esc(variant?.name||m.name)+'</strong>'+(guide?'<span> · '+esc(guide.role)+'</span>':'')+'</summary><div class="tower-bestiary-notes">'+tactics+sensing+'<p>可能掉落：'+drops+(lord?'；另有50%機率掉裝備':'')+'</p>'+(variant?'<p>素材來自 '+esc(materials.ecology(run).name)+'，不是所有怪物都掉相同食材。</p>':'')+(guide?.gate?'<p>'+esc(guide.gate)+'</p>':'')+'</div></details>';
+        }).join('')+'</div>';
       }else{
         body='<div class="tower-grid"><article class="tower-item">'+portrait(p.profession)+'<h3>'+esc(P.PROFESSIONS[p.profession].name)+' · 你</h3><p>'+esc(P.PROFESSIONS[p.profession].description)+'</p></article>'+p.members.map(m=>'<article class="tower-item">'+portrait(m.profession)+'<h3>'+esc(P.person(m.profession,P.sex(r(),m.id)))+' · '+esc(P.PROFESSIONS[m.profession].name)+'</h3><p>強度 '+m.level+'/5 · 生命 '+Math.ceil(m.hp)+'/'+P.memberMax(m)+(m.hp<=0?' · 需要料理或營地休息':'')+'</p>'+act('與他道別','party-dismiss-ask',m.id)+'</article>').join('')+'</div><p class="tower-copy">'+(p.buffs.length?p.buffs.map(b=>P.BUFFS[b.id]+'（'+b.floors+' 層）').join(' · '):'烹飪料理可獲得增益；最多同時保留兩種。')+'</p>';
       }
-      ctx.dialog('高塔遠征 · 暫停中',{team:'冒險隊伍',cook:'旅人廚房',bestiary:'迷宮生物誌'}[kind],copy,body,act('隊伍','party-team')+act('料理','party-kitchen')+act('鍛匠工坊','party-forge')+act('生物誌','party-bestiary')+(run.party.boss?act('本層機關說明','party-boss-help'):'')+act('分享乾糧休息','party-rest',null,!safeCamp())+act('修理 '+(modern()?Math.ceil(6*(1-H.teamPassive(run,'economy')/100)):P.has(run,'smith')?3:6)+' 幣','party-repair',null,!safeCamp())+act('裝備與道具','bag')+act('回到迷宮','close'),{silent:quiet,summary:{team:'冒險隊伍。主角加三名同伴。',cook:'旅人廚房。選擇烹飪，或享用料理。',bestiary:'迷宮生物誌。了解怪物，收集材料。'}[kind]});
+      ctx.dialog('高塔遠征 · 暫停中',{team:'冒險隊伍',cook:'旅人廚房',bestiary:'迷宮生物誌'}[kind],copy,body,act('隊伍','party-team')+act('料理','party-kitchen')+act('鍛匠工坊','party-forge')+act('生物誌','party-bestiary')+(run.party.boss?act('本層機關說明','party-boss-help'):'')+act('分享乾糧休息','party-rest',null,!safeCamp())+act('修理 '+(modern()?Math.ceil(6*(1-H.teamPassive(run,'economy')/100)):P.has(run,'smith')?3:6)+' 幣','party-repair',null,!safeCamp())+act('裝備與道具','bag')+act('回到迷宮','close'),{silent:quiet,summary:{team:run.floor<0?'冒險隊伍。主角加四名同伴。':'冒險隊伍。主角加三名同伴。',cook:'旅人廚房。選擇烹飪，或享用料理。',bestiary:'迷宮生物誌。了解怪物，收集材料。'}[kind]});
     }
     function commit(result,speak=true){if(!ctx.transact(result))return false;if(speak&&result.message)ctx.toast(result.message,2300,result.message);return true;}
     function interact(){pruneRecruits();if(!live()||!near||ctx.G.shifting||distance(near)>2.6||!clear(near))return false;const n=near;if(n.kind==='camp'){panel('cook');return true;}
       if(n.kind==='site'){sitePanel(n);return true;}
-      if(n.kind==='recruit'){const job=P.PROFESSIONS[offer.profession],traveller=P.person(offer.profession,offer.sex),draw=modern()?H.preview(r(),offer):null;ctx.dialog(job.name+' · '+traveller,'一起尋找回家的路',draw?'主動：'+draw.skills.map(k=>H.SKILLS[k].name).join('、')+'。被動：'+draw.passives.map(k=>H.PASSIVES[k].name).join('、')+'。':job.description,'<div class="party-invite">'+(modern()?root.TowerHeroVisuals.portrait(offer.profession,offer.sex):portrait(offer.profession))+'<p>等級 '+offer.level+'/5 · 招募費 '+offer.price+' 枚銅幣 · 同伴 '+r().party.members.length+'/'+P.recruitLimit(r())+'</p></div>',act('邀請加入','party-recruit',offer.id,r().coins<offer.price||r().party.members.length>=P.recruitLimit(r()))+act('查看隊伍','party-team')+act('下次再聊','close'),{speaker:{gender:offer.sex,age:'adult'},summary:job.name+'，'+traveller+'。邀請加入需要'+offer.price+'枚銅幣。'});return true;}
+      if(n.kind==='recruit'){const maxLevel=modern()?H.maxLevel(r(),offer.id):5,job=P.PROFESSIONS[offer.profession],traveller=P.person(offer.profession,offer.sex),draw=modern()?H.preview(r(),offer):null;ctx.dialog(job.name+' · '+traveller,'一起尋找回家的路',draw?'主動：'+draw.skills.map(k=>H.SKILLS[k].name).join('、')+'。被動：'+draw.passives.map(k=>H.PASSIVES[k].name).join('、')+'。':job.description,'<div class="party-invite">'+(modern()?root.TowerHeroVisuals.portrait(offer.profession,offer.sex):portrait(offer.profession))+'<p>等級 '+offer.level+'/'+maxLevel+' · 招募費 '+offer.price+' 枚銅幣 · 同伴 '+r().party.members.length+'/'+P.recruitLimit(r())+'</p>'+(modern()&&r().floor<0?'<p>地下新同伴從 5 級起步，加入時隨機獲得四級解鎖的一招普通技能，最高可升至 10 級。</p>':'')+'</div>',act('邀請加入','party-recruit',offer.id,r().coins<offer.price||r().party.members.length>=P.recruitLimit(r()))+act('查看隊伍','party-team')+act('下次再聊','close'),{speaker:{gender:offer.sex,age:'adult'},summary:job.name+'，'+traveller+'。邀請加入需要'+offer.price+'枚銅幣。'});return true;}
       if(n.kind==='boss'){if(commit(P.bossAction(r(),n.index,r().revision))){ctx.audio.sfxAction?.('device');ctx.save();}return true;}return false;
     }
     function handle(key,id){if(heroes?.handle(key,id))return true;if(!key.startsWith('party-'))return false;if(!enabled())return true;
@@ -182,8 +300,8 @@
         if(commit(X.repair(r(),id,pendingRepair.revision))){ctx.audio.sfxAction?.('forge');ctx.refreshGear?.();syncActors();forgePanel(true);}return true;
       }
       if(key==='party-forge-ask'||key==='party-forge-confirm'){
-        if(!safeCamp())return true;const split=id?.indexOf('|'),trait=id?.slice(0,split),gearId=id?.slice(split+1),g=X.allGear(r()).find(g=>g.id===gearId);if(!g||!Object.hasOwn(X.TRAITS,trait))return true;
-        if(key==='party-forge-ask'){pendingForge={id,revision:r().revision};ctx.dialog('確認鍛造',g.name+' · '+X.TRAITS[trait].name,'選定特性後不能更換，每件裝備最多強化兩次。確認後才會扣除工坊列出的零件與銅幣。','',act('返回工坊','party-forge')+act('確認鍛造','party-forge-confirm',id),{summary:'確認鍛造'+X.TRAITS[trait].name+'。選定後不能更換。'});return true;}
+        if(!safeCamp())return true;const split=id?.indexOf('|'),trait=id?.slice(0,split),gearId=id?.slice(split+1),g=X.allGear(r()).find(g=>g.id===gearId),q=X.forgeQuote(r(),gearId,trait);if(!g||!q)return true;
+        if(key==='party-forge-ask'){if(!q.allowed||!q.affordable){ctx.toast(q.reason||'鍛造素材、零件或銅幣不足。');return true;}pendingForge={id,revision:r().revision};ctx.dialog('確認鍛造',g.name+' · '+q.name,'第 '+q.level+' 級，需要 '+q.parts+' 份金屬零件與 '+q.coins+' 枚銅幣。選定特性後不能更換，每件裝備最多強化兩次。','<p>'+esc(X.TRAITS[trait].description)+'</p>'+costLine(q.materialCost,true),act('返回工坊','party-forge')+act('確認鍛造','party-forge-confirm',id),{summary:'確認鍛造'+q.name+'。選定後不能更換。'});return true;}
         if(!pendingForge||pendingForge.id!==id)return true;
         if(commit(X.forge(r(),gearId,trait,pendingForge.revision),!modern())){ctx.audio.sfxAction?.('forge');ctx.refreshGear?.();forgePanel(true);if(modern()){ctx.toast('鍛造完成！',1800,false);heroes.specialty('smith');}}return true;
       }
@@ -286,7 +404,7 @@
         if(a.queueLeader!==targetId){a.queueLeader=targetId;a.path=[];a.pathLeft=0;}
         const speed=(fighting?3.6:Math.hypot(target.x-a.model.position.x,target.z-a.model.position.z)>6?6.2:5.6)*(modern()?H.speed(r(),a.id):1);
         const standOff=fighting&&modern()&&H.ranged(r(),a.id)?Math.max(2.5,Math.min(6,H.stats(r(),a.id).reach-.6)):1.35;
-        const moving=queueMove(a,dt,speed,fighting?standOff:QUEUE_GAP,target);
+        const moving=modern()&&heroes.cooperating?.(a.id)?false:queueMove(a,dt,speed,fighting?standOff:QUEUE_GAP,target);
         // A guard who leaves the line must not drag the rest of the party into
         // battle; downed companions likewise never become a stationary leader.
         if(!fighting){leader=a.model.position;leaderId=a.id;}
@@ -302,7 +420,7 @@
       if(modern()){for(const a of actors){root.TowerHeroVisuals.dress(T,a.model,H.equipment(r(),a.id),ctx.dispose,{showHelmet:H.actor(r(),a.id).showHelmet});if(H.hp(r(),a.id)<=0){root.TowerCombatMotion?.cancel(a.model);continue;}root.TowerHeroVisuals.pose(a.model,H.actor(r(),a.id).attack,H.stats(r(),a.id).interval,false,dt);}heroes.tick(dt);}
       for(const m of ctx.monsters()){if(!m.alive)continue;if(m.model.userData.partyHp)m.model.userData.partyHp.scale.x=.94*Math.max(.001,(r().party.health[m.id]??m.partyMaxHp)/m.partyMaxHp);
         if(ctx.camera?.()&&m.model.userData.tag)m.model.userData.tag.visible=m.model.position.distanceTo(ctx.camera().position)>3.4;
-        if(m.kind==='moth'){m.model.userData.body.children.filter(x=>x.name==='party-wing').forEach((w,i)=>w.rotation.z=Math.sin(now*.012)*(i?1:-1)*.5);if(m.windup>0)for(const other of ctx.monsters())if(other.alive&&other!==m&&Math.hypot(other.model.position.x-m.model.position.x,other.model.position.z-m.model.position.z)<6)other.alertLeft=4;}
+        if(m.kind==='moth'){(m.model.userData.body?.children||[]).filter(x=>x.name==='party-wing').forEach((w,i)=>w.rotation.z=Math.sin(now*.012)*(i?1:-1)*.5);if(m.windup>0)for(const other of ctx.monsters())if(other.alive&&other!==m&&Math.hypot(other.model.position.x-m.model.position.x,other.model.position.z-m.model.position.z)<6)other.alertLeft=4;}
         if(m.kind==='mushroom'&&m.windup>0&&m.windup<=dt&&distance(m.model.position)<2.8&&clear(m.model.position)){if(modern())H.inflict(r(),H.state(r()).active,'slow',3,.6);else r().party.slowLeft=3;}
       }
       const b=r().party.boss;if(b){const phase=P.bossPhase(r()),d=X.BOSSES[r().floor];for(const s of stations.filter(s=>s.kind==='boss')){
@@ -329,7 +447,7 @@
     }
     function install(){heroes?.install();const rail=document.getElementById('towerActionRail');if(!rail)return;const b=document.createElement('button');b.id='towerProfessionBtn';b.className='tower-btn';b.hidden=true;ctx.bind(b,skill);rail.prepend(b);}
     function switchControl(from,to){const target=actors.find(a=>a.id===to),old={x:ctx.G.px,z:ctx.G.pz};if(!target)return;const next={x:target.model.position.x,z:target.model.position.z};syncActors();const previous=actors.find(a=>a.id===from);if(previous)previous.model.position.set(old.x,0,old.z);ctx.G.px=next.x;ctx.G.pz=next.z;ctx.player().position.set(next.x,0,next.z);}
-    return {enabled,live,portrait,switchControl,heroes,refreshActors:syncActors,refreshMonsters,ingredientModel,monsterModel,build,tick,hud,attack,skill,guard,shift,interact,handle,panel,install,reset,safeCamp,get nearby(){pruneRecruits();return live()?near:null;},reserved:()=>{pruneRecruits();return live()?stations:[];},markers:()=>{pruneRecruits();return live()?stations.filter(s=>s.model.visible).map(s=>({cx:s.cx,cy:s.cy,color:s.kind==='boss'?'#efc977':'#a0dcc2',label:s.kind==='boss'?String(s.index+1):s.kind==='camp'?'營':s.kind==='site'?'探':'友'})):[];}};
+    return {enabled,live,portrait,switchControl,heroes,refreshActors:syncActors,refreshMonsters,ingredientModel,materialModel,monsterModel,build,tick,hud,attack,skill,guard,shift,interact,handle,panel,install,reset,safeCamp,get nearby(){pruneRecruits();return live()?near:null;},reserved:()=>{pruneRecruits();return live()?stations:[];},markers:()=>{pruneRecruits();return live()?stations.filter(s=>s.model.visible).map(s=>({cx:s.cx,cy:s.cy,color:s.kind==='boss'?'#efc977':'#a0dcc2',label:s.kind==='boss'?String(s.index+1):s.kind==='camp'?'營':s.kind==='site'?'探':'友'})):[];}};
   }
-  root.TowerPartyRuntime={create};
+  root.TowerPartyRuntime={create,portrait,foodArt,dishArt};
 })(typeof globalThis!=='undefined'?globalThis:this);

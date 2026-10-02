@@ -1,4 +1,4 @@
-/* 高塔原創低面數人物與装備：只產生幾何，不載入圖片、不建立燈光或動畫迴圈。 */
+/* 高塔原創低面數人物與裝備：只產生幾何，不載入圖片、不建立燈光或動畫迴圈。 */
 (function (root, factory) {
   const api = factory();
   if (typeof module === 'object' && module.exports) module.exports = api;
@@ -93,17 +93,35 @@
       k.box(leg, [.26, .03, .35], 0x222b34, 'boot-sole', 0, -legHeight + .015, .055);
       limbs['arm' + suffix] = arm; limbs['leg' + suffix] = leg;
     }
-    g.userData = { ...limbs, body, head, modelFamily: 'tower-original', frontAxis: '+Z',sculpted:true };
+    g.userData = { ...limbs, body, head, bodyWidth:width, modelFamily: 'tower-original', frontAxis: '+Z',sculpted:true };
     if(globalThis.CharacterFace)globalThis.CharacterFace.attach(k.T,g,g,eyes,headY);
     return g;
   }
+
+  // Non-player people use the same continuous sculpture as playable jobs, but
+  // with a smaller mesh budget. Their existing hats, tools and names stay unique.
+  function hair(k,g,{job='classic',sex='male',color,name='continuous-hair',braidName='continuous-braid',bald=false}){
+    const rig=new k.T.Group();rig.name=name+'-root';rig.position.y=g.userData.head.position.y;g.add(rig);
+    const material=new k.T.MeshLambertMaterial({color}),sculpt=globalThis.CharacterSculpt;
+    function add(geometry,label){const m=new k.T.Mesh(geometry,material);m.name=label;m.userData.continuousHair=true;rig.add(m);return m;}
+    if(sculpt?.hair){const parts=sculpt.hair(k.T,{job,sex,detail:'npc'});add(parts.crown,name).visible=!bald;add(parts.drape,name+'-drape');for(const braid of parts.braids)add(braid.geometry,braidName);}
+    else{
+      // Standalone fallback is one deformed surface, never detached box locks.
+      const geo=new k.T.SphereGeometry(1,12,8,0,Math.PI*2,bald?Math.PI/2:0,bald?Math.PI*.18:Math.PI*.68),p=geo.attributes.position,long=sex==='female'&&job==='mage',length=long?.68:sex==='female'?.3:.24;
+      for(let i=0;i<p.count;i++){const x=p.getX(i),y=p.getY(i),z=p.getZ(i),r=Math.hypot(x,z)||1,front=Math.max(0,Math.min(1,(z/r-.25)/.5)),drop=Math.max(0,-y/.536);p.setXYZ(i,y>=0?x*.289:x/r*.282,y>=0?.08+y*.255:.08+drop*(front*.018-(1-front)*length),(y>=0?z*.267:z/r*.267)-.018);}
+      geo.computeVertexNormals();add(geo,name);
+      if(sex==='female'&&job==='swordsman'){const curve=new k.T.CatmullRomCurve3([new k.T.Vector3(.235,-.07,-.12),new k.T.Vector3(.3,-.32,-.04),new k.T.Vector3(.29,-.62,.04)]);add(new k.T.TubeGeometry(curve,12,.052,5,false),braidName);}
+    }
+    return rig;
+  }
+  function belt(k,g,size,color,name,y){const width=Math.min(size[0],g.userData.bodyWidth*.96),depth=Math.min(size[2],.37),m=k.torus(g,[width/2-.024,.024,5,16],color,name,0,y,0);m.rotation.x=Math.PI/2;m.scale.y=depth/width;m.userData.contouredBelt=true;return m;}
 
   function makeSmith(k) {
     const g = figure(k, { width: .8, legHeight: .51, bodyY: .89, headY: 1.46, shirt: 0x5a6570, pants: 0x51463e, skin: 0xd8ad8a });
     k.box(g, [.69, .78, .09], 0x80533b, 'leather-apron', 0, .83, .24);
     k.box(g, [.1, .45, .04], 0xba926a, 'apron-strap-left', -.22, 1.15, .294).rotation.z = -.18;
     k.box(g, [.1, .45, .04], 0xba926a, 'apron-strap-right', .22, 1.15, .294).rotation.z = .18;
-    k.box(g, [.8, .11, .43], 0x483b36, 'work-belt', 0, .73, 0);
+    belt(k,g,[.8,.11,.43],0x483b36,'work-belt',.73);
     k.box(g, [.14, .14, .055], 0xcfad72, 'belt-buckle', 0, .73, .265);
     k.box(g, [.48, .27, .13], 0xc1c7c7, 'wide-grey-beard', 0, 1.31, .287);
     k.cone(g, [.23, .2, 4], 0xc1c7c7, 'beard-tip', 0, 1.11, .285).rotation.z = Math.PI;
@@ -122,8 +140,7 @@
 
   function makeArmorer(k) {
     const g = figure(k, { width: .59, legHeight: .57, bodyY: .98, headY: 1.63, shirt: 0x613e65, pants: 0x473a55, skin: 0xf0c7ad });
-    k.box(g, [.59, .15, .54], 0x362b42, 'hair-crown', 0, 1.9, -.005);
-    for (const side of [-1, 1]) k.box(g, [.15, .5, .18], 0x362b42, 'side-hair', side * .31, 1.57, -.08).rotation.z = side * .14;
+    hair(k,g,{job:'mage',sex:'female',color:0x362b42,name:'hair-crown'});
     k.box(g, [.82, .77, .13], 0x9c4778, 'shawl-back', 0, 1.02, -.28).rotation.x = .1;
     for (const side of [-1, 1]) {
       k.box(g, [.25, .22, .48], 0xb25a8e, 'shawl-shoulder', side * .38, 1.26, .015).rotation.z = side * .25;
@@ -131,7 +148,7 @@
     }
     for (let i = 0; i < 3; i++) k.box(g, [.49 - i * .035, .2, .105], i % 2 ? 0x899eaf : 0xa4b2bf, 'fitted-armor-plate', 0, 1.2 - i * .18, .25 + i * .016);
     k.box(g, [.09, .08, .06], 0xe1c67d, 'shawl-clasp', -.29, 1.26, .29);
-    k.box(g, [.69, .09, .46], 0x765340, 'tailoring-belt', 0, .72, 0);
+    belt(k,g,[.69,.09,.46],0x765340,'tailoring-belt',.72);
     k.box(g, [.23, .24, .2], 0x9c7554, 'sewing-pouch', .4, .65, .09);
     k.box(g, [.24, .075, .21], 0xc79b6c, 'pouch-flap', .4, .76, .09);
     k.cylinder(g, [.055, .055, .15, 6], 0xe9d0a5, 'thread-spool', -.36, .78, .24).rotation.z = Math.PI / 2;
@@ -147,7 +164,7 @@
       k.box(g, [.22, .69, .1], 0x427e65, 'coat-front-tail', side * .16, .81, .24).rotation.z = side * .06;
       k.box(g, [.15, .3, .09], 0xc8ad73, 'coat-lapel', side * .15, 1.28, .244).rotation.z = -side * .28;
     }
-    k.box(g, [.57, .14, .51], 0x46544d, 'swept-short-hair', 0, 2.08, -.01).rotation.z = -.08;
+    hair(k,g,{job:'scout',color:0x46544d,name:'swept-short-hair'});
     k.box(g, [.28, .16, .075], 0x46544d, 'short-beard', 0, 1.66, .268);
     k.torus(g, [.083, .021, 5, 12], 0xc8ad73, 'single-goggle-frame', .13, 1.86, .291);
     k.cylinder(g, [.064, .064, .018, 10], 0x8cb9c1, 'single-goggle-lens', .13, 1.86, .292).rotation.x = Math.PI / 2;
@@ -169,8 +186,7 @@
 
   function makeEve(k) {
     const group = figure(k, { width: .57, legHeight: .57, bodyY: .99, headY: 1.62, shirt: 0x718997, pants: 0x535e6d, skin: 0xe9bb9d });
-    k.box(group, [.57, .16, .5], 0x695048, 'traveler-hair', 0, 1.87, -.02);
-    k.box(group, [.18, .39, .18], 0x695048, 'traveler-braid', .3, 1.54, -.05).rotation.z = .13;
+    hair(k,group,{job:'swordsman',sex:'female',color:0x695048,name:'traveler-hair',braidName:'traveler-braid'});
     k.cylinder(group, [.29, .33, .24, 8], 0xbfad85, 'travel-hat-crown', 0, 1.99, -.015);
     k.cylinder(group, [.47, .47, .045, 10], 0xd5c096, 'travel-hat-brim', 0, 1.86, -.015);
     k.cylinder(group, [.332, .332, .075, 8], 0x648f8a, 'hat-ribbon', 0, 1.92, -.015);
@@ -191,12 +207,10 @@
 
   function makeRowan(k) {
     const g = figure(k, { width: .72, legHeight: .64, bodyY: 1.04, headY: 1.69, shirt: 0xbb7047, pants: 0x405862, skin: 0xc8916e });
-    k.box(g, [.58, .16, .52], 0x713d2f, 'copper-short-hair', 0, 1.94, -.015);
-    k.box(g, [.38, .14, .17], 0x98513b, 'windswept-fringe', -.08, 1.92, .24).rotation.z = -.24;
-    k.box(g, [.14, .21, .39], 0x713d2f, 'cropped-sideburn', .275, 1.77, -.02);
+    hair(k,g,{job:'scout',color:0x713d2f,name:'windswept-fringe'});
     k.box(g, [.43, .13, .51], 0xdfb85f, 'climber-scarf', 0, 1.42, .035);
     k.box(g, [.17, .37, .08], 0xdfb85f, 'scarf-short-tail', -.19, 1.25, .25).rotation.z = -.19;
-    k.box(g, [.77, .12, .45], 0x775642, 'utility-belt', 0, .76, 0);
+    belt(k,g,[.77,.12,.45],0x775642,'utility-belt',.76);
     for (const side of [-1, 1]) k.box(g, [.2, .22, .08], 0xe0a968, 'jacket-pocket', side * .23, .95, .24);
     k.box(g, [.38, .54, .23], 0x5c716b, 'climber-pack', 0, 1.07, -.34);
     k.cylinder(g, [.13, .13, .76, 8], 0x90a79a, 'rolled-sleeping-mat', 0, 1.35, -.37).rotation.z = Math.PI / 2;
@@ -212,16 +226,16 @@
 
   function makeMira(k) {
     const g = figure(k, { width: .6, legHeight: .52, bodyY: .93, headY: 1.54, shirt: 0x58826a, pants: 0x555747, skin: 0xe7b791 });
-    k.box(g, [.57, .17, .51], 0x523d32, 'gatherer-hair-crown', 0, 1.8, -.015);
+    hair(k,g,{job:'chef',sex:'female',color:0x523d32,name:'gatherer-hair-crown'});
     for (const side of [-1, 1]) {
-      k.sphere(g, [.185, 7, 5], 0x654939, 'round-double-bun', side * .33, 1.85, -.07);
-      k.box(g, [.16, .04, .12], 0xdca864, 'bun-ribbon', side * .35, 1.79, .065);
+      k.sphere(g, [.15, 8, 6], 0x523d32, 'round-double-bun', side * .28, 1.765, -.07);
+      k.box(g, [.13, .04, .12], 0xdca864, 'bun-ribbon', side * .32, 1.75, .035);
       k.torus(g, [.094, .018, 4, 10], 0xc3ad70, 'round-spectacle-frame', side * .125, 1.57, .282);
     }
     k.box(g, [.062, .025, .025], 0xc3ad70, 'spectacle-bridge', 0, 1.57, .282);
     k.cylinder(g, [.28, .48, .59, 6], 0x668d72, 'flared-gathering-skirt', 0, .62, 0);
     k.box(g, [.4, .43, .065], 0xe1d6b4, 'linen-apron', 0, .78, .325);
-    k.box(g, [.69, .09, .44], 0x937044, 'sample-belt', 0, .9, 0);
+    belt(k,g,[.69,.09,.44],0x937044,'sample-belt',.9);
     k.box(g, [.48, .26, .21], 0x937044, 'three-vial-case', .14, .85, .35);
     for (let i = 0; i < 3; i++) {
       k.cylinder(g, [.049, .049, .23, 7], [0xa3bf76, 0x88bbc1, 0xd9a77e][i], 'sample-vial', -.02 + i * .15, 1.02, .35);
@@ -236,15 +250,15 @@
     const g = figure(k, { width: .49, legHeight: .68, bodyY: 1.11, headY: 1.79, shirt: 0x7c6c92, pants: 0x565263, skin: 0xe5bf9f });
     k.box(g, [.2, .2, .24], 0xe5bf9f, 'scholar-neck', 0, 1.485, 0);
     k.cylinder(g, [.26, .34, 1.01, 6], 0x766689, 'scholar-long-robe', 0, .91, -.01);
+    hair(k,g,{color:0xc3c5bf,name:'silver-temple-hair',bald:true});
     for (const side of [-1, 1]) {
-      k.box(g, [.1, .3, .43], 0xc3c5bf, 'silver-temple-hair', side * .285, 1.86, -.03);
       k.box(g, [.15, .045, .04], 0xe8e6d7, 'white-brow', side * .12, 1.89, .271).rotation.z = side * .06;
       k.box(g, [.092, .8, .04], 0xd8c898, 'robe-long-trim', side * .14, .99, .29);
     }
     k.box(g, [.11, .13, .11], 0xd7a987, 'scholar-nose', 0, 1.77, .288);
     k.box(g, [.4, .16, .095], 0xe8e6d7, 'white-beard-root', 0, 1.58, .283);
     k.cone(g, [.205, .48, 4], 0xe8e6d7, 'long-pointed-white-beard', 0, 1.35, .292).rotation.z = Math.PI;
-    k.box(g, [.58, .085, .42], 0x594d54, 'scholar-sash', 0, .72, 0);
+    belt(k,g,[.58,.085,.42],0x594d54,'scholar-sash',.72);
     k.cylinder(g, [.097, .097, .71, 8], 0xc9b897, 'back-scroll-case', -.14, 1.07, -.3).rotation.z = -.27;
     for (const y of [.75, 1.39]) k.cylinder(g, [.109, .109, .055, 8], 0x927953, 'scroll-case-cap', y === .75 ? -.23 : -.06, y, -.3).rotation.z = -.27;
     const cane = new k.T.Group(); cane.name = 'scholar-walking-cane'; cane.position.set(.055, -.32, .15);
@@ -257,9 +271,7 @@
 
   function makeSena(k) {
     const g = figure(k, { width: .5, legHeight: .48, bodyY: .84, headY: 1.42, shirt: 0x64608d, pants: 0x555276, skin: 0xecc6b0 });
-    k.box(g, [.58, .16, .52], 0xb4adce, 'silver-lilac-bob-crown', 0, 1.68, -.02);
-    k.box(g, [.56, .42, .17], 0xa09bbd, 'short-bob-back', 0, 1.42, -.23);
-    k.box(g, [.19, .3, .12], 0xb4adce, 'asymmetric-bob-fringe', -.24, 1.48, .19).rotation.z = -.17;
+    hair(k,g,{job:'chef',sex:'female',color:0xb4adce,name:'silver-lilac-bob-crown'});
     k.crystal(g, [.082, 0], 0xf2d98f, 'comet-hairpin-star', .24, 1.7, .26);
     k.cone(g, [.056, .19, 3], 0xe8c77e, 'comet-hairpin-tail', .32, 1.63, .25).rotation.z = -.8;
     k.box(g, [.49, .56, .1], 0x39395f, 'single-shoulder-cape', -.14, .91, -.25).rotation.z = -.17;
@@ -350,7 +362,7 @@
     const k=kit(deps),s=WARRIOR_STYLES[strength],g=figure(k,{width:.6+strength*.025,shirt:s.cloth,pants:0x354453});
     g.name='tower-warrior-'+strength;
     const armor=k.box(g,[.62,.58,.09],s.metal,'rank-'+strength+'-breastplate',0,.98,.23);
-    k.box(g,[.65,.1,.42],0x51453d,'guard-belt',0,.7,0);
+    belt(k,g,[.65,.1,.42],0x51453d,'guard-belt',.7);
     // 胸前 1～5 枚金釘：色覺不敏感的孩子也能靠數量辨別。
     for(let i=0;i<strength;i++)k.box(g,[.055,.085,.03],0xffe5a0,'rank-pin-'+i,(i-(strength-1)/2)*.09,1.04,.3);
     if(strength===1){

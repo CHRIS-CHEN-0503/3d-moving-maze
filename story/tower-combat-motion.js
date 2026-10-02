@@ -37,9 +37,11 @@
     scout:[{rx:-.5,lx:-.4,rz:-.25},{rx:-1.2,lx:-.85,ry:.5,rz:-.6,lz:.45,wx:1.1,tilt:-.05},{rx:-.6,lx:-.5,ry:-.3,wx:.6}],
     thrust:[{rx:-.65,lx:-.55,wx:.7},{rx:-1.6,lx:-.85,wx:1.6,lean:.12},{rx:-.8,lx:-1,wx:1}],
   };
+  const motionFamilies=new Set(Object.values(FAMILIES));
+  const familyFor=skill=>motionFamilies.has(skill?.presentation?.motion)?skill.presentation.motion:FAMILIES[skill?.effect]||'';
   function rest(kind,shield){const p={...REST};if(shield)p.lx=-.35;if(['greatsword','warhammer','arcane_staff'].includes(kind)){p.rx=-.35;p.lx=-.5;p.rz=.65;p.lz=-.9;}if(kind==='spellbook'){p.rx=p.lx=-1;p.rz=.5;p.lz=-.5;}if(kind==='elven_bow'){p.rx=-.7;p.lx=-.35;p.wx=0;}return p;}
   function sample(kind,action='attack',variant=0,progress=1,shield=false,family='',out={}){
-    kind=kind.replace(/_t[23]$/,'');
+    kind=kind.replace(/_t[2-5]$/,'');
     const base=rest(kind,shield),track=(WEAPONS[kind]||WEAPONS.unarmed)[variant%2];let poses=track;
     if(action==='skill'){poses=family==='bow'?WEAPONS.elven_bow[variant%2]:family==='slash'?WEAPONS.longsword[variant%2]:family==='heavy'?track:family==='spin'?[{...track[0],ry:-.75,tilt:-.1},{...track[1],ry:.85,wy:1,wz:.7,tilt:.12},{...track[2],ry:.4}]:SKILL_TRACKS[family]||SKILL_TRACKS.cast;}
     const t=clamp(progress);if(action!=='charge'&&t===1){Object.assign(out,base);return out;}
@@ -48,8 +50,8 @@
     for(const k in base){const a=frames[i][k]??base[k],b=frames[i+1][k]??base[k];out[k]=a+(b-a)*smooth;}return out;
   }
   function state(model){return model.userData.combatMotion||(model.userData.combatMotion={counts:{},action:'',elapsed:0,duration:1,variant:0,family:'',pose:{}});}
-  function begin(model,action,duration,skill){if(!model?.userData)return false;const s=state(model),kind=model.userData.heroWeapon||'unarmed';s.action=action;s.duration=Math.max(.1,Math.min(4,Number(duration)||.65));s.elapsed=0;s.family=FAMILIES[skill?.effect]||'';s.skillId=skill?.id||'';if(action==='attack'){s.variant=s.counts[kind]||0;s.counts[kind]=(s.variant+1)%2;}else s.variant=0;return true;}
+  function begin(model,action,duration,skill){if(!model?.userData)return false;const s=state(model),kind=model.userData.heroWeapon||'unarmed';s.action=action;s.duration=Math.max(.1,Math.min(4,Number(duration)||.65));s.elapsed=0;s.family=familyFor(skill);s.skillId=skill?.id||'';if(action==='attack'){s.variant=s.counts[kind]||0;s.counts[kind]=(s.variant+1)%2;}else s.variant=0;return true;}
   function cancel(model){if(model?.userData.combatMotion){const s=state(model);s.action='';s.elapsed=s.duration;}}
   function update(model,dt=0){const s=state(model);s.elapsed=Math.min(s.duration,s.elapsed+Math.max(0,Math.min(.1,Number(dt)||0)));if(s.elapsed>=s.duration)s.action='';return sample(model.userData.heroWeapon||'unarmed',s.action||'attack',s.variant,s.action?s.elapsed/s.duration:1,model.userData.hasShield,s.family,s.pose);}
-  return Object.freeze({WEAPONS,FAMILIES,sample,begin,cancel,update,state});
+  return Object.freeze({WEAPONS,FAMILIES,familyFor,sample,begin,cancel,update,state});
 });

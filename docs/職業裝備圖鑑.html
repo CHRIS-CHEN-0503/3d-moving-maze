@@ -1,8 +1,74 @@
-<!doctype html><html lang="zh-Hant"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>倒轉高塔 · 職業與裝備圖鑑</title><style>
-*{box-sizing:border-box}body{margin:0;background:#0b1927;color:#e2eaf0;font:16px/1.7 system-ui,sans-serif}main{max-width:1200px;margin:auto;padding:40px 24px}h1,h2,h3{color:#ffe1a2;line-height:1.3}h1{font-size:36px}h2{margin-top:45px}h3{font-size:19px;margin:0}p{margin:9px 0}header p{color:#b2c7d3}nav{display:flex;flex-wrap:wrap;gap:10px;margin:24px 0}a{color:#ffe1a2;text-decoration:none;border:1px solid #476271;border-radius:9px;padding:8px 14px}.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:14px}article{background:#1b3444;border:1px solid #466070;border-radius:18px;padding:20px}.hero-icon{width:80px;height:80px;display:block;margin-bottom:14px}small{color:#b9d3db;display:block}table{border-collapse:collapse;width:100%;font-size:14px;margin-top:12px}th,td{text-align:center;border:1px solid #506573;padding:5px}footer{margin-top:40px;color:#b9d3db}@media print{body{background:white;color:#172a39}article{break-inside:avoid;background:#f5f8f9}h1,h2,h3{color:#243e4f}.hero-icon g{stroke:#294e61!important;fill:#d7e4e9!important}small,footer,header p{color:#345}nav{display:none}}
-</style></head><body><main><header><small>倒轉高塔 · 新版劇情規則</small><h1>七種職業，一起走出高塔</h1><p>49 個主動技能、42 個被動技能、54 件三階專用裝備。初始三主動、兩被動；主角成長至十級可再取得四招，其中一招為專屬覺醒。</p><p>本圖鑑與遊戲共用同一份規則和原創向量圖示。數值是目前基礎設定，不含其他技能、強化及食物的加成。</p></header><nav id="nav"></nav><div id="content"></div><footer>近戰命中才消耗耐久 1；光彈、箭矢與遠程攻擊技能發射即消耗 1，命中不重扣。術士／療癒師普通攻擊為遠程光彈。射手普通弓射／一般攻擊技能耗 1 支箭，群星箭雨／世界樹之箭耗 3 支，輔助技能不耗箭。共用箭袋上限 99；新射手 30 支、招募射手 15 支，商店每支 1 幣、每次補 10 支，有射手時地圖才額外出現箭束，每束 10 支。<br>受傷時穿戴中的防具各消耗 1；護盾吸收或無敵擋下的傷害不耗防具耐久。雙刃為一組裝備。單手武器固定右手、盾牌左手，雙手武器不能裝備盾牌。<br>普通武器／重裝耐久 30～100、高級 100～200；普通輕裝／法袍 20～67、高級 67～133。木紋小圓盾採輕裝倍率、金屬盾採重裝倍率。裝備耗盡保留但失效，隊中有能行動的鍛匠即可在工坊付費修復。強化 +1～+3 隨樓層逐漸開放。每 +1 武器攻擊增加 2，防具防禦增加 1。<br>主角十級、技能六級；同伴五級，四級可選一招額外技能。十級經驗門檻：0／700／1800／3500／5800／8600／12200／16600／21900／28100。</footer></main>
-<script src="../story/tower-hero-growth.js?v=1.43.1"></script><script src="../story/tower-heroes-core.js?v=1.43.1"></script><script src="../story/tower-heroes-icons.js"></script><script>
-const H=TowerHeroes,I=TowerHeroIcons,names={root:'甜根莖',herb:'香草',shell:'硬殼',mushroom:'月傘菇',nectar:'花蜜',meat:'蟹肉'},slots={weapon:'武器',helmet:'頭部',armor:'身體',shield:'盾牌'};
-document.getElementById('nav').innerHTML=Object.entries(H.JOBS).map(([id,j])=>'<a href="#'+id+'">'+j.name+'</a>').join('')+'<a href="#gear">所有裝備</a>';
-document.getElementById('content').innerHTML=Object.entries(H.JOBS).map(([id,j])=>'<section id="'+id+'"><h2>'+j.name+' · 六普通主動／五普通被動＋主角專屬</h2><div class="grid">'+[...Object.values(H.SKILLS),...Object.values(H.PASSIVES)].filter(s=>s.job===id).map(s=>'<article>'+I.svg(s.id)+'<h3>'+s.name+'</h3><small>'+(s.unique?'十級主角專屬 · ':'')+(H.SKILLS[s.id]?(s.attack?'主動攻擊':'主動輔助'):'被動技能')+'</small><p>'+s.description+'</p><small>'+H.scale(s).label+'</small><table><tr>'+[1,2,3,4,5,6].map(n=>'<th>'+n+'級</th>').join('')+'</tr><tr>'+s.power.map(n=>'<td>'+n+H.scale(s).unit+'</td>').join('')+'</tr></table>'+(s.cooldown?'<p>基礎冷卻 '+s.cooldown+' 秒</p>':'')+(s.cost&&Object.keys(s.cost).length?'<small>材料：'+Object.entries(s.cost).map(([k,v])=>names[k]+' ×'+v).join('、')+'</small>':'')+'</article>').join('')+'</div></section>').join('')+'<section id="gear"><h2>54 件三階專用裝備（1／3／5 級可用）</h2><div class="grid">'+Object.values(H.GEAR).map(g=>'<article>'+I.svg(g.kind)+'<h3>'+g.name+'</h3><small>'+'第 '+g.tier+' 階 · '+g.requiredLevel+' 級可用 · '+slots[g.slot]+' · '+g.jobs.map(j=>H.JOBS[j].name).join('、')+'</small><p>'+(g.slot==='weapon'?'物理 '+g.damage+(g.magicDamage?' · 法術 '+g.magicDamage+' · 輔助 +'+Math.round(g.support*100)+'%':'')+'<br>攻擊間隔 '+g.interval+' 秒 · 距離 '+g.reach+'<br>'+(g.hands===2?'雙手占用，不能持盾':'單手，可搭配盾牌'):'基礎防禦 '+g.defense)+'</p></article>').join('')+'</div></section>';
-</script></body></html>
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#0a151e">
+<meta name="description" content="倒轉高塔劇情模式完整圖鑑：七職業、所有技能、五階武器防具、補給材料、合作連攜、烹飪與鍛造。共用遊戲原創圖示與目前規則，支援手機查閱。">
+<title>冒險者全書 · 倒轉高塔劇情圖鑑</title>
+<link rel="icon" href="../assets/app-icon/favicon-48.png">
+<link rel="stylesheet" href="story-atlas.css?v=1.47.0">
+</head>
+<body id="top">
+<a class="skip" href="#results">跳到圖鑑內容</a>
+<div class="wrap">
+<header class="topbar"><a class="brand" href="../index.html#home"><img src="../assets/app-icon/icon-192.png" alt="" width="38" height="38">3D移動迷宮</a><small>劇情模式 · v1.48.0 圖鑑</small></header>
+<section class="hero" aria-labelledby="pageTitle">
+<div><p class="eyebrow">從雲頂高塔，到地底深處</p><h1 id="pageTitle">倒轉高塔<span>冒險者全書</span></h1><p class="intro">認識每一種職業，找到適合自己的武器與技能。這裡收錄目前劇情模式的完整規則與遊戲圖示，地上高塔與地下遠征一次查清楚。</p><div class="stats" id="stats" aria-label="圖鑑收錄數量"></div></div>
+<div class="hero-art" role="img" aria-label="遊戲原創高塔召喚封面"><p>99 層高塔 ／ 50 層地下遠征</p></div>
+</section>
+<details class="rules" id="readingRules"><summary>閱讀前先看：成長、技能抽選與裝備規則</summary><div class="rules-grid">
+<section><h3>職業本領不等於隨機技能</h3><p>七種職業皆可選男女外觀，能力相同。出發前揭曉隨機三主動、兩被動；圖鑑收錄全部候選，不代表一人同時擁有所有技能。廚師雙份料理等效果須實際學會對應被動。</p></section>
+<section><h3>地上與地下成長分開</h3><p>地上主角最高十級、同伴五級。進入地下才開放主角十五級、同伴十級，並可帶四位同伴；地下新招募一律五級，入隊隨機取得四級追加技能，不再補選。</p></section>
+<section><h3>覺醒與進階路線</h3><p>地上主角十級隨機覺醒；地下尚未覺醒者可二選一，已有絕技不重抽。同伴六／八級可選普通技能，地下十級二選一；主角十二、十五級各獲得同路線進階招式。</p></section>
+<section><h3>武器階級與耐久</h3><p>一至五階分別需一、三、五、八、十級；四、五階只在地下開放。近戰命中才扣耐久；光彈與箭矢發射就扣。雙手武器不能配盾，男女裝版型不同、數值相同。</p></section>
+<section><h3>物資與照明</h3><p>物資不會散放或因變形重生，改由討伐掉落、交易、委託等來源取得。火把五分鐘、日光術十分鐘；日光術是術士本領，不占技能格。主線印記仍需在地圖尋找。</p></section>
+<section><h3>隊伍連攜</h3><p>兩人或三人實際學會指定技能，冷卻與材料足夠，且符合距離、視線與站位時才顯示連攜鈕。點擊選招，共同準備後發動；準備中受傷、離開陣形或切換角色會取消，不扣材料。</p></section>
+<section><h3>料理與鍛造</h3><p>新增食譜與工藝也收錄在本頁。地下料理依抵達深度解鎖；星脈、鎮淵工藝需進入地下，且必須是適用的裝備。每件裝備只可選一種工藝、最多兩級，確認前可查看花費。</p></section>
+<section><h3>數值怎麼閱讀</h3><p>各卡列出基礎效果、耗材、準備及冷卻；等級表指技能等級，不是裝備階級。實際效果可能受人物等級、被動、強化與料理加成影響。本頁唯讀，不讀取或更動你的存檔。</p></section>
+</div></details>
+</div>
+<div class="controls-shell"><div class="wrap">
+<nav class="categories" id="categories" aria-label="圖鑑分類"></nav>
+<div class="filters">
+<label for="search">搜尋名稱、效果或材料<input id="search" type="search" placeholder="例如：棘蔓、護盾、火把…" autocomplete="off"></label>
+<label for="job">適用職業<select id="job"><option value="">所有職業</option></select></label>
+<label for="scope">解鎖範圍<select id="scope"><option value="">全部內容</option><option value="surface">地上可取得</option><option value="underground">地下新增</option></select></label>
+<label for="kind">細分類<select id="kind"><option value="">全部類型</option></select></label>
+</div></div></div>
+<main class="wrap" id="results" tabindex="-1">
+<div id="loadError" role="alert" hidden>圖鑑資料尚未載入完整，請重新整理；請勿將空白清單視為遊戲內容已移除。</div>
+<div class="results-top"><div><h2 id="sectionTitle">職業總覽</h2><p id="resultCount" role="status" aria-live="polite">正在整理圖鑑…</p></div><div class="actions"><button id="reset" type="button">重設篩選</button><button id="expand" type="button" aria-pressed="false">全部展開</button><button id="print" type="button">列印</button></div></div>
+<div class="grid" id="content"></div>
+<noscript>本頁需要開啟瀏覽器的程式執行功能，才能讀取與遊戲共用的圖示及規則。</noscript>
+<footer><p>所有圖示取自本專案遊戲；職業、技能、裝備數值與遊戲共用資料。特殊材料新增小圖也同步用於遊戲管理介面。</p><p>只收錄目前劇情玩法，不混入搶購商品、一般多人道具或退役的舊版裝備。主線物件名稱可能透露章節線索，不顯示故事結局。版本標示不代表正式網站已部署。</p><p>列印只輸出目前篩選結果；如需完整全書，先按「全部」並重設其他篩選。<a href="../index.html#home">返回遊戲首頁</a></p></footer>
+</main>
+<a class="back-top" href="#top">回頁首 ↑</a>
+<script src="../story/tower-underworld.js?v=1.47.0"></script>
+<script src="../assets/pickup-objects.js"></script>
+<script src="../story/tower-ascension-catalog.js?v=1.47.0"></script>
+<script src="../story/tower-gear-tiers.js?v=1.47.0"></script>
+<script src="../story/tower-hero-growth.js?v=1.48.0"></script>
+<script src="../story/tower-heroes-core.js?v=1.47.0"></script>
+<script src="../story/tower-heroes-icons.js?v=1.47.0"></script>
+<script src="../story/story-core.js?v=1.47.0"></script>
+<script src="../story/tower-narrative.js?v=1.47.0"></script>
+<script src="../story/tower-materials.js?v=1.48.0"></script>
+<script src="../story/tower-expedition-core.js?v=1.48.0"></script>
+<script src="../story/tower-lighting-core.js?v=1.47.0"></script>
+<script src="../story/tower-encounters.js?v=1.47.0"></script>
+<script src="../story/tower-loot.js?v=1.48.0"></script>
+<script src="../story/tower-party-core.js?v=1.48.0"></script>
+<script src="../story/tower-party-runtime.js?v=1.48.0"></script>
+<script src="../story/tower-lighting-runtime.js?v=1.47.0"></script>
+<script src="../story/tower-resource-icons.js?v=1.48.0"></script>
+<script src="../story/tower-forge-icons.js?v=1.47.0"></script>
+<script src="../story/tower-cooperation-core.js?v=1.47.0"></script>
+<script src="../story/tower-cooperation-runtime.js?v=1.47.0"></script>
+<script src="../story/tower-field-guide.js?v=1.47.0"></script>
+<script src="story-atlas-rules.js?v=1.48.0"></script>
+<script src="story-atlas-items.js?v=1.48.0"></script>
+<script src="story-atlas-cooperation.js?v=1.47.0"></script>
+<script src="story-atlas.js?v=1.47.0"></script>
+</body>
+</html>

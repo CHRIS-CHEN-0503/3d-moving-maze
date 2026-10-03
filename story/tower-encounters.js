@@ -5,10 +5,19 @@
   if (root) root.TowerEncounters = api;
 })(typeof globalThis !== 'undefined' ? globalThis : this, function (core) {
   'use strict';
+  const GROCERY = Object.freeze({ merchantId: 'suHe', chance: .4, commonIngredients: Object.freeze(['root', 'mushroom', 'herb', 'nectar']), commonPrice: 2, specialtyPrice: 5, minStock: 1, maxStock: 5 });
   const MERCHANTS = Object.freeze({
-    tieLing: Object.freeze({ id: 'tieLing', name: '鐵嶺', title: '鐵匠', greeting: '我是鐵匠鐵嶺。頭盔、球棒和保命補給，都在這裡挑。', equipmentKinds: Object.freeze(['helmet', 'bat']), supplies: Object.freeze(['heal', 'shield']) }),
-    jinHe: Object.freeze({ id: 'jinHe', name: '錦禾', title: '裁甲師', greeting: '我是裁甲師錦禾。盔甲、平底鍋和旅途糧食，由我準備。', equipmentKinds: Object.freeze(['armor', 'pan']), supplies: Object.freeze(['ration', 'feather']) }),
-    lanZhou: Object.freeze({ id: 'lanZhou', name: '嵐舟', title: '盾匠', greeting: '我是盾匠嵐舟。盾牌、木杖和探路工具，都在這裡。', equipmentKinds: Object.freeze(['shield', 'staff']), supplies: Object.freeze(['map', 'bell', 'hourglass']) }),
+    tieLing: Object.freeze({ id: 'tieLing', name: '鐵嶺', title: '鐵匠', greeting: '我是鐵匠鐵嶺。頭盔與近戰武器，交給我就放心。', equipmentKinds: Object.freeze(['helmet', 'bat']), supplies: Object.freeze([]) }),
+    jinHe: Object.freeze({ id: 'jinHe', name: '錦禾', title: '裁甲師', greeting: '我是裁甲師錦禾。合身的盔甲，會陪你走得更遠。', equipmentKinds: Object.freeze(['armor', 'pan']), supplies: Object.freeze([]) }),
+    lanZhou: Object.freeze({ id: 'lanZhou', name: '嵐舟', title: '盾匠', greeting: '我是盾匠嵐舟。盾牌與遠行武器，都在這裡。', equipmentKinds: Object.freeze(['shield', 'staff']), supplies: Object.freeze([]) }),
+    suHe: Object.freeze({ id: 'suHe', name: '蘇禾', title: '雜貨商', sex: 'female', greeting: '我是雜貨商蘇禾。藥水、食材和旅途補給，都替你備好了。', equipmentKinds: Object.freeze([]), get supplies() { return Object.freeze(Object.keys(core().ITEMS).filter(id => id !== 'coin')); } }),
+  });
+  // The same catalogue drives sales and professional maintenance. Every base
+  // weapon belongs to exactly one merchant, across all five equipment tiers.
+  const MERCHANT_SERVICES=Object.freeze({
+    tieLing:Object.freeze({slot:'helmet',weaponKinds:Object.freeze(['longsword','greatsword','smith_hammer','warhammer']),legacyWeapons:Object.freeze(['bat'])}),
+    jinHe:Object.freeze({slot:'armor',weaponKinds:Object.freeze(['cooking_pan','twin_daggers']),legacyWeapons:Object.freeze(['pan'])}),
+    lanZhou:Object.freeze({slot:'shield',weaponKinds:Object.freeze(['arcane_staff','spellbook','elven_bow']),legacyWeapons:Object.freeze(['staff'])}),
   });
   const EXPLORERS = Object.freeze({
     eve: Object.freeze({ id: 'eve', name: '伊芙', title: '探索者', greeting: '我的地圖又被高塔改寫了。沒關係，我們一起把路找回來。' }),
@@ -35,11 +44,53 @@
     const random = randomFor(floor, seed, 0x683f47), ids = Object.keys(EXPLORERS);
     return { ...EXPLORERS[ids[Math.floor(random() * ids.length)]] };
   }
-  function newAdventure() { return { version: 1, claimed: [], quest: null }; }
-  function validateAdventure(value, floor) {
+  const materials = () => typeof module === 'object' && module.exports ? require('./tower-materials.js') : globalThis.TowerMaterials;
+  function groceryCatalogue(floor, seed) {
+    // Independent stream: adding a grocery never changes the three equipment vendors.
+    const random = randomFor(floor, seed, 0x6a09e667);
+    if (random() >= GROCERY.chance) return null;
+    const roll = Math.floor(random() * (floor < 0 ? 149 : 99)), sourceFloor = roll < 99 ? roll + 1 : 98 - roll;
+    const M = materials(), specialty = M.signature(sourceFloor), stock = () => 1 + Math.floor(random() * GROCERY.maxStock);
+    return [
+      ...GROCERY.commonIngredients.map(ingredientId => ({ id: `grocery:${floor}:common:${ingredientId}`, ingredientId, name: M.INGREDIENTS[ingredientId], sourceFloor: null, sourceName: '常備食材', specialty: false, price: GROCERY.commonPrice, stock: stock() })),
+      { id: `grocery:${floor}:special:${sourceFloor}:${specialty}`, ingredientId: specialty, name: M.INGREDIENTS[specialty], sourceFloor, sourceName: M.ecology(sourceFloor).name, specialty: true, price: GROCERY.specialtyPrice, stock: stock() },
+    ];
+  }
+  function groceryPurchases(value, floor, seed) {
+    if (value === undefined) return {};
+    if (!value || typeof value !== 'object' || Array.isArray(value) || Object.keys(value).length > GROCERY.commonIngredients.length + 1) return null;
+    const result = {}, ingredients = materials().INGREDIENTS;
+    let specials = 0;
+    for (const [id, count] of Object.entries(value)) {
+      const match = /^grocery:(-?\d+):(common|special):(?:(-?\d+):)?([a-z]+)$/.exec(id);
+      if (!match || !validFloor(Number(match[1])) || String(Number(match[1])) !== match[1] || floor !== undefined && Number(match[1]) !== floor || !integer(count, 0, GROCERY.maxStock) || !Object.hasOwn(ingredients, match[4])) return null;
+      if (match[2] === 'common') { if (match[3] || !GROCERY.commonIngredients.includes(match[4])) return null; }
+      else {
+        const source = Number(match[3]);
+        if (++specials > 1 || !validFloor(source) || String(source) !== match[3] || Number(match[1]) > 0 && source < 0 || materials().signature(source) !== match[4]) return null;
+      }
+      result[id] = count;
+    }
+    if (seed !== undefined && Object.keys(result).length) {
+      if (!validFloor(floor) || !integer(seed, 1, 0xffffffff)) return null;
+      const offers = groceryCatalogue(floor, seed) || [];
+      if (Object.entries(result).some(([id, count]) => !offers.some(offer => offer.id === id && count <= offer.stock))) return null;
+    }
+    return result;
+  }
+  function groceryOffers(run) {
+    if (!run || run.expedition?.active) return [];
+    const purchases = groceryPurchases(run.adventure?.groceryPurchases, run.floor, run.seed);
+    if (!purchases) return [];
+    return (groceryCatalogue(run.floor, run.seed) || []).map(offer => ({ ...offer, purchased: purchases[offer.id] || 0, remaining: Math.max(0, offer.stock - (purchases[offer.id] || 0)) }));
+  }
+  function newAdventure() { return { version: 1, claimed: [], quest: null, groceryPurchases: {} }; }
+  function validateAdventure(value, floor, seed) {
     if (floor !== undefined && !validFloor(floor)) return null;
     if (value === undefined) return newAdventure();
     if (!value || typeof value !== 'object' || Array.isArray(value) || value.version !== 1 || !uniqueIds(value.claimed, 128)) return null;
+    const purchases = groceryPurchases(value.groceryPurchases, floor, seed);
+    if (!purchases) return null;
     let quest = null;
     if (value.quest !== null) {
       const q = value.quest;
@@ -48,7 +99,7 @@
       if ((q.status === 'active' && q.progress >= q.goal) || (q.status !== 'active' && q.progress !== q.goal)) return null;
       quest = { id: q.id, floor: q.floor, type: q.type, status: q.status, target: q.target, goal: q.goal, progress: q.progress, events: [...q.events] };
     }
-    return { version: 1, claimed: [...value.claimed], quest };
+    return { version: 1, claimed: [...value.claimed], quest, groceryPurchases: purchases };
   }
   function floorLootCounts(size) {
     if (!Object.hasOwn(COUNTS, size)) throw new RangeError('未知的迷宮尺寸。');
@@ -62,38 +113,48 @@
     return Array.from({length:count},(_,i)=>({id:'arrows:'+run.floor+':'+i,kind:'arrow',quantity:10}));
   }
   function merchantOffers(floor, seed, modern=false) {
-    const C = core(), random = randomFor(floor, seed, 0x24181), ids = Object.keys(MERCHANTS);
+    const C = core(), random = randomFor(floor, seed, 0x24181), ids = Object.keys(MERCHANT_SERVICES);
     for (let i = ids.length - 1; i > 0; i--) { const j = Math.floor(random() * (i + 1)); [ids[i], ids[j]] = [ids[j], ids[i]]; }
     const count = floor < 70 && random() < .45 ? 2 : 1;
-    return ids.slice(0, count).map(id => {
-      const kinds={tieLing:['heavy_helm','light_hood','rune_crown','longsword','greatsword','smith_hammer','warhammer'],jinHe:['heavy_armor','light_armor','robe','cooking_pan','twin_daggers'],lanZhou:['buckler','round_shield','tower_shield','arcane_staff','spellbook','elven_bow']};
+    const shops = ids.slice(0, count).map(id => {
       const H=typeof module==='object'&&module.exports?require('./tower-heroes-core.js'):globalThis.TowerHeroes;
-      if(modern)for(const merchant of ids)kinds[merchant]=H.gearPool(floor).filter(k=>kinds[merchant].includes(H.GEAR[k].baseKind));
-      const old=MERCHANTS[id],entry=modern?{...old,equipmentKinds:kinds[id],greeting:'我是'+old.name+'，這裡有專用裝備與旅途補給。'}:old;
-      return { ...entry, equipmentKinds: [...entry.equipmentKinds], supplies: [...entry.supplies,...(modern?['arrow']:[])], gear: entry.equipmentKinds.map(kind => {
+      const old=MERCHANTS[id],entry=modern?{...old,equipmentKinds:H.gearPool(floor).filter(kind=>merchantHandles(id,kind))}:old;
+      return { ...entry, equipmentKinds: [...entry.equipmentKinds], supplies: [], gear: entry.equipmentKinds.map(kind => {
         const gear = C.createGear(kind, floor, seed, `shop:${floor}:${id}:${kind}`, false);
         return { kind, gear, price: C.gearPrice(gear) };
       }) };
     });
+    const ingredientOffers = groceryCatalogue(floor, seed);
+    if (ingredientOffers) shops.push({ ...MERCHANTS.suHe, equipmentKinds: [], supplies: [...MERCHANTS.suHe.supplies], gear: [], ingredientOffers });
+    return shops;
   }
   function merchant(run, merchantId) { return merchantOffers(run.floor, run.seed,!!run.party?.loadouts).find(entry => entry.id === merchantId); }
+  function merchantHandles(merchantId,gear){
+    const rules=Object.hasOwn(MERCHANT_SERVICES,merchantId)?MERCHANT_SERVICES[merchantId]:null,kind=typeof gear==='string'?gear:gear?.kind,definition=core().GEAR[kind];
+    if(!rules||!definition)return false;
+    return definition.slot===rules.slot||definition.slot==='weapon'&&(rules.weaponKinds.includes(definition.baseKind||kind)||rules.legacyWeapons.includes(kind));
+  }
+  function serviceContext(run,merchantId){return run&&Object.hasOwn(MERCHANT_SERVICES,merchantId)&&merchant(run,merchantId)?{kind:'merchant',merchantId,floor:run.floor,seed:run.seed}:null;}
+  function serviceAvailable(run,service,gear){
+    return !!(run&&service?.kind==='merchant'&&service.floor===run.floor&&service.seed===run.seed&&merchant(run,service.merchantId)&&merchantHandles(service.merchantId,gear));
+  }
   function failure(run, message) { return { ok: false, run, message }; }
   function transaction(run, expectedRevision, fn) {
     return core().transaction(run, expectedRevision, next => {
-      const adventure = validateAdventure(next.adventure, next.floor);
+      const adventure = validateAdventure(next.adventure, next.floor, next.seed);
       if (!adventure) return { ok: false, message: '奇遇進度有誤，請重新讀取存檔。' };
       next.adventure = adventure;
       const result = fn(next);
-      if (result.ok && !validateAdventure(next.adventure, next.floor)) return { ok: false, message: '本層奇遇紀錄已滿，無法保存這次操作。' };
+      if (result.ok && !validateAdventure(next.adventure, next.floor, next.seed)) return { ok: false, message: '本層奇遇紀錄已滿，無法保存這次操作。' };
       return result;
     });
   }
   function buySupply(run, merchantId, itemId, quantity = 1, expectedRevision) {
     return transaction(run, expectedRevision, next => {
       const C = core(), shop = merchant(next, merchantId), item = C.ITEMS[itemId];
-      if (!shop || !shop.supplies.includes(itemId) || !item || !integer(quantity, 1, 99)) return { ok: false, message: '這位商人沒有出售這件補給。' };
-      const cost = item.buyPrice * quantity;
-      if (next.coins < cost || next.bag[itemId] + quantity > 99) return { ok: false, message: next.coins < cost ? '銅幣不足。' : '補給背包已滿。' };
+      if (next.expedition?.active || !shop || !shop.supplies.includes(itemId) || !item || !integer(quantity, 1, C.itemLimit(itemId,next))) return { ok: false, message: '這位商人沒有出售這件補給。' };
+      const cost = C.supplyPrice(itemId, quantity);
+      if (next.coins < cost || next.bag[itemId] + quantity > C.itemLimit(itemId,next)) return { ok: false, message: next.coins < cost ? '銅幣不足。' : '補給背包已滿。' };
       next.coins -= cost; next.bag[itemId] += quantity;
       return { ok: true, message: `向${shop.name}購買${item.name} × ${quantity}。` };
     });
@@ -101,10 +162,24 @@
   function sellSupply(run, merchantId, itemId, quantity = 1, expectedRevision) {
     return transaction(run, expectedRevision, next => {
       const C = core(), shop = merchant(next, merchantId), item = C.ITEMS[itemId];
-      if (!shop || !shop.supplies.includes(itemId) || !item || !integer(quantity, 1, 99)) return { ok: false, message: '這位商人不收購這件補給。' };
+      if (next.expedition?.active || !shop || !shop.supplies.includes(itemId) || !item || !(item.sellPrice > 0) || !integer(quantity, 1, C.itemStorageLimit(itemId))) return { ok: false, message: '這位商人不收購這件補給。' };
       if (next.bag[itemId] < quantity || next.coins + item.sellPrice * quantity > 999999) return { ok: false, message: '物資不足或銅幣已達上限。' };
       next.bag[itemId] -= quantity; next.coins += item.sellPrice * quantity;
       return { ok: true, message: `向${shop.name}出售${item.name} × ${quantity}。` };
+    });
+  }
+  function buyIngredient(run, merchantId, offerId, quantity = 1, expectedRevision) {
+    return transaction(run, expectedRevision, next => {
+      if (!next.party || merchantId !== GROCERY.merchantId || !integer(quantity, 1, GROCERY.maxStock)) return { ok: false, message: '這位商人沒有出售這份食材。' };
+      const offers = groceryOffers(next), offer = offers.find(entry => entry.id === offerId);
+      if (!offer) return { ok: false, message: '本層沒有這份食材，請重新確認攤位。' };
+      if (quantity > offer.remaining) return { ok: false, message: '這份食材的本層庫存不足。' };
+      if (next.party.ingredients[offer.ingredientId] + quantity > 99) return { ok: false, message: '食材袋已滿。' };
+      const cost = offer.price * quantity;
+      if (next.coins < cost) return { ok: false, message: '銅幣不足。' };
+      next.coins -= cost; next.party.ingredients[offer.ingredientId] += quantity;
+      next.adventure.groceryPurchases[offer.id] = offer.purchased + quantity;
+      return { ok: true, message: `向蘇禾購買${offer.name} × ${quantity}。`, effect: { ingredient: offer.ingredientId, quantity, sourceFloor: offer.sourceFloor } };
     });
   }
   function buyMerchantGear(run, merchantId, kind, expectedRevision) {
@@ -230,7 +305,7 @@
       const C = core(), q = next.adventure.quest;
       if (!q || q.status !== 'ready' || next.adventure.claimed.includes(`reward:${q.id}`)) return { ok: false, message: '沒有尚未領取的委託報酬。' };
       const reward = questReward(next.floor, next.seed,!!next.party?.loadouts);
-      if (next.coins + reward.coins > 999999 || Object.entries(reward.items).some(([id, amount]) => next.bag[id] + amount > 99)) return { ok: false, message: '請先整理背包或銅幣，再領取報酬。' };
+      if (next.coins + reward.coins > 999999 || Object.entries(reward.items).some(([id, amount]) => next.bag[id] + amount > C.itemLimit(id,next))) return { ok: false, message: '請先整理背包或銅幣，再領取報酬。' };
       if (reward.gear) { const result = C.receiveGear(next, reward.gear); if (!result.ok) return result; }
       next.coins += reward.coins; for (const [id, amount] of Object.entries(reward.items)) next.bag[id] += amount;
       q.status = 'claimed'; next.adventure.claimed.push(`reward:${q.id}`);
@@ -245,5 +320,5 @@
       return { ok: true, message: '已放棄本層委託，尚未領取的報酬不會保留。' };
     });
   }
-  return Object.freeze({ MERCHANTS, EXPLORERS, QUEST_TYPES, newAdventure, validateAdventure, floorLootCounts, arrowLoot, merchantOffers, buySupply, sellSupply, buyMerchantGear, chestOffer, openChest, questReward, explorerIdentity, explorerOffer, acceptQuest, questProgress, claimQuestReward, abandonQuest });
+  return Object.freeze({ MERCHANTS, MERCHANT_SERVICES, GROCERY, groceryOffers, buyIngredient, validateGroceryPurchases: groceryPurchases, merchantHandles, serviceContext, serviceAvailable, EXPLORERS, QUEST_TYPES, newAdventure, validateAdventure, floorLootCounts, arrowLoot, merchantOffers, buySupply, sellSupply, buyMerchantGear, chestOffer, openChest, questReward, explorerIdentity, explorerOffer, acceptQuest, questProgress, claimQuestReward, abandonQuest });
 });

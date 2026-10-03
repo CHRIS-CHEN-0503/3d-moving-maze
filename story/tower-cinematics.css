@@ -1,0 +1,10 @@
+#towerCinema[hidden]{display:none!important}
+#towerCinema{position:fixed;inset:0;z-index:90;isolation:isolate;color:#fff5df;background:linear-gradient(#06111caa,transparent 24%,transparent 63%,#06111cee);touch-action:none}
+.cinema-veil{position:absolute;inset:0;background:#050b13;pointer-events:none;opacity:0;z-index:-1}
+.cinema-controls{position:absolute;right:max(18px,env(safe-area-inset-right));top:max(14px,env(safe-area-inset-top));display:flex;gap:10px}
+.cinema-controls button{min-width:72px;min-height:44px;padding:8px 16px;border:1px solid #c8d9df88;border-radius:12px;color:#fff5df;background:#182c3dec;font:inherit;cursor:pointer}
+.cinema-controls button[hidden]{display:none}
+.cinema-caption{position:absolute;bottom:max(16px,env(safe-area-inset-bottom));left:max(24px,env(safe-area-inset-left));right:max(24px,env(safe-area-inset-right));max-width:900px;margin:auto;text-shadow:0 2px 4px #000}
+.cinema-caption small{font-size:12px;letter-spacing:.1em;color:#d3c59d}.cinema-caption h2{font-size:clamp(19px,3vw,26px);margin:4px 0 7px}.cinema-caption p{font-size:clamp(16px,2.3vw,21px);line-height:1.5;margin:0;max-height:28vh;overflow:auto}
+body.tower-cinematic-active #gameScreen :not(#c3d){visibility:hidden!important;opacity:0!important;pointer-events:none!important}
+@media(max-height:420px){.cinema-caption{bottom:max(10px,env(safe-area-inset-bottom));left:max(18px,env(safe-area-inset-left));right:max(18px,env(safe-area-inset-right))}.cinema-caption h2{margin:3px 0}.cinema-caption p{font-size:16px;max-height:24vh}.cinema-controls{top:8px}}

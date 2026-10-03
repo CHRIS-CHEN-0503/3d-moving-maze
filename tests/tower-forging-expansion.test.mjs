@@ -5,10 +5,11 @@ import {readFileSync} from 'node:fs';
 import vm from 'node:vm';
 const require=createRequire(import.meta.url),C=require('../story/story-core.js'),P=require('../story/tower-party-core.js'),H=require('../story/tower-heroes-core.js'),X=require('../story/tower-expedition-core.js'),G=require('../story/tower-hero-growth.js'),N=require('../story/tower-narrative.js'),I=require('../story/tower-forge-icons.js');
 const ok=result=>{assert.ok(result.ok,result.message);assert.ok(C.validateSave(result.run),'valid saved transaction');return result.run;};
-const fresh=(job='swordsman')=>{const r=ok(H.enable(ok(P.enable(C.newRun({seed:31}),job))));r.coins=1000;r.party.journey.scrap=99;for(const key of Object.keys(r.party.journey.materials))r.party.journey.materials[key]=99;return r;};
+function smithCrew(run){if(!P.has(run,'smith')){const departed=run.party.travellers.find(t=>t.profession==='smith'),member={id:'forge-specialist:'+run.floor,profession:'smith',sex:departed?.sex==='male'?'female':'male',level:1,hp:34,cooldown:0,hurtLeft:0};run.party.members.push(member);if(!run.party.joined.includes(member.id))run.party.joined.push(member.id);H.addMember(run,member);H.sync(run);}return run;}
+const fresh=(job='swordsman')=>{const r=smithCrew(ok(H.enable(ok(P.enable(C.newRun({seed:31}),job)))));r.coins=1000;r.party.journey.scrap=99;for(const key of Object.keys(r.party.journey.materials))r.party.journey.materials[key]=99;return r;};
 const near=(a,b)=>assert.ok(Math.abs(a-b)<1e-8,`${a} != ${b}`);
 function under(job='swordsman'){
-  let r=fresh(job);r.floor=1;r.floorsCleared=98;r.chronicle=N.newChronicle(1);P.advance(r,{reward:false});r=ok(N.collectClue(r));r=ok(N.chooseEnding(r,'keeper'));r.party.boss.started=true;r.party.boss.done=true;r.party.boss.seals.fill(true);r.defeatedMonsters.push('monster-11');r=ok(C.descend(r));r=ok(C.startUnderworld(r));r.coins=1000;r.party.journey.scrap=99;return r;
+  let r=fresh(job);r.floor=1;r.floorsCleared=98;r.chronicle=N.newChronicle(1);P.advance(r,{reward:false});r=ok(N.collectClue(r));r=ok(N.chooseEnding(r,'keeper'));r.party.boss.started=true;r.party.boss.done=true;r.party.boss.seals.fill(true);r.defeatedMonsters.push('monster-11');r=ok(C.descend(r));r=smithCrew(ok(C.startUnderworld(r)));r.coins=1000;r.party.journey.scrap=99;return r;
 }
 const forge=(r,id,trait)=>ok(X.forge(r,id,trait,r.revision));
 function equip(r,kind){const gear=C.createGear(kind,r.floor,r.seed,'forge-test-'+kind);r=ok(C.grantGear(r,gear));return ok(H.equip(r,'hero',gear.id));}
@@ -86,8 +87,8 @@ test('save validation rejects mismatched weapon types, old traits retain exact b
 
 test('workshop uses shared eligibility, quote and exact original icons for both selection and confirmation',()=>{
   const source=readFileSync(new URL('../story/tower-party-runtime.js',import.meta.url),'utf8');
-  assert.match(source,/choices=X\.forgeOptions\(run,g\)/);assert.match(source,/TowerForgeIcons\?\.svg\(X\.TRAITS\[q\.trait\]\.icon\)/);
-  assert.match(source,/q=X\.forgeQuote\(r\(\),gearId,trait\)/);assert.match(source,/X\.forge\(r\(\),gearId,trait,pendingForge\.revision\)/);
+  assert.match(source,/choices=X\.forgeOptions\(run,g,forgeService\)/);assert.match(source,/TowerForgeIcons\?\.svg\(X\.TRAITS\[q\.trait\]\.icon\)/);
+  assert.match(source,/q=X\.forgeQuote\(r\(\),gearId,trait,forgeService\)/);assert.match(source,/X\.forge\(r\(\),gearId,trait,pendingForge\.revision,pendingForge\.service\)/);
 });
 
 test('light armor accelerates its actual wearer, caps at six percent, and is not counted twice for the leader',()=>{
@@ -104,7 +105,7 @@ test('light armor accelerates its actual wearer, caps at six percent, and is not
     r=forge(r,helmet,'light');near(H.speed(r,id),base[id]*1.06);
   }
   const source=readFileSync(new URL('../story/tower-mode.js',import.meta.url),'utf8'),movement=source.match(/function movementScale\(\)\{[^\n]+\}/)[0];
-  const playerSpeed=(run,modern)=>vm.runInNewContext(movement+'; movementScale();',{run,active:true,paused:false,G:{shifting:false},hazardSlow:1,modern:()=>modern,Heroes:H,window:{TowerExpedition:X}});
+  const playerSpeed=(run,modern)=>vm.runInNewContext(movement+'; movementScale();',{C,run,active:true,paused:false,G:{shifting:false},hazardSlow:1,modern:()=>modern,Heroes:H,window:{TowerExpedition:X}});
   near(playerSpeed(r,true),base.hero*1.06);
   const beforeSwitch=H.speed(r,member.id);r=ok(H.switchActor(r,member.id,r.revision));near(H.speed(r,member.id),beforeSwitch);near(playerSpeed(r,true),beforeSwitch);
   H.equipment(r,member.id).armor.durability=0;near(H.speed(r,member.id),base[member.id]*1.03);

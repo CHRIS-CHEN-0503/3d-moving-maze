@@ -6,7 +6,7 @@
   const P=()=>typeof module==='object'&&module.exports?require('./tower-party-core.js'):globalThis.TowerPartyCore;
   const M=()=>typeof module==='object'&&module.exports?require('./tower-materials.js'):globalThis.TowerMaterials;
   const num=(v,a,b)=>Number.isInteger(v)&&v>=a&&v<=b;
-  const CHANCES=Object.freeze({common:20,uncommon:12,rare:6,legendary:3}),MAX_GROUND=96;
+  const CHANCES=Object.freeze({common:20,uncommon:12,rare:6,legendary:3}),MAX_GROUND=96,ARROW_DROP_QUANTITY=50;
   function hash(seed,text){let h=seed>>>0;for(const c of String(text))h=Math.imul(h^c.charCodeAt(0),16777619)>>>0;
     // Mix all bits before modulo: power-of-two candidate pools otherwise make
     // FNV's low bits correlate the choice with its supposedly independent roll.
@@ -14,7 +14,7 @@
   }
   const fresh=()=>({version:1,rolled:[],entries:[]});
   function pool(run,spec){
-    const regional=M().dropPool(run,spec),supplies=[{type:'item',key:'ration',rarity:'common',quantity:1},{type:'fuel',key:'kit',rarity:'common',quantity:1},{type:'item',key:'heal',rarity:'uncommon',quantity:1},...['shield','map','bell','hourglass'].map(key=>({type:'item',key,rarity:'rare',quantity:1})),{type:'item',key:'feather',rarity:'legendary',quantity:1},...(P().has(run,'archer')?[{type:'item',key:'arrow',rarity:'common',quantity:12}]:[])];
+    const regional=M().dropPool(run,spec),supplies=[{type:'item',key:'ration',rarity:'common',quantity:1},{type:'fuel',key:'kit',rarity:'common',quantity:1},{type:'item',key:'heal',rarity:'uncommon',quantity:1},...['shield','map','bell','hourglass'].map(key=>({type:'item',key,rarity:'rare',quantity:1})),{type:'item',key:'feather',rarity:'legendary',quantity:1},...(P().has(run,'archer')?[{type:'item',key:'arrow',rarity:'common',quantity:ARROW_DROP_QUANTITY}]:[])];
     // Weight ecology and ordinary supplies equally before the original rarity
     // roll. A region's only food must not be drowned out by eight rare supplies.
     const harvest=regional.length?Array.from({length:Math.max(supplies.length,regional.length)},(_,i)=>regional[i%regional.length]):[];
@@ -44,7 +44,7 @@
   }
   function validate(value,floor,defeated){
     if(value===undefined)return fresh();if(!value||value.version!==1||!Array.isArray(value.rolled)||value.rolled.length>128||new Set(value.rolled).size!==value.rolled.length||!value.rolled.every(id=>C().validMonsterId(id,floor)&&defeated.includes(id))||!Array.isArray(value.entries)||value.entries.length>128||new Set(value.entries.map(e=>e?.id)).size!==value.entries.length)return null;
-    const maxCell=C().floorConfig(floor).size-1,entries=[];for(const e of value.entries){if(!e||!value.rolled.includes(e.source)||!['item','ingredient','material','fuel','gear'].includes(e.type)||!Object.hasOwn(CHANCES,e.rarity)||!num(e.quantity,1,20)||!num(e.cx,0,maxCell)||!num(e.cy,0,maxCell)||e.id!==floor+':'+e.source+':'+(e.type==='gear'?'gear':'item'))return null;
+    const maxCell=C().floorConfig(floor).size-1,entries=[];for(const e of value.entries){if(!e||!value.rolled.includes(e.source)||!['item','ingredient','material','fuel','gear'].includes(e.type)||!Object.hasOwn(CHANCES,e.rarity)||!num(e.quantity,1,e.type==='item'&&e.key==='arrow'?ARROW_DROP_QUANTITY:20)||!num(e.cx,0,maxCell)||!num(e.cy,0,maxCell)||e.id!==floor+':'+e.source+':'+(e.type==='gear'?'gear':'item'))return null;
       if(e.type==='item'&&(!Object.hasOwn(C().ITEMS,e.key)||e.key==='coin')||e.type==='ingredient'&&!Object.hasOwn(P().INGREDIENTS,e.key)||e.type==='material'&&(!Object.hasOwn(M().MATERIALS,e.key)||floor>0&&['starore','abyssalloy'].includes(e.key))||e.type==='fuel'&&e.key!=='kit')return null;
       const gear=e.type==='gear'?C().validateGear(e.gear):undefined;if(e.type==='gear'&&(!gear||gear.kind!==e.key||e.quantity!==1||e.source!==(floor<0?'monster-12':'monster-11')))return null;
       entries.push({id:e.id,source:e.source,type:e.type,key:e.key,quantity:e.quantity,rarity:e.rarity,cx:e.cx,cy:e.cy,...(gear?{gear}:{})});
@@ -53,8 +53,8 @@
   function claim(run,id,revision=run.revision){return C().transaction(run,revision,n=>{const state=n.party?.loot,e=state?.entries.find(e=>e.id===id);if(!e)return {ok:false,message:'這件掉落物已被拾取。'};
     if(e.type==='gear'){const result=C().receiveGear(n,e.gear);if(!result.ok)return result;}
     else if(e.type==='fuel'){if(!n.party.light||n.party.light.wood+e.quantity>99||n.party.light.cloth+e.quantity>99)return {ok:false,message:'火把材料已滿，物品留在原地。'};n.party.light.wood+=e.quantity;n.party.light.cloth+=e.quantity;}
-    else{const stock=e.type==='ingredient'?n.party.ingredients:e.type==='material'?n.party.journey.materials:n.bag;if(!stock||!num(stock[e.key],0,99))return {ok:false,message:'材料資料尚未就緒，掉落物留在原地。'};if(stock[e.key]+e.quantity>99)return {ok:false,message:'這種物品已滿，掉落物留在原地。'};stock[e.key]+=e.quantity;}
+    else{const stock=e.type==='ingredient'?n.party.ingredients:e.type==='material'?n.party.journey.materials:n.bag,limit=e.type==='item'?C().itemLimit(e.key,n):99,storedLimit=e.type==='item'?C().itemStorageLimit(e.key):99;if(!stock||!num(stock[e.key],0,storedLimit))return {ok:false,message:'材料資料尚未就緒，掉落物留在原地。'};if(stock[e.key]+e.quantity>limit)return {ok:false,message:e.key==='arrow'?'箭袋空間不足，整束箭矢留在原地。':'這種物品已滿，掉落物留在原地。'};stock[e.key]+=e.quantity;}
     state.entries=state.entries.filter(x=>x.id!==id);compact(n);return {ok:true,message:'獲得 '+label(e),effect:{pickup:e}};
   });}
-  return Object.freeze({CHANCES,MAX_GROUND,fresh,pool,recordKill,compact,validate,claim,label,hash});
+  return Object.freeze({CHANCES,MAX_GROUND,ARROW_DROP_QUANTITY,fresh,pool,recordKill,compact,validate,claim,label,hash});
 });

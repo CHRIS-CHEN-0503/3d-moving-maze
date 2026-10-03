@@ -15,8 +15,11 @@
       [{rx:-.65,lx:-.55,rz:.3,lz:-.65,wx:.65,wy:-.55,wz:-.35},{rx:-1,lx:-.9,rz:.75,lz:-1,wx:1.7,wy:.5,wz:.3,tilt:.16},{rx:-.65,lx:-.6,rz:.8,lz:-1,wx:1.25,wy:.4}]],
     cooking_pan:[[{rx:-.65,ry:-.8,rz:-.7,wx:1.1,wy:-.8,wz:-1},{rx:-1.1,ry:.65,rz:.45,wx:1.55,wy:.7,wz:.9,tilt:.12},{rx:-.65,rz:.6,wx:1.5,wy:1,wz:1.2}],
       [{rx:-.4,rz:-.2,wx:1.8,wpz:-.08},{rx:-1.7,rz:.1,wx:.75,wy:.2,wpz:.25,lean:.1},{rx:-1.2,wx:1,wz:-.2}]],
-    twin_daggers:[[{rx:-1,lx:-1,rz:-.65,lz:.65,wx:.7,lwx:.7,wz:-.9,lwz:.9},{rx:-1.3,lx:-1.3,rz:.4,lz:-.4,wx:1.7,lwx:1.7,wz:.8,lwz:-.8,lean:.08},{rx:-.65,lx:-.65,rz:.55,lz:-.55,wx:2,lwx:2}],
-      [{rx:-.55,lx:-1.1,wx:1.57,lwx:1.57,wpz:-.1},{rx:-1.6,lx:-.65,wx:1.57,lwx:1.57,wpz:.34,lpz:-.08,lean:.13},{rx:-.7,lx:-1.6,wx:1.57,lwx:1.57,wpz:-.08,lpz:.34,lean:.08}]],
+    // +Z is forward, the right shoulder is -X. Alternate a right-then-left
+    // combination with a simultaneous inward X cut. Wrist Z signs deliberately
+    // oppose the shoulders: the real blade tips cross in front, not behind us.
+    twin_daggers:[[{rx:-.7,lx:-.5,rz:-.25,lz:.2,wx:.5,lwx:.35,wz:-.12,lwz:.12,tilt:-.04},{rx:-1.6,lx:-.45,rz:.18,lz:.12,wx:1.57,lwx:.2,wz:-.12,lwz:.16,lean:.06,tilt:.045},{rx:-.45,lx:-1.6,rz:-.12,lz:-.18,wx:.2,lwx:1.57,wz:-.16,lwz:.12,lean:.06,tilt:-.045}],
+      [{rx:-.9,lx:-.9,rz:-.85,lz:.85,wx:.7,lwx:.7,wz:.65,lwz:-.65,lean:-.025},{rx:-1.35,lx:-1.35,rz:.9,lz:-.9,wx:1.3,lwx:1.3,wz:-.8,lwz:.8,lean:.09},{rx:-1.15,lx:-1.15,rz:1,lz:-1,wx:1.15,lwx:1.15,wz:-1.05,lwz:1.05,lean:.075}]],
     arcane_staff:[[{rx:-1.7,lx:-1.25,rz:.45,lz:-.75,wx:.15,wpy:.12},{rx:-1.3,lx:-1,rz:.55,lz:-.85,wx:1.57,wpz:.16,lean:.05},{rx:-1,lx:-.75,rz:.55,lz:-.75,wx:1.25}],
       [{rx:-1.1,lx:-.65,rz:.55,lz:-.55,wx:.05,wpy:.2},{rx:-1.4,lx:-1.2,rz:.5,lz:-.85,wx:1.57,wpz:.26},{rx:-1.05,lx:-.75,rz:.55,lz:-.75,wx:1.2}]],
     spellbook:[[{rx:-1,lx:-1,rz:.5,lz:-.5,bookLift:.13,bookTilt:-.2},{rx:-1.65,lx:-1.1,rz:-.25,lz:-.5,bookLift:.18,bookTilt:.12,bookPush:.18},{rx:-1.15,lx:-1,rz:.15,lz:-.5,bookLift:.07}],

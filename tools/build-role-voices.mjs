@@ -6,6 +6,7 @@ const profiles={
   'merchant.tieLing':{gender:'male',age:'older',speaker:'uncle_fu',instruction:'成熟年长男铁匠，声音厚实沉稳。'},
   'merchant.jinHe':{gender:'female',age:'adult',speaker:'serena',instruction:'成年女裁缝，嗓音温润干练，清楚利落。'},
   'merchant.lanZhou':{gender:'male',age:'adult',speaker:'dylan',instruction:'成年男工匠，声音平稳可靠，标准普通话，不带方言。'},
+  'merchant.suHe':{gender:'female',age:'adult',speaker:'serena',instruction:'成年女杂货商，声音温暖亲切，清晰利落，像可靠的旅途伙伴。'},
   'explorer.eve':{gender:'female',age:'young',speaker:'serena',instruction:'年轻女旅人，轻柔明亮，充满好奇，清楚自然。'},
   'explorer.rowan':{gender:'male',age:'young',speaker:'dylan',instruction:'年轻男冒险者，爽朗热心，标准普通话，不带方言。'},
   'explorer.mira':{gender:'female',age:'young',speaker:'vivian',instruction:'年轻女研究员，清脆活泼，说话轻快而认真。'},
@@ -22,7 +23,7 @@ for(const [key,text] of Object.entries({hold:'我來擋住牠，你先走！',ti
   tracks['guard.'+key]={text,category:'event',src:'./assets/voice/roles/guard-'+key+'-v1.mp3',speaker:'dylan',gender:'male',age:'adult',rate:1,instruction:'成年男性护卫，沉稳可靠，短句清楚有力，正常说话速度，不喊叫，不拖音。'};
 }
 for(const [id,profile] of Object.entries(profiles)){
-  tracks[id]={...base[id],...profile,src:'./assets/voice/roles/'+id.replaceAll('.','-')+'.mp3',rate:1};
+  tracks[id]={...base[id],...profile,src:'./assets/voice/roles/'+id.replaceAll('.','-')+(id.startsWith('merchant.')?'-v149':'')+'.mp3',rate:1};
   overrides[id]=tracks[id];
 }
 for(const [id,t] of Object.entries(base)){

@@ -7,6 +7,16 @@ const require=createRequire(import.meta.url),H=require('../story/tower-heroes-co
 require('../story/tower-party-runtime.js');
 const detail=(record,key)=>record.details.find(d=>d.label===key)?.value||'';
 
+test('profession invitations and repair-all documentation use the current shared recruitment costs',()=>{
+  const R=require('../story/tower-recruitment.js');
+  for(const [identity,terms]of Object.entries(R.TERMS)){
+    const [job,sex]=identity.split(':'),text=detail(D.profession(job),sex==='male'?'男旅人首次同行':'女旅人首次同行');
+    for(const[type,value]of Object.entries(terms.costs))for(const[key,n]of typeof value==='number'?[[type,value]]:Object.entries(value))assert.ok(text.includes(R.label(type,key)+' ×'+n),identity);
+    assert.match(D.profession(job).notes.join(''),/本層不能重招.*50%/);
+  }
+  assert.match(D.gear('longsword').notes.join(''),/一鍵修理.*資源不足不局部扣款/);
+});
+
 test('atlas covers every current job, weapon, armor and skill exactly once with its real game icon',()=>{
   const data=D.build();assert.equal(data.jobs.length,7);assert.equal(data.skills.length,119);assert.equal(data.weapons.length,45);assert.equal(data.armor.length,45);assert.equal(data.forging.length,7);assert.equal(data.entries.length,223);
   assert.equal(new Set(data.entries.map(e=>e.category+':'+e.id)).size,223);
@@ -69,8 +79,8 @@ test('all gear stats, five tiers, wear and price ranges use game definitions rat
 test('merchant, acquisition and profession notes reflect the modern rules',()=>{
   const shops=new Map();for(let seed=1;seed<=24;seed++)for(const m of E.merchantOffers(-21,seed,true))for(const kind of m.equipmentKinds)shops.set(kind,m.name);
   for(const record of D.build().gear)assert.ok(detail(record,'行商').startsWith(shops.get(record.id)),record.id);
-  assert.match(D.profession('chef').description,/所有隊伍都能.*烹飪/);assert.match(D.profession('chef').notes[0],/一料雙份.*等級/);
-  assert.match(D.profession('mage').description,/日光術.*不占技能欄/);assert.match(D.profession('smith').description,/修復耐久歸零/);
+  assert.match(D.profession('chef').description,/六道基本菜任何隊伍都能烹飪.*有能行動的廚師.*高階菜譜/);assert.match(D.profession('chef').notes[0],/一料雙份.*等級/);
+  assert.match(D.profession('mage').description,/日光術.*不占技能欄/);assert.match(D.profession('smith').description,/完整修理.*重建破損.*專門商人.*20%/);
   for(const job of D.build().jobs)assert.match(job.notes.join(''),/五級.*隨機/);
   assert.deepEqual(D.build().progression.xp,G.XP);assert.equal(D.build().progression.branches.length,14);
   for(const key of ['undefined','__proto__','constructor','missing']){assert.equal(D.skill(key),null);assert.equal(D.gear(key),null);assert.equal(D.profession(key),null);}
@@ -79,7 +89,7 @@ test('merchant, acquisition and profession notes reflect the modern rules',()=>{
 test('browser adapter is read-only, needs no DOM or storage, and matches CommonJS output',()=>{
   const context=vm.createContext({});
   for(const forbidden of ['document','localStorage','sessionStorage','fetch','setTimeout','requestAnimationFrame'])Object.defineProperty(context,forbidden,{get(){throw new Error('Atlas must not touch '+forbidden);}});
-  for(const name of ['tower-materials','tower-ascension-catalog','tower-hero-growth','tower-gear-tiers','tower-heroes-core','tower-expedition-core','tower-party-core','story-core','tower-underworld','tower-encounters','tower-field-guide','tower-heroes-icons','tower-forge-icons','tower-party-runtime'])vm.runInContext(readFileSync(new URL('../story/'+name+'.js',import.meta.url),'utf8'),context,{filename:name+'.js'});
+  for(const name of ['tower-materials','tower-ascension-catalog','tower-hero-growth','tower-gear-tiers','tower-heroes-core','tower-expedition-core','tower-party-core','tower-recruitment','story-core','tower-underworld','tower-encounters','tower-field-guide','tower-heroes-icons','tower-forge-icons','tower-party-runtime'])vm.runInContext(readFileSync(new URL('../story/'+name+'.js',import.meta.url),'utf8'),context,{filename:name+'.js'});
   vm.runInContext(readFileSync(new URL('../docs/story-atlas-rules.js',import.meta.url),'utf8'),context);
   const before=JSON.stringify({jobs:H.JOBS,skills:H.SKILLS,passives:H.PASSIVES,gear:H.GEAR});
   const data=context.StoryAtlasRules.build();assert.deepEqual(JSON.parse(JSON.stringify(data)),JSON.parse(JSON.stringify(D.build())));

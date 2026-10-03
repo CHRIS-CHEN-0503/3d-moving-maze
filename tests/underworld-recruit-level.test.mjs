@@ -1,10 +1,11 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {createRequire} from 'node:module';
+import {provisionTravellers} from './recruit-fixtures.mjs';
 
 const require=createRequire(import.meta.url);
 const C=require('../story/story-core.js'),P=require('../story/tower-party-core.js'),H=require('../story/tower-heroes-core.js'),G=require('../story/tower-hero-growth.js'),N=require('../story/tower-narrative.js'),D=require('../story/tower-dungeons.js');
-const fresh=seed=>H.enable(P.enable(C.newRun({seed,name:'地下招募測試'}),'mage','female').run).run;
+const fresh=seed=>provisionTravellers(H.enable(P.enable(C.newRun({seed,name:'地下招募測試'}),'mage','female').run).run);
 const valid=run=>{const saved=C.validateSave(JSON.stringify(run));assert.ok(saved,'recruited party must remain saveable');return saved;};
 
 function atFloor(run,floor){

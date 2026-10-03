@@ -36,7 +36,7 @@ test('瀏覽器與Node皆提供同一個無外部依賴的建模介面', () => {
   const context = vm.createContext({});
   vm.runInContext(readFileSync(new URL('../story/tower-characters.js', import.meta.url), 'utf8'), context);
   for (const method of ['buildMerchant', 'buildExplorer', 'buildChest', 'buildGear']) assert.equal(typeof context.TowerCharacters[method], 'function');
-  assert.deepEqual(Object.keys(characters.MERCHANT_STYLES), ['tieLing', 'jinHe', 'lanZhou']);
+  assert.deepEqual(Object.keys(characters.MERCHANT_STYLES), ['tieLing', 'jinHe', 'lanZhou', 'suHe']);
   assert.deepEqual(Object.keys(characters.EXPLORER_STYLES), ['eve', 'rowan', 'mira', 'oren', 'sena']);
   assert.throws(() => characters.buildMerchant('tieLing'), TypeError);
   for (const invalid of ['missing', '__proto__', 'constructor', null]) assert.throws(() => characters.buildMerchant(invalid, deps), RangeError);
@@ -45,11 +45,12 @@ test('瀏覽器與Node皆提供同一個無外部依賴的建模介面', () => {
   for (const invalid of ['missing', '__proto__', 'constructor', null, 0]) assert.throws(() => characters.buildExplorer(invalid, deps), RangeError);
 });
 
-test('三商人有獨立裝束和輪廓，商品分類正確，保留跟隨走路用四肢樞紐', () => {
+test('四商人有獨立裝束和輪廓，商品分類正確，保留跟隨走路用四肢樞紐', () => {
   const expected = {
     tieLing: { nodes: ['leather-apron', 'wide-grey-beard', 'forge-hammer', 'forge-helmet'], goods: ['helmet', 'bat'] },
     jinHe: { nodes: ['shawl-back', 'fitted-armor-plate', 'sewing-pouch', 'sewing-shears-a'], goods: ['armor', 'pan'] },
     lanZhou: { nodes: ['long-coat-back', 'short-beard', 'single-goggle-frame', 'back-round-shield'], goods: ['shield', 'staff'] },
+    suHe: { nodes: ['woven-hat-brim', 'grocery-apron', 'produce-basket', 'remedy-bottles'], goods: ['heal', 'haste', 'herb'] },
   };
   const summaries = {};
   for (const [id, style] of Object.entries(expected)) {

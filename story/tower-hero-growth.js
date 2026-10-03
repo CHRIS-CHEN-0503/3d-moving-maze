@@ -17,7 +17,7 @@
     active('escape_line','scout','安全撤離線',false,25,75,'escape','已探索走道鋪六格引路線，十二秒內沿線加速25%、免一般陷阱。'),
     active('hero_feast','chef','迷宮盛宴',false,35,120,'feast','三種不同食材各一份：飽食+35、十秒恢復20%生命、全隊增傷15%四十五秒。'),
     active('dawn_sanctuary','healer','黎明聖域',false,40,120,'sanctuary','十秒治療領域恢復40%生命，施放時扶起一位隊友至30%生命。',{herb:3}),
-    active('moving_fortress','smith','移動堡壘',false,100,90,'fortress','自身100%生命護盾五分鐘；十五秒持續挑釁、抵銷四次耐久消耗。',{shell:2}),
+    active('moving_fortress','smith','移動堡壘',false,100,90,'fortress','自身100%生命護盾五分鐘；十五秒持續挑釁、抵銷四次耐久消耗。挑釁上限依技能等級：一～二級一隻、三～四級兩隻、五～六級三隻；目標離開可見近處才補選。',{shell:2}),
     active('worldtree_arrow','archer','世界樹之箭',true,480,65,'great_arrow','凝聚精靈之力射出強力箭，傷害480%，並使怪物緩速；不能穿牆。'),
   ];
   const passives=[
@@ -43,8 +43,8 @@
     passive('artisan_soul','smith','匠魂刻印',Array(6).fill(20),'營地對修滿裝備花兩零件刻印：20%耐久護層；武器增傷15%或防具防禦+2。每人限一件。',true),
     passive('forest_echo','archer','森靈追擊',Array(6).fill(40),'射擊已被緩速的怪物額外增傷40%；纏枝箭與隊友的緩速都能觸發。',true),
   ];
-  const itemIds=['heal','ration','shield','hourglass','bell','map'];
-  function policy(){return {strategy:'support',materials:false,heal:{enabled:false,threshold:30,reserve:2},shield:false,bell:false,hourglass:false,map:false,itemLeft:0,thinkLeft:0};}
+  const itemIds=['heal','ration','shield','hourglass','bell','map','haste'];
+  function policy(){return {strategy:'support',materials:false,heal:{enabled:false,threshold:30,reserve:2},shield:false,bell:false,hourglass:false,map:false,haste:false,itemLeft:0,thinkLeft:0};}
   function freshRecord(){return {choices:[],awakening:null,tastes:[],tasteLeft:0,echo:0,defiance:0,covenant:0};}
   function fresh(ids=['hero']){return {version:2,...freshRecord(),members:Object.fromEntries(ids.filter(id=>id!=='hero').map(id=>[id,freshRecord()])),quick:['heal','ration','shield','bell'],useActive:false,food:{enabled:false,threshold:20,reserve:2},policies:Object.fromEntries(ids.map(id=>[id,policy()])),imprints:{},route:null,nearby:{}};}
   const state=run=>H().state(run).growth||(H().state(run).growth=fresh(H().ids(run)));
@@ -90,12 +90,13 @@
     if(key==='heal'){if(h.hp(n,id)>=h.maxHp(n,id))return {ok:false,message:'生命已滿。'};h.heal(n,id,35);}
     if(key==='ration'){if(n.hunger>=100)return {ok:false,message:'飽食度已滿。'};n.hunger=Math.min(100,n.hunger+45*(1+h.teamPassive(n,'gourmet')/100));h.food(n,id);}
     if(key==='shield'){if(h.buff(n,'barrier',id)?.power>=h.maxHp(n,id)*.35)return {ok:false,message:'護盾仍充足。'};shield(n,id,h.maxHp(n,id)*.35);}
+    if(key==='haste'){if(h.buff(n,'haste',id))return {ok:false,message:'加速藥水仍在生效，不需重複使用。'};h.setBuff(n,id,'haste',C().HASTE_DURATION,C().HASTE_PERCENT);}
     const timed={hourglass:['freeze',25],bell:['repel',20],map:['reveal',18]};if(timed[key]){const [k,t]=timed[key];if(n.effects[k]>0)return {ok:false,message:'效果仍在持續。'};n.effects[k]=t*(1+h.pv(n,'extension',id)/100);}
     n.bag[key]--;p.itemLeft=automatic?5:1;return {ok:true,message:'使用 '+C().ITEMS[key].name,effect:{item:key,actorId:id}};});}
   function autoItems(run,threats=[]){const h=H(),g=state(run),order=h.ids(run).filter(id=>h.hp(run,id)>0&&(id!==h.state(run).active||g.useActive)).sort((a,b)=>h.hp(run,a)/h.maxHp(run,a)-h.hp(run,b)/h.maxHp(run,b));
     for(const id of order){const p=g.policies[id];if(p.itemLeft>0)continue;if(p.heal.enabled&&run.bag.heal>p.heal.reserve&&h.hp(run,id)/h.maxHp(run,id)*100<=p.heal.threshold)return {id,key:'heal'};
       if(g.food.enabled&&run.hunger<=g.food.threshold&&run.bag.ration>g.food.reserve)return {id,key:'ration'};
-      if(threats.includes(id)){if(p.shield&&run.bag.shield&&h.hp(run,id)<h.maxHp(run,id)*.5&&!h.buff(run,'barrier',id)?.power)return {id,key:'shield'};for(const [key,e]of [['bell','repel'],['hourglass','freeze']])if(p[key]&&run.bag[key]&&h.hp(run,id)<h.maxHp(run,id)*.3&&!run.effects[e])return {id,key};if(p.map&&run.bag.map&&!run.effects.reveal&&!run.engine.mapKnowledge?.revealed)return {id,key:'map'};}
+      if(threats.includes(id)){if(p.shield&&run.bag.shield&&h.hp(run,id)<h.maxHp(run,id)*.5&&!h.buff(run,'barrier',id)?.power)return {id,key:'shield'};for(const [key,e]of [['bell','repel'],['hourglass','freeze']])if(p[key]&&run.bag[key]&&h.hp(run,id)<h.maxHp(run,id)*.3&&!run.effects[e])return {id,key};if(p.haste&&run.bag.haste&&!h.buff(run,'haste',id))return {id,key:'haste'};if(p.map&&run.bag.map&&!run.effects.reveal&&!run.engine.mapKnowledge?.revealed)return {id,key:'map'};}
     }return null;
   }
   function aiChoice(run,id,near,threat){const h=H(),a=h.actor(run,id),p=state(run).policies[id];if(!p||p.strategy==='manual'||p.thinkLeft>0||h.hp(run,id)<=0)return null;
@@ -117,7 +118,7 @@
     g.version=2;
     if(!Array.isArray(g.quick)||g.quick.length!==4||!g.quick.every(k=>itemIds.includes(k)||k===null)||typeof g.useActive!=='boolean')return null;
     const recovery=p=>p&&typeof p.enabled==='boolean'&&Number.isInteger(p.threshold)&&p.threshold>=10&&p.threshold<=90&&p.threshold%5===0&&Number.isInteger(p.reserve)&&num(p.reserve,0,99);
-    if(!recovery(g.food)||!g.policies||typeof g.policies!=='object')return null;for(const id of ids){const p=g.policies[id];if(!p||!['manual','attack','support','survive'].includes(p.strategy)||!recovery(p.heal)||typeof p.materials!=='boolean'||!['shield','bell','hourglass','map'].every(k=>typeof p[k]==='boolean')||!num(p.itemLeft,0,5)||!num(p.thinkLeft,0,5))return null;}
+    if(!recovery(g.food)||!g.policies||typeof g.policies!=='object')return null;for(const id of ids){const p=g.policies[id];if(p&&p.haste===undefined)p.haste=false;if(!p||!['manual','attack','support','survive'].includes(p.strategy)||!recovery(p.heal)||typeof p.materials!=='boolean'||!['shield','bell','hourglass','map','haste'].every(k=>typeof p[k]==='boolean')||!num(p.itemLeft,0,5)||!num(p.thinkLeft,0,5))return null;}
     g.policies=Object.fromEntries(ids.map(id=>[id,g.policies[id]]));if(!g.imprints||typeof g.imprints!=='object'||Object.keys(g.imprints).length>5)return null;for(const [id,m]of Object.entries(g.imprints))if(!ids.includes(id)||typeof m.gearId!=='string'||m.gearId.length>160||!num(m.left,0,200)||m.boost!==undefined&&!num(m.boost,1,1.3))return null;
     if(g.route!==null&&(!g.route||!num(g.route.left,0,12)||!C().isFloor(g.route.floor)||g.route.power!==undefined&&!num(g.route.power,0,100)||!Array.isArray(g.route.points)||g.route.points.length>6||!g.route.points.every(p=>num(p.x,-1000,1000)&&num(p.z,-1000,1000))))return null;
     if(!g.nearby||typeof g.nearby!=='object'||Object.entries(g.nearby).some(([id,list])=>!ids.includes(id)||!Array.isArray(list)||list.length>5||!list.every(k=>ids.includes(k))))return null;return g;

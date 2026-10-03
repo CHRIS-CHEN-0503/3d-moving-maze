@@ -106,6 +106,18 @@ test('存檔保存當前庫存與剩餘冷卻；破損或儲存額滿不冒充�
   assert.equal(h.messages.length, 1);
 });
 
+test('舊旅程加入重逢紀錄前先備份原文，備份失敗不覆寫原存檔', () => {
+  const P=require('../story/tower-party-core.js'),key='maze3d_tower_v1';
+  for(const fail of [false,true]){
+    const h=runtime(),run=P.enable(core.newRun({seed:123}),'mage').run,old=structuredClone(run);delete old.party.travellers;
+    const raw=JSON.stringify(old);h.storage.set(key,raw);h.testApi.setState({run});
+    if(fail)h.context.localStorage.setItem=(k,v)=>{if(k===key+'_before_traveller_reunion')throw new Error('quota');h.storage.set(k,v);};
+    assert.equal(h.testApi.save(),!fail);
+    if(fail)assert.equal(h.storage.get(key),raw);
+    else{assert.equal(h.storage.get(key+'_before_traveller_reunion'),raw);assert.deepEqual(JSON.parse(h.storage.get(key)).party.travellers,[]);assert.equal(h.testApi.save(),true);assert.equal(h.storage.get(key+'_before_traveller_reunion'),raw);}
+  }
+});
+
 test('怪物蓄力攻擊不能穿牆，命中後給予短暫保護避免多怪瞬間連殺', () => {
   const h = runtime();
   h.context.G.px = 1;

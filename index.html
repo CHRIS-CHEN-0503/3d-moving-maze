@@ -618,7 +618,8 @@ button:focus-visible,input:focus-visible{outline:3px solid #fff;outline-offset:3
 </style>
 <link rel="stylesheet" href="assets/game-polish.css?v=1.39.3">
 <link rel="stylesheet" href="assets/play-controls.css?v=1.42.1">
-<link rel="stylesheet" href="story/tower-party.css?v=1.48.0">
+<link rel="stylesheet" href="story/tower-party.css?v=1.49.0">
+<link rel="stylesheet" href="story/tower-cinematics.css?v=1.50.0">
 <link rel="stylesheet" href="story/tower-cooperation.css?v=1.47.0">
 <link rel="stylesheet" href="story/tower-heroes.css?v=1.43.0">
 <link rel="stylesheet" href="story/tower-mobile.css?v=1.43.0">
@@ -994,22 +995,22 @@ button:focus-visible,input:focus-visible{outline:3px solid #fff;outline-offset:3
 <script src="./assets/render-quality.js?v=1.44.0"></script>
 <script src="./assets/camera-comfort.js?v=1.45.0"></script>
 <script src="./assets/voice-catalog.js?v=1.33.0"></script>
-<script src="./assets/role-voices.js?v=1.35.5"></script>
-<script src="./assets/character-voices.js?v=1.43.3"></script>
+<script src="./assets/role-voices.js?v=1.49.0"></script>
+<script src="./assets/character-voices.js?v=1.49.0"></script>
 <script src="story/tower-underworld.js?v=1.45.0"></script>
-<script src="story/tower-floor-lords.js?v=1.46.0"></script>
-<script src="./assets/voice-pack.js?v=1.43.3"></script>
+<script src="story/tower-floor-lords.js?v=1.49.0"></script>
+<script src="./assets/voice-pack.js?v=1.49.0"></script>
 <script src="./assets/audio-settings.js?v=1.43.3"></script>
 <script src="./assets/game-voice.js?v=1.43.3"></script>
 <script src="./assets/maze-stone-audio.js?v=1.34.2"></script>
-<script src="./assets/combat-audio.js?v=1.46.0"></script>
+<script src="./assets/combat-audio.js?v=1.49.0"></script>
 <script>
 'use strict';
 /* =====================================================
    3D移動迷宮 — 給小朋友的變形迷宮冒險
    ===================================================== */
 const $=id=>document.getElementById(id);
-const GAME_VERSION='1.48.0';
+const GAME_VERSION='1.50.0';
 
 /* ---------- 設定（後台可調） ---------- */
 const DEFAULT_CFG={teamSize:2,shiftMin:3,itemCount:6,foodCount:4,hungerMin:3,stunSec:3,pingSec:3,smellCells:3,mazeSize:13,magicMap:0,duelMin:5,unpaidRate:100,musicOn:1,speechOn:1,speechVoice:'',apiUrl:'',roomMax:3,rounds:3,goodsCount:16,shopCollect:1,shopMin:2.5,cartFull:400,views:{fp:1,tp:1,top:1},broker:'wss://broker.emqx.io:8084/mqtt'};
@@ -2887,6 +2888,7 @@ function setupTouch(){
   let ox=0,oy=0;
   const start=(x,y,id)=>{joy.active=true;joy.id=id;ox=x;oy=y;base.style.display='block';stick.style.display='block';setStick(x,y,x,y);};
   const move=(x,y)=>{
+    if(G.frozen)return;
     let dx=x-ox,dy=y-oy; const len=Math.hypot(dx,dy),max=52;
     if(len>max){dx=dx/len*max;dy=dy/len*max;}
     joy.dx=dx/max; joy.dy=dy/max; setStick(ox,oy,ox+dx,oy+dy);
@@ -2904,8 +2906,9 @@ function setupTouch(){
   });
   // 右半邊拖曳 → 轉視角
   const look=$('lookZone'); let lkId=null,lx=0,ly=0;
-  look.addEventListener('touchstart',e=>{const t=e.changedTouches[0];lkId=t.identifier;lx=t.clientX;ly=t.clientY;},{passive:true});
+  look.addEventListener('touchstart',e=>{if(G.frozen)return;const t=e.changedTouches[0];lkId=t.identifier;lx=t.clientX;ly=t.clientY;},{passive:true});
   look.addEventListener('touchmove',e=>{
+    if(G.frozen){lkId=null;return;}
     for(const t of e.changedTouches)if(t.identifier===lkId){
       G.camYaw-=(t.clientX-lx)*0.008; G.camPitch=Math.max(-0.6,Math.min(1.0,G.camPitch-(t.clientY-ly)*0.004));
       lx=t.clientX; ly=t.clientY;
@@ -2914,7 +2917,7 @@ function setupTouch(){
   look.addEventListener('touchend',e=>{for(const t of e.changedTouches)if(t.identifier===lkId)lkId=null;});
   look.addEventListener('mousedown',e=>{
     let px=e.clientX,py=e.clientY;
-    const mm=ev=>{G.camYaw-=(ev.clientX-px)*0.008;G.camPitch=Math.max(-0.6,Math.min(1.0,G.camPitch-(ev.clientY-py)*0.004));px=ev.clientX;py=ev.clientY;};
+    const mm=ev=>{if(!G.frozen){G.camYaw-=(ev.clientX-px)*0.008;G.camPitch=Math.max(-0.6,Math.min(1.0,G.camPitch-(ev.clientY-py)*0.004));}px=ev.clientX;py=ev.clientY;};
     const mu=()=>{window.removeEventListener('mousemove',mm);window.removeEventListener('mouseup',mu);};
     window.addEventListener('mousemove',mm); window.addEventListener('mouseup',mu);
   });
@@ -3843,7 +3846,7 @@ function sightFrame(){return {T:THREE,g:G,scene,wall:wallMesh,atmosphere:mazeAtm
   const visit=o=>{if(!o||o===wallMesh||o===floorMesh||o===playerGroup||o===compass3D||o===camera||o===mazeAtmosphere?.floorRoot||o.name==='maze-sight-layer'||o.isLight)return;if(containers.has(o)||['tower-party-scene','tower-lighting'].includes(o.name)){o.children.forEach(visit);return;}list.push(o);};
   for(const o of scene.children)if(o===envGroup)o.children.forEach(visit);else visit(o);return list;
 }};}
-function renderMaze(){MazeCameraComfort.render(playerGroup,camera,G.view,()=>{if(window.MazeSight&&wallMesh)MazeSight.render(sightFrame(),renderer,camera);else renderer.render(scene,camera);});}
+function renderMaze(){const draw=()=>MazeCameraComfort.render(playerGroup,camera,window.TowerMode?.cinematicActive?'tp':G.view,()=>{if(window.MazeSight&&wallMesh)MazeSight.render(sightFrame(),renderer,camera);else renderer.render(scene,camera);});return window.TowerMode?.cinematicActive?TowerMode.cinematicRender(draw):draw();}
 function loop(tms){
   requestAnimationFrame(loop);
   if(!renderer)return;
@@ -3851,6 +3854,7 @@ function loop(tms){
   const screenActive=$('gameScreen').classList.contains('active'),storyPaused=!!(window.TowerMode?.active&&TowerMode.paused);
   MazeQuality.frame(rawDt*1000,screenActive&&!storyPaused&&!document.hidden&&!G.shifting);
   if(!screenActive||document.hidden)return;
+  if(window.TowerMode?.cinematicActive){TowerMode.cinematicFrame(dt);renderMaze();return;}
   if(storyPaused){if(tms-lastPausedRender>=80){lastPausedRender=tms;renderMaze();}return;}
   if(G.running&&!G.shifting){
     G.elapsed=(performance.now()-G.startTime)/1000-G.timeOffset;
@@ -3876,6 +3880,7 @@ function loop(tms){
   }
   updatePlayer(dt,t);
   if(window.TowerMode&&TowerMode.active)TowerMode.tick(dt,tms);
+  if(window.TowerMode?.cinematicActive){TowerMode.cinematicFrame(dt);renderMaze();return;}
   updateCamera(dt);
   updateParticles(dt);
   updateCompass();
@@ -5151,45 +5156,47 @@ window.addEventListener('pagehide',()=>{AudioEng.shiftSound?.stop();AudioEng.com
 <script src="assets/capture-mode.js?v=1.36.0"></script>
 <script src="story/tower-ascension-catalog.js?v=1.46.0"></script>
 <script src="story/tower-gear-tiers.js?v=1.46.0"></script>
-<script src="story/tower-hero-growth.js?v=1.48.0"></script>
-<script src="story/tower-heroes-core.js?v=1.47.0"></script>
-<script src="story/tower-heroes-icons.js?v=1.46.0"></script>
-<script src="story/tower-combat-motion.js?v=1.46.0"></script>
+<script src="story/tower-hero-growth.js?v=1.49.0"></script>
+<script src="story/tower-heroes-core.js?v=1.49.0"></script>
+<script src="story/tower-heroes-icons.js?v=1.49.0"></script>
+<script src="story/tower-combat-motion.js?v=1.49.0"></script>
 <script src="story/tower-menu-voice.js?v=1.42.4"></script>
 <script src="story/tower-heroes-visuals.js?v=1.46.0"></script>
 <script src="story/tower-skill-effects.js?v=1.46.0"></script>
-<script src="story/tower-growth-runtime.js?v=1.46.0"></script>
+<script src="story/tower-growth-runtime.js?v=1.49.0"></script>
 <script src="story/tower-team-tactics.js?v=1.42.6"></script>
 <script src="story/tower-combat-intent.js?v=1.43.3"></script>
 <script src="story/tower-equipment-compare.js?v=1.44.0"></script>
-<script src="story/tower-heroes-runtime.js?v=1.47.0"></script>
-<script src="story/tower-cooperation-core.js?v=1.47.0"></script>
-<script src="story/tower-cooperation-runtime.js?v=1.47.0"></script>
-<script src="story/story-core.js?v=1.47.0"></script>
+<script src="story/tower-heroes-runtime.js?v=1.50.0"></script>
+<script src="story/tower-cooperation-core.js?v=1.48.1"></script>
+<script src="story/tower-cooperation-runtime.js?v=1.50.0"></script>
+<script src="story/story-core.js?v=1.49.0"></script>
 <script src="story/tower-narrative.js?v=1.45.0"></script>
 <script src="story/tower-side-stories.js?v=1.45.0"></script>
 <script src="story/tower-dungeons.js?v=1.45.0"></script>
-<script src="story/tower-hazards.js?v=1.45.0"></script>
-<script src="story/tower-encounters.js?v=1.46.0"></script>
-<script src="story/tower-characters.js?v=1.43.4"></script>
+<script src="story/tower-hazards.js?v=1.49.0"></script>
+<script src="story/tower-encounters.js?v=1.49.0"></script>
+<script src="story/tower-characters.js?v=1.49.0"></script>
 <script src="story/tower-audio.js"></script>
 <script src="story/tower-materials.js?v=1.48.0"></script>
-<script src="story/tower-expedition-core.js?v=1.48.0"></script>
-<script src="story/tower-lighting-core.js?v=1.45.0"></script>
-<script src="story/tower-loot.js?v=1.48.0"></script>
+<script src="story/tower-expedition-core.js?v=1.49.0"></script>
+<script src="story/tower-lighting-core.js?v=1.49.0"></script>
+<script src="story/tower-loot.js?v=1.49.0"></script>
 <script src="story/tower-reinforcements.js?v=1.48.0"></script>
 <script src="story/tower-stairs.js?v=1.43.3"></script>
 <script src="story/tower-monster-sense.js?v=1.44.0"></script>
-<script src="story/tower-party-core.js?v=1.48.0"></script>
+<script src="story/tower-party-core.js?v=1.49.0"></script>
+<script src="story/tower-recruitment.js?v=1.49.0"></script>
 <script src="story/tower-resource-icons.js?v=1.48.0"></script>
 <script src="story/tower-forge-icons.js?v=1.47.0"></script>
-<script src="story/tower-party-runtime.js?v=1.48.0"></script>
-<script src="story/tower-lighting-runtime.js?v=1.47.0"></script>
+<script src="story/tower-party-runtime.js?v=1.50.0"></script>
+<script src="story/tower-lighting-runtime.js?v=1.49.0"></script>
 <script src="story/tower-encounter-alert.js?v=1.42.5"></script>
 <script src="story/tower-combat-readability.js?v=1.44.0"></script>
-<script src="story/tower-field-guide.js?v=1.46.0"></script>
+<script src="story/tower-field-guide.js?v=1.49.0"></script>
 <script src="story/tower-creature-art.js?v=1.44.0"></script>
-<script src="story/tower-mode.js?v=1.48.0"></script>
+<script src="story/tower-cinematics.js?v=1.50.0"></script>
+<script src="story/tower-mode.js?v=1.50.0"></script>
 <script src="assets/room-lifecycle.js?v=1.36.0"></script>
 <script src="assets/shop-collection-core.js?v=1.31.0"></script>
 <script src="assets/shop-collection.js?v=1.31.0"></script>

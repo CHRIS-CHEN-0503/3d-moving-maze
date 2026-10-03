@@ -19,7 +19,7 @@ function accepted(type,floor=99){const run=findRun(r=>E.explorerOffer(r)?.type==
 function harness(run){
   let now=1000;
   const nodes=new Map(),storage=new Map(),messages=[];
-  const node=id=>{if(!nodes.has(id))nodes.set(id,{style:{},hidden:true,textContent:'',innerHTML:'',isConnected:true,focus(){},classList:{add(){},remove(){},toggle(){}}});return nodes.get(id);};
+  const node=id=>{if(!nodes.has(id))nodes.set(id,{style:{},hidden:true,textContent:'',innerHTML:'',isConnected:true,focus(){},querySelector(selector){return selector==='.tower-dialog-content'?(this.content||={scrollTop:0}):null;},classList:{add(){},remove(){},toggle(){}}});return nodes.get(id);};
   class Vector{constructor(){this.set(0,0,0);}set(x,y,z){this.x=x;this.y=y;this.z=z;return this;}copy(v){return this.set(v.x,v.y,v.z);}}
   class Group{constructor(){this.position=new Vector();this.rotation=new Vector();this.scale=new Vector().set(1,1,1);this.userData={};this.children=[];this.visible=true;}add(item){this.children.push(item);}remove(item){this.children=this.children.filter(c=>c!==item);}}
   class Material{constructor(options={}){Object.assign(this,options);this.color={setHex(){}};}}
@@ -95,7 +95,8 @@ test('陷阱開箱先確認，防具減傷耗耐久且保存後無法重開',()=
 
 test('裝備商店購買進行囊，不自動替換武器，確認裝備才穿戴',()=>{
   const run=runAt();run.coins=999;const h=harness(run),offer=E.merchantOffers(run.floor,run.seed)[0],shop={...h.actor(1,0),id:offer.id,name:offer.name,offer};h.api.entities({nearest:shop});
-  const originalWeapon=run.equipment.weapon.id;h.api.trade();h.api.handleAction('buy-gear',offer.gear[1].kind);
+  const originalWeapon=run.equipment.weapon.id;h.api.trade();h.nodes.get('towerDialog').querySelector('.tower-dialog-content').scrollTop=91;h.api.handleAction('buy-gear',offer.gear[1].kind);
+  assert.equal(h.nodes.get('towerDialog').querySelector('.tower-dialog-content').scrollTop,91,'Buying equipment preserves the current stock scroll position');
   assert.equal(h.api.state().run.gearBag.length,1);assert.equal(h.api.state().run.equipment.weapon.id,originalWeapon);
   const bought=h.api.state().run.gearBag[0];h.api.handleAction('equip',bought.id);assert.equal(h.api.state().run.equipment.weapon.id,bought.id);assert.ok(h.api.state().run.gearBag.some(g=>g.id===originalWeapon));
   assert.ok(C.validateSave(h.api.state().run));

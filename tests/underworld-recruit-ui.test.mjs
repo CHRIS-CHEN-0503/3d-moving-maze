@@ -21,13 +21,13 @@ function invite(run){
   for(let floor=run.floor;!offer&&floor>-50;){run.floor=--floor;run.floorsCleared=99-floor-1;P.advance(run,{reward:false});offer=P.recruitOffer(run);}
   assert.ok(offer);assert.ok(C.validateSave(run));
   let dialog;
-  const context=vm.createContext({P,H,offer,r:()=>run,modern:()=>H.enabled(run),pruneRecruits(){},live:()=>true,near:{kind:'recruit'},distance:()=>0,clear:()=>true,
+  const context=vm.createContext({P,H,offer,esc:v=>v,r:()=>run,modern:()=>H.enabled(run),pruneRecruits(){},live:()=>true,near:{kind:'recruit',offer},distance:()=>0,clear:()=>true,
     ctx:{G:{shifting:false},dialog:(...args)=>{dialog=args;}},root:{TowerHeroVisuals:{portrait:()=>'<figure></figure>'}},portrait:()=>'<figure></figure>',act:label=>label});
   vm.runInContext(source.slice(start,end),context);assert.equal(context.interact(),true);return {offer,html:dialog[3]};
 }
 test('underground invitation shows level five of ten and its random fourth-level reward',()=>{
   const {offer,html}=invite(journey(true,true));
-  assert.equal(offer.level,5);assert.match(html,/等級 5\/10/);assert.match(html,/加入時隨機獲得四級解鎖的一招普通技能/);assert.doesNotMatch(html,/等級 5\/5|可再選一招/);
+  assert.equal(offer.level,5);assert.match(html,/等級 5\/10/);assert.match(html,/加入時隨機獲得四級追加技能/);assert.doesNotMatch(html,/等級 5\/5|可再選一招/);
 });
 test('surface invitation keeps level one of five without underground growth copy',()=>{
   const {offer,html}=invite(journey(false,true));

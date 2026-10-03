@@ -261,9 +261,12 @@ test('a temporary stun-created tie becomes timed when the monster recovers witho
 
 test('save validation clones equipment, stun and adventure state and rejects corrupt gear/duplicate IDs', () => {
   const run = C.hitMonster(fresh(), 'monster-0', 3).run;
-  run.adventure = { version: 1, claimed: ['chest-0'], quest: { id: 'quest-0', floor: 99, type: 'stun', status: 'active', target: 'monster-0', goal: 2, progress: 1, events: ['monster-0'] } };
+  run.adventure = { ...C.newAdventure(), claimed: ['chest-0'], quest: { id: 'quest-0', floor: 99, type: 'stun', status: 'active', target: 'monster-0', goal: 2, progress: 1, events: ['monster-0'] } };
   const saved = C.validateSave(JSON.stringify(run));
   assert.deepEqual(saved, run);
+  const legacy=JSON.parse(JSON.stringify(run));delete legacy.adventure.groceryPurchases;
+  assert.deepEqual(C.validateSave(legacy),run,'Existing quest saves gain empty grocery counts without changing equipment or quest progress');
+  assert.equal(Object.hasOwn(legacy.adventure,'groceryPurchases'),false,'Migration must not mutate the original save');
   saved.equipment.weapon.durability = 1; saved.monsterStuns['monster-0'] = 1;
   saved.adventure.quest.events.push('monster-1');
   assert.equal(run.monsterStuns['monster-0'], 10);
@@ -288,7 +291,7 @@ test('quest save status must agree with progress while completed and claimed rec
     assert.equal(C.validateSave(JSON.stringify(invalid)), null);
   }
   for (const status of ['ready', 'claimed']) {
-    const valid = { ...run, adventure: { version: 1, claimed: status === 'claimed' ? ['reward-0'] : [], quest: { ...quest, status, progress: 2, events: ['monster-0', 'monster-1'] } } };
+    const valid = { ...run, adventure: { ...C.newAdventure(), claimed: status === 'claimed' ? ['reward-0'] : [], quest: { ...quest, status, progress: 2, events: ['monster-0', 'monster-1'] } } };
     const saved = C.validateSave(JSON.stringify(valid));
     assert.deepEqual(saved, valid);
     assert.equal(saved.adventure.quest.status, status);

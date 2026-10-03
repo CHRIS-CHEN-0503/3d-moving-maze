@@ -105,6 +105,7 @@
     tempered_edge:g(sword,'rotate(40 32 32)')+p('M8 55q-6-15 5-22 0 14 10 13 1 12-15 9Z'),
     sturdy_gear:drawings.heavy_armor+p('M27 30h10v14H27m5-10v6'),
     item_heal:p('M23 5h18v9H23Zm2 9v9L13 34v22h38V34L39 23v-9M15 37h34M26 43h12m-6-6v18'),
+    item_haste:p('M28 5h17v8H28Zm2 8v9C16 30 14 48 25 56h20c11-8 9-26-3-34v-9M22 35q11-5 24 0M17 20H5m9 9H2m10 13H4m10 10H8')+'<path fill="#f3bc57" fill-opacity=".95" stroke="#ffe5a4" d="m37 29-10 14h8l-3 12 13-17h-9l4-9Z"/>',
     item_ration:p('M8 24Q8 8 32 8t24 16v31H8ZM8 28h48M19 17l-4 7m15-10-4 9m15-9-4 9M13 47h38'),
     item_shield:shield+g(star,'translate(21 20) scale(.35)'),
     item_hourglass:p('M16 5h32v9q0 11-12 18 12 7 12 18v9H16v-9q0-11 12-18-12-7-12-18ZM13 5h38M13 59h38M23 49l9-10 9 10Z'),

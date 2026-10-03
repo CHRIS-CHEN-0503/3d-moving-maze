@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {createRequire} from 'node:module';
+import {provisionTravellers} from './recruit-fixtures.mjs';
 const require=createRequire(import.meta.url),C=require('../story/story-core.js'),P=require('../story/tower-party-core.js'),H=require('../story/tower-heroes-core.js'),G=require('../story/tower-hero-growth.js'),N=require('../story/tower-narrative.js'),B=require('../story/tower-floor-lords.js'),A=require('../story/tower-ascension-catalog.js');
 const expectOk=result=>{assert.ok(result.ok,result.message);assert.ok(C.validateSave(JSON.stringify(result.run)),'action must produce a valid save');return result.run;};
 const fresh=(job,seed=31)=>expectOk(H.enable(expectOk(P.enable(C.newRun({seed,name:'進階實測'}),job))));
@@ -14,7 +15,7 @@ function underground(job,seed=31){
   r=expectOk(C.descend(r));return expectOk(C.startUnderworld(r));
 }
 function companion(job,desired=job){for(let seed=1;seed<=300;seed++){
-  let r=underground(job,seed),offer=P.recruitOffer(r);if(offer?.profession!==desired)continue;r.coins=1000;return expectOk(P.recruit(r,offer.id));
+  let r=underground(job,seed),offer=P.recruitOffer(r);if(offer?.profession!==desired)continue;r.coins=1000;provisionTravellers(r);return expectOk(P.recruit(r,offer.id));
 }throw Error('No recruit fixture for '+desired);}
 function awaken(base,level=12,withCompanion=false){
   const b=A.BRANCHES[base];let r=withCompanion?companion(b.job):underground(b.job);

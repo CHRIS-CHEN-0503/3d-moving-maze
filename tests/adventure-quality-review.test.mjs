@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
 import {createRequire} from 'node:module';
 import vm from 'node:vm';
+import {provisionTravellers} from './recruit-fixtures.mjs';
 const require=createRequire(import.meta.url),T=require('../lib/three.min.js'),H=require('../story/tower-heroes-core.js'),C=require('../story/story-core.js'),P=require('../story/tower-party-core.js'),Compare=require('../story/tower-equipment-compare.js'),Cue=require('../story/tower-combat-readability.js');
 const fresh=job=>H.enable(P.enable(C.newRun({seed:31415,name:'review'}),job).run).run;
 function freeze(value){if(value&&typeof value==='object'&&!Object.isFrozen(value)){Object.freeze(value);for(const v of Object.values(value))freeze(v);}return value;}
@@ -19,7 +20,7 @@ test('automatic quality is bounded and hysteretic, and paused/background samples
 });
 test('equipment preview is read-only and agrees with actual two-handed equip for active and non-active actors',()=>{
   for(const activeTarget of [true,false]){
-    let run=fresh('swordsman');run=P.recruit(run,P.recruitOffer(run).id).run;const id=activeTarget?'hero':run.party.members[0].id,item=C.createGear('greatsword',99,run.seed,'compare-'+id);run=C.grantGear(run,item).run;
+    let run=provisionTravellers(fresh('swordsman'));run=P.recruit(run,P.recruitOffer(run).id).run;const id=activeTarget?'hero':run.party.members[0].id,item=C.createGear('greatsword',99,run.seed,'compare-'+id);run=C.grantGear(run,item).run;
     assert.ok(H.canEquip(run,id,item));const before=H.stats(run,id),saved=JSON.stringify(run),result=Compare.compare(H,freeze(run),id,item);assert.equal(JSON.stringify(run),saved);assert.ok(result.removesShield);
     const equipped=H.equip(run,id,item.id);assert.ok(equipped.ok,equipped.message);assert.equal(H.equipment(equipped.run,id).shield,null);const after=H.stats(equipped.run,id);
     for(const d of result.deltas){const precision=d.key==='interval'||d.key==='heal'?100:d.key==='reach'?10:1;let expected=Math.round((after[d.key]-before[d.key])*precision)/precision;if(d.key==='heal')expected=Math.round(expected*100);assert.equal(d.delta,expected,d.key);assert.equal(d.good,d.key==='interval'?expected<0:expected>0);}

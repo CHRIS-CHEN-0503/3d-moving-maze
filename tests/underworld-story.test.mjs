@@ -94,7 +94,7 @@ test('all five underground mechanisms are solvable, validate on reload and only 
 test('underground lords never collide with twelve ordinary monsters or accidentally reference surface recordings',()=>{
   assert.equal(Object.keys(B.LORDS).length,10);assert.equal(Object.keys(B.UNDERWORLD_LORDS).length,5);assert.equal(Object.keys(B.tracks).length,30);
   const names=new Set();for(const [floor,def]of Object.entries(B.UNDERWORLD_LORDS)){
-    const run=playable(Number(floor)),spec=B.spec(run);assert.equal(spec.id,'monster-12');assert.equal(spec.maxHp,def.maxHp);assert.ok(spec.maxHp>=600&&spec.maxHp<=1200);
+    const run=playable(Number(floor)),spec=B.spec(run);assert.equal(spec.id,'monster-12');assert.equal(spec.maxHp,def.maxHp);assert.equal(spec.maxHp,Math.round((450+Math.abs(floor)*15)*1.3));
     assert.equal(def.recordedVoice,false);assert.ok(def.id.startsWith('lord-underworld-'));assert.equal(def.lines.length,3);names.add(def.name);
     const monsters=P.monsterSpecs(run);assert.equal(new Set(monsters.map(m=>m.id)).size,monsters.length);assert.equal(monsters.filter(m=>m.lord).length,1);
     assert.equal(B.defeated(run),false);run.defeatedMonsters.push(B.ID);assert.equal(B.defeated(run),false);run.defeatedMonsters.push(B.UNDERWORLD_ID);assert.equal(B.defeated(run),true);

@@ -14,6 +14,21 @@
   const isUnderworld = run => !!run && run.floor < 0 && run.underworld?.version === 1;
   const MAX_COINS = 999999;
   const MAX_STACK = 99;
+  const HASTE_DURATION = 300, HASTE_PERCENT = 20;
+  function hasteMultiplier(run,id=run?.party?.loadouts?.active){
+    const loadouts=run?.party?.loadouts,active=loadouts?loadouts.actors?.[id]?.buffs?.some(b=>b.id==='haste'&&b.left>0):run?.effects?.haste>0;
+    return active?1+HASTE_PERCENT/100:1;
+  }
+  // Every archer contributes a quiver, even while downed or not controlled.
+  // Storage validation is deliberately wider: an archer leaving never deletes arrows.
+  const itemStorageLimit = id => id === 'arrow' ? 3000 : MAX_STACK;
+  function itemLimit(id,run){
+    if(id!=='arrow')return MAX_STACK;
+    const p=run?.party,capacity=(level,max)=>100+50*((Number.isInteger(level)?Math.max(1,Math.min(max,level)):1)-1);
+    let total=p?.profession==='archer'?capacity(p.loadouts?.level,15):0;
+    if(Array.isArray(p?.members))for(const m of p.members)if(m.profession==='archer')total+=capacity(m.level,10);
+    return Math.max(100,Math.min(itemStorageLimit(id),total));
+  }
   // Late lookup keeps the browser's core → narrative → dungeons loading order safe.
   const narrativeRules = () => typeof module === 'object' && module.exports ? require('./tower-narrative.js') : globalThis.TowerNarrative;
   const dungeonRules = () => typeof module === 'object' && module.exports ? require('./tower-dungeons.js') : globalThis.TowerDungeons;
@@ -34,12 +49,13 @@
   const ITEMS = Object.freeze({
     heal: Object.freeze({ id: 'heal', name: '療癒藥', description: '恢復 35 點生命。', buyPrice: 14, sellPrice: 6, color: '#ff7889' }),
     ration: Object.freeze({ id: 'ration', name: '乾糧', description: '恢復 45 點飽食度。', buyPrice: 8, sellPrice: 3, color: '#efc073' }),
+    haste: Object.freeze({ id: 'haste', name: '加速藥水', description: '使用者的移動速度與普通攻擊速度提高 '+HASTE_PERCENT+'%，持續五分鐘。不能疊加或刷新，不縮短技能冷卻與準備時間。', buyPrice: 24, sellPrice: 10, color: '#f3bc57' }),
     shield: Object.freeze({ id: 'shield', name: '星紋護盾', description: '職業旅程：最大生命35%的護盾，持續五分鐘。舊旅程：25秒減傷65%。', buyPrice: 18, sellPrice: 8, color: '#70bfff' }),
     hourglass: Object.freeze({ id: 'hourglass', name: '定牆沙漏', description: '暫停迷宮變形 25 秒。', buyPrice: 20, sellPrice: 9, color: '#ffd36f' }),
     bell: Object.freeze({ id: 'bell', name: '驅怪鈴', description: '讓怪物退避 20 秒。', buyPrice: 18, sellPrice: 8, color: '#bda2ff' }),
     map: Object.freeze({ id: 'map', name: '魔法地圖', description: '完整揭露當下迷宮直到變形，之後重新探索；出口路線額外指引 18 秒。', buyPrice: 12, sellPrice: 5, color: '#6de5d7' }),
     feather: Object.freeze({ id: 'feather', name: '復甦羽', description: '受到致命傷時自動消耗，恢復 50 點生命。', buyPrice: 45, sellPrice: 20, color: '#fff1bb' }),
-    arrow: Object.freeze({ id: 'arrow', name: '箭矢', description: '射手的共用箭袋。普通弓射消耗一支，箭雨與世界樹之箭消耗三支。', buyPrice: 1, sellPrice: 0, color: '#b3d79b' }),
+    arrow: Object.freeze({ id: 'arrow', name: '箭矢', description: '共用箭袋累加每位射手的容量：每人1級100支，每級增加50支；無射手時100支。商店每包十支一枚銅幣；怪物若掉箭，每束50支。普通弓射消耗一支，箭雨與世界樹之箭消耗三支。', buyPrice: 1, buyQuantity: 10, sellPrice: 0, color: '#b3d79b' }),
     coin: Object.freeze({ id: 'coin', name: '銅幣', description: '與塔中的冒險者購買物資。', buyPrice: null, sellPrice: null, color: '#efc05e' }),
   });
 
@@ -108,8 +124,8 @@
     const seed = Number.isInteger(opts.seed) && opts.seed > 0 && opts.seed <= 0xffffffff ? opts.seed : ((Date.now() >>> 0) || 1);
     return {
       stateVersion: STATE_VERSION, mode: 'tower', floor: 99, hp: MAX_HP, hunger: 100, coins: 24,
-      bag: { heal: 2, ration: 2, shield: 0, hourglass: 0, bell: 0, map: 1, feather: 0, arrow: 0 },
-      effects: { shield: 0, freeze: 0, repel: 0, reveal: 0 },
+      bag: { heal: 2, ration: 2, haste: 0, shield: 0, hourglass: 0, bell: 0, map: 1, feather: 0, arrow: 0 },
+      effects: { shield: 0, freeze: 0, repel: 0, reveal: 0, haste: 0 },
       engine: { shovels: 1, kites: 0, whistles: 0, shovelCooldownMs: 0, skillCooldownMs: 0 },
       claimed: [], floorElapsed: 0, warrior: null, hiredWarriors: [], defeatedMonsters: [],
       equipment: { helmet: null, armor: null, shield: null, weapon: createGear('staff', 99, seed, 'starter') },
@@ -129,12 +145,18 @@
     return Array.isArray(ids) && ids.length <= limit && ids.every((id) => typeof id === 'string' && id.length > 0 && id.length <= 80) && new Set(ids).size === ids.length;
   }
 
-  function newAdventure() { return { version: 1, claimed: [], quest: null }; }
+  function newAdventure() { return { version: 1, claimed: [], quest: null, groceryPurchases: {} }; }
 
-  function validateAdventure(value, floor) {
+  function validateAdventure(value, floor, seed) {
     if (value === undefined) return newAdventure();
     const ids = (list, limit) => Array.isArray(list) && list.length <= limit && list.every(id => typeof id === 'string' && id.length > 0 && id.length <= 96) && new Set(list).size === list.length;
     if (!value || value.version !== 1 || !ids(value.claimed, 128)) return null;
+    const encounters = typeof module === 'object' && module.exports ? require('./tower-encounters.js') : globalThis.TowerEncounters;
+    // The original standalone core/dungeon bundle has no merchant module.
+    // It can migrate an empty ledger, but must never trust or discard purchases.
+    const rawPurchases=value.groceryPurchases,emptyPurchases=rawPurchases===undefined||rawPurchases&&Object.prototype.toString.call(rawPurchases)==='[object Object]'&&Object.keys(rawPurchases).length===0;
+    const purchases = typeof encounters?.validateGroceryPurchases==='function'?encounters.validateGroceryPurchases(rawPurchases,floor,seed):emptyPurchases?{}:null;
+    if (!purchases) return null;
     let quest = null;
     if (value.quest !== null) {
       const q = value.quest;
@@ -142,7 +164,7 @@
       if ((q.status === 'active' && q.progress >= q.goal) || (q.status !== 'active' && q.progress !== q.goal)) return null;
       quest = { id: q.id, floor: q.floor, type: q.type, status: q.status, target: q.target, goal: q.goal, progress: q.progress, events: [...q.events] };
     }
-    return { version: 1, claimed: [...value.claimed], quest };
+    return { version: 1, claimed: [...value.claimed], quest, groceryPurchases: purchases };
   }
 
   function durabilityMultiplier(kind) {
@@ -235,7 +257,11 @@
     if (run.floor < 0) {
       const u = run.underworld, departed = u?.departed, P = partyRules();
       if (!u || u.version !== 1 || !narrativeRules().ENDINGS.some(e => e.id === u.surfaceEnding) || run.chronicle?.ending !== u.surfaceEnding) return null;
-      if (departed !== null && (!departed || !validIds([departed.id], 1) || departed.id === 'hero' || !Object.hasOwn(P.PROFESSIONS, departed.profession) || !['male', 'female'].includes(departed.sex) || departed.name !== P.person(departed.profession, departed.sex) || !run.party?.joined?.includes(departed.id) || run.party?.members?.some(m => m.id === departed.id))) return null;
+      if (departed !== null && (!departed || !validIds([departed.id], 1) || departed.id === 'hero' || !Object.hasOwn(P.PROFESSIONS, departed.profession) || !['male', 'female'].includes(departed.sex) || departed.name !== P.person(departed.profession, departed.sex) || !run.party?.joined?.includes(departed.id))) return null;
+      // The farewell remains part of the ending even after a later reunion.
+      // Require a matching archived identity before accepting that return;
+      // old saves with no traveller archive still retain their original ending.
+      if (departed && run.party?.members?.some(m=>m.id===departed.id) && !run.party?.travellers?.some(t=>t.id===departed.id&&t.profession===departed.profession&&t.sex===departed.sex&&t.departedFloor>run.floor)) return null;
       underworld = { version: 1, departed: departed === null ? null : { id: departed.id, profession: departed.profession, sex: departed.sex, name: departed.name }, surfaceEnding: u.surfaceEnding };
     } else if (run.underworld !== undefined) return null;
     if (!validNumber(run.seed, 1, 0xffffffff, true) || !validNumber(run.revision, 0, Number.MAX_SAFE_INTEGER - 1, true) || !validNumber(run.charIdx, 0, 5, true)) return null;
@@ -248,7 +274,8 @@
     for (const id of Object.keys(ITEMS).filter((key) => key !== 'coin')) {
       // Old journeys get their initial quiver once, without resetting other inventory.
       if (id === 'arrow' && !Object.hasOwn(run.bag,id)) { bag.arrow=run.party?.loadouts&&(run.party.profession==='archer'||run.party.members?.some(m=>m.profession==='archer'))?30:0; continue; }
-      if (!Object.hasOwn(run.bag, id) || !validNumber(run.bag[id], 0, MAX_STACK, true)) return null;
+      if (id === 'haste' && !Object.hasOwn(run.bag,id)) { bag.haste=0; continue; }
+      if (!Object.hasOwn(run.bag, id) || !validNumber(run.bag[id], 0, itemStorageLimit(id), true)) return null;
       bag[id] = run.bag[id];
     }
     if (Object.keys(run.bag).some((id) => !Object.hasOwn(bag, id))) return null;
@@ -257,6 +284,8 @@
       if (!Object.hasOwn(run.effects, id) || !validNumber(run.effects[id], 0, 120)) return null;
       effects[id] = run.effects[id];
     }
+    if (run.effects.haste !== undefined && !validNumber(run.effects.haste,0,HASTE_DURATION)) return null;
+    effects.haste = run.effects.haste ?? 0;
     if (!run.engine || typeof run.engine !== 'object' || Array.isArray(run.engine)) return null;
     const engine = {};
     for (const id of ['shovels', 'kites', 'whistles']) {
@@ -314,7 +343,7 @@
       if (!validIds([id], 1) || /^monster-\d+$/.test(id) && !validMonsterId(id, run.floor) || ['__proto__', 'constructor', 'prototype'].includes(id) || defeatedMonsters.includes(id) || !validNumber(seconds, Number.MIN_VALUE, 140)) return null;
       monsterStuns[id] = seconds;
     }
-    const adventure = validateAdventure(run.adventure, run.floor);
+    const adventure = validateAdventure(run.adventure, run.floor, run.seed);
     if (!adventure) return null;
     const chronicle = narrativeRules().validateChronicle(run.chronicle, run.floor);
     const expedition = dungeonRules().validateExpedition(run.expedition, run.floor, run.seed);
@@ -480,13 +509,19 @@
     });
   }
 
+  function supplyPrice(itemId, quantity = 1) {
+    const item = Object.hasOwn(ITEMS, itemId) ? ITEMS[itemId] : null;
+    if (!item || !validNumber(item.buyPrice, 1, MAX_COINS, true) || !validNumber(quantity, 1, itemStorageLimit(itemId), true)) return null;
+    // Coins stay integral, including a partial arrow bundle when filling a nearly full bag.
+    return Math.ceil(quantity / (item.buyQuantity || 1)) * item.buyPrice;
+  }
   function buy(run, itemId, quantity = 1, expectedRevision) {
     return transaction(run, expectedRevision, (next) => {
       const item = Object.hasOwn(ITEMS, itemId) ? ITEMS[itemId] : null;
-      if (!item || !validNumber(item.buyPrice, 1, MAX_COINS, true) || !validNumber(quantity, 1, MAX_STACK, true)) return { ok: false, message: '無效的購買項目或數量。' };
-      const cost = item.buyPrice * quantity;
+      if (!item || !validNumber(item.buyPrice, 1, MAX_COINS, true) || !validNumber(quantity, 1, itemLimit(itemId,next), true)) return { ok: false, message: '無效的購買項目或數量。' };
+      const cost = supplyPrice(itemId, quantity);
       if (next.coins < cost) return { ok: false, message: '銅幣不足。' };
-      if (next.bag[itemId] + quantity > MAX_STACK) return { ok: false, message: '這種道具的背包數量已滿。' };
+      if (next.bag[itemId] + quantity > itemLimit(itemId,next)) return { ok: false, message: '這種道具的背包數量已滿。' };
       next.coins -= cost; next.bag[itemId] += quantity;
       return { ok: true, message: `獲得 ${item.name} × ${quantity}。` };
     });
@@ -495,7 +530,7 @@
   function sell(run, itemId, quantity = 1, expectedRevision) {
     return transaction(run, expectedRevision, (next) => {
       const item = Object.hasOwn(ITEMS, itemId) ? ITEMS[itemId] : null;
-      if (!item || !validNumber(item.sellPrice, 1, MAX_COINS, true) || !validNumber(quantity, 1, MAX_STACK, true)) return { ok: false, message: '無效的出售項目或數量。' };
+      if (!item || !validNumber(item.sellPrice, 1, MAX_COINS, true) || !validNumber(quantity, 1, itemStorageLimit(itemId), true)) return { ok: false, message: '無效的出售項目或數量。' };
       if (next.bag[itemId] < quantity) return { ok: false, message: '背包裡沒有足夠的道具。' };
       if (next.coins + item.sellPrice * quantity > MAX_COINS) return { ok: false, message: '銅幣已達上限。' };
       next.bag[itemId] -= quantity; next.coins += item.sellPrice * quantity;
@@ -511,7 +546,7 @@
         if ((id === 'coin' ? next.coins : next.bag[id]) < count) return { ok: false, message: '交換所需的物資不足。' };
       }
       for (const [id, count] of Object.entries(trade.receive)) {
-        if (next.bag[id] - (trade.give[id] || 0) + count > MAX_STACK) return { ok: false, message: '背包數量已滿，無法交換。' };
+        if (next.bag[id] - (trade.give[id] || 0) + count > itemLimit(id,next)) return { ok: false, message: '背包數量已滿，無法交換。' };
       }
       for (const [id, count] of Object.entries(trade.give)) {
         if (id === 'coin') next.coins -= count; else next.bag[id] -= count;
@@ -531,6 +566,10 @@
       if (itemId === 'heal' && next.hp >= maximum) return { ok: false, message: '生命已滿，先把療癒藥留著吧。' };
       if (itemId === 'ration' && next.hunger >= 100) return { ok: false, message: '飽食度已滿，暫時不需要乾糧。' };
       const effect = { id: itemId };
+      if (itemId === 'haste') {
+        if (next.effects.haste > 0) return {ok:false,message:'加速藥水仍在生效，不需重複使用。'};
+        next.effects.haste=HASTE_DURATION; effect.duration=HASTE_DURATION;
+      }
       if (itemId === 'heal') { effect.healed = Math.min(35, maximum - next.hp); next.hp += effect.healed; }
       if (itemId === 'ration') { effect.fed = Math.min(45*(next.party?.loadouts?1+heroRules().teamPassive(next,'gourmet')/100:1), 100 - next.hunger); next.hunger += effect.fed;if(next.party?.loadouts)heroRules().food(next); }
       const timed = { shield: ['shield', 25], hourglass: ['freeze', 25], bell: ['repel', 20], map: ['reveal', 18] };
@@ -551,7 +590,7 @@
         if (next.coins + quantity > MAX_COINS) return { ok: false, message: '銅幣已達上限。' };
         next.coins += quantity;
       } else {
-        if (next.bag[itemId] + quantity > MAX_STACK) return { ok: false, message: '背包數量已滿。' };
+        if (next.bag[itemId] + quantity > itemLimit(itemId,next)) return { ok: false, message: '背包數量已滿。' };
         next.bag[itemId] += quantity;
       }
       return { ok: true, message: `拾取${ITEMS[itemId].name} × ${quantity}。` };
@@ -631,13 +670,14 @@
       // A completed tower's old overflow is not underground training. The
       // separate surface snapshot still retains the original saved XP.
       if(H.level(next,'hero')===10){const growth=typeof module==='object'&&module.exports?require('./tower-hero-growth.js'):globalThis.TowerHeroGrowth;H.state(next).xp=Math.min(H.state(next).xp,growth.XP[9]);}
-      if (companion) { returned.push(...Object.values(H.equipment(next, companion.id)).filter(Boolean)); next.gearBag.push(...returned); H.removeMember(next, companion.id); }
+      if (companion) { P.archiveMember(next, companion); returned.push(...Object.values(H.equipment(next, companion.id)).filter(Boolean)); next.gearBag.push(...returned); H.removeMember(next, companion.id); }
     }
+    if (companion && !next.party?.loadouts) P.archiveMember(next, companion);
     if (companion) next.party.members = next.party.members.filter(m => m.id !== companion.id);
     next.underworld = { version: 1, departed, surfaceEnding: next.chronicle.ending };
     next.floor = -1; next.status = 'playing'; next.floorsCleared = 99;
     next.claimed = []; next.floorElapsed = 0; next.defeatedMonsters = []; next.monsterStuns = {}; next.adventure = newAdventure();
-    next.effects = { shield: 0, freeze: 0, repel: 0, reveal: 0 };
+    next.effects = { shield: 0, freeze: 0, repel: 0, reveal: 0, haste: next.effects.haste || 0 };
     delete next.engine.sightMemory; delete next.engine.mapKnowledge;
     next.expedition.discovered = false; next.expedition.active = null;
     if (next.warrior?.mode === 'holding') next.warrior = null;
@@ -656,7 +696,7 @@
       if (next.floor === 1 && next.chronicle.ending === null) return { ok: false, message: '請先在塔心選擇高塔的未來，再踏出歸途之門。' };
       next.coins = Math.min(MAX_COINS, next.coins + floorConfig(next.floor).rewardCoins);
       next.floorsCleared += 1;
-      next.effects = { shield: 0, freeze: 0, repel: 0, reveal: 0 };
+      next.effects = { shield: 0, freeze: 0, repel: 0, reveal: 0, haste: next.effects.haste || 0 };
       next.claimed = []; next.floorElapsed = 0; next.defeatedMonsters = [];
       delete next.engine.sightMemory; delete next.engine.mapKnowledge;
       next.monsterStuns = {}; next.adventure = newAdventure();
@@ -675,5 +715,5 @@
     });
   }
 
-  return Object.freeze({ STATE_VERSION, MAX_HP, MAX_MONSTERS, validMonsterId, isFloor, isUnderworld, ITEMS, GEAR, MONSTERS, CHAPTERS, OPENING, ENDING, EXCHANGES, floorConfig, newRun, validateSave, buy, sell, exchange, useItem, collect, takeDamage, tickEffects, startUnderworld, descend, monsterStrength, warriorOffer, hireWarrior, interceptMonster, createGear, validateGear, durabilityMultiplier, gearPrice, equipmentStats, receiveGear, grantGear, equipGear, discardGear, buyGear, effectiveMonsterStrength, hitMonster, resolveHeldMonster, transaction, applyDamage, newAdventure, validateAdventure });
+  return Object.freeze({ STATE_VERSION, MAX_HP, MAX_MONSTERS, HASTE_DURATION, HASTE_PERCENT, hasteMultiplier, validMonsterId, isFloor, isUnderworld, ITEMS, itemLimit, itemStorageLimit, GEAR, MONSTERS, CHAPTERS, OPENING, ENDING, EXCHANGES, floorConfig, newRun, validateSave, supplyPrice, buy, sell, exchange, useItem, collect, takeDamage, tickEffects, startUnderworld, descend, monsterStrength, warriorOffer, hireWarrior, interceptMonster, createGear, validateGear, durabilityMultiplier, gearPrice, equipmentStats, receiveGear, grantGear, equipGear, discardGear, buyGear, effectiveMonsterStrength, hitMonster, resolveHeldMonster, transaction, applyDamage, newAdventure, validateAdventure });
 });

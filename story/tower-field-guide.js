@@ -29,6 +29,7 @@
   const ITEM_TIPS=freeze({
     heal:{when:'生命變低時使用，也可放進快捷欄。',caution:'隊友自動喝藥需先開啟，並設定生命門檻與保留數量。'},
     ration:{when:'飽食度偏低時先補充，別等肚子餓到受傷。',caution:'飽食度是全隊共用；療癒藥不能代替食物。'},
+    haste:{when:'交戰前喝下，可更快移動及普通攻擊；也能放進快捷欄。',caution:'只作用於喝下的角色，切換領隊不轉移；效果期間不能重複喝，不縮短技能冷卻或準備時間。'},
     shield:{when:'準備接戰，或需要護著受傷隊員撤退時。',caution:'護盾會被傷害消耗，不代表五分鐘內都不會受傷。'},
     hourglass:{when:'快走到出口、護送旅人或正在交戰時。',caution:'停的是迷宮牆壁，怪物仍然會行動。'},
     bell:{when:'被多隻怪物包圍，或需要回營地整理隊伍時。',caution:'讓怪物退開不等於無敵，仍要避開身體和陷阱。'},
@@ -71,7 +72,7 @@
     const fit=!validActor?'適用：'+def.jobs.map(j=>h.JOBS[j].name).join('、'):!def.jobs.includes(job)?'這件裝備不適合目前選取的職業。':level<def.requiredLevel?'還需要升到 '+def.requiredLevel+' 級才能穿戴。':'符合目前角色的職業與等級。';
     const pct=typeof value==='object'&&Number.isFinite(value?.durability)&&Number.isFinite(value?.maxDurability)&&value.maxDurability>0?Math.max(0,Math.min(100,Math.ceil(value.durability/value.maxDurability*100))):null;
     const severity=pct===null?'unknown':pct===0?'broken':pct<=10?'critical':pct<=20?'warning':'good';
-    const condition=severity==='broken'?'已損壞，能力暫停；隊中有能行動的鍛匠時，可到工坊支付材料與銅幣修復。':severity==='critical'?'耐久快用完了，先換備用裝備或回營地修理。':severity==='warning'?'耐久偏低，下次經過營地記得修理。':'裝備未損壞時才提供能力。';
+    const condition=severity==='broken'?'已損壞，能力暫停；有能行動的鍛匠可在營地付費重建，否則找專門商人，銅幣另加20%。':severity==='critical'?'耐久快用完了，先換備用裝備或回營地修理。':severity==='warning'?'耐久偏低，下次經過營地記得修理。':'裝備未損壞時才提供能力。';
     return {name:def.name,tier:def.tier,requiredLevel:def.requiredLevel,...role,fit,condition,severity,durabilityPercent:pct,
       wear:def.slot!=='weapon'?'受到有效傷害時，穿戴中的每件防具各消耗耐久。':['bow','staff','book'].includes(def.type)?'遠程攻擊發射就消耗武器耐久，射空也會消耗。':'近戰命中才消耗武器耐久，揮空不扣。'};
   }
@@ -85,10 +86,10 @@
   const PROFESSIONS=freeze({
     swordsman:{innate:'能穿重裝，使用長劍配盾或雙手劍。卡住的石門可用職業本領快速處理。',examples:['guard_instinct','endurance']},
     mage:{innate:'法杖發射遠程光彈。隊中有能行動的術士，就能使用十分鐘日光術，不占技能欄。',examples:['recovery','extension']},
-    scout:{innate:'使用雙短刃與輕裝。遇到被掩蓋的暗門，可用職業本領快速找出暗扣。',examples:['trap_sense','intuition']},
-    chef:{innate:'使用鐵鍋、輕裝與盾。遇到棘殼食材箱，可用職業本領快速處理。所有隊伍都能在營地烹飪。',examples:['double_portion','gourmet']},
+    scout:{innate:'使用雙短刃與輕裝。可提前辨認附近陷阱線索，遇到被掩蓋的暗門，可用職業本領快速找出暗扣。',examples:['trap_sense','intuition']},
+    chef:{innate:'使用鐵鍋、輕裝與盾。遇到棘殼食材箱，可用職業本領快速處理。六道基本菜任何隊伍都能烹飪；有能行動的廚師，才顯示並可烹飪高階菜譜。',examples:['double_portion','gourmet']},
     healer:{innate:'法書發射遠程光彈。遇到受污染的泉眼，可用職業本領快速淨化。',examples:['herbalism','rescue']},
-    smith:{innate:'能穿重裝，使用短鎚配盾或重錘。隊中有能行動的鍛匠，工坊就能修復耐久歸零的裝備。',examples:['economy','care']},
+    smith:{innate:'能穿重裝，使用短鎚配盾或重錘。隊中有能行動的鍛匠，營地才可完整修理、重建破損（耐久歸零）與鍛造強化；否則需找專門商人，銅幣另加20%。',examples:['economy','care']},
     archer:{innate:'精靈長弓進行遠程攻擊，使用輕裝與全隊共用箭袋；發射會消耗箭矢。',examples:['steady_aim','nimble_shot']},
   });
   function profession(job,run,actorId){

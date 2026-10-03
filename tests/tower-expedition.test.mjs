@@ -57,7 +57,7 @@ test('forging is revision guarded, class-discounted, one immutable trait and two
   let r=fresh(99,'smith');r.coins=100;r.party.journey.scrap=30;r.party.journey.materials.ironore=3;const id=r.equipment.weapon.id,rev=r.revision;
   r=X.forge(r,id,'durable',rev).run;assert.equal(r.coins,96);assert.equal(r.party.journey.scrap,27);assert.equal(X.forge(r,id,'durable',rev).ok,false);assert.equal(X.forge(r,id,'light').ok,false);
   r=X.forge(r,id,'durable').run;assert.equal(r.equipment.weapon.forge.level,2);assert.equal(X.forge(r,id,'durable').ok,false);assert.ok(C.validateSave(r));
-  let other=fresh();other.coins=100;other.party.journey.scrap=30;other.party.journey.materials.toughfiber=3;other=X.forge(other,other.equipment.weapon.id,'light').run;assert.equal(other.coins,92);assert.ok(Math.abs(X.attackInterval(other)-.72)<1e-9);
+  let other=fresh();other.coins=100;other.party.journey.scrap=30;other.party.journey.materials.toughfiber=3;assert.equal(X.forge(other,other.equipment.weapon.id,'light').ok,false,'a party without a smith cannot forge at camp');other.party.profession='smith';other=X.forge(other,other.equipment.weapon.id,'light').run;assert.equal(other.coins,96);assert.ok(Math.abs(X.attackInterval(other)-.72)<1e-9);
 });
 test('durable gear consumes reserve first, repairs do not refill it; broken gear yields one scrap',()=>{
   let r=fresh(84,'smith');r.coins=100;r.party.journey.scrap=30;r.party.journey.materials.ironore=1;const id=r.equipment.weapon.id;r=X.forge(r,id,'durable').run;
@@ -71,7 +71,7 @@ test('armor traits cap movement and trap mitigation without changing hunger dama
   const g=r.equipment.helmet;g.forge={trait:'durable',level:1,reserve:2};C.applyDamage(r,30,'monster');assert.equal(g.forge.reserve,1);assert.ok(C.validateSave(r));
 });
 test('dismantling handles equipped and stored gear once, including stale confirmations',()=>{
-  let r=fresh();const id=r.equipment.weapon.id,rev=r.revision,value=X.salvageValue(r.equipment.weapon);r=X.dismantle(r,id,rev).run;assert.equal(r.equipment.weapon,null);assert.equal(r.party.journey.scrap,value);assert.equal(X.dismantle(r,id).ok,false);assert.ok(C.validateSave(r));
+  let r=fresh(99,'smith');const id=r.equipment.weapon.id,rev=r.revision,value=X.salvageValue(r.equipment.weapon);r=X.dismantle(r,id,rev).run;assert.equal(r.equipment.weapon,null);assert.equal(r.party.journey.scrap,value);assert.equal(X.dismantle(r,id).ok,false);assert.ok(C.validateSave(r));
   const g=C.createGear('helmet',99,1,'spare');r=C.grantGear(r,g).run;assert.ok(r);r=X.dismantle(r,g.id).run;assert.equal(r.gearBag.length,0);
 });
 test('names and browser loading order use the expansion without changing classic modes',()=>{

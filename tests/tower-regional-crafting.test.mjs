@@ -6,7 +6,7 @@ const legacyIngredients=['root','mushroom','herb','nectar','meat','shell'];
 const previousRecipes=['stew','broth','skewer','crab','soup','bento','salad','feast','trail_bread','honey_roast','crab_pot','herbal_platter','root_banquet','mist_broth','ember_crab','gate_feast'];
 const fresh=(job='mage')=>H.enable(P.enable(C.newRun({seed:82,name:'地方食譜'}),job).run).run;
 function move(run,floor){run.floor=floor;run.floorsCleared=floor>0?99-floor:99+(-floor-1);run.claimed=[];run.defeatedMonsters=[];run.monsterStuns={};run.adventure=C.newAdventure();run.expedition=D.newExpedition();if(floor>0)run.chronicle=N.newChronicle(floor);P.advance(run,{reward:false});return run;}
-function underground(){const run=move(fresh(),1);run.chronicle.ending='keeper';run.chronicle.clues.push('clue:heart');run.party.boss.started=true;run.party.boss.done=true;run.party.boss.seals.fill(true);run.defeatedMonsters.push('monster-11');const ended=C.descend(run);assert.ok(ended.ok);const entered=C.startUnderworld(ended.run);assert.ok(entered.ok);return entered.run;}
+function underground(job='mage'){const run=move(fresh(job),1);run.chronicle.ending='keeper';run.chronicle.clues.push('clue:heart');run.party.boss.started=true;run.party.boss.done=true;run.party.boss.seals.fill(true);run.defeatedMonsters.push('monster-11');const ended=C.descend(run);assert.ok(ended.ok);const entered=C.startUnderworld(ended.run);assert.ok(entered.ok);return entered.run;}
 
 test('regional ingredients and minerals start empty, preserve the six original supplies and stay separate',()=>{
   const run=fresh();assert.equal(Object.keys(P.INGREDIENTS).length,21);assert.equal(Object.keys(M.MATERIALS).length,6);assert.deepEqual(P.INGREDIENTS,M.INGREDIENTS);
@@ -41,7 +41,7 @@ test('ingredients, prepared food and new forging materials survive environment c
 
 test('all fifteen regional ingredients have recipes and region-exclusive recipes cannot use old ingredients as substitutes',()=>{
   const regionKeys=Object.keys(P.INGREDIENTS).filter(k=>!legacyIngredients.includes(k));assert.equal(regionKeys.length,15);
-  for(const key of regionKeys){const matches=Object.entries(P.RECIPES).filter(([,r])=>r.cost[key]);assert.ok(matches.length>0,key);for(const[id,recipe]of matches){const run=move(underground(),-50);for(const key of legacyIngredients)run.party.ingredients[key]=99;const before=JSON.stringify(run);assert.equal(P.cook(run,id).ok,false,id);assert.equal(JSON.stringify(run),before);for(const[k,v]of Object.entries(recipe.cost))run.party.ingredients[k]=v;const cooked=P.cook(run,id);assert.ok(cooked.ok,id+': '+cooked.message);assert.equal(cooked.run.party.ingredients[key],0);assert.ok(C.validateSave(cooked.run));}}
+  for(const key of regionKeys){const matches=Object.entries(P.RECIPES).filter(([,r])=>r.cost[key]);assert.ok(matches.length>0,key);for(const[id,recipe]of matches){const run=move(underground('chef'),-50);for(const key of legacyIngredients)run.party.ingredients[key]=99;const before=JSON.stringify(run);assert.equal(P.cook(run,id).ok,false,id);assert.equal(JSON.stringify(run),before);for(const[k,v]of Object.entries(recipe.cost))run.party.ingredients[k]=v;const cooked=P.cook(run,id);assert.ok(cooked.ok,id+': '+cooked.message);assert.equal(cooked.run.party.ingredients[key],0);assert.ok(C.validateSave(cooked.run));}}
 });
 
 test('all seven forge treatments consume scaled regional material costs atomically, never by repair',()=>{

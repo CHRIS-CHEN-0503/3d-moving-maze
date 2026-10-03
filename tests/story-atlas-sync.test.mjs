@@ -61,7 +61,7 @@ test('atlas IDs and icons are complete and descriptions have no unresolved value
   const records=[...rules.entries,...items.map(r=>({...r,category:r.recipe?'cooking':'items'})),...cooperation];
   assert.equal(new Set(records.map(r=>r.category+':'+r.id)).size,records.length);
   for(const r of records){assert.ok(r.name);assert.ok(r.description);assert.doesNotMatch(JSON.stringify(r),/undefined|NaN/);}
-  assert.equal(records.length,312);
+  assert.equal(records.length,313);
 });
 
 test('current game and read-only reference share the release version and accessible entry links',()=>{

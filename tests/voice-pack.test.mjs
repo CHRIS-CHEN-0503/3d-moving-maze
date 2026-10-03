@@ -40,11 +40,20 @@ test('大拍賣使用三種完整句音檔，數字轉為中文發音且不再�
   assert.equal(pack.get('shop.sale.good.0'),null);
 });
 
-test('第一批專用語音涵蓋開場、三位行商、五位探索者與怪物警告',()=>{
+test('專用語音涵蓋開場、四位行商、五位探索者與怪物警告',()=>{
   const ids=Object.keys(pack.tracks);
   assert.equal(pack.version,1);assert.equal(ids.filter(id=>id.startsWith('story.scene99.')).length,3);
-  assert.equal(ids.filter(id=>id.startsWith('merchant.')).length,3);assert.equal(ids.filter(id=>id.startsWith('explorer.')).length,5);
+  assert.equal(ids.filter(id=>id.startsWith('merchant.')).length,4);assert.equal(ids.filter(id=>id.startsWith('explorer.')).length,5);
   assert.ok(pack.get('alert.monster'));assert.equal(pack.get('__proto__'),null);
+});
+
+test('四位商人的角色覆寫與預設錄音共用新版台詞和音檔',()=>{
+  const roles=require('../assets/role-voices.js');
+  for(const [id,gender,speaker]of [['tieLing','male','uncle_fu'],['jinHe','female','serena'],['lanZhou','male','dylan'],['suHe','female','serena']]){
+    const key='merchant.'+id,track=pack.get(key),override=roles.overrides[key],recording=roles.tracks[key];
+    assert.equal(override.text,track.text);assert.equal(recording.text,track.text);assert.equal(override.src,track.src);assert.equal(recording.src,track.src);assert.match(track.src,/-v149\.mp3$/);assert.equal(roles.profiles[key].gender,gender);assert.equal(override.gender,gender);assert.equal(override.speaker,speaker);assert.equal(recording.speaker,speaker);
+  }
+  assert.equal(roles.profiles['merchant.suHe'].age,'adult');
 });
 
 test('錄音文字與畫面上的固定台詞一致',()=>{

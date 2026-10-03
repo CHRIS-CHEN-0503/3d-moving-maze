@@ -15,7 +15,7 @@ function harness(current=winner(),surface=winner()){
   const context=vm.createContext({C,P,N,Underworld:U,Heroes:{...H,enable(){events.enabled++;throw Error('must not replace legacy equipment');}},HeroVisual:{portrait:id=>'<figure data-profession="'+id+'"></figure>'},
     SAVE,SURFACE_CLEAR,run:structuredClone(current),pendingUnderworld:null,pendingUnderworldSource:null,pendingUnderworldActive:null,
     pendingProfession:null,pendingHero:null,pendingSex:'female',pendingDungeonShift:null,upgradingProfession:false,
-    active:false,paused:false,pauseAt:0,floorStarted:false,saveFailed:false,exitDeclined:false,explorer:null,partyUI:null,lightingUI:null,
+    active:false,paused:false,pauseAt:0,floorStarted:false,saveFailed:false,exitDeclined:false,explorer:null,partyUI:null,lightingUI:null,cinema:null,
     text:String,prose:rows=>rows.join('\n'),floorLabel:floor=>floor<0?'地下第 '+(-floor)+' 層':'第 '+floor+' 層',
     modern:()=>!!context.run?.party?.loadouts,inDungeon:()=>false,
     dialog:(...args)=>dialogs.push(args),showToast:message=>messages.push(message),enter:()=>events.entered++,open:()=>events.opened++,revealHero:()=>events.revealed++,

@@ -19,7 +19,7 @@ test('atlas derives every current inventory item, ingredient, recipe and all 15 
   assert.deepEqual(entries.filter(e=>e.id.startsWith('meal:')).map(e=>e.key).sort(),Object.keys(P.RECIPES).sort());
   assert.equal(N.allChapters().length,15);
   for(const chapter of N.allChapters()){const item=find(chapter.clueId);assert.equal(item.name,chapter.clueName);assert.equal(item.midFloor,chapter.mid);assert.equal(item.gateFloor,chapter.low);assert.equal(item.spoiler,true);}
-  assert.equal(entries.length,81);assert.equal(new Set(entries.map(e=>e.id)).size,entries.length);
+  assert.equal(entries.length,82);assert.equal(new Set(entries.map(e=>e.id)).size,entries.length);
   for(const e of entries){for(const field of ['id','name','category','description','effect','acquisition'])assert.ok(e[field]?.length,e.id+' '+field);assert.ok(e.sources.length);for(const source of e.sources)assert.ok(fs.existsSync(path.join(base,source)),source);assert.ok(Object.isFrozen(e));}
 });
 
@@ -46,7 +46,8 @@ test('item guide uses current actor combat values, not the retired feather and s
 
 test('drop percentages are conditional and arrow bundles differ from shop quantities',()=>{
   for(const e of entries.filter(e=>e.drop))assert.equal(e.drop.conditionalPercent,Loot.CHANCES[e.drop.rarity]);
-  assert.equal(find('item:arrow').drop.quantity,12);assert.match(find('item:arrow').acquisition,/10 支/);assert.match(find('item:arrow').acquisition,/12 支/);
+  assert.equal(find('item:arrow').drop.quantity,Loot.ARROW_DROP_QUANTITY);assert.equal(find('item:arrow').drop.quantity,50);assert.match(find('item:arrow').acquisition,/10 支/);assert.match(find('item:arrow').acquisition,/50 支/);
+  assert.equal(find('item:arrow').stackLimit,null);assert.match(find('item:arrow').capacityRule,/所有射手/);assert.match(find('item:arrow').capacityRule,/300 支/);assert.match(find('item:arrow').effect,/每一名射手累加/);
   assert.match(Atlas.dropExplanation,/先.*抽一種/);assert.match(Atlas.dropExplanation,/不是每件/);
   assert.match(find('item:map').effect,/18 秒/);assert.match(find('item:map').effect,/下一次變形/);
   assert.match(Atlas.scope.notes.join(' '),/12 秒/);assert.match(Atlas.scope.notes.join(' '),/不是第二件劇情道具/);
@@ -57,6 +58,14 @@ test('cooking cards preserve real costs and distinguish self, party healing and 
   for(const [id,recipe]of Object.entries(P.RECIPES)){const entry=find('meal:'+id);assert.deepEqual(entry.recipe.cost,recipe.cost);assert.equal(entry.recipe.hp,recipe.hp);assert.equal(entry.recipe.hunger,recipe.hunger);assert.equal(entry.requiredDepth,recipe.requiredDepth||0);assert.equal(entry.underground,!!recipe.requiredDepth);if(recipe.team)assert.match(entry.effect,new RegExp(recipe.team+' 點'));if(recipe.buff)assert.match(entry.effect,/3 層.*2 種/);}
   assert.match(find('meal:stew').description,/任何職業/);assert.match(find('meal:stew').notes.join(' '),/不是有廚師就必定雙倍/);
   const run=fresh(),snapshot=JSON.stringify(run);Atlas.records();assert.equal(JSON.stringify(run),snapshot);
+});
+
+test('grocery supplies and regional ingredients document the same prices, haste duration and availability',()=>{
+  const E=require('../story/tower-encounters.js');
+  for(const id of Object.keys(C.ITEMS).filter(id=>id!=='coin')){assert.match(find('item:'+id).acquisition,/雜貨商・蘇禾/);assert.doesNotMatch(find('item:'+id).acquisition,/鐵匠・鐵嶺|裁甲師・錦禾|盾匠・嵐舟/);}
+  assert.match(find('item:haste').effect,new RegExp(C.HASTE_DURATION+' 秒'));assert.match(find('item:haste').effect,new RegExp(C.HASTE_PERCENT+'%'));assert.equal(find('item:haste').drop,null);assert.match(find('item:haste').effect,/不疊加/);
+  for(const key of E.GROCERY.commonIngredients)assert.match(find('ingredient:'+key).notes.join(' '),/雜貨商販售常用食材/);
+  assert.match(find('ingredient:frostberry').notes.join(' '),/可早於原產地/);assert.match(find('light:torch').acquisition,/雜貨商/);assert.doesNotMatch(find('light:torch').acquisition,/三位行商皆售/);
 });
 
 test('torch, raw materials, daylight and tools are current obtainable resources without old spawn promises',()=>{

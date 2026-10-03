@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {createRequire} from 'node:module';
+import {grocerySeed,groceryShop} from './grocery-fixtures.mjs';
 const require=createRequire(import.meta.url),C=require('../story/story-core.js'),H=require('../story/tower-heroes-core.js'),P=require('../story/tower-party-core.js'),N=require('../story/tower-narrative.js'),E=require('../story/tower-encounters.js'),D=require('../story/tower-dungeons.js'),S=require('../story/tower-side-stories.js'),L=require('../story/tower-lighting-core.js'),Hazards=require('../story/tower-hazards.js'),F=require('../story/tower-field-guide.js');
 const clone=v=>structuredClone(v);
 function underground(floor=-1,seed=43,job='mage'){
@@ -37,8 +38,9 @@ test('underground disables all old rifts while preserving authentic completed to
 test('underground merchants, chests and rewards are deterministic, valid and do not reduce the three-tier catalogue',()=>{
   let chestCount=0,gearCount=0;const merchants=new Set();
   for(let floor=-1;floor>=-50;floor--)for(let seed=1;seed<=16;seed++){
-    const shops=E.merchantOffers(floor,seed,true);assert.deepEqual(E.merchantOffers(floor,seed,true),shops);assert.ok(shops.length>=1&&shops.length<=2);
-    for(const shop of shops){merchants.add(shop.id);assert.ok(shop.gear.some(g=>H.GEAR[g.kind].tier===3));assert.ok(shop.supplies.includes('arrow'));for(const entry of shop.gear){assert.ok(C.validateGear(entry.gear));assert.ok(entry.price>0&&Number.isFinite(entry.price));}}
+    const shops=E.merchantOffers(floor,seed,true),professionals=shops.filter(m=>m.id!=='suHe');assert.deepEqual(E.merchantOffers(floor,seed,true),shops);assert.ok(professionals.length>=1&&professionals.length<=2);
+    for(const shop of professionals){merchants.add(shop.id);assert.ok(shop.gear.some(g=>H.GEAR[g.kind].tier===3));assert.deepEqual(shop.supplies,[]);for(const entry of shop.gear){assert.ok(C.validateGear(entry.gear));assert.ok(entry.price>0&&Number.isFinite(entry.price));}}
+    for(const shop of shops.filter(m=>m.id==='suHe')){assert.deepEqual(shop.gear,[]);assert.ok(shop.supplies.includes('arrow'));assert.equal(shop.ingredientOffers.length,5);}
     const chest=E.chestOffer(floor,seed,true);assert.deepEqual(E.chestOffer(floor,seed,true),chest);if(chest){chestCount++;if(chest.gear){gearCount++;assert.ok(C.validateGear(chest.gear));}else assert.ok(chest.damage>0&&Number.isFinite(chest.damage));}
     const reward=E.questReward(floor,seed,true);assert.deepEqual(E.questReward(floor,seed,true),reward);assert.ok(reward.coins>0&&Number.isFinite(reward.coins));if(reward.gear)assert.ok(C.validateGear(reward.gear));
   }
@@ -47,7 +49,7 @@ test('underground merchants, chests and rewards are deterministic, valid and do 
 });
 test('basement torch stock, gathering and fuel survive reload and cannot be claimed twice',()=>{
   for(const floor of [-1,-10,-40,-41,-50]){
-    let r=underground(floor);r.coins=100;const merchant=E.merchantOffers(floor,r.seed)[0].id;
+    let r=underground(floor,grocerySeed(floor));r.coins=100;const merchant=groceryShop(r).id;
     for(let i=0;i<3;i++){const bought=L.buy(r,merchant,r.revision);assert.ok(bought.ok,bought.message);r=C.validateSave(JSON.stringify(bought.run));assert.ok(r);}
     assert.equal(r.coins,88);assert.equal(L.buy(r,merchant).ok,false);
     const picked=L.gather(r,'light-supply-2');assert.ok(picked.ok,picked.message);r=picked.run;assert.equal(L.gather(r,'light-supply-2').ok,false);
@@ -57,9 +59,9 @@ test('basement torch stock, gathering and fuel survive reload and cannot be clai
 });
 test('basement merchant purchases and chest settlement charge once and retain validated save data',()=>{
   for(const floor of [-1,-40,-41,-50]){
-    let r=underground(floor);r.coins=5000;const shop=E.merchantOffers(floor,r.seed,true)[0],item=shop.supplies.find(id=>r.bag[id]<90),cost=C.ITEMS[item].buyPrice;
+    let r=underground(floor,grocerySeed(floor));r.coins=5000;const shop=groceryShop(r),item=shop.supplies.find(id=>r.bag[id]<90),cost=C.ITEMS[item].buyPrice;
     const bought=E.buySupply(r,shop.id,item,1,r.revision);assert.ok(bought.ok,bought.message);assert.equal(bought.run.coins,r.coins-cost);assert.equal(bought.run.bag[item],r.bag[item]+1);assert.equal(E.buySupply(bought.run,shop.id,item,1,r.revision).ok,false);r=bought.run;
-    const gear=shop.gear[0],purchased=E.buyMerchantGear(r,shop.id,gear.kind,r.revision);assert.ok(purchased.ok,purchased.message);assert.ok(C.validateSave(purchased.run));assert.equal(E.buyMerchantGear(purchased.run,shop.id,gear.kind).ok,false);
+    const gearShop=E.merchantOffers(floor,r.seed,true)[0],gear=gearShop.gear[0],purchased=E.buyMerchantGear(r,gearShop.id,gear.kind,r.revision);assert.ok(purchased.ok,purchased.message);assert.ok(C.validateSave(purchased.run));assert.equal(E.buyMerchantGear(purchased.run,gearShop.id,gear.kind).ok,false);
   }
   for(const outcome of ['trap','gear']){
     let r,offer;for(let seed=1;seed<=150;seed++){offer=E.chestOffer(-41,seed,true);if(offer?.outcome===outcome){r=underground(-41,seed);break;}}

@@ -6,7 +6,7 @@
   const SKILL_SOUNDS=Object.freeze({arrow:'bow',binding:'bow',volley:'bow',great_arrow:'bow',cleave:'slash',circle:'slash',blind:'slash',stun:'metal',stagger:'metal',splash:'cook',bolt:'magic',weak:'magic',slow:'slash',mark:'metal',shock:'thunder',thorns:'thorns',repel:'burst',starfall:'meteor',star_ring:'meteor',decisive:'slash',guard:'shield',barrier:'shield',ward:'shield',fortify:'forge',fortress:'shield',rally:'shield',speed:'scan',polish:'forge',stealth:'smoke',smoke:'smoke',stomach:'cook',meal:'cook',soup:'heal',feast:'cook',heal:'heal',revive:'heal',cleanse:'heal',sanctuary:'heal',reveal:'scan',escape:'scan',disarm:'device',daylight:'heal',repair:'forge',frost:'frost',taunt:'metal',barricade:'device'});
   const skillKind=skill=>Object.hasOwn(ACTIONS,skill?.presentation?.sound)?skill.presentation.sound:SKILL_SOUNDS[skill?.effect]||'magic';
   const hitKind=weapon=>['staff','book'].includes(weapon?.type)?'hit-magic':['blade','daggers','hammer','pan'].includes(weapon?.type)?'hit-metal':'hit';
-  const itemKind=id=>({heal:'drink',ration:'cook',shield:'shield',hourglass:'scan',bell:'metal',map:'scan'}[id]||'device');
+  const itemKind=id=>({heal:'drink',haste:'drink',ration:'cook',shield:'shield',hourglass:'scan',bell:'metal',map:'scan'}[id]||'device');
   const chargeSeconds=value=>Number.isFinite(value)&&value>0?Math.min(4,Math.max(.1,Math.round(value*10)/10)):.65;
   function renderAction(kind,seconds){
     const duration=kind==='charge'?chargeSeconds(seconds):ACTIONS[kind],data=new Float32Array(Math.round(RATE*duration));let seed=9143,low=0,peak=0;

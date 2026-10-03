@@ -1,8 +1,9 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {createRequire} from 'node:module';
+import {provisionTravellers} from './recruit-fixtures.mjs';
 const require=createRequire(import.meta.url),C=require('../story/story-core.js'),P=require('../story/tower-party-core.js'),H=require('../story/tower-heroes-core.js'),N=require('../story/tower-narrative.js'),D=require('../story/tower-dungeons.js');
-const fresh=(job='swordsman',seed=31415)=>H.enable(P.enable(C.newRun({seed,name:'遠征者'}),job).run).run;
+const fresh=(job='swordsman',seed=31415)=>provisionTravellers(H.enable(P.enable(C.newRun({seed,name:'遠征者'}),job).run).run);
 function floor(r,f){r.floor=f;r.floorsCleared=99-f;r.chronicle=N.newChronicle(f);r.expedition=D.newExpedition();r.claimed=[];r.defeatedMonsters=[];r.monsterStuns={};P.advance(r);return r;}
 test('all eleven originals and the floor lord retain damage, poise, effects and one area-skill hit after reload',()=>{
   const seed=Array.from({length:500},(_,i)=>i+1).find(s=>C.floorConfig(1,s).monsterCount===11&&H.draft(s,'swordsman','hero').skills.includes('whirlwind'));

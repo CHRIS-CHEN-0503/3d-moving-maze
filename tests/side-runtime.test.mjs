@@ -9,11 +9,11 @@ const THREE = require('../lib/three.min.js');
 const C = require('../story/story-core.js'), N = require('../story/tower-narrative.js');
 const D = require('../story/tower-dungeons.js'), S = require('../story/tower-side-stories.js');
 const read = name => readFileSync(new URL('../story/' + name, import.meta.url), 'utf8');
-const sources = { coreSource: read('story-core.js'), narrativeSource: read('tower-narrative.js'), sideStoriesSource: read('tower-side-stories.js'), dungeonsSource: read('tower-dungeons.js'), encountersSource: read('tower-encounters.js'), charactersSource: read('tower-characters.js'), runtimeSource: read('tower-mode.js') };
+const sources = { coreSource: read('story-core.js'), narrativeSource: read('tower-narrative.js'), sideStoriesSource: read('tower-side-stories.js'), dungeonsSource: read('tower-dungeons.js'), encountersSource: read('tower-encounters.js'), materialsSource:read('tower-materials.js'), lightingRuntimeSource:read('tower-lighting-runtime.js'), charactersSource: read('tower-characters.js'), runtimeSource: read('tower-mode.js') };
 const flowSource = readFileSync(new URL('./tower-flow.test.mjs', import.meta.url), 'utf8');
 const factoryStart = flowSource.indexOf('function harness('), factoryEnd = flowSource.indexOf('\ntest(', factoryStart);
 assert.ok(factoryStart >= 0 && factoryEnd > factoryStart);
-const factory = vm.runInNewContext('(' + flowSource.slice(factoryStart, factoryEnd).trim() + ')', { vm, assert, THREE, console, SAVE_KEY: 'maze3d_tower_v1', ...sources });
+const factory = vm.runInNewContext('(' + flowSource.slice(factoryStart, factoryEnd).trim() + ')', { vm, assert, THREE, console, require, SAVE_KEY: 'maze3d_tower_v1', ...sources });
 const bridge = `window.__sideTest = {
   state(){return {run,paused,floorConfig,mainClue,rift,explorer,dungeonObjects,loot,traders,monsters,shiftLeft,reader};},
   handleAction

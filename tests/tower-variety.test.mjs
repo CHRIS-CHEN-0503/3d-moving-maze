@@ -6,9 +6,9 @@ import {readFileSync} from 'node:fs';
 import vm from 'node:vm';
 const require=createRequire(import.meta.url),C=require('../story/story-core.js'),D=require('../story/tower-dungeons.js'),S=require('../story/tower-side-stories.js'),H=require('../story/tower-hazards.js'),V=require('../assets/game-voice.js'),THREE=require('../lib/three.min.js');
 const read=name=>readFileSync(new URL('../story/'+name,import.meta.url),'utf8');
-const sources={coreSource:read('story-core.js'),narrativeSource:read('tower-narrative.js'),sideStoriesSource:read('tower-side-stories.js'),dungeonsSource:read('tower-dungeons.js'),encountersSource:read('tower-encounters.js'),charactersSource:read('tower-characters.js'),runtimeSource:read('tower-mode.js')};
+const sources={coreSource:read('story-core.js'),narrativeSource:read('tower-narrative.js'),sideStoriesSource:read('tower-side-stories.js'),dungeonsSource:read('tower-dungeons.js'),encountersSource:read('tower-encounters.js'),materialsSource:read('tower-materials.js'),lightingRuntimeSource:read('tower-lighting-runtime.js'),charactersSource:read('tower-characters.js'),runtimeSource:read('tower-mode.js')};
 const flow=readFileSync(new URL('./tower-flow.test.mjs',import.meta.url),'utf8'),start=flow.indexOf('function harness('),end=flow.indexOf('\ntest(',start);
-const factory=vm.runInNewContext('('+flow.slice(start,end).trim()+')',{vm,assert,THREE,console,SAVE_KEY:'maze3d_tower_v1',...sources});
+const factory=vm.runInNewContext('('+flow.slice(start,end).trim()+')',{vm,assert,THREE,console,require,SAVE_KEY:'maze3d_tower_v1',...sources});
 const bridge=`window.TowerHazards=globalThis.__hazardModule;
 window.__variety={state:()=>({run,hazards,hazardGrace,hazardSlow,dungeonObjects}),readStory,readSideStory,journal,handleAction,damage,tickHazards,buildWorld,
 setShiftDue:()=>{shiftLeft=0;},setClock:(elapsed)=>{if(run.expedition.active)run.expedition.active.elapsed=elapsed;else run.floorElapsed=elapsed;hurtLeft=0;hazardGrace=0;}};`;
@@ -74,7 +74,7 @@ test('v3 九種副本可續存、完成、一次性領獎；v2 中途進度不�
   assert.deepEqual(C.validateSave(JSON.stringify(r)),r);assert.equal(D.offer(r).catalogVersion,2);
   r=D.finish(r,'abandoned').run;r=C.descend(r).run;assert.equal(r.expedition.version,3);assert.equal(r.expedition.history[0].catalogVersion,2);assert.ok(C.validateSave(r));
 });
-test('四種陷阱配置固定、有安全區、留繞行空間，數量與繪製成本有上限',()=>{
+test('無牆資料時四種地板陷阱配置固定、有安全區，數量與繪製成本有上限',()=>{
   assert.deepEqual(H.layout({floor:99,size:7,seed:1}),[]);
   const blocked=['4,4','6,8','0,0','12,12'],all=new Set();
   for(let floor=95;floor>=1;floor--){
@@ -82,18 +82,19 @@ test('四種陷阱配置固定、有安全區、留繞行空間，數量與繪�
     for(const trap of traps){
       all.add(trap.kind);assert.ok(trap.cx+trap.cy>=4);assert.ok(24-trap.cx-trap.cy>=3);
       assert.ok(blocked.every(key=>{const [x,y]=key.split(',').map(Number);return Math.abs(x-trap.cx)+Math.abs(y-trap.cy)>1;}));
-      let meshes=0;const model=H.build(THREE,trap);model.traverse(o=>{assert.ok(!o.isLight&&!o.isSprite);if(o.isMesh){meshes++;assert.ok(!o.material.map);}});assert.ok(meshes<=7);
+      let meshes=0;const model=H.build(THREE,trap);model.traverse(o=>{assert.ok(!o.isLight&&!o.isSprite);if(o.isMesh){meshes++;assert.ok(!o.material.map);}});assert.ok(meshes<=10);
       for(const state of ['idle','warning','active']){H.animate(model,{state,progress:.5},12);assert.ok(Number.isFinite(model.userData.moving.position.y));}
     }
   }
   assert.equal(all.size,4);
 });
-test('每個機關都有完整 1.8 秒預警，不因樓層加深縮短躲避時間',()=>{
+test('每個機關都有完整 0.65 秒近身預警，不因樓層加深縮短躲避時間',()=>{
   for(const kind of Object.keys(H.TYPES))for(const tier of [1,5]){
-    const trap={kind,tier,offset:0},rest=6-(tier-1)*.4;
-    assert.equal(H.phase(trap,rest-.01).state,'idle');assert.equal(H.phase(trap,rest).state,'warning');
-    assert.equal(H.phase(trap,rest+1.79).state,'warning');assert.equal(H.phase(trap,rest+1.81).state,'active');
-    assert.deepEqual(H.phase(trap,10),H.phase(trap,10));
+    const trap={kind,tier,offset:0};
+    assert.equal(H.step(trap,10).state,'idle');assert.equal(H.step(trap,.01,{inside:true}).state,'warning');
+    for(let i=0;i<6;i++)assert.equal(H.step(trap,.1).state,'warning');
+    assert.equal(H.step(trap,.04).state,'warning');assert.equal(H.step(trap,.02).state,'active');
+    assert.deepEqual(H.phase(trap),H.phase(trap));
   }
 });
 test('主線、逸聞翻頁和返回上一頁不重讀標題；新開故事與日誌全文仍可讀',()=>{
@@ -111,16 +112,17 @@ test('主線、逸聞翻頁和返回上一頁不重讀標題；新開故事與�
 test('真實場景機關接入：防具耗損、暫停與變形安全期、同波不連傷、藤蔓離開恢復',()=>{
   const h=runtime(runAt(35));h.start();const state=h.api.state(),spike=state.hazards.find(t=>t.kind==='spikes');assert.ok(spike);
   const traps=state.hazards;assert.ok(traps.length>0);assert.ok(h.context.TowerMode.reservedCells().includes(spike.cx+','+spike.cy));
-  const elapsed=6-(spike.tier-1)*.4+1.9-spike.offset+20*(6-(spike.tier-1)*.4+1.8+1.2);
+  const elapsed=12;
   h.api.setClock(elapsed);h.context.G.px=spike.x;h.context.G.pz=spike.z;
   const gear=C.createGear('armor',35,1,'hazard-test');h.api.state().run.equipment.armor=gear;
-  const hp=h.api.state().run.hp,dur=gear.durability;h.api.tickHazards(.01);
+  const hp=h.api.state().run.hp,dur=gear.durability;h.api.tickHazards(.01);assert.equal(h.api.state().run.hp,hp);assert.equal(H.phase(spike).state,'warning');
+  for(let i=0;i<7;i++)h.api.tickHazards(.1);
   assert.ok(h.api.state().run.hp<hp);assert.equal(h.api.state().run.equipment.armor?.durability,dur-1);
   const after=h.api.state().run.hp;h.api.setClock(elapsed);h.api.tickHazards(.01);assert.equal(h.api.state().run.hp,after);
   h.api.journal();const frozen=JSON.stringify(h.api.state().run);h.tick(10);assert.equal(JSON.stringify(h.api.state().run),frozen);h.click('close');
   h.api.setShiftDue();h.context.TowerMode.updateShift();h.tick(.1);h.context.G.shifting=false;h.tick(.1);assert.ok(h.api.state().hazardGrace>0);
-  const vine=traps.find(t=>t.kind==='vines');assert.ok(vine);const cycle=6-(vine.tier-1)*.4+1.8+2.5;
-  h.api.setClock(6-(vine.tier-1)*.4+1.9-vine.offset+20*cycle);h.context.G.px=vine.x;h.context.G.pz=vine.z;h.api.tickHazards(.01);assert.equal(h.context.TowerMode.movementScale(),.55);
+  const vine=h.api.state().hazards.find(t=>t.kind==='vines');assert.ok(vine);
+  h.api.setClock(12);h.context.G.px=vine.x;h.context.G.pz=vine.z;h.api.tickHazards(.01);for(let i=0;i<7;i++)h.api.tickHazards(.1);assert.equal(h.context.TowerMode.movementScale(),.55);
   h.context.G.px=h.context.G.pz=0;h.api.tickHazards(.01);assert.equal(h.context.TowerMode.movementScale(),1);
 });
 test('舊副本不突然新增陷阱，v3 副本有機關且重載配置相同',()=>{

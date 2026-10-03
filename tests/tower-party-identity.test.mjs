@@ -41,5 +41,7 @@ test('the player profession is not a named companion; other travellers and later
   withMember(run,'healer');assert.equal(P.recruitOffer(run).profession,'swordsman');
   setFloor(run,91);assert.equal(P.recruitOffer(run),null);
   const dismissed=P.dismiss(run,run.party.members[0].id,run.revision);assert.equal(dismissed.ok,true);
-  assert.equal(P.recruitOffer(dismissed.run).profession,'healer');
+  assert.equal(P.recruitOffer(dismissed.run),null,'the same floor cannot respawn a dismissed identity');
+  let reunion=null;for(let f=90;f>=1&&!reunion;f--){setFloor(dismissed.run,f);const next=P.recruitOffer(dismissed.run);if(next?.returning)reunion=next;}
+  assert.ok(reunion);assert.equal(reunion.profession,'healer');assert.equal(reunion.id,'companion:earlier:healer');
 });

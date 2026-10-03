@@ -4,12 +4,14 @@ import { readFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import vm from 'node:vm';
 
-const THREE = createRequire(import.meta.url)('../lib/three.min.js');
+const require = createRequire(import.meta.url), THREE = require('../lib/three.min.js');
 const narrativeSource = readFileSync(new URL('../story/tower-narrative.js', import.meta.url), 'utf8');
 const sideStoriesSource = readFileSync(new URL('../story/tower-side-stories.js', import.meta.url), 'utf8');
 const dungeonsSource = readFileSync(new URL('../story/tower-dungeons.js', import.meta.url), 'utf8');
 const coreSource = readFileSync(new URL('../story/story-core.js', import.meta.url), 'utf8');
 const encountersSource = readFileSync(new URL('../story/tower-encounters.js', import.meta.url), 'utf8');
+const materialsSource = readFileSync(new URL('../story/tower-materials.js', import.meta.url), 'utf8');
+const lightingRuntimeSource = readFileSync(new URL('../story/tower-lighting-runtime.js', import.meta.url), 'utf8');
 const charactersSource = readFileSync(new URL('../story/tower-characters.js', import.meta.url), 'utf8');
 const runtimeSource = readFileSync(new URL('../story/tower-mode.js', import.meta.url), 'utf8');
 const SAVE_KEY = 'maze3d_tower_v1';
@@ -41,15 +43,17 @@ function harness(initialSave, runtimeBridge = '',preferences = {}) {
     }
     get innerHTML() { return this._html; }
     appendChild(child) { this.children.push(child); return child; }
+    insertBefore(child,before) { const at=this.children.indexOf(before);if(at<0)this.children.push(child);else this.children.splice(at,0,child);return child; }
     setAttribute(key, value) { this[key] = value; }
     removeAttribute(key) { delete this[key]; }
     getContext() { return { strokeText() {}, fillText() {} }; }
     addEventListener(type, fn) { this.listeners.set(type, fn); }
     closest(selector) { return selector === 'button[data-tower]' && this.dataset.tower ? this : null; }
     querySelectorAll() { return (this.buttons || []).filter(button => !button.disabled); }
+    querySelector(selector) { return selector === '.tower-dialog-content' ? (this.content ||= {scrollTop:0}) : null; }
     focus() { document.activeElement = this; }
   }
-  const document = { body: new Element('body'), hidden: false, activeElement: null, getElementById: id => elements.get(id) || null, createElement: tag => new Element(tag), addEventListener() {} };
+  const document = { body: new Element('body'), hidden: false, activeElement: null, getElementById: id => elements.get(id) || null, querySelector: selector=>selector==='#towerHud .tower-hud-summary'?elements.get('towerHud'):null, createElement: tag => new Element(tag), addEventListener() {} };
   for (const id of ['gameScreen', 'hudRightBtns', 'storyEntryBtn', 'joyBase', 'joyStick', 'playerName', 'profileTitle', 'profileNextBtn', 'hudLvlName', 'hudRound', 'hudRoundControl', 'shiftCountdown', 'preWarn', 'preWarnSec']) { const element = new Element(); element.id = id; }
   const buildCharacter = () => {
     const model = new THREE.Group();
@@ -83,7 +87,18 @@ function harness(initialSave, runtimeBridge = '',preferences = {}) {
     addEventListener: (type, fn) => windowEvents.set(type, fn),
   });
   context.window = context;
+  // Ingredient purchases need a real profession inventory, but old-flow tests
+  // deliberately retain their legacy character-creation path and equipment.
+  const storedRun=typeof initialSave==='string'?null:initialSave;
+  if(storedRun?.party){
+    context.TowerPartyCore=require('../story/tower-party-core.js');context.TowerExpedition=require('../story/tower-expedition-core.js');
+    context.TowerLighting=require('../story/tower-lighting-core.js');context.TowerFloorLords=require('../story/tower-floor-lords.js');context.TowerLoot=require('../story/tower-loot.js');context.TowerReinforcements=require('../story/tower-reinforcements.js');
+    context.TowerCreatureArt=require('../story/tower-creature-art.js');
+    context.camera=new THREE.PerspectiveCamera();
+    vm.runInContext(lightingRuntimeSource,context,{filename:'tower-lighting-runtime.js'});
+  }
   vm.runInContext(coreSource, context, { filename: 'story-core.js' });
+  vm.runInContext(materialsSource, context, { filename: 'tower-materials.js' });
   vm.runInContext(narrativeSource, context, { filename: 'tower-narrative.js' });
   vm.runInContext(sideStoriesSource, context, { filename: 'tower-side-stories.js' });
   vm.runInContext(dungeonsSource, context, { filename: 'tower-dungeons.js' });
@@ -141,7 +156,7 @@ test('beginNew creates a valid save and renders opening prose rather than an obj
 });
 
 for (const merchantId of ['tieLing', 'jinHe', 'lanZhou']) {
-  test(`${merchantId} has exclusive stock, real buy/sell/equip controls, and paused trading time`, () => {
+  test(`${merchantId} keeps exclusive equipment, real purchase/equip controls, no supplies, and paused trading time`, () => {
     const catalog = harness().context;
     let seed = 1;
     while (seed < 1000 && catalog.TowerEncounters.merchantOffers(99, seed)[0].id !== merchantId) seed++;
@@ -151,8 +166,11 @@ for (const merchantId of ['tieLing', 'jinHe', 'lanZhou']) {
     h.context.TowerMode.open(); h.click('continue'); h.click('close');
     const merchants = [];
     h.context.scene.traverse(object => { if (object.userData.role === 'merchant') merchants.push(object); });
-    assert.equal(merchants.length, 1);
-    const merchant = merchants[0];
+    const offers=catalog.TowerEncounters.merchantOffers(99,seed);
+    assert.equal(merchants.length, offers.length);
+    assert.deepEqual(merchants.map(m=>m.userData.merchantId).sort(),Array.from(offers,o=>o.id).sort());
+    assert.equal(merchants.filter(m=>m.userData.merchantId!=='suHe').length,1);
+    const merchant = merchants.find(m=>m.userData.merchantId===merchantId);
     assert.equal(merchant.userData.merchantId, merchantId);
     assert.ok(merchant.position.x + merchant.position.z >= h.context.G.cell * 2, 'Merchants must not occupy the floor entrance');
     assert.equal(h.get('towerTalkBtn').disabled, true, 'Entry is not a fixed merchant interaction zone');
@@ -163,14 +181,11 @@ for (const merchantId of ['tieLing', 'jinHe', 'lanZhou']) {
     const buttons = h.get('towerDialog').buttons;
     assert.deepEqual(buttons.filter(b => b.dataset.tower === 'buy').map(b => b.dataset.item), Array.from(offer.supplies));
     assert.deepEqual(buttons.filter(b => b.dataset.tower === 'sell').map(b => b.dataset.item), Array.from(offer.supplies));
+    assert.deepEqual(Array.from(offer.supplies),[]);
+    assert.equal(buttons.some(b=>['buy-ingredient','light-buy'].includes(b.dataset.tower)),false);
     assert.deepEqual(buttons.filter(b => b.dataset.tower === 'buy-gear').map(b => b.dataset.item), Array.from(offer.gear, item => item.kind));
     assert.doesNotMatch(h.get('towerDialog').innerHTML, /data-tower="exchange"/);
-    const itemId = offer.supplies[0], item = h.context.TowerCore.ITEMS[itemId], initial = h.save();
-    h.click('buy', itemId);
-    assert.equal(h.save().coins, initial.coins - item.buyPrice); assert.equal(h.save().bag[itemId], initial.bag[itemId] + 1);
-    h.click('sell', itemId);
-    assert.equal(h.save().coins, initial.coins - item.buyPrice + item.sellPrice); assert.equal(h.save().bag[itemId], initial.bag[itemId]);
-    const before = h.save(); h.tick(5); h.emit('pagehide');
+    h.emit('pagehide');const before = h.save(); h.tick(5); h.emit('pagehide');
     assert.equal(h.save().elapsed, before.elapsed, 'Time cannot advance while trading'); assert.ok(h.context.TowerCore.validateSave(h.save()));
     const stock = offer.gear[0]; h.click('buy-gear', stock.kind);
     assert.equal(h.save().coins, before.coins - stock.price);
@@ -186,6 +201,48 @@ for (const merchantId of ['tieLing', 'jinHe', 'lanZhou']) {
     h.click('close'); assert.equal(h.context.G.frozen, false); assert.equal(h.context.TowerMode.paused, false);
   });
 }
+
+function visitMerchant(h,id){
+  const models=[];h.context.scene.traverse(model=>{if(model.userData.role==='merchant')models.push(model);});
+  const merchant=models.find(model=>model.userData.merchantId===id);assert.ok(merchant,`Actual merchant model ${id} must exist`);
+  h.context.G.px=merchant.position.x;h.context.G.pz=merchant.position.z;h.tick(.2);
+  assert.equal(h.get('towerTalkBtn').disabled,false);h.get('towerTalkBtn').onclick();return merchant;
+}
+
+test('grocer exposes every supply, buys and sells medicine, charges ten arrows per coin, and never offers equipment services',()=>{
+  const catalog=harness().context,run=catalog.TowerCore.newRun({seed:1});run.coins=250;
+  const h=harness(run);h.context.TowerMode.open();h.click('continue');h.click('close');visitMerchant(h,'suHe');
+  const shop=h.context.TowerEncounters.merchantOffers(99,1).find(m=>m.id==='suHe'),buttons=h.get('towerDialog').buttons;
+  assert.deepEqual(buttons.filter(b=>b.dataset.tower==='buy').map(b=>b.dataset.item),Array.from(shop.supplies));
+  assert.deepEqual(buttons.filter(b=>b.dataset.tower==='sell').map(b=>b.dataset.item),Array.from(shop.supplies).filter(id=>h.context.TowerCore.ITEMS[id].sellPrice>0));
+  assert.equal(buttons.some(b=>['buy-gear','party-merchant-forge'].includes(b.dataset.tower)),false);
+  assert.match(h.get('towerDialog').innerHTML,/蘇禾|旅行雜貨與遠方食材/);
+  const initial=h.save(),content=h.get('towerDialog').querySelector('.tower-dialog-content');content.scrollTop=155;
+  h.click('buy','heal');assert.equal(h.save().coins,initial.coins-14);assert.equal(h.save().bag.heal,initial.bag.heal+1);assert.equal(content.scrollTop,155);
+  h.click('sell','heal');assert.equal(h.save().coins,initial.coins-14+6);assert.equal(h.save().bag.heal,initial.bag.heal);
+  const arrowBefore=h.save();h.click('buy','arrow');assert.equal(h.save().bag.arrow,arrowBefore.bag.arrow+10);assert.equal(h.save().coins,arrowBefore.coins-1);
+  const hasteBefore=h.save();h.click('buy','haste');assert.equal(h.save().bag.haste,hasteBefore.bag.haste+1);assert.equal(h.save().coins,hasteBefore.coins-h.context.TowerCore.ITEMS.haste.buyPrice);
+  const before=h.save();h.tick(5);h.emit('pagehide');assert.equal(h.save().elapsed,before.elapsed);assert.ok(h.context.TowerCore.validateSave(h.save()));
+});
+
+test('grocer ingredient UI buys exact limited stock, disables sold out shelves and preserves purchases after reload',()=>{
+  const Core=require('../story/story-core.js'),Party=require('../story/tower-party-core.js'),Narrative=require('../story/tower-narrative.js');
+  const run=Party.enable(Core.newRun({seed:37}),'mage').run;run.floor=92;run.floorsCleared=7;run.chronicle=Narrative.newChronicle(92);Party.advance(run);run.coins=250;
+  let h=harness(run);h.context.TowerMode.open();h.click('continue');h.click('close');visitMerchant(h,'suHe');
+  const offers=Array.from(h.context.TowerEncounters.groceryOffers(h.save())),special=offers.find(o=>o.specialty);
+  assert.equal(special.sourceFloor,30);assert.equal(special.stock,2);assert.equal(special.ingredientId,'frostberry');
+  assert.deepEqual(h.get('towerDialog').buttons.filter(b=>b.dataset.tower==='buy-ingredient').map(b=>b.dataset.item),offers.map(o=>o.id));
+  assert.match(h.get('towerDialog').innerHTML,/30|霜封迴廊/);
+  const initial=h.save();h.click('buy-ingredient',special.id);assert.equal(h.save().coins,initial.coins-5);assert.equal(h.save().party.ingredients.frostberry,initial.party.ingredients.frostberry+1);assert.equal(h.save().adventure.groceryPurchases[special.id],1);
+  h.click('buy-ingredient',special.id);const purchased=h.save();assert.equal(purchased.adventure.groceryPurchases[special.id],2);assert.equal(purchased.coins,initial.coins-10);
+  const soldOut=()=>h.get('towerDialog').buttons.find(b=>b.dataset.tower==='buy-ingredient'&&b.dataset.item===special.id);
+  assert.equal(soldOut().disabled,true);assert.match(h.get('towerDialog').innerHTML,/本層已售完/);
+  h.get('towerOverlay').listeners.get('click')({target:soldOut()});assert.deepEqual(h.save(),purchased,'Disabled stale requests never deduct currency or duplicate ingredients');
+  h=harness(purchased);h.context.TowerMode.open();h.click('continue');h.click('close');visitMerchant(h,'suHe');assert.equal(soldOut().disabled,true);assert.equal(h.context.TowerEncounters.groceryOffers(h.save()).find(o=>o.id===special.id).remaining,0);
+  const common=offers.find(o=>!o.specialty),before=h.save();h.click('buy-ingredient',common.id);assert.equal(h.save().coins,before.coins-common.price);assert.equal(h.save().party.ingredients[common.ingredientId],before.party.ingredients[common.ingredientId]+1);assert.ok(h.context.TowerCore.validateSave(h.save()));
+  const stale=h.get('towerDialog').buttons.find(b=>b.dataset.tower==='buy-ingredient'&&b.dataset.item===common.id),beforeDistance=h.save();h.context.G.px=h.context.G.pz=0;
+  h.get('towerOverlay').listeners.get('click')({target:stale});assert.deepEqual(h.save(),beforeDistance,'Leaving the actual grocery prevents a pending ingredient purchase');
+});
 
 test('continue restores tools, cooldowns and claimed drops at the saved floor entrance', () => {
   const original = harness().context.TowerCore.newRun({ seed: 444, charIdx: 4 });

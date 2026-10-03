@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {createRequire} from 'node:module';
 const require=createRequire(import.meta.url),C=require('../story/story-core.js'),P=require('../story/tower-party-core.js'),L=require('../story/tower-lighting-core.js'),E=require('../story/tower-encounters.js'),N=require('../story/tower-narrative.js'),D=require('../story/tower-dungeons.js');
-const fresh=(job='scout')=>P.enable(C.newRun({seed:31415}),job).run;
+const fresh=(job='scout',seed=31415)=>P.enable(C.newRun({seed}),job).run;
 const advanceTime=(run,seconds)=>{while(seconds>0){const dt=Math.min(seconds,60),result=C.tickEffects(run,dt);assert.ok(result.ok,result.message);run=result.run;seconds-=dt;}return run;};
 test('old party saves receive a one-time lighting kit without changing gameplay state',()=>{
   const original=fresh();delete original.party.light;const copy=structuredClone(original),loaded=C.validateSave(original);
@@ -42,11 +42,11 @@ test('living mage companion can cast; absent, dismissed or downed mage cannot; e
   r=P.dismiss(r,'companion:mage').run;assert.equal(L.canCast(r),false);assert.equal(r.party.light.daylight,600);assert.equal(advanceTime(r,600).party.light.daylight,0);
 });
 test('merchant torches are real finite stock, charge coins, cannot be farmed by reload',()=>{
-  let r=fresh();r.coins=100;const id=E.merchantOffers(r.floor,r.seed)[0].id;
+  let r=fresh('scout',1);r.coins=100;const id=E.merchantOffers(r.floor,r.seed).find(m=>m.id==='suHe').id;
   const before=r.revision;r=L.buy(r,id,before).run;assert.equal(r.coins,96);assert.equal(r.party.light.torches,3);assert.equal(L.buy(r,id,before).ok,false);
   for(let i=0;i<2;i++)r=L.buy(C.validateSave(JSON.stringify(r)),id).run;
   assert.equal(r.coins,88);assert.equal(L.buy(r,id).ok,false);assert.equal(L.buy(r,'not-here').ok,false);
-  const poor=fresh();poor.coins=0;assert.equal(L.buy(poor,id).ok,false);
+  const poor=fresh('scout',1);poor.coins=0;assert.equal(L.buy(poor,id).ok,false);
 });
 test('material quantity scales with floor size, claims survive shifts/reloads and reset on descent only',()=>{
   assert.deepEqual([7,9,11,13,15,17,19].map(L.supplyCount),[1,1,2,2,3,3,3]);

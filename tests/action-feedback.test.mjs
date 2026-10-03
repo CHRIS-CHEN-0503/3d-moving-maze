@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import {createRequire} from 'node:module';
 import {readFileSync} from 'node:fs';
 import vm from 'node:vm';
+import {provisionTravellers} from './recruit-fixtures.mjs';
 const require=createRequire(import.meta.url),A=require('../assets/combat-audio.js'),H=require('../story/tower-heroes-core.js'),C=require('../story/story-core.js'),P=require('../story/tower-party-core.js'),R=require('../story/tower-hero-growth.js'),N=require('../story/tower-narrative.js'),T=require('../lib/three.min.js');
 const code=file=>readFileSync(new URL('../'+file,import.meta.url),'utf8');
 test('all 63 surface and underground active skills map to bounded audio; sound families are distinct',()=>{
@@ -45,7 +46,7 @@ function fixture(skill,options={}){
   if(skill.effect==='revive'){
     run.coins=9999;
     if(C.isUnderworld(run))for(let floor=-1;floor>=-50;floor--){run.floor=floor;run.floorsCleared=99+(-floor-1);P.advance(run,{reward:false});if(P.recruitOffer(run))break;}
-    run=P.recruit(run,P.recruitOffer(run).id).run;target=run.party.members[0].id;H.setHp(run,target,0);
+    provisionTravellers(run);run=P.recruit(run,P.recruitOffer(run).id).run;target=run.party.members[0].id;H.setHp(run,target,0);
     const model=new T.Group();model.position.set(1,0,0);actors=[{id:target,model}];
   }
   run.hunger=10;H.setHp(run,'hero',10);run.equipment.weapon.durability--;
@@ -121,7 +122,7 @@ test('successful guard, healing and completed disarm play the acting gender spec
     assert.deepEqual(f.voiceCalls,['character.'+H.SKILLS[skill].job+'.'+sex+'.specialty'],sex+' '+skill);f.runtime.reset();
   }
   for(const sex of ['male','female'])for(const job of ['mage','archer']){
-    const f=fixture(H.SKILLS[job==='mage'?'arcane_bolt':'piercing_arrow'],{sex});H.setHp(f.run(),'hero',H.maxHp(f.run())*.5);f.enableVoice();assert.equal(job==='mage'?f.runtime.daylight():f.runtime.shoot(),true);assert.deepEqual(f.voiceCalls,['character.'+job+'.'+sex+'.specialty']);f.runtime.reset();
+    const f=fixture(H.SKILLS[job==='mage'?'arcane_bolt':'piercing_arrow'],{sex});H.setHp(f.run(),'hero',H.maxHp(f.run())*.5);f.enableVoice();assert.equal(job==='mage'?f.runtime.daylight():f.runtime.shoot(),true);assert.equal(f.voiceCalls.length,1);assert.ok(['character.'+job+'.'+sex+'.specialty',...(job==='mage'?['character.mage.'+sex+'.specialty.hope']:[])].includes(f.voiceCalls[0]));f.runtime.reset();
   }
 });
 test('equipment descriptions show the selected wearer clothing variant without changing stats or durability',()=>{

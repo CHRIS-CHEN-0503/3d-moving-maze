@@ -19,6 +19,12 @@
       "speaker": "dylan",
       "instruction": "成年男工匠，声音平稳可靠，标准普通话，不带方言。"
     },
+    "merchant.suHe": {
+      "gender": "female",
+      "age": "adult",
+      "speaker": "serena",
+      "instruction": "成年女杂货商，声音温暖亲切，清晰利落，像可靠的旅途伙伴。"
+    },
     "explorer.eve": {
       "gender": "female",
       "age": "young",
@@ -62,8 +68,8 @@
       "instruction": "成熟男性低音旁白，胸腔共鸣深厚，深沉稳重，带有克制的神秘感，像奇幻迷宫的守门人。正常自然语速，咬字清楚，句间短暂停顿。不故意拖慢、不耳语、不阴森恐怖、不夸张喊叫。"
     },
     "merchant.tieLing": {
-      "src": "./assets/voice/roles/merchant-tieLing.mp3",
-      "text": "我是鐵匠鐵嶺。頭盔、球棒和保命補給，都在這裡挑。",
+      "src": "./assets/voice/roles/merchant-tieLing-v149.mp3",
+      "text": "我是鐵匠鐵嶺。頭盔與近戰武器，交給我就放心。",
       "gender": "male",
       "age": "older",
       "speaker": "uncle_fu",
@@ -71,8 +77,8 @@
       "rate": 1
     },
     "merchant.jinHe": {
-      "src": "./assets/voice/roles/merchant-jinHe.mp3",
-      "text": "我是裁甲師錦禾。盔甲、平底鍋和旅途糧食，由我準備。",
+      "src": "./assets/voice/roles/merchant-jinHe-v149.mp3",
+      "text": "我是裁甲師錦禾。合身的盔甲，會陪你走得更遠。",
       "gender": "female",
       "age": "adult",
       "speaker": "serena",
@@ -80,12 +86,21 @@
       "rate": 1
     },
     "merchant.lanZhou": {
-      "src": "./assets/voice/roles/merchant-lanZhou.mp3",
-      "text": "我是盾匠嵐舟。盾牌、木杖和探路工具，都在這裡。",
+      "src": "./assets/voice/roles/merchant-lanZhou-v149.mp3",
+      "text": "我是盾匠嵐舟。盾牌與遠行武器，都在這裡。",
       "gender": "male",
       "age": "adult",
       "speaker": "dylan",
       "instruction": "成年男工匠，声音平稳可靠，标准普通话，不带方言。",
+      "rate": 1
+    },
+    "merchant.suHe": {
+      "src": "./assets/voice/roles/merchant-suHe-v149.mp3",
+      "text": "我是雜貨商蘇禾。藥水、食材和旅途補給，都替你備好了。",
+      "gender": "female",
+      "age": "adult",
+      "speaker": "serena",
+      "instruction": "成年女杂货商，声音温暖亲切，清晰利落，像可靠的旅途伙伴。",
       "rate": 1
     },
     "explorer.eve": {
@@ -749,8 +764,8 @@
       "instruction": "成年男性护卫，沉稳可靠，短句清楚有力，正常说话速度，不喊叫，不拖音。"
     },
     "merchant.tieLing": {
-      "src": "./assets/voice/roles/merchant-tieLing.mp3",
-      "text": "我是鐵匠鐵嶺。頭盔、球棒和保命補給，都在這裡挑。",
+      "src": "./assets/voice/roles/merchant-tieLing-v149.mp3",
+      "text": "我是鐵匠鐵嶺。頭盔與近戰武器，交給我就放心。",
       "gender": "male",
       "age": "older",
       "speaker": "uncle_fu",
@@ -758,8 +773,8 @@
       "rate": 1
     },
     "merchant.jinHe": {
-      "src": "./assets/voice/roles/merchant-jinHe.mp3",
-      "text": "我是裁甲師錦禾。盔甲、平底鍋和旅途糧食，由我準備。",
+      "src": "./assets/voice/roles/merchant-jinHe-v149.mp3",
+      "text": "我是裁甲師錦禾。合身的盔甲，會陪你走得更遠。",
       "gender": "female",
       "age": "adult",
       "speaker": "serena",
@@ -767,12 +782,21 @@
       "rate": 1
     },
     "merchant.lanZhou": {
-      "src": "./assets/voice/roles/merchant-lanZhou.mp3",
-      "text": "我是盾匠嵐舟。盾牌、木杖和探路工具，都在這裡。",
+      "src": "./assets/voice/roles/merchant-lanZhou-v149.mp3",
+      "text": "我是盾匠嵐舟。盾牌與遠行武器，都在這裡。",
       "gender": "male",
       "age": "adult",
       "speaker": "dylan",
       "instruction": "成年男工匠，声音平稳可靠，标准普通话，不带方言。",
+      "rate": 1
+    },
+    "merchant.suHe": {
+      "src": "./assets/voice/roles/merchant-suHe-v149.mp3",
+      "text": "我是雜貨商蘇禾。藥水、食材和旅途補給，都替你備好了。",
+      "gender": "female",
+      "age": "adult",
+      "speaker": "serena",
+      "instruction": "成年女杂货商，声音温暖亲切，清晰利落，像可靠的旅途伙伴。",
       "rate": 1
     },
     "explorer.eve": {

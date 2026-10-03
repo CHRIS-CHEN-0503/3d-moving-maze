@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {createRequire} from 'node:module';
+import {provisionTravellers} from './recruit-fixtures.mjs';
 const require=createRequire(import.meta.url),C=require('../story/story-core.js'),P=require('../story/tower-party-core.js'),N=require('../story/tower-narrative.js'),D=require('../story/tower-dungeons.js');
 const fresh=(job='swordsman')=>P.enable(C.newRun({seed:31415,name:'遠征者'}),job).run;
 function floor(run,f){run.floor=f;run.floorsCleared=99-f;run.chronicle=N.newChronicle(f);run.expedition=D.newExpedition();run.claimed=[];run.defeatedMonsters=[];run.monsterStuns={};P.advance(run);assert.ok(C.validateSave(run));return run;}
@@ -19,14 +20,14 @@ test('party roundtrips and rejects malformed, duplicate, oversized or prototype-
   for(const mutate of mutations){const r=structuredClone(original);mutate(r);assert.equal(C.validateSave(r),null);}
 });
 test('recruitment is deterministic, revision-checked, paid once, and capped at four total',()=>{
-  let r=fresh();r.coins=200;for(const f of [99,97,95]){r=floor(r,f);const o=P.recruitOffer(r),rev=r.revision;assert.deepEqual(o,P.recruitOffer(r));const result=P.recruit(r,o.id,rev);assert.equal(result.ok,true);assert.equal(P.recruit(result.run,o.id,rev).ok,false);r=result.run;}
+  let r=provisionTravellers(fresh());r.coins=200;for(const f of [99,97,95]){r=floor(r,f);const o=P.recruitOffer(r),rev=r.revision;assert.deepEqual(o,P.recruitOffer(r));const result=P.recruit(r,o.id,rev);assert.equal(result.ok,true);assert.equal(P.recruit(result.run,o.id,rev).ok,false);r=result.run;}
   assert.equal(r.party.members.length,3);r=floor(r,93);assert.equal(P.recruit(r,P.recruitOffer(r).id).ok,false);
   const id=r.party.members[0].id;r=P.dismiss(r,id).run;assert.equal(r.party.members.length,2);assert.ok(r.party.joined.includes(id));
   assert.equal(P.recruit(r,P.recruitOffer(r).id).ok,true);
 });
 test('surface recipes debit ingredients, preserve legacy chef double portions, cap stacks and prevent stale spending',()=>{
-  assert.equal(Object.keys(P.RECIPES).length,23);assert.equal(Object.keys(P.availableRecipes(fresh())).length,18);
-  for(const id of Object.keys(P.availableRecipes(fresh()))){let r=fresh('chef');for(const k of Object.keys(r.party.ingredients))r.party.ingredients[k]=30;const before=structuredClone(r);const result=P.cook(r,id,r.revision);assert.equal(result.ok,true);assert.equal(result.run.party.meals[id],2);for(const[k,n]of Object.entries(P.RECIPES[id].cost))assert.equal(result.run.party.ingredients[k],30-n);assert.deepEqual(r,before);assert.equal(P.cook(result.run,id,r.revision).ok,false);result.run.party.meals[id]=99;assert.equal(P.cook(result.run,id).ok,false);}
+  assert.equal(Object.keys(P.RECIPES).length,23);assert.equal(Object.keys(P.availableRecipes(fresh('chef'))).length,18);assert.equal(Object.keys(P.availableRecipes(fresh())).length,6);
+  for(const id of Object.keys(P.availableRecipes(fresh('chef')))){let r=fresh('chef');for(const k of Object.keys(r.party.ingredients))r.party.ingredients[k]=30;const before=structuredClone(r);const result=P.cook(r,id,r.revision);assert.equal(result.ok,true);assert.equal(result.run.party.meals[id],2);for(const[k,n]of Object.entries(P.RECIPES[id].cost))assert.equal(result.run.party.ingredients[k],30-n);assert.deepEqual(r,before);assert.equal(P.cook(result.run,id,r.revision).ok,false);result.run.party.meals[id]=99;assert.equal(P.cook(result.run,id).ok,false);}
   const r=fresh();r.party.ingredients.root=0;assert.equal(P.cook(r,'stew').ok,false);
 });
 test('food buffs refresh without stacking, expire after three descents and can revive companions',()=>{

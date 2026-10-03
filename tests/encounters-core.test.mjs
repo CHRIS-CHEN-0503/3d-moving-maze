@@ -24,13 +24,13 @@ function completeSimple(run) {
   assert.equal(run.adventure.quest.status,'ready');return run;
 }
 
-test('三位商人的裝備與補給專業互不混淆，每層只出現一或兩位',()=>{
+test('三位商人的裝備專業互不混淆，每層一或兩位，補給只由獨立雜貨商供應',()=>{
   const expected={tieLing:['helmet','bat'],jinHe:['armor','pan'],lanZhou:['shield','staff']},seen=new Set();
-  assert.equal(new Set(Object.values(E.MERCHANTS).flatMap(m=>m.supplies)).size,7);
+  assert.equal(new Set(Object.values(E.MERCHANTS).flatMap(m=>m.supplies)).size,Object.keys(C.ITEMS).length-1);
   for(const floor of [99,69,19])for(let seed=1;seed<=35;seed++){
-    const shops=E.merchantOffers(floor,seed);assert.ok(shops.length>=1&&shops.length<=2);if(floor===99)assert.equal(shops.length,1);
+    const shops=E.merchantOffers(floor,seed),professionals=shops.filter(m=>m.id!=='suHe');assert.ok(professionals.length>=1&&professionals.length<=2);if(floor===99)assert.equal(professionals.length,1);
     assert.deepEqual(shops,E.merchantOffers(floor,seed));
-    for(const shop of shops){seen.add(shop.id);assert.deepEqual(shop.equipmentKinds,expected[shop.id]);assert.deepEqual(shop.gear.map(g=>g.kind),expected[shop.id]);for(const entry of shop.gear){assert.equal(entry.gear.bonus,0);assert.equal(entry.price,C.gearPrice(entry.gear));}}
+    for(const shop of professionals){seen.add(shop.id);assert.deepEqual(shop.supplies,[]);assert.deepEqual(shop.equipmentKinds,expected[shop.id]);assert.deepEqual(shop.gear.map(g=>g.kind),expected[shop.id]);for(const entry of shop.gear){assert.equal(entry.gear.bonus,0);assert.equal(entry.price,C.gearPrice(entry.gear));}}
   }
   assert.equal(seen.size,3);
 });
@@ -50,9 +50,10 @@ test('商店驗證在場商人與供貨，不接受任意物品、價錢或重�
   const bought=E.buyMerchantGear(run,shop.id,kind,run.revision);assert.equal(bought.ok,true);assert.equal(bought.run.coins,999-shop.gear[0].price);assert.equal(bought.run.gearBag.length,1);
   const duplicate=E.buyMerchantGear(bought.run,shop.id,kind);assert.equal(duplicate.ok,false);assert.deepEqual(duplicate.run,bought.run);
   const otherkind=Object.keys(C.GEAR).find(id=>!shop.equipmentKinds.includes(id));assert.equal(E.buyMerchantGear(run,shop.id,otherkind).ok,false);
-  const supplies=E.buySupply(run,shop.id,shop.supplies[0],2);assert.equal(supplies.ok,true);assert.equal(supplies.run.bag[shop.supplies[0]],run.bag[shop.supplies[0]]+2);
-  assert.equal(E.buySupply(supplies.run,shop.id,shop.supplies[0],1,run.revision).ok,false);
-  const sold=E.sellSupply(supplies.run,shop.id,shop.supplies[0]);assert.equal(sold.ok,true);assert.ok(C.validateSave(sold.run));
+  const grocer=E.merchantOffers(run.floor,run.seed).find(m=>m.id==='suHe');assert.ok(grocer);assert.equal(E.buySupply(run,shop.id,'heal',2).ok,false);
+  const supplies=E.buySupply(run,grocer.id,'heal',2);assert.equal(supplies.ok,true);assert.equal(supplies.run.bag.heal,run.bag.heal+2);
+  assert.equal(E.buySupply(supplies.run,grocer.id,'heal',1,run.revision).ok,false);
+  const sold=E.sellSupply(supplies.run,grocer.id,'heal');assert.equal(sold.ok,true);assert.ok(C.validateSave(sold.run));
 });
 
 test('寶箱與探險者各自約二成出現，種子固定且互相獨立',()=>{

@@ -10,6 +10,7 @@
     tieLing: Object.freeze({ id: 'tieLing', name: '鐵匠・鐵嶺', goods: Object.freeze(['helmet', 'bat']), colors: Object.freeze({ cloth: 0x80533b, metal: 0x78838e, accent: 0xcfad72 }), silhouette: '矮壯、灰鬍、皮圍裙與鍛槌' }),
     jinHe: Object.freeze({ id: 'jinHe', name: '裁甲師・錦禾', goods: Object.freeze(['armor', 'pan']), colors: Object.freeze({ cloth: 0x9c4778, metal: 0xa4b2bf, accent: 0xe1c67d }), silhouette: '女性、紫紅披肩、分層胸甲與裁縫腰包' }),
     lanZhou: Object.freeze({ id: 'lanZhou', name: '盾匠・嵐舟', goods: Object.freeze(['shield', 'staff']), colors: Object.freeze({ cloth: 0x356b58, metal: 0x899ca3, accent: 0xc8ad73 }), silhouette: '高瘦、綠長外套、單片護目與背圓盾' }),
+    suHe: Object.freeze({ id: 'suHe', name: '雜貨商・蘇禾', goods: Object.freeze(['heal', 'haste', 'herb']), colors: Object.freeze({ cloth: 0xc39c54, metal: 0x71918b, accent: 0xa8d7ac }), silhouette: '成年女性、編髮草帽、青綠圍裙、提籃與隨身藥瓶' }),
   });
   const EXPLORER_STYLES = Object.freeze({
     eve: Object.freeze({ id: 'eve', name: '伊芙', title: '探索者', description: '擅長記錄路線的青年旅人，總把新發現畫在隨身地圖上。', silhouette: '女性、旅行帽、側辮、青綠斗篷與地圖' }),
@@ -174,11 +175,35 @@
     return g;
   }
 
+  function makeGrocer(k) {
+    const g=figure(k,{width:.64,legHeight:.56,bodyY:.98,headY:1.64,shirt:0xc39c54,pants:0x406c65,skin:0xe8b89a});
+    hair(k,g,{job:'swordsman',sex:'female',color:0x583e32,name:'grocer-hair',braidName:'grocer-braid'});
+    k.cylinder(g,[.28,.31,.18,10],0xd3b474,'woven-hat-crown',0,1.95,-.02);
+    k.cylinder(g,[.45,.45,.045,12],0xe4cb91,'woven-hat-brim',0,1.84,-.02);
+    k.cylinder(g,[.309,.313,.045,10],0x71918b,'hat-ribbon',0,1.9,-.02);
+    k.cylinder(g,[.27,.38,.5,12],0x406c65,'grocer-skirt',0,.62,0);
+    k.box(g,[.46,.59,.055],0x91b3a3,'grocery-apron',0,.93,.228);
+    belt(k,g,[.66,.07,.36],0xdbcda7,'apron-tie',.84);
+    k.box(g,[.11,.09,.03],0xe4cb91,'apron-clasp',0,.85,.267);
+    const basket=new k.T.Group();basket.name='produce-basket';basket.position.set(0,-.47,.16);g.userData.armR.add(basket);
+    k.cylinder(basket,[.24,.19,.29,10],0x967449,'basket-weave',0,-.06,0);
+    k.torus(basket,[.22,.025,4,12],0xe4cb91,'basket-handle',0,.17,0);
+    const fruit=k.sphere(basket,[.105,8,5],0xe0bb68,'basket-root',-.08,.095,.01);fruit.scale.set(.9,1.3,.9);
+    k.sphere(basket,[.105,8,5],0xb7cfa0,'basket-produce',.09,.09,.02);
+    const bottles=new k.T.Group();bottles.name='remedy-bottles';bottles.position.set(.38,.79,.13);g.add(bottles);
+    for(const [i,color]of [0xdf8e97,0x6bbcb0,0xacbb6d].entries()){
+      k.cylinder(bottles,[.048,.059,.16,8],color,'remedy-bottle-'+i,(i-1)*.11,0,0);
+      k.cylinder(bottles,[.032,.032,.06,6],0xe4cb91,'bottle-stopper-'+i,(i-1)*.11,.11,0);
+    }
+    g.userData.armR.rotation.z=-.13;g.userData.sex='female';
+    return g;
+  }
+
   function buildMerchant(id, deps) {
     const canonical = typeof id === 'string' && (Object.hasOwn(MERCHANT_STYLES, id) ? id : Object.hasOwn(aliases, id) ? aliases[id] : null);
     if (!canonical) throw new RangeError('未知的高塔商人：' + id);
     const k = kit(deps);
-    const group = canonical === 'tieLing' ? makeSmith(k) : canonical === 'jinHe' ? makeArmorer(k) : makeShieldsmith(k, deps);
+    const group = canonical === 'tieLing' ? makeSmith(k) : canonical === 'jinHe' ? makeArmorer(k) : canonical === 'suHe' ? makeGrocer(k) : makeShieldsmith(k, deps);
     group.name = 'tower-merchant-' + canonical;
     Object.assign(group.userData, { merchantId: canonical, role: 'merchant', style: MERCHANT_STYLES[canonical] });
     return group;

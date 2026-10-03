@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import {createRequire} from 'node:module';
 const require=createRequire(import.meta.url),C=require('../story/story-core.js'),P=require('../story/tower-party-core.js'),H=require('../story/tower-heroes-core.js'),N=require('../story/tower-narrative.js'),D=require('../story/tower-dungeons.js'),G=require('../story/tower-hero-growth.js');
 require('../story/tower-party-runtime.js');
-const fresh=()=>H.enable(P.enable(C.newRun({seed:72,name:'料理測試'}),'mage').run).run;
+const fresh=()=>{const run=H.enable(P.enable(C.newRun({seed:72,name:'料理測試'}),'chef').run).run;H.actor(run).passives=['gourmet','nourishment'];return run;};
 function atFloor(run,floor){run.floor=floor;run.floorsCleared=floor<0?99+(-floor-1):99-floor;run.claimed=[];run.defeatedMonsters=[];run.monsterStuns={};run.adventure=C.newAdventure();run.expedition=D.newExpedition();if(floor>0)run.chronicle=N.newChronicle(floor);P.advance(run,{reward:false});return run;}
 function underground(floor=-1){const run=atFloor(fresh(),1);run.chronicle.ending='keeper';run.chronicle.clues.push('clue:heart');run.party.boss.started=true;run.party.boss.done=true;run.party.boss.seals.fill(true);run.defeatedMonsters.push('monster-11');const ended=C.descend(run);assert.ok(ended.ok);const entered=C.startUnderworld(ended.run);assert.ok(entered.ok);const next=atFloor(entered.run,floor);assert.ok(C.validateSave(next));return next;}
 const fill=run=>{Object.keys(run.party.ingredients).forEach(k=>run.party.ingredients[k]=30);run.hp=10;run.hunger=0;return run;};
@@ -29,7 +29,7 @@ test('every recipe cooks and eats using real transaction rules with accurate cos
   for(const [id,recipe]of Object.entries(P.RECIPES)){
     const run=fill(recipe.requiredDepth?underground(-recipe.requiredDepth):fresh()),before=JSON.stringify(run),cooked=P.cook(run,id,run.revision);assert.ok(cooked.ok,id+': '+cooked.message);assert.equal(JSON.stringify(run),before);assert.equal(cooked.run.party.meals[id],1,id);
     for(const key of Object.keys(P.INGREDIENTS))assert.equal(cooked.run.party.ingredients[key],30-(recipe.cost[key]||0));
-    assert.equal(P.cook(cooked.run,id,run.revision).ok,false,'stale revision cannot double spend');const eaten=P.eat(cooked.run,id,cooked.run.revision);assert.ok(eaten.ok,eaten.message);assert.equal(eaten.run.party.meals[id],0);assert.equal(eaten.run.hp,Math.min(H.maxHp(eaten.run),10+recipe.hp));assert.equal(eaten.run.hunger,Math.min(100,recipe.hunger));
+    assert.equal(P.cook(cooked.run,id,run.revision).ok,false,'stale revision cannot double spend');const eaten=P.eat(cooked.run,id,cooked.run.revision);assert.ok(eaten.ok,eaten.message);assert.equal(eaten.run.party.meals[id],0);assert.equal(eaten.run.hp,Math.min(H.maxHp(eaten.run),10+recipe.hp));assert.equal(eaten.run.hunger,Math.min(100,recipe.hunger*(1+H.teamPassive(eaten.run,'gourmet')/100)));
     if(recipe.buff)assert.ok(eaten.run.party.buffs.some(b=>b.id===recipe.buff&&b.floors===3));assert.ok(C.validateSave(JSON.stringify(eaten.run)),id);
   }
 });

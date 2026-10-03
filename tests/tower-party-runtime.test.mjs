@@ -90,7 +90,7 @@ test('all chapter stations have bounded native geometry and scale their warning 
   }
 });
 test('forge confirmations cannot spend from afar, through a wall, twice, or when durable save fails',()=>{
-  const h=harness(99);h.run.party.journey.scrap=30;h.run.party.journey.materials.ironore=3;h.run.coins=100;const id=h.run.equipment.weapon.id,key='durable|'+id;
+  const h=harness(99);h.run.party.profession='smith';h.run.party.journey.scrap=30;h.run.party.journey.materials.ironore=3;h.run.coins=100;const id=h.run.equipment.weapon.id,key='durable|'+id;
   h.ui.handle('party-forge-confirm',key);assert.equal(h.run.party.journey.scrap,30);
   h.G.px=40;h.ui.handle('party-forge-ask',key);h.ui.handle('party-forge-confirm',key);assert.equal(h.run.party.journey.scrap,30);
   h.G.px=0;h.wall=true;h.ui.handle('party-forge-ask',key);h.wall=false;h.ui.handle('party-forge-confirm',key);assert.equal(h.run.party.journey.scrap,30);

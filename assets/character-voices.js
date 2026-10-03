@@ -26,10 +26,12 @@
     tracks[id]=Object.freeze({src:'./assets/voice/characters/'+job+'-'+gender+'-'+events[i]+'.mp3',text,speaker:voices[job][gender],instruction:(gender==='male'?'成年男性，':'成年女性，')+'温暖清楚，冒险游戏角色说话，自然正常语速，不要夸张尖叫。',category:'character-bark'});
   });
   for(const [job,sexes]of Object.entries(specialties))for(const [gender,text]of Object.entries(sexes)){const id='character.'+job+'.'+gender+'.specialty';tracks[id]=Object.freeze({src:'./assets/voice/characters/'+job+'-'+gender+'-specialty.mp3',text,speaker:voices[job][gender],instruction:(gender==='male'?'成年男性，':'成年女性，')+'普通话自然清楚，正常语速，温暖自信，不要唱歌。',category:'character-bark'});}
+  for(const gender of ['male','female']){const base=tracks['character.mage.'+gender+'.specialty'];tracks['character.mage.'+gender+'.specialty.hope']=Object.freeze({...base,src:'./assets/voice/characters/mage-'+gender+'-specialty-hope.mp3',text:'加油！有光的地方就有希望！'});}
   function create(ctx){let clock=0,next=0;const played=new Map(),low=new Set();
     function say(event,id,{allowPaused=false}={}){const H=globalThis.TowerHeroes,run=ctx.run(),voice=ctx.voice||globalThis.GameVoice;if(!H?.enabled(run)||!H.ids(run).includes(id)||!voice||!allowPaused&&ctx.paused?.())return false;
       const key=id+':'+event,status=voice.status();if(!status.enabled||!status.supported||status.speaking||clock<next||clock<(played.get(key)||0))return false;
-      const asset='character.'+H.job(run,id)+'.'+H.sex(run,id)+'.'+event,track=tracks[asset];if(!track)return false;
+      const job=H.job(run,id),gender=H.sex(run,id),base='character.'+job+'.'+gender+'.'+event;
+      const asset=event==='specialty'&&job==='mage'&&Math.random()>=.5?base+'.hope':base,track=tracks[asset];if(!track)return false;
       played.set(key,clock+45);next=clock+12;voice.announceAsset(asset,track.text,false,{identity:'party-'+id,gender:H.sex(run,id),age:'adult'});return true;
     }
     function tick(dt){clock+=dt;const H=globalThis.TowerHeroes,run=ctx.run();if(!H?.enabled(run))return;for(const id of H.ids(run)){const ratio=H.hp(run,id)/H.maxHp(run,id);if(ratio>.5)low.delete(id);if(ratio>0&&ratio<=.25&&!low.has(id)){if(say('danger',id))low.add(id);}}}

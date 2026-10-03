@@ -4,7 +4,7 @@
   const C=()=>typeof module==='object'&&module.exports?require('./story-core.js'):globalThis.TowerCore;
   const E=()=>typeof module==='object'&&module.exports?require('./tower-encounters.js'):globalThis.TowerEncounters;
   const TORCH_SECONDS=300,DAYLIGHT_SECONDS=600,DAYLIGHT_COOLDOWN=600,TORCH_PRICE=4,SHOP_STOCK=3;
-  const SHOPS=['tieLing','jinHe','lanZhou'];
+  const SHOPS=['tieLing','jinHe','lanZhou','suHe'];
   const PROFILES=Object.freeze(Object.fromEntries(Object.entries({
     summoning:{name:'雲間石燈',style:'rune',color:0x9be5f5,sky:0x090f1b,ambient:.035,hemi:.075,sun:.045,radius:3.2},
     garden:{name:'花園燈籠',style:'lantern',color:0xffd88a,sky:0x0b1412,ambient:.04,hemi:.08,sun:.045,radius:3.4},
@@ -35,8 +35,9 @@
     if(!['torches','wood','cloth'].every(k=>number(value[k],99,true))||!number(value.fuel,TORCH_SECONDS)||!number(value.daylight,DAYLIGHT_SECONDS)||!number(value.cooldown,DAYLIGHT_COOLDOWN)||value.lit&&value.fuel===0||value.cooldown<value.daylight)return null;
     const count=supplyCount(C().floorConfig(floor).size);
     if(!Array.isArray(value.gathered)||value.gathered.length>count||new Set(value.gathered).size!==value.gathered.length||!value.gathered.every(id=>typeof id==='string'&&Array.from({length:count},(_,i)=>'light-supply-'+i).includes(id)))return null;
-    if(!value.bought||Object.keys(value.bought).length!==SHOPS.length||!SHOPS.every(k=>Object.hasOwn(value.bought,k)&&number(value.bought[k],SHOP_STOCK,true)))return null;
-    return {version:1,torches:value.torches,wood:value.wood,cloth:value.cloth,fuel:value.fuel,lit:value.lit,daylight:value.daylight,cooldown:value.cooldown,gathered:[...value.gathered],bought:{...value.bought}};
+    // Keep historical professional-vendor counts while migrating their supply service.
+    if(!value.bought||typeof value.bought!=='object'||Array.isArray(value.bought)||Object.keys(value.bought).some(k=>!SHOPS.includes(k))||!SHOPS.every(k=>k==='suHe'&&!Object.hasOwn(value.bought,k)||Object.hasOwn(value.bought,k)&&number(value.bought[k],SHOP_STOCK,true)))return null;
+    return {version:1,torches:value.torches,wood:value.wood,cloth:value.cloth,fuel:value.fuel,lit:value.lit,daylight:value.daylight,cooldown:value.cooldown,gathered:[...value.gathered],bought:{...value.bought,suHe:value.bought.suHe||0}};
   }
   const heroes=()=>typeof module==='object'&&module.exports?require('./tower-heroes-core.js'):globalThis.TowerHeroes;
   const canCast=run=>run.party?.loadouts?heroes().ids(run).some(id=>heroes().hp(run,id)>0&&heroes().job(run,id)==='mage'):!!run.party&&(run.party.profession==='mage'||run.party.members.some(m=>m.profession==='mage'&&m.hp>0));
@@ -59,7 +60,7 @@
     return {ok:true,message:'施放 日光術'};
   });}
   function buy(run,id,revision){return tx(run,revision,(n,l)=>{
-    if(n.expedition.active||!E().merchantOffers(n.floor,n.seed).some(m=>m.id===id))return {ok:false,message:'這位商人不在此處。'};
+    if(id!==E().GROCERY.merchantId||n.expedition.active||!E().merchantOffers(n.floor,n.seed).some(m=>m.id===id))return {ok:false,message:'請向本層的雜貨商購買火把。'};
     if(l.bought[id]>=SHOP_STOCK)return {ok:false,message:'本層的火把已售完。'};
     if(n.coins<TORCH_PRICE||l.torches>=99)return {ok:false,message:n.coins<TORCH_PRICE?'銅幣不足。':'火把袋已滿。'};
     n.coins-=TORCH_PRICE;l.bought[id]++;l.torches++;return {ok:true,message:'獲得 火把'};

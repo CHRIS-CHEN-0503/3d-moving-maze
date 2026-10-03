@@ -35,14 +35,14 @@
     [-50,1,'原門誓守者','被半句誓言束縛的門庭古衛，從未把守燈人也當成需要回家的旅人。',1200,34,0x536776,0xffe1a6,['最後一人還沒回家，守燈人不能走。','舊誓仍在，誰也不准離開！','原來，她就是最後一位歸人。']],
   ];
   const UNDERWORLD_LORDS=Object.freeze(Object.fromEntries(undergroundRows.map(([floor,baseFloor,name,personality,maxHp,damage,color,accent,lines])=>{
-    const base=LORDS[baseFloor];return [floor,Object.freeze({...base,id:'lord-underworld-'+base.environment,floor,name,personality,description:personality,maxHp,damage,color,accent,strength:5,underworld:true,recordedVoice:false,
+    const base=LORDS[baseFloor];return [floor,Object.freeze({...base,id:'lord-underworld-'+base.environment,floor,name,personality,description:personality,maxHp:Math.round(maxHp*1.3),damage,color,accent,strength:5,underworld:true,recordedVoice:false,
       tactics:Object.freeze({...base.tactics,...(base.environment==='furnace'?{role:'深井重衛',threat:'察覺長通道裡的旅人便會逼近，近身重擊十分危險。'}:{role:'地下'+base.tactics.role}),tell:base.ranged?'身前聚光、腳下警示亮起時，立刻準備側移。':'靠近後會停步蓄力；警戒圈亮起時先退到圈外。'}),lines:Object.freeze(lines)})];
   })));
   const ALL_LORDS=Object.freeze({...LORDS,...UNDERWORLD_LORDS});
   const allLords=()=>ALL_LORDS;
   const defs=()=>Object.fromEntries(Object.values(ALL_LORDS).map(d=>[d.id,d]));
   const forRun=run=>run?.party&&!run.expedition?.active?ALL_LORDS[run.floor]||null:null;
-  function spec(run){const d=forRun(run);return d?{id:d.underworld?UNDERWORLD_ID:ID,kind:d.id,def:d,strength:d.strength,maxHp:d.maxHp||Math.min(240,85+Math.round((99-run.floor)*1.5)),lord:true}:null;}
+  function spec(run){const d=forRun(run);return d?{id:d.underworld?UNDERWORLD_ID:ID,kind:d.id,def:d,strength:d.strength,maxHp:d.maxHp||Math.round(Math.min(240,85+Math.round((99-run.floor)*1.5))*1.3),lord:true}:null;}
   const defeated=run=>{const d=forRun(run);return !d||run.defeatedMonsters.includes(d.underworld?UNDERWORLD_ID:ID);};
   const tracks={};for(const d of Object.values(LORDS))for(const [i,event]of ['encounter','wounded','defeat'].entries())tracks['lord.'+d.environment+'.'+event]=Object.freeze({src:'./assets/voice/lords/'+d.environment+'-'+event+'.mp3',text:d.lines[i],speaker:d.speaker,instruction:'成年角色，普通话清楚自然，正常速度，沉稳有戏剧感，不要尖叫，不要唱歌。',category:'character-bark'});
   function build(T,d){

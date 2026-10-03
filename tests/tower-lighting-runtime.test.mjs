@@ -6,9 +6,9 @@ import vm from 'node:vm';
 const require=createRequire(import.meta.url),T=require('../lib/three.min.js'),C=require('../story/story-core.js'),P=require('../story/tower-party-core.js'),L=require('../story/tower-lighting-core.js'),E=require('../story/tower-encounters.js');
 const source=readFileSync(new URL('../story/tower-lighting-runtime.js',import.meta.url),'utf8');
 function harness(){
-  let run=P.enable(C.newRun({seed:31415}),'mage').run,wall=false,failed=false,disposals=0,active=true,at=1;
+  let run=P.enable(C.newRun({seed:1}),'mage').run,wall=false,failed=false,disposals=0,active=true,at=1;
   const world=new T.Group(),player=new T.Group(),camera=new T.PerspectiveCamera(),fog=new T.Fog(0x263d38,4,20),events=[];
-  const G={px:0,pz:0,mazeW:7,mazeH:7,running:true,shifting:false,view:'tp'},merchant={...E.merchantOffers(run.floor,run.seed)[0],x:8,z:0,cx:2,cy:0};
+  const G={px:0,pz:0,mazeW:7,mazeH:7,running:true,shifting:false,view:'tp'},merchant={...E.merchantOffers(run.floor,run.seed).find(m=>m.id==='suHe'),x:8,z:0,cx:2,cy:0};
   const context=vm.createContext({TowerLighting:L,document:{getElementById:()=>null}});vm.runInContext(source,context);
   const ui=context.TowerLightingRuntime.create({THREE:T,G,run:()=>run,active:()=>active,world:()=>world,player:()=>player,camera:()=>camera,
     traders:()=>[merchant],inDungeon:()=>!!run.expedition.active,environment:()=>({id:'echo',rig:{fog}}),clear:()=>!wall,

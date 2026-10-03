@@ -113,6 +113,96 @@ body.tower-danger #towerHud #towerHp::-moz-progress-bar {background:#ed8576}
 .camp-rule-notes {margin:4px 0 12px;color:#b8cddd;font-size:.82em}
 .camp-rule-notes summary {min-height:32px;cursor:pointer;align-content:center}
 .camp-rule-notes p {margin:5px 0;line-height:1.6}
+/* Shops and camps share compact item rows; the item heading opens its details. */
+.tower-commerce .trade-stock-grid{grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}
+.tower-commerce .trade-card-actions{display:flex;align-items:stretch;gap:6px;width:100%;margin-top:auto}
+.tower-commerce .trade-card-actions .tower-btn{flex:1 1 0;width:auto;min-width:44px;min-height:44px;padding:7px 10px;font-size:15px;margin:0;box-sizing:border-box;white-space:normal}
+.tower-commerce .trade-card-actions [data-tower="sell"]{flex:0 0 auto;background:#1d3543;border-color:#506d78;color:#bcd4dc}
+.tower-titles-with-wallet{display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:center;gap:0 12px}
+.tower-titles-with-wallet .tower-kicker{grid-column:1/-1}
+.tower-trade-wallet{display:flex;align-items:center;gap:4px;white-space:nowrap;font-size:15px;font-weight:700;color:#f3dca0}
+.tower-trade-wallet>.resource-icon{width:22px;height:24px;flex:none}
+.trade-item-details{width:100%;margin:0}
+.tower-commerce .tower-item{min-width:0;box-sizing:border-box}
+.trade-item-details>summary{display:flex;align-items:center;gap:8px;min-height:44px;list-style:none;cursor:pointer}
+.trade-item-details>summary::-webkit-details-marker{display:none}
+.trade-item-details>summary>svg{width:38px;height:40px;flex:none;margin:0;filter:drop-shadow(0 2px 2px #0004)}
+.trade-item-details>summary>div{flex:1;min-width:0}
+.trade-item-details>summary h3{font-size:17px!important;margin:0;line-height:1.3}
+.trade-item-details>summary small{display:block;font-size:13px;color:#aac8d3;line-height:1.4;margin-top:3px}
+.trade-detail-indicator{color:#b5c9d3;font-size:21px;flex:none}
+.trade-item-details[open] .trade-detail-indicator{transform:rotate(180deg)}
+.trade-item-details>p,.tower-trade-note>p{font-size:15px;line-height:1.55;margin:8px 0}
+.trade-categories{display:flex;gap:8px;margin:0 0 8px}
+.trade-categories .tower-btn{min-height:44px;padding:7px 16px;flex:1}
+.trade-categories .tower-btn[aria-pressed="true"]{border-color:#e0c581;background:#385762;color:#fff0be}
+.tower-commerce .grocery-stock{margin:0}
+.tower-commerce .grocery-stock[hidden]{display:none!important}
+.tower-trade-note{margin:10px 0;border:1px solid #7893a344;border-radius:9px;background:#102431;padding:0 10px}
+.tower-trade-note>summary,.tower-commerce .supply-guide>summary,.forge-trait-guide>summary{cursor:pointer;min-height:44px;display:flex;align-items:center;gap:7px;color:#b6d3db;font-size:15px}
+.tower-trade-note>summary::before,.tower-commerce .supply-guide>summary::before,.forge-trait-guide>summary::before{content:'＋';font-size:16px;color:#e6cea0}
+.tower-trade-note[open]>summary::before,.tower-commerce .supply-guide[open]>summary::before,.forge-trait-guide[open]>summary::before{content:'−'}
+.tower-trade-note>summary::-webkit-details-marker,.tower-commerce .supply-guide>summary::-webkit-details-marker,.forge-trait-guide>summary::-webkit-details-marker{display:none}
+.tower-commerce .grocery-heading{gap:8px;margin:0}
+.tower-commerce .grocery-heading svg{width:36px;height:38px;flex-basis:36px}
+.tower-commerce .grocery-heading>div{min-width:0}
+.tower-commerce .grocery-heading h3{font-size:17px!important;line-height:1.25}
+.tower-commerce .grocery-heading small{font-size:13px;line-height:1.4}
+.tower-commerce .trade-item-stat{font-size:14px!important;line-height:1.4!important;margin:2px 0!important}
+.forge-overview-notes{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:8px;margin:8px 0}
+.forge-overview-notes .party-stock-panel,.forge-overview-notes .tower-trade-note{margin:0}
+.forge-overview-notes .party-stock-panel summary{font-size:15px;padding:8px 10px}
+.forge-overview-notes .party-stock-panel summary>span{display:none}
+.forge-overview-notes .party-stocks{max-height:none;overflow:visible}
+.forge-resources{margin:0 0 6px;gap:6px;font-size:15px;line-height:1.4}
+.forge-resources .resource-icon{width:23px;height:23px}
+.forge-traits-title{font-size:17px!important;display:flex;align-items:center;gap:10px;margin:10px 0 7px}
+.forge-traits-title small{color:#b4cbd7;font-size:13px;font-weight:normal}
+.forge-piece h3{margin:0!important;font-size:18px!important}
+.forge-piece p{margin:3px 0;font-size:14px!important;line-height:1.4}
+.forge-repair{display:flex;align-items:center;gap:10px;justify-content:space-between;padding:8px 10px;margin:8px 0 12px}
+.forge-repair>div{min-width:0;flex:1}.forge-repair h3{font-size:16px!important;margin:0}
+.forge-repair p{font-size:14px!important;margin:3px 0;line-height:1.4}.forge-repair>.tower-btn{min-height:44px;flex:none;padding:8px 12px;margin:0}
+.forge-detail .party-forge-traits{display:grid;grid-template-columns:repeat(2,minmax(0,1fr))}
+.forge-detail .party-forge-traits section{display:flex;flex-direction:column;align-items:stretch;gap:5px}
+.forge-detail .party-forge-traits .tower-btn{max-width:none;width:100%;min-height:44px}
+.forge-trait-heading{display:flex;align-items:center;gap:7px}
+.forge-trait-heading>svg{width:30px;height:30px;flex:none}
+.forge-trait-heading b{font-size:16px;line-height:1.3}.forge-trait-heading small{font-size:12px;color:#b8cddd}
+.forge-trait-warning{font-size:13px;color:#edc5a7;line-height:1.4}
+.forge-trait-guide p{margin:5px 0;line-height:1.45}
+@media(max-width:1000px),(max-height:600px){
+  #towerDialog.tower-commerce .tower-dialog-header .tower-kicker{display:none}
+  #towerDialog.tower-commerce .tower-dialog-content{padding:7px 10px}
+  #towerDialog.tower-commerce[data-commerce="grocery"] .tower-dialog-content,
+  #towerDialog.tower-commerce[data-commerce="merchant"] .tower-dialog-content{padding:4px 8px}
+  #towerDialog.tower-commerce .tower-titles-with-wallet{gap:0 8px}
+  #towerDialog.tower-commerce .tower-dialog-content>.tower-copy{font-size:15px;line-height:1.4;margin:0 0 7px}
+  #towerDialog.tower-commerce .tower-grid{grid-template-columns:repeat(3,minmax(0,1fr));gap:7px}
+  #towerDialog.tower-commerce .tower-grid .tower-item{padding:7px 8px;gap:5px;border-radius:10px}
+  #towerDialog.tower-commerce .trade-stock-grid{gap:4px}
+  #towerDialog.tower-commerce .trade-stock-grid .tower-item{padding:2px 6px;gap:2px}
+  #towerDialog.tower-commerce .trade-stock-grid .trade-card-actions{gap:4px}
+  #towerDialog.tower-commerce .trade-stock-grid .trade-item-details>summary small{margin-top:1px}
+  #towerDialog.tower-commerce .trade-categories{gap:6px;margin-bottom:4px}
+  #towerDialog.tower-commerce .tower-grid .tower-item h3{font-size:16px}
+  #towerDialog.tower-commerce .trade-item-details>p{font-size:15px;line-height:1.5}
+  #towerDialog.tower-commerce .trade-card-actions .tower-btn{padding:6px 7px;font-size:15px}
+  #towerDialog.tower-commerce .camp-service-strip{padding:6px 8px;margin:0 0 8px;gap:7px;border-radius:9px}
+  #towerDialog.tower-commerce .camp-service-strip>div{min-width:90px}
+  #towerDialog.tower-commerce .camp-service-strip b{font-size:15px}
+  #towerDialog.tower-commerce .camp-service-strip small{font-size:13px}
+  #towerDialog.tower-commerce .camp-rule-notes summary{min-height:44px}
+  #towerDialog.tower-commerce .party-stock-panel>small{font-size:13px}
+  #towerDialog.tower-commerce .party-stock-panel .party-stocks{max-height:none;overflow:visible}
+  .tower-commerce .party-recipe .supply-guide{margin:0}
+}
+@media(max-width:700px){
+  #towerDialog.tower-commerce .tower-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
+  #towerDialog.tower-commerce .trade-card-actions{flex-wrap:wrap}
+  #towerDialog.tower-commerce .trade-card-actions .tower-btn{padding:6px;font-size:15px}
+  .trade-item-details>summary{gap:6px}.trade-item-details>summary>svg{width:31px;height:36px}
+}
 .recruit-costs {list-style:none;padding:0;margin:8px 0;display:grid;gap:6px}
 .recruit-costs li {display:flex;align-items:center;flex-wrap:wrap;gap:8px;padding:8px 12px;background:#172e3c;border:1px solid #426472;border-radius:10px}
 .recruit-costs li span {flex:1;min-width:100px}

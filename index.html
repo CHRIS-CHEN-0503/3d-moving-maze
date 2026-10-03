@@ -618,11 +618,11 @@ button:focus-visible,input:focus-visible{outline:3px solid #fff;outline-offset:3
 </style>
 <link rel="stylesheet" href="assets/game-polish.css?v=1.39.3">
 <link rel="stylesheet" href="assets/play-controls.css?v=1.42.1">
-<link rel="stylesheet" href="story/tower-party.css?v=1.49.0">
+<link rel="stylesheet" href="story/tower-party.css?v=1.51.0">
 <link rel="stylesheet" href="story/tower-cinematics.css?v=1.50.0">
 <link rel="stylesheet" href="story/tower-cooperation.css?v=1.47.0">
-<link rel="stylesheet" href="story/tower-heroes.css?v=1.43.0">
-<link rel="stylesheet" href="story/tower-mobile.css?v=1.43.0">
+<link rel="stylesheet" href="story/tower-heroes.css?v=1.51.0">
+<link rel="stylesheet" href="story/tower-mobile.css?v=1.51.0">
 <link rel="stylesheet" href="story/tower-growth.css?v=1.42.0">
 <link rel="stylesheet" href="assets/battle-dock.css?v=1.43.3">
 <link rel="stylesheet" href="assets/adventure-polish.css?v=1.46.0">
@@ -980,9 +980,9 @@ button:focus-visible,input:focus-visible{outline:3px solid #fff;outline-offset:3
 </div>
 
 <script src="./lib/three.min.js"></script>
-<script src="./assets/character-sculpt.js?v=1.44.0"></script>
-<script src="./assets/character-face.js?v=1.44.0"></script>
-<script src="./assets/character-motion.js?v=1.43.3"></script>
+<script src="./assets/character-sculpt.js?v=1.51.0"></script>
+<script src="./assets/character-face.js?v=1.51.0"></script>
+<script src="./assets/character-motion.js?v=1.51.0"></script>
 <script src="./assets/maze-atmosphere.js?v=1.44.0"></script>
 <script src="./assets/pickup-objects.js"></script>
 <script src="./assets/native-symbols.js"></script>
@@ -1010,7 +1010,7 @@ button:focus-visible,input:focus-visible{outline:3px solid #fff;outline-offset:3
    3D移動迷宮 — 給小朋友的變形迷宮冒險
    ===================================================== */
 const $=id=>document.getElementById(id);
-const GAME_VERSION='1.50.0';
+const GAME_VERSION='1.51.0';
 
 /* ---------- 設定（後台可調） ---------- */
 const DEFAULT_CFG={teamSize:2,shiftMin:3,itemCount:6,foodCount:4,hungerMin:3,stunSec:3,pingSec:3,smellCells:3,mazeSize:13,magicMap:0,duelMin:5,unpaidRate:100,musicOn:1,speechOn:1,speechVoice:'',apiUrl:'',roomMax:3,rounds:3,goodsCount:16,shopCollect:1,shopMin:2.5,cartFull:400,views:{fp:1,tp:1,top:1},broker:'wss://broker.emqx.io:8084/mqtt'};
@@ -1859,7 +1859,7 @@ function buildCharacter(cd){
   if(cd.type==='boy'||cd.type==='girl'){
     const nose=soft(.075,.085,.085,cd.skin);nose.name='sculpted-nose';nose.position.set(0,-.055,.255);headRig.add(nose);
   }
-  if(window.CharacterFace)CharacterFace.attach(THREE,g,headRig,faceEyes,0,cd.type==='robot');
+  if(window.CharacterFace)CharacterFace.attach(THREE,g,headRig,faceEyes,0,cd.type==='robot',cd);
   const shade=new THREE.Mesh(new THREE.CircleGeometry(.37,16),new THREE.MeshBasicMaterial({color:0x132434,transparent:true,opacity:.17,depthWrite:false}));shade.rotation.x=-Math.PI/2;shade.position.y=.013;shade.name='contact-shadow';g.add(shade);
   if(window.CharacterMotion)CharacterMotion.prepare(g);
   return g;
@@ -5159,9 +5159,10 @@ window.addEventListener('pagehide',()=>{AudioEng.shiftSound?.stop();AudioEng.com
 <script src="story/tower-hero-growth.js?v=1.49.0"></script>
 <script src="story/tower-heroes-core.js?v=1.49.0"></script>
 <script src="story/tower-heroes-icons.js?v=1.49.0"></script>
-<script src="story/tower-combat-motion.js?v=1.49.0"></script>
+<script src="story/tower-combat-motion.js?v=1.51.0"></script>
 <script src="story/tower-menu-voice.js?v=1.42.4"></script>
-<script src="story/tower-heroes-visuals.js?v=1.46.0"></script>
+<script src="assets/equipment-surfaces.js?v=1.51.0"></script>
+<script src="story/tower-heroes-visuals.js?v=1.51.0"></script>
 <script src="story/tower-skill-effects.js?v=1.46.0"></script>
 <script src="story/tower-growth-runtime.js?v=1.49.0"></script>
 <script src="story/tower-team-tactics.js?v=1.42.6"></script>
@@ -5170,13 +5171,13 @@ window.addEventListener('pagehide',()=>{AudioEng.shiftSound?.stop();AudioEng.com
 <script src="story/tower-heroes-runtime.js?v=1.50.0"></script>
 <script src="story/tower-cooperation-core.js?v=1.48.1"></script>
 <script src="story/tower-cooperation-runtime.js?v=1.50.0"></script>
-<script src="story/story-core.js?v=1.49.0"></script>
+<script src="story/story-core.js?v=1.51.0"></script>
 <script src="story/tower-narrative.js?v=1.45.0"></script>
 <script src="story/tower-side-stories.js?v=1.45.0"></script>
 <script src="story/tower-dungeons.js?v=1.45.0"></script>
 <script src="story/tower-hazards.js?v=1.49.0"></script>
 <script src="story/tower-encounters.js?v=1.49.0"></script>
-<script src="story/tower-characters.js?v=1.49.0"></script>
+<script src="story/tower-characters.js?v=1.51.0"></script>
 <script src="story/tower-audio.js"></script>
 <script src="story/tower-materials.js?v=1.48.0"></script>
 <script src="story/tower-expedition-core.js?v=1.49.0"></script>
@@ -5189,14 +5190,14 @@ window.addEventListener('pagehide',()=>{AudioEng.shiftSound?.stop();AudioEng.com
 <script src="story/tower-recruitment.js?v=1.49.0"></script>
 <script src="story/tower-resource-icons.js?v=1.48.0"></script>
 <script src="story/tower-forge-icons.js?v=1.47.0"></script>
-<script src="story/tower-party-runtime.js?v=1.50.0"></script>
-<script src="story/tower-lighting-runtime.js?v=1.49.0"></script>
+<script src="story/tower-party-runtime.js?v=1.51.0"></script>
+<script src="story/tower-lighting-runtime.js?v=1.51.0"></script>
 <script src="story/tower-encounter-alert.js?v=1.42.5"></script>
 <script src="story/tower-combat-readability.js?v=1.44.0"></script>
 <script src="story/tower-field-guide.js?v=1.49.0"></script>
 <script src="story/tower-creature-art.js?v=1.44.0"></script>
 <script src="story/tower-cinematics.js?v=1.50.0"></script>
-<script src="story/tower-mode.js?v=1.50.0"></script>
+<script src="story/tower-mode.js?v=1.51.0"></script>
 <script src="assets/room-lifecycle.js?v=1.36.0"></script>
 <script src="assets/shop-collection-core.js?v=1.31.0"></script>
 <script src="assets/shop-collection.js?v=1.31.0"></script>

@@ -1,4 +1,4 @@
-/* Separate scrolling regions: controls always reserve their own space. */
+/* Dialogs have one vertical content scroller; header and actions reserve space. */
 #towerDialog.tower-card{display:flex;flex-direction:column;overflow:hidden;padding:0;max-height:calc(100dvh - 36px);width:min(980px,100%)}
 .tower-dialog-header{display:flex;align-items:center;gap:14px;padding:18px 22px;border-bottom:1px solid #7794a433;flex:none}
 .tower-dialog-titles{flex:1;min-width:0}.tower-dialog-header .tower-heading{margin:0;font-size:25px;overflow-wrap:anywhere}
@@ -13,6 +13,7 @@
 .forge-pick .hero-icon{width:32px;height:36px}.forge-pick span{min-width:0}.forge-pick b{display:block;font-size:15px;overflow-wrap:anywhere}.forge-pick small{font-size:13px;color:#c1d4df;display:block}
 .forge-pick[aria-pressed=true]{border-color:#edc97c;background:#345468;box-shadow:inset 3px 0 #edc97c}
 .forge-detail{min-width:0}.forge-piece{display:flex;align-items:center;gap:12px}.forge-piece .hero-icon{width:48px;height:48px}
+.forge-detail-nav,.forge-pick-arrow{display:none}
 .forge-repair{padding:12px;margin:10px 0 18px;background:#244449;border:1px solid #90c9b966;border-radius:10px}
 .forge-detail .party-forge-traits{display:flex;flex-direction:column;gap:10px}.forge-detail .party-forge-traits section{display:flex;flex-direction:row;align-items:center;gap:12px;padding:12px}
 .forge-detail .party-forge-traits section>div{flex:1;min-width:0}.forge-detail .party-forge-traits .tower-btn{flex:none;max-width:48%;white-space:normal}
@@ -47,16 +48,20 @@
   #towerDialog .hero-bag-item{flex-wrap:wrap}#towerDialog .hero-bag-item>div{flex:1;min-width:50%}#towerDialog .hero-bag-item .hero-icon{width:42px;height:44px}
   #towerDialog .hero-catalog{grid-template-columns:repeat(2,minmax(0,1fr))}#towerDialog .hero-skill-list .hero-icon{width:42px;height:44px}
   #towerDialog .tower-prose p{font-size:19px;line-height:1.85;letter-spacing:.025em}.tower-prose{padding-left:12px}
-  .tower-workshop .tower-dialog-content{display:flex;flex-direction:column;overflow:hidden}.tower-workshop .tower-dialog-content>.tower-copy{flex:none;font-size:14px!important;margin-bottom:8px!important}
-  .forge-workspace{flex:1;min-height:0;grid-template-columns:minmax(144px,27%) minmax(0,1fr);align-items:stretch;gap:12px}
-  .forge-picker,.forge-detail{min-height:0;overflow:auto;overscroll-behavior:contain;scrollbar-gutter:stable;padding:2px 4px 16px 0}
-  #towerDialog .forge-pick{padding:8px;gap:6px;min-height:58px}.forge-pick .hero-icon{width:27px;height:30px}.forge-pick b{font-size:15px}
-  .forge-detail .party-forge-traits section{display:block;padding:10px}.forge-detail .party-forge-traits .tower-btn{max-width:none;width:100%;margin-top:8px}.forge-detail p{font-size:15px!important}
+  .tower-workshop .tower-dialog-content{display:block;overflow-y:auto}.tower-workshop .tower-dialog-content>.tower-copy{font-size:15px!important;margin-bottom:6px!important}
+  .forge-workspace{display:block;min-height:0}
+  .forge-picker,.forge-detail{overflow:visible;min-height:0;max-height:none;padding:0}
+  .forge-workspace[data-forge-page="list"]>.forge-detail,.forge-workspace[data-forge-page="detail"]>.forge-picker,.forge-overview[data-forge-page="detail"]{display:none}
+  .forge-picker{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:7px}
+  #towerDialog .forge-pick{padding:7px;gap:6px;min-height:60px}.forge-pick .hero-icon{width:30px;height:34px}.forge-pick span:not(.forge-pick-arrow){flex:1}.forge-pick b{font-size:15px;line-height:1.25}.forge-pick small{font-size:13px;margin-top:3px;line-height:1.25}
+  .forge-pick-arrow{display:block;font-size:24px;color:#bdced8}.forge-detail-nav{display:block;margin-bottom:6px}.forge-detail-nav .tower-btn{padding:6px 10px}
+  .forge-detail .party-forge-traits{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
+  .forge-detail .party-forge-traits section{display:flex;flex-direction:column;align-items:stretch;padding:8px;gap:3px}.forge-detail .party-forge-traits .tower-btn{max-width:none;width:100%;margin-top:auto;padding:6px;font-size:14px!important}.forge-detail p{font-size:15px!important}
 }
 @media(max-width:500px){
   #towerDialog .tower-grid,#towerDialog .hero-catalog{grid-template-columns:minmax(0,1fr)}
   .tower-dialog-header .tower-kicker{display:none}.tower-dialog-header{padding:6px 8px}.tower-dialog-header .tower-heading{font-size:18px}
-  .forge-workspace{display:flex;flex-direction:column;gap:8px}.forge-picker{flex:none;flex-direction:row;overflow-x:auto;overflow-y:hidden;padding:0 0 5px;max-height:92px}.forge-pick{flex:none;width:154px}.forge-detail{flex:1}
+  .forge-picker,.forge-detail .party-forge-traits{grid-template-columns:repeat(2,minmax(0,1fr))}
 }
 @media(max-height:360px){.tower-dialog-header .tower-kicker{display:none}.tower-dialog-header{min-height:44px;padding-top:3px;padding-bottom:3px}#towerDialog>.tower-actions{padding-top:4px;padding-bottom:4px}.tower-dialog-content{padding-top:6px;padding-bottom:6px}}
 /* Creation cards keep their job name and choice above the phone fold. */

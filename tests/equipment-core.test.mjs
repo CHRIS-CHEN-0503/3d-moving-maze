@@ -28,7 +28,7 @@ test('six gear kinds have only three armor slots and one nonlethal weapon slot',
   assert.deepEqual(['helmet', 'armor', 'shield'].map(kind => C.GEAR[kind].defense), [2, 4, 3]);
   const run = fresh();
   assert.equal(run.equipment.weapon.kind, 'staff');
-  assert.ok(run.equipment.weapon.durability >= 30 && run.equipment.weapon.durability <= 100);
+  assert.ok(run.equipment.weapon.durability >= 60 && run.equipment.weapon.durability <= 200);
   assert.equal(run.bag.shield, 0);
   assert.equal(run.equipment.shield, null);
 });
@@ -40,12 +40,12 @@ test('normal equipment scales original 3..10 durability; enhanced rolls retain t
       const plain = C.createGear(kind, 99, seed, 'supply');
       const mult=C.durabilityMultiplier(kind);ordinary.add(Math.round(plain.durability/mult));
       assert.deepEqual(C.createGear(kind, 99, seed, 'supply'), plain);
-      assert.ok(plain.durability >= Math.round(3*mult) && plain.durability <= Math.round(10*mult));
+      assert.ok(plain.durability >= C.durabilityForRoll(kind,3) && plain.durability <= C.durabilityForRoll(kind,10));
       assert.equal(plain.durability, plain.maxDurability);
       assert.equal(plain.bonus, 0);
       for (const [floor, maxDurability, maxBonus] of [[99, 13, 1], [70, 13, 1], [69, 16, 2], [40, 16, 2], [39, 20, 3], [1, 20, 3]]) {
         const improved = C.createGear(kind, floor, seed, 'chest', true);
-        assert.ok(improved.maxDurability >= Math.round(10*mult) && improved.maxDurability <= Math.round(maxDurability*mult));
+        assert.ok(improved.maxDurability >= C.durabilityForRoll(kind,10) && improved.maxDurability <= C.durabilityForRoll(kind,maxDurability));
         assert.ok(improved.bonus >= 1 && improved.bonus <= maxBonus);
         assert.ok(C.validateGear(improved));
         if (floor === 1) { deepBonus.add(improved.bonus); deepDurability.add(Math.round(improved.maxDurability/mult)); }

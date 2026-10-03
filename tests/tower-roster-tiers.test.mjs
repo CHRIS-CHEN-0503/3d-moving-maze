@@ -8,7 +8,7 @@ const fresh=(job='swordsman',seed=43,sex='male')=>H.enable(P.enable(C.newRun({se
 const floor=(r,f)=>{r.floor=f;r.floorsCleared=99-f;r.chronicle=N.newChronicle(f);P.advance(r);return r;};
 test('18 gear types retain three surface tiers, requirements 1/3/5 and category-correct durability',()=>{
   assert.equal(Object.keys(H.GEAR).length,90);
-  for(const base of H.BASE_GEAR){let strength=0;for(const tier of [1,2,3]){const d=H.GEAR[H.tierKind(base.kind,tier)];assert.equal(d.requiredLevel,[0,1,3,5][tier]);assert.equal(d.baseKind,base.kind);const power=d.damage+d.magicDamage+d.defense;assert.ok(power>strength);strength=power;assert.equal(C.durabilityMultiplier(d.kind),base.slot==='weapon'||base.type==='heavy'||['round_shield','tower_shield'].includes(base.kind)?10:20/3);const item=C.createGear(d.kind,49,43,'tiers');assert.ok(C.validateGear(item));}}
+  for(const base of H.BASE_GEAR){let strength=0;for(const tier of [1,2,3]){const d=H.GEAR[H.tierKind(base.kind,tier)];assert.equal(d.requiredLevel,[0,1,3,5][tier]);assert.equal(d.baseKind,base.kind);const power=d.damage+d.magicDamage+d.defense;assert.ok(power>strength);strength=power;assert.equal(C.durabilityMultiplier(d.kind),base.slot==='weapon'||base.type==='heavy'||['round_shield','tower_shield'].includes(base.kind)?20:40/3);const item=C.createGear(d.kind,49,43,'tiers');assert.ok(C.validateGear(item));}}
   assert.deepEqual(H.gearPool(99).map(k=>H.GEAR[k].tier),Array(18).fill(1));assert.equal(H.gearPool(60).length,36);assert.equal(H.gearPool(20).length,54);
 });
 test('equipment level gates reject without mutations and also validate active/inactive saved loadouts',()=>{

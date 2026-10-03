@@ -378,7 +378,8 @@
       for(let i=0;i<3;i++)k.cylinder(group,[.039,.039,.025,7],0x5b5347,'staff-grip-wrap',0,.05+i*.055,0);
       k.cylinder(group,[.041,.041,.04,7],0xb9af86,'staff-foot-cap',0,-.014,0);
     } else throw new RangeError('未知的高塔裝備：' + kind);
-    Object.assign(group.userData, { role: 'gear', kind, mount: GEAR_MOUNTS[kind], modelFamily: 'tower-original' });
+    const contact=kind==='pan'?{center:[0,.5,-.0225],normal:[0,0,-1]}:kind==='bat'?{center:[0,.485,.066],normal:[0,0,1]}:kind==='staff'?{center:[0,.677,.059],normal:[0,0,1]}:null;
+    Object.assign(group.userData, { role: 'gear', kind,weaponKind:kind,contact,mount: GEAR_MOUNTS[kind], modelFamily: 'tower-original' });
     return group;
   }
 
@@ -453,9 +454,10 @@
       k.cone(weapon,[.066,.2,4],s.metal,'sword-tip',0,.91,0);
     }else{
       k.cylinder(weapon,[.04,.04,.68,6],s.metal,'hammer-haft',0,.22,0);
-      k.box(weapon,[.49,.27,.26],s.cloth,'sun-hammer-head',0,.64,0);
-      for(const side of [-1,1])k.box(weapon,[.07,.31,.3],s.metal,'hammer-gold-cap',side*.245,.64,0);
-      k.crystal(weapon,[.13,0],s.accent,'hammer-star',0,.64,.2);
+      k.box(weapon,[.26,.27,.49],s.cloth,'sun-hammer-head',0,.64,0);
+      for(const side of [-1,1])k.box(weapon,[.3,.31,.07],s.metal,'hammer-gold-cap',0,.64,side*.245);
+      k.crystal(weapon,[.13,0],s.accent,'hammer-star',.2,.64,0);
+      weapon.userData.contact={center:[0,.64,.28],normal:[0,0,1],headCenter:[0,.64,0]};
     }
     Object.assign(g.userData,{role:'warrior',strength,style:s,guardBlade:weapon,armor,modelFamily:'tower-original'});
     return g;

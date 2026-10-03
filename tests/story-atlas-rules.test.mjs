@@ -61,7 +61,7 @@ test('all gear stats, five tiers, wear and price ranges use game definitions rat
     const def=H.GEAR[record.id],m=C.durabilityMultiplier(record.id);
     assert.equal(record.tier,def.tier);assert.equal(record.requiredLevel,def.requiredLevel);assert.deepEqual(record.jobs,def.jobs);
     for(const key of ['damage','magicDamage','defense','support','interval','reach','hands'])assert.equal(record.rawStats[key],def[key]);
-    assert.equal(detail(record,'普通初始耐久'),[3,10].map(n=>Math.round(n*m)).join('～'));
+    assert.equal(detail(record,'普通初始耐久'),[3,10].map(n=>C.durabilityForRoll(record.id,n)).join('～'));
     if(def.slot==='weapon')assert.match(detail(record,'耐久消耗'),['bow','staff','book'].includes(def.type)?/發射就消耗/:/揮空不扣/);
     if(def.tier>3)assert.match(record.notes.join(''),/僅地下篇/);
     const floor=def.tier<=3?[99,69,39][def.tier-1]:def.tier===4?-1:-21;
@@ -71,8 +71,8 @@ test('all gear stats, five tiers, wear and price ranges use game definitions rat
       assert.ok(gear.maxDurability>=record.rawStats.normalDurability[0]&&gear.maxDurability<=record.rawStats.normalDurability[1],record.id);
     }
   }
-  assert.equal(detail(D.gear('longsword'),'普通初始耐久'),'30～100');assert.equal(detail(D.gear('robe'),'普通初始耐久'),'20～67');
-  assert.equal(detail(D.gear('buckler'),'普通初始耐久'),'20～67');assert.equal(detail(D.gear('round_shield'),'普通初始耐久'),'30～100');
+  assert.equal(detail(D.gear('longsword'),'普通初始耐久'),'60～200');assert.equal(detail(D.gear('robe'),'普通初始耐久'),'40～134');
+  assert.equal(detail(D.gear('buckler'),'普通初始耐久'),'40～134');assert.equal(detail(D.gear('round_shield'),'普通初始耐久'),'60～200');
   assert.match(detail(D.gear('arcane_staff_t5'),'普通攻擊'),/光彈.*法術/);assert.match(detail(D.gear('rune_crown'),'法袍額外效益'),/法術增傷4%.*治療加成5%/);
 });
 

@@ -5,16 +5,16 @@ const require=createRequire(import.meta.url),C=require('../story/story-core.js')
 const fresh=(job='smith')=>H.enable(P.enable(C.newRun({seed:43}),job).run).run;
 test('all weapon and armor multipliers match category; legacy damaged items upgrade once without healing',()=>{
   for(const [kind,def]of Object.entries(C.GEAR)){
-    const expected=def.slot==='weapon'||def.type==='heavy'||['helmet','armor','shield','round_shield','tower_shield'].includes(def.baseKind||kind)?10:20/3;
+    const expected=def.slot==='weapon'||def.type==='heavy'||['helmet','armor','shield','round_shield','tower_shield'].includes(def.baseKind||kind)?20:40/3;
     assert.equal(C.durabilityMultiplier(kind),expected);
     const gear=C.createGear(kind,49,13,'migration'),price=C.gearPrice(gear),old={...gear,durability:2,maxDurability:Math.round(gear.maxDurability/expected)};delete old.durabilityVersion;
-    const upgraded=C.validateGear(old);assert.equal(upgraded.durability,Math.round(2*expected));assert.equal(upgraded.maxDurability,gear.maxDurability);assert.deepEqual(C.validateGear(upgraded),upgraded);assert.equal(C.gearPrice(upgraded),price);
+    const upgraded=C.validateGear(old);assert.equal(upgraded.durability,Math.round(old.durability*gear.maxDurability/old.maxDurability));assert.equal(upgraded.maxDurability,gear.maxDurability);assert.deepEqual(C.validateGear(upgraded),upgraded);assert.equal(C.gearPrice(upgraded),price);
   }
 });
 test('active, inactive and bag gear upgrade together and never multiply on later reloads',()=>{
   let r=fresh();r=P.recruit(r,P.recruitOffer(r).id).run;r.gearBag.push(C.createGear('robe',99,43,'bag'));
   for(const g of H.allGear(r)){const m=C.durabilityMultiplier(g.kind);g.durability=2;g.maxDurability=Math.round(g.maxDurability/m);delete g.durabilityVersion;}
-  const restored=C.validateSave(r);assert.ok(restored);for(const g of H.allGear(restored))assert.equal(g.durability,Math.round(2*C.durabilityMultiplier(g.kind)));
+  const old=new Map(H.allGear(r).map(g=>[g.id,g])),restored=C.validateSave(r);assert.ok(restored);for(const g of H.allGear(restored))assert.equal(g.durability,Math.round(2*g.maxDurability/old.get(g.id).maxDurability));
   assert.deepEqual(C.validateSave(JSON.stringify(restored)),restored);
 });
 test('warnings turn orange at 20%, red at 10%, include broken pieces, and clear after repair',()=>{

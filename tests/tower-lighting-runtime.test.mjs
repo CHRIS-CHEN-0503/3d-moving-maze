@@ -12,7 +12,7 @@ function harness(){
   const context=vm.createContext({TowerLighting:L,document:{getElementById:()=>null}});vm.runInContext(source,context);
   const ui=context.TowerLightingRuntime.create({THREE:T,G,run:()=>run,active:()=>active,world:()=>world,player:()=>player,camera:()=>camera,
     traders:()=>[merchant],inDungeon:()=>!!run.expedition.active,environment:()=>({id:'echo',rig:{fog}}),clear:()=>!wall,
-    cell:(cx,cy)=>({cx,cy,x:cx*4,z:cy*4}),chooseCell:()=>({cx:at,cy:1,x:at++*4,z:4}),marker:()=>new T.Group(),bind(){},action:()=>'',dialog(){events.push('dialog');},
+    cell:(cx,cy)=>({cx,cy,x:cx*4,z:cy*4}),chooseCell:()=>({cx:at,cy:1,x:at++*4,z:4}),marker:()=>new T.Group(),bind(){},action:(label,key,id,disabled)=>'<button data-tower="'+key+'" data-item="'+id+'"'+(disabled?' disabled':'')+'>'+label+'</button>',dialog(){events.push('dialog');},
     transact:result=>{if(!result.ok||failed)return false;run=result.run;return true;},toast:msg=>events.push(msg),audio:{sfxUse(){},sfxPickup(){}},close(){events.push('close');},trade(){events.push('trade');},dispose(){disposals++;},
   });
   const build=()=>{at=1;ui.build(()=>.5,new Set());};build();
@@ -64,4 +64,14 @@ test('torch shop actions require real proximity and line of sight, and survive s
   const h=harness(),id=h.merchant.id,start=h.run.coins;h.ui.handle('light-buy',id);assert.equal(h.run.coins,start);
   h.G.px=8;h.wall=true;h.ui.handle('light-buy',id);assert.equal(h.run.coins,start);h.wall=false;h.failed=true;h.ui.handle('light-buy',id);assert.equal(h.run.coins,start);
   h.failed=false;h.ui.handle('light-buy',id);assert.equal(h.run.coins,start-4);assert.equal(h.run.party.light.torches,3);
+});
+test('torch merchant uses a compact closed summary and keeps finite stock and purchase guards',()=>{
+  const h=harness(),id=h.merchant.id,before=JSON.stringify(h.run),html=h.ui.merchantCard(id);
+  assert.match(html,/<details class="trade-item-details"><summary>/);assert.doesNotMatch(html,/<details[^>]*\bopen\b/);
+  assert.match(html,/<h3>旅人火把<\/h3>/);assert.match(html,/<\/summary><p>照明五分鐘/);
+  assert.match(html,/<div class="trade-card-actions"><button data-tower="light-buy" data-item="suHe">購買 4 幣/);
+  assert.equal(JSON.stringify(h.run),before,'rendering stock is not a purchase');assert.equal(h.ui.merchantCard('jinHe'),'');
+  h.run.coins=0;assert.match(h.ui.merchantCard(id),/data-item="suHe" disabled/);
+  h.run.coins=100;h.run.party.light.bought[id]=L.SHOP_STOCK;assert.match(h.ui.merchantCard(id),/<small>持有 2 · 剩 0<\/small>/);assert.match(h.ui.merchantCard(id),/data-item="suHe" disabled/);
+  h.run.party.light.bought[id]=0;h.run.party.light.torches=99;assert.match(h.ui.merchantCard(id),/data-item="suHe" disabled/);
 });

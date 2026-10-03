@@ -169,8 +169,12 @@
 
   function durabilityMultiplier(kind) {
     const item=GEAR[kind];
-    return (item?.slot==='weapon'||item?.type==='heavy'||['helmet','armor','shield','round_shield','tower_shield'].includes(item?.baseKind||kind)?15:10)*2/3;
+    return (item?.slot==='weapon'||item?.type==='heavy'||['helmet','armor','shield','round_shield','tower_shield'].includes(item?.baseKind||kind)?15:10)*4/3;
   }
+  // Double the previous rounded value: light gear's old 47/67 become 94/134,
+  // not 93/133. One shared roll helper keeps generation and the guide identical.
+  const DURABILITY_VERSION=5;
+  function durabilityForRoll(kind,roll) { return Math.round(roll*(durabilityMultiplier(kind)/2))*2; }
   function createGear(kind, floor, seed, sourceId, enhanced = false) {
     floorConfig(floor);
     if (!Object.hasOwn(GEAR, kind) || !validNumber(seed, 1, 0xffffffff, true) || typeof sourceId !== 'string' || !sourceId || sourceId.length > 96 || typeof enhanced !== 'boolean') throw new RangeError('無效的裝備來源。');
@@ -179,27 +183,28 @@
     const tier = floor >= 70 ? 1 : floor >= 40 ? 2 : 3;
     const bonus = enhanced ? 1 + hash % tier : 0;
     const maximum = [0, 13, 16, 20][tier];
-    const maxDurability = Math.round((enhanced ? 10 + (hash >>> 8) % (maximum - 9) : 3 + (hash >>> 8) % 8)*durabilityMultiplier(kind));
+    const maxDurability = durabilityForRoll(kind,enhanced ? 10 + (hash >>> 8) % (maximum - 9) : 3 + (hash >>> 8) % 8);
     const item = GEAR[kind];
-    return { id: `gear:${floor}:${seed}:${sourceId}:${kind}`, kind, slot: item.slot, name: item.name + (bonus ? ` +${bonus}` : ''), durability: maxDurability, maxDurability, durabilityVersion:4, defense: item.slot === 'weapon' ? 0 : item.defense + bonus, bonus };
+    return { id: `gear:${floor}:${seed}:${sourceId}:${kind}`, kind, slot: item.slot, name: item.name + (bonus ? ` +${bonus}` : ''), durability: maxDurability, maxDurability, durabilityVersion:DURABILITY_VERSION, defense: item.slot === 'weapon' ? 0 : item.defense + bonus, bonus };
   }
 
   function validateGear(value) {
     if (!value || typeof value !== 'object' || !Object.hasOwn(GEAR, value.kind) || typeof value.id !== 'string' || !value.id || value.id.length > 160) return null;
     const item = GEAR[value.kind];
-    const legacy=value.durabilityVersion===undefined,currentMultiplier=durabilityMultiplier(value.kind);
-    if(!legacy&&![2,3,4].includes(value.durabilityVersion))return null;
+    const legacy=value.durabilityVersion===undefined,priorMultiplier=durabilityMultiplier(value.kind)/2;
+    if(!legacy&&![2,3,4,DURABILITY_VERSION].includes(value.durabilityVersion))return null;
     // Validate in the source version's units before upgrading, exactly once.
-    const mult=legacy?1:value.durabilityVersion===2?currentMultiplier*1.5/5:value.durabilityVersion===3?currentMultiplier*1.5:currentMultiplier;
-    if (value.slot !== item.slot || !validNumber(value.bonus, 0, 3, true) || !validNumber(value.maxDurability, Math.round((value.bonus ? 10 : 3)*mult), Math.round((value.bonus ? 20 : 10)*mult), true) || !Array.from({length:value.bonus?11:8},(_,i)=>Math.round((i+(value.bonus?10:3))*mult)).includes(value.maxDurability) || !validNumber(value.durability, legacy?1:0, value.maxDurability, true)) return null;
+    const mult=legacy?1:value.durabilityVersion===2?priorMultiplier*1.5/5:value.durabilityVersion===3?priorMultiplier*1.5:priorMultiplier;
+    if (value.slot !== item.slot || !validNumber(value.bonus, 0, 3, true) || !validNumber(value.maxDurability, 1, 800, true) || !validNumber(value.durability, 0, value.maxDurability, true)) return null;
+    const start=value.bonus?10:3,rolls=Array.from({length:value.bonus?11:8},(_,i)=>i+start),sourceMax=rolls.map(n=>value.durabilityVersion===DURABILITY_VERSION?durabilityForRoll(value.kind,n):Math.round(n*mult)),roll=rolls[sourceMax.indexOf(value.maxDurability)];
+    if(roll===undefined)return null;
     const name = item.name + (value.bonus ? ` +${value.bonus}` : '');
     const defense = item.slot === 'weapon' ? 0 : item.defense + value.bonus;
     if (value.name !== name || value.defense !== defense) return null;
     const forge=value.forge===undefined?undefined:expeditionRules()?.validateForge(value.forge,item.slot,item);
     if(value.forge!==undefined&&!forge)return null;
-    const upgrade=currentMultiplier/mult;
-    const maxDurability=Math.round(value.maxDurability*upgrade),durability=value.durability===0?0:Math.max(1,Math.min(maxDurability,Math.round(value.durability*upgrade)));
-    return { id: value.id, kind: value.kind, slot: item.slot, name, durability, maxDurability, durabilityVersion:4, defense, bonus: value.bonus,...(forge?{forge}:{}) };
+    const maxDurability=durabilityForRoll(value.kind,roll),durability=value.durability===0?0:Math.max(1,Math.min(maxDurability,Math.round(value.durability*maxDurability/value.maxDurability)));
+    return { id: value.id, kind: value.kind, slot: item.slot, name, durability, maxDurability, durabilityVersion:DURABILITY_VERSION, defense, bonus: value.bonus,...(forge?{forge}:{}) };
   }
 
   function gearPrice(gear) {
@@ -715,5 +720,5 @@
     });
   }
 
-  return Object.freeze({ STATE_VERSION, MAX_HP, MAX_MONSTERS, HASTE_DURATION, HASTE_PERCENT, hasteMultiplier, validMonsterId, isFloor, isUnderworld, ITEMS, itemLimit, itemStorageLimit, GEAR, MONSTERS, CHAPTERS, OPENING, ENDING, EXCHANGES, floorConfig, newRun, validateSave, supplyPrice, buy, sell, exchange, useItem, collect, takeDamage, tickEffects, startUnderworld, descend, monsterStrength, warriorOffer, hireWarrior, interceptMonster, createGear, validateGear, durabilityMultiplier, gearPrice, equipmentStats, receiveGear, grantGear, equipGear, discardGear, buyGear, effectiveMonsterStrength, hitMonster, resolveHeldMonster, transaction, applyDamage, newAdventure, validateAdventure });
+  return Object.freeze({ STATE_VERSION, MAX_HP, MAX_MONSTERS, HASTE_DURATION, HASTE_PERCENT, hasteMultiplier, validMonsterId, isFloor, isUnderworld, ITEMS, itemLimit, itemStorageLimit, GEAR, MONSTERS, CHAPTERS, OPENING, ENDING, EXCHANGES, floorConfig, newRun, validateSave, supplyPrice, buy, sell, exchange, useItem, collect, takeDamage, tickEffects, startUnderworld, descend, monsterStrength, warriorOffer, hireWarrior, interceptMonster, createGear, validateGear, durabilityMultiplier, durabilityForRoll, DURABILITY_VERSION, gearPrice, equipmentStats, receiveGear, grantGear, equipGear, discardGear, buyGear, effectiveMonsterStrength, hitMonster, resolveHeldMonster, transaction, applyDamage, newAdventure, validateAdventure });
 });

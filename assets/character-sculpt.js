@@ -4,12 +4,18 @@
   'use strict';
   function ellipsoid(T,w,h,d){const g=new T.SphereGeometry(1,12,8);g.scale(w/2,h/2,d/2);return g;}
   function head(T,w=.54,h=.55,d=.48,{jaw=1,cheek=1,chin=1,detail='shared'}={}){
-    const g=new T.SphereGeometry(1,detail==='hero'?22:18,detail==='hero'?14:12),p=g.attributes.position;
+    const g=new T.SphereGeometry(1,detail==='hero'?26:20,detail==='hero'?18:14),p=g.attributes.position;
     for(let i=0;i<p.count;i++){let x=p.getX(i),y=p.getY(i),z=p.getZ(i);const lower=Math.max(0,-y),front=Math.max(0,z),eye=Math.exp(-((Math.abs(x)-.48)**2/.055+(y-.1)**2/.04));
       x*=1+(jaw-1)*lower*.7;y+=.035*(chin-1)*lower;z+=front*(.065*cheek*Math.exp(-((Math.abs(x)-.56)**2/.07+(y+.2)**2/.09))-.05*eye+.035*chin*Math.exp(-(x*x/.12+(y+.65)**2/.08)));
       // One connected cheekbone, philtrum and chin surface, instead of adding
       // more floating face pieces. The temple stays rounded under every hairdo.
       z+=front*(.025*Math.exp(-((Math.abs(x)-.5)**2/.045+(y+.03)**2/.035))-.018*Math.exp(-(x*x/.04+(y+.42)**2/.045)));
+      // Connected nasal bridge, orbital rims, cheek planes and lip recess.
+      // The detailed head stays below one thousand triangles.
+      z+=front*(.082*Math.exp(-(x*x/.012+(y+.055)**2/.07))+.078*Math.exp(-(x*x/.025+(y+.225)**2/.019))
+        -.026*Math.exp(-((Math.abs(x)-.43)**2/.07+(y-.12)**2/.055))
+        +.019*Math.exp(-((Math.abs(x)-.62)**2/.06+(y+.25)**2/.045))
+        -.02*Math.exp(-(x*x/.13+(y+.47)**2/.01)));
       x*=1-.035*Math.exp(-((y-.28)**2/.06));p.setXYZ(i,x*w/2,y*h/2,z*d/2);
     }g.computeVertexNormals();return g;
   }

@@ -2,7 +2,7 @@
 set -euo pipefail
 guard_dir="${PROCESS_GUARD_DIR:?Set PROCESS_GUARD_DIR to the installed process-guard skill directory}"
 qa_script="${1:-tools/tower-party-browser-qa.mjs}"
-if [ "$qa_script" = tools/tower-arrow-cap-browser-qa.mjs ] || [ "$qa_script" = tools/tower-grocery-browser-qa.mjs ] || [ "$qa_script" = tools/tower-cinematics-browser-qa.mjs ]; then
+if [ "$qa_script" = tools/tower-arrow-cap-browser-qa.mjs ] || [ "$qa_script" = tools/tower-grocery-browser-qa.mjs ] || [ "$qa_script" = tools/tower-cinematics-browser-qa.mjs ] || [ "$qa_script" = tools/tower-market-art-browser-qa.mjs ] || [ "$qa_script" = tools/tower-v151-entry-browser-qa.mjs ] || [ "$qa_script" = tools/tower-weapon-contact-browser-qa.mjs ]; then
   trap 'bash "$guard_dir/scripts/stop-managed-process.sh" --name tower-party-qa' EXIT
   bash "$guard_dir/scripts/start-managed-process.sh" --name tower-party-qa --command 'python3 -m http.server 8795 --bind 127.0.0.1' --port 8795 --health-url http://127.0.0.1:8795/ --timeout 20
   bash "$guard_dir/scripts/guarded-run.sh" --timeout 240 --log-name tower-supplies-browser -- node "$qa_script"

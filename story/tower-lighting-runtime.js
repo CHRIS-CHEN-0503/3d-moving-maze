@@ -86,7 +86,7 @@
     function merchantCard(id){
       if(!enabled()||id!=='suHe'||!Object.hasOwn(r().party.light.bought,id))return '';
       const l=r().party.light,left=L.SHOP_STOCK-l.bought[id];
-      return '<article class="tower-item tower-light-card">'+icon('torch')+'<h3>旅人火把</h3><p>照明五分鐘 · 持有 '+l.torches+' 支 · 本層剩 '+left+' 支</p>'+ctx.action('購買 '+L.TORCH_PRICE+' 幣','light-buy',id,!left||r().coins<L.TORCH_PRICE||l.torches>=99)+'</article>';
+      return '<article class="tower-item tower-light-card"><details class="trade-item-details"><summary>'+icon('torch')+'<div><h3>旅人火把</h3><small>持有 '+l.torches+' · 剩 '+left+'</small></div><span class="trade-detail-indicator" aria-hidden="true">⌄</span></summary><p>照明五分鐘。沒有術士時，帶著火把探索黑暗中的道路。</p></details><div class="trade-card-actions">'+ctx.action('購買 '+L.TORCH_PRICE+' 幣','light-buy',id,!left||r().coins<L.TORCH_PRICE||l.torches>=99)+'</div></article>';
     }
     function panel(quiet=false){
       if(!ready())return;const run=r(),l=run.party.light;panelRevision=run.revision;

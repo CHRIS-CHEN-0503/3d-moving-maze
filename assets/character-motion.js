@@ -25,12 +25,16 @@
     return true;
   }
 
-  // 棍／鍋／杖沿模型的 +Y 延伸。正的 X 旋轉把 +Y 轉向角色正面 +Z；負角會向後揮。
+  // Blades cut on +/-X; pans strike on their -Z bottom, never the cooking
+  // surface. Their +Y handles retain the same hand mount and forward reach.
   function weaponPose(weapon, progress) {
     if (!weapon) return;
     const reach = Math.sin(Math.PI * clamp(progress));
-    weapon.position.set(-.48 + .18 * reach, .9 + .04 * reach, .18 + .25 * reach);
-    weapon.rotation.set(.25 + 1.35 * reach, .16 * reach, .2 - .38 * reach);
+    const kind=weapon.userData.weaponKind||weapon.userData.kind;
+    const authored=kind==='wood_sword'||kind==='bat'||kind==='pan'||kind==='staff';
+    weapon.position.set(authored?-.38:-.48+.18*reach, .9 + (authored?.4:.04)*reach, .18 + .25 * reach);
+    if(authored)weapon.rotation.set(.25+2*reach,kind==='wood_sword'?Math.PI/2:kind==='pan'?Math.PI:0,0);
+    else weapon.rotation.set(.25 + 1.35 * reach, .16 * reach, .2 - .38 * reach);
   }
   function worldWeaponPose(weapon, model, progress, firstPerson = false) {
     if (!weapon || !model) return;
@@ -74,6 +78,8 @@
     data.armL.rotation.z = .055 + .035 * breathe * (1 - stride);
     data.armR.rotation.z = -.055 - .035 * breathe * (1 - stride) - .12 * strike;
     model.position.y = .012 * (1 + breathe) * (1 - stride) + Math.abs(wave) * .045 * stride;
+    // Lean and sway belong to the character's own forward axis at every yaw.
+    model.rotation.order = 'YXZ';
     model.rotation.x = .045 * stride + .065 * strike;
     model.rotation.z = wave * .025 * stride - .025 * strike;
     if (data.body?.scale) data.body.scale.y = state.bodyScaleY * (1 + breathe * .008 * (1 - stride));
@@ -144,7 +150,9 @@
     // Remove materials not used by this profession immediately; instantiated mesh materials are disposed with its scene.
     const used = new Set(group.children.map(mesh => mesh.material));
     for (const material of [wood,metal,accent]) if (!used.has(material)) material.dispose();
-    Object.assign(group.userData, {frontAxis: '+Z', shaftAxis: '+Y', role: 'attack-visual'});
+    const weaponKind=index===0?'wood_sword':index===1?'pan':index===3?'staff':index===2?'glove':index===4?'wrench':'claw';
+    const contact=weaponKind==='wood_sword'?{center:[.0525,.48,0],normal:[1,0,0],oppositeNormal:[-1,0,0]}:weaponKind==='pan'?{center:[0,.51,-.0325],normal:[0,0,-1]}:weaponKind==='staff'?{center:[0,.64,.14],normal:[0,0,1]}:null;
+    Object.assign(group.userData, {frontAxis: '+Z', shaftAxis: '+Y', role: 'attack-visual',weaponKind,contact});
     weaponPose(group, 0); group.visible = false;
     return group;
   }

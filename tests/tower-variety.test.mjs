@@ -24,7 +24,7 @@ function active(run){const o=D.offer(run);return D.enter(D.discover(run).run,o.i
 
 test('v2 的 9,900 個舊副本完整保留，既有存檔不重抽',()=>{
   const hash=createHash('sha256');
-  for(let seed=1;seed<=100;seed++)for(let floor=99;floor>=1;floor--)hash.update(JSON.stringify(offer(floor,seed,2),(_key,v)=>{if(v?.durabilityVersion!==4)return v;const old={...v,durability:Math.round(v.durability/C.durabilityMultiplier(v.kind)),maxDurability:Math.round(v.maxDurability/C.durabilityMultiplier(v.kind))};delete old.durabilityVersion;return old;})+'\n');
+  for(let seed=1;seed<=100;seed++)for(let floor=99;floor>=1;floor--)hash.update(JSON.stringify(offer(floor,seed,2),(_key,v)=>{if(v?.durabilityVersion!==C.DURABILITY_VERSION)return v;const old={...v,durability:Math.round(v.durability/C.durabilityMultiplier(v.kind)),maxDurability:Math.round(v.maxDurability/C.durabilityMultiplier(v.kind))};delete old.durabilityVersion;return old;})+'\n');
   assert.equal(hash.digest('hex'),'d2ef9c807445a4939309cd996cd9a733595fe853600c0ef7d2904855ce54a6a5');
 });
 test('新行程保留出現機率，避開最近兩次種類，新解鎖種類優先輪替且讀檔不重抽',()=>{

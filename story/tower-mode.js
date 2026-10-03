@@ -18,6 +18,7 @@
   const floorLabel=floor=>floor<0?'地下第 '+Math.abs(floor)+' 層':'第 '+floor+' 層';
   let run = null, active = false, paused = false, pauseAt = 0, modalFocus = null;
   let world = null, loot = [], monsters = [], traders = [], nearest = null;
+  let tradeCategory='supplies',tradeMerchant='';
   let warriorNpc = null, nearestWarrior = null, escort = null;
   let explorer = null, chest = null, relic = null, nearbyEncounter = null, lastSurveyCell = '', gearVisual = null, gearSignature = '', exitDeclined = false;
   let shiftLeft = C.floorConfig(99).shiftSeconds, wasShifting = false, floorConfig = null, saveClock = 0, hudClock = 0;
@@ -258,7 +259,10 @@
     el('towerDialog').classList.toggle('hero-management',!!narration.heroManagement);
     el('towerDialog').classList.toggle('hero-creation',!!narration.heroCreation);
     el('towerDialog').classList.toggle('tower-workshop',!!narration.workshop);
-    el('towerDialog').innerHTML = '<header class="tower-dialog-header"><div class="tower-dialog-titles"><div class="tower-kicker">' + text(kicker) + '</div><h2 class="tower-heading" id="towerDialogTitle">' + text(title) + '</h2></div>'+voiceControls+closeButton+'</header><div class="tower-dialog-content" tabindex="0" role="region" aria-label="對話內容">'+(copy?'<p class="tower-copy">' + text(copy) + '</p>':'') + (body || '') + '</div><div class="tower-actions">' + actions + '</div>';
+    el('towerDialog').classList.toggle('tower-commerce',!!narration.commerce);
+    el('towerDialog').setAttribute?.('data-commerce',narration.commerce||'');
+    const wallet=Number.isFinite(narration.wallet)?'<span class="tower-trade-wallet" aria-label="持有銅幣 '+text(narration.wallet)+'">'+(window.TowerResourceIcons?.svg('coin')||'')+text(narration.wallet)+' 幣</span>':'';
+    el('towerDialog').innerHTML = '<header class="tower-dialog-header"><div class="tower-dialog-titles'+(wallet?' tower-titles-with-wallet':'')+'"><div class="tower-kicker">' + text(kicker) + '</div><h2 class="tower-heading" id="towerDialogTitle">' + text(title) + '</h2>'+wallet+'</div>'+voiceControls+closeButton+'</header><div class="tower-dialog-content" tabindex="0" role="region" aria-label="對話內容">'+(copy?'<p class="tower-copy">' + text(copy) + '</p>':'') + (body || '') + '</div><div class="tower-actions">' + actions + '</div>';
     el('towerDialog').focus();
     el('towerDialog').scrollTop=0;
     el('towerDialog').voiceScope=narration.full?'full':'summary';
@@ -346,10 +350,11 @@
       if(run.party?.loadouts?.growth&&previous?.party?.loadouts&&!previous.party.loadouts.growth&&C.validateSave(previous)&&!localStorage.getItem(SAVE+'_before_hero_growth'))localStorage.setItem(SAVE+'_before_hero_growth',raw);
       if(run.party?.loadouts?.growth?.version===2&&previous?.party?.loadouts&&previous.party.loadouts.growth?.version!==2&&C.validateSave(previous)&&!localStorage.getItem(SAVE+'_before_underground_growth_v2'))localStorage.setItem(SAVE+'_before_underground_growth_v2',raw);
       if(run.party?.loadouts?.xpScale===10&&previous?.party?.loadouts&&previous.party.loadouts.xpScale===undefined&&C.validateSave(previous)&&!localStorage.getItem(SAVE+'_before_xp10'))localStorage.setItem(SAVE+'_before_xp10',raw);
-      const previousGear=previous?[...(previous.gearBag||[]),...Object.values(previous.equipment||{}),...Object.values(previous.party?.loadouts?.actors||{}).flatMap(a=>Object.values(a?.equipment||{}))].filter(Boolean):[];
+      const previousGear=previous?[...(previous.gearBag||[]),...Object.values(previous.equipment||{}),...Object.values(previous.party?.loadouts?.actors||{}).flatMap(a=>Object.values(a?.equipment||{})),...(previous.party?.loot?.entries||[]).filter(e=>e.type==='gear').map(e=>e.gear)].filter(Boolean):[];
       if(previous&&C.validateSave(previous)&&previousGear.some(g=>g.durabilityVersion===undefined)&&!localStorage.getItem(SAVE+'_before_durability2'))localStorage.setItem(SAVE+'_before_durability2',raw);
       if(previous&&C.validateSave(previous)&&previousGear.some(g=>g.durabilityVersion===undefined||g.durabilityVersion===2)&&!localStorage.getItem(SAVE+'_before_durability3'))localStorage.setItem(SAVE+'_before_durability3',raw);
-      if(previous&&C.validateSave(previous)&&previousGear.some(g=>g.durabilityVersion!==4)&&!localStorage.getItem(SAVE+'_before_durability4'))localStorage.setItem(SAVE+'_before_durability4',raw);
+      if(previous&&C.validateSave(previous)&&previousGear.some(g=>g.durabilityVersion===undefined||g.durabilityVersion===2||g.durabilityVersion===3)&&!localStorage.getItem(SAVE+'_before_durability4'))localStorage.setItem(SAVE+'_before_durability4',raw);
+      if(previous&&C.validateSave(previous)&&previousGear.some(g=>g.durabilityVersion!==C.DURABILITY_VERSION)&&!localStorage.getItem(SAVE+'_before_durability5'))localStorage.setItem(SAVE+'_before_durability5',raw);
       if(run.status==='won'&&run.floor===1&&C.validateSave(run))localStorage.setItem(SURFACE_CLEAR,JSON.stringify(run));
       localStorage.setItem(SAVE, JSON.stringify(run)); return true;
     }
@@ -908,7 +913,17 @@
     const guard=run.warrior,p=escort.model.position;
     if(guard.mode==='holding') {
       const target=monsters.find(m=>m.alive&&isHeld(m));
-      if(target){const q=target.model.position;const offset=playerInWall(q.x+.65,q.z,.28)?-.45:.65;p.set(q.x+offset,0,q.z);escort.model.rotation.y=-Math.PI/2;escort.model.userData.guardBlade.rotation.x=Math.sin(now*.008)*.35;}
+      if(target){
+        const q=target.model.position,offset=playerInWall(q.x+.65,q.z,.28)?-.45:.65;
+        p.set(q.x+offset,0,q.z);escort.model.rotation.y=offset>0?-Math.PI/2:Math.PI/2;
+        const blade=escort.model.userData.guardBlade,phase=(now%1400)/1400;
+        if(guard.strength===5){
+          // Short repeating face-first hammer clashes. The positive +Z gold
+          // end follows the impact stroke; recovery is visibly slower.
+          const stroke=phase<.42?phase/.42:1-(phase-.42)/.58;
+          blade.rotation.x=.1+stroke;
+        }else blade.rotation.x=Math.sin(now*.008)*.35;
+      }
       if(target&&!(run.monsterStuns[target.id]>0)&&now>=guardClashAt&&Math.hypot(G.px-p.x,G.pz-p.z)<12&&hasClearPath(p.x,p.z,G.px,G.pz)){AudioEng.sfxGuardBlock?.();guardClashAt=now+1400;}
       return;
     }
@@ -1326,10 +1341,34 @@
   function updateHeroFirstPerson(){
     if(heroFp?.parent!==world){heroFp=null;heroFpKind='';}
     if(G.view!=='fp'){if(heroFp)heroFp.visible=false;return;}
-    const kind=run.equipment.weapon?.kind||'',baseKind=Heroes.GEAR[kind]?.baseKind;
-    if(kind!==heroFpKind||!heroFp){if(heroFp){world.remove(heroFp);disposeSceneObject(heroFp);}heroFp=new THREE.Group();heroFp.name='hero-first-person-weapon';heroFpKind=kind;if(kind){heroFp.add(HeroVisual.gear(THREE,kind));if(baseKind==='twin_daggers')heroFp.add(HeroVisual.gear(THREE,kind));}world.add(heroFp);}
-    heroFp.visible=true;const yaw=playerGroup.rotation.y,progress=1-Heroes.actor(run).attack/Heroes.stats(run).interval;
-    heroFp.children.forEach((piece,i)=>{window.CharacterMotion?.worldWeaponPose(piece,playerGroup,progress,true);if(i||baseKind==='spellbook'){const offset=i?.9:.48;piece.position.x+=Math.cos(yaw)*offset;piece.position.z-=Math.sin(yaw)*offset;}if(baseKind==='spellbook')piece.rotation.x=0;});
+    const weapon=run.equipment.weapon,kind=weapon?.durability>0?weapon.kind:'',baseKind=Heroes.GEAR[kind]?.baseKind;
+    const appearance={job:Heroes.job(run),sex:Heroes.sex(run)},signature=kind+'|'+appearance.job+'|'+appearance.sex;
+    if(signature!==heroFpKind||!heroFp){
+      if(heroFp){world.remove(heroFp);disposeSceneObject(heroFp);}
+      heroFp=new THREE.Group();heroFp.name='hero-first-person-weapon';heroFpKind=signature;
+      // First person renders its own pieces because the body is hidden. It
+      // must still follow the actual two-hand rig and weapon-specific motion.
+      heroFp.userData.poseMatrix=new THREE.Matrix4();heroFp.userData.parentInverse=new THREE.Matrix4();heroFp.userData.anchor=new THREE.Vector3();
+      if(kind){heroFp.add(HeroVisual.gear(THREE,kind,appearance));if(baseKind==='twin_daggers')heroFp.add(HeroVisual.gear(THREE,kind,appearance));}
+      for(const piece of heroFp.children)piece.matrixAutoUpdate=false;
+      world.add(heroFp);
+    }
+    heroFp.visible=true;playerGroup.updateWorldMatrix(true,true);world.updateWorldMatrix(true,false);
+    const inverse=heroFp.userData.parentInverse,matrix=heroFp.userData.poseMatrix;
+    // The sight system tests a dynamic group's origin. Anchor the FP group at
+    // its owner, rather than the unseen maze origin, then copy relative poses.
+    inverse.copy(world.matrixWorld).invert();heroFp.position.copy(heroFp.userData.anchor.setFromMatrixPosition(playerGroup.matrixWorld).applyMatrix4(inverse));
+    heroFp.updateWorldMatrix(true,false);inverse.copy(heroFp.matrixWorld).invert();
+    let i=0;
+    for(const source of playerGroup.userData.heroPieces||[]){
+      if(source.userData.baseKind!==baseKind)continue;
+      const piece=heroFp.children[i++];if(!piece)break;
+      matrix.copy(source.matrixWorld);matrix.elements[13]+=.32;
+      // Keep the authored matrix intact: nonuniform body proportions plus
+      // wrist rotation contain shear that quaternion decomposition would lose.
+      matrix.premultiply(inverse);piece.matrix.copy(matrix);piece.matrixWorldNeedsUpdate=true;piece.visible=source.visible;
+    }
+    for(;i<heroFp.children.length;i++)heroFp.children[i].visible=false;
   }
   function gearDescription(gear) {
     if(modern())return partyUI.heroes.info(gear);
@@ -1412,12 +1451,20 @@
     if(!active||G.shifting||!nearest||run.status!=='playing')return;
     syncEngine();
     const grocer=nearest.id===E.GROCERY.merchantId,ingredients=grocer&&run.party?E.groceryOffers(run):[],scrollTop=quiet?(el('towerDialog').querySelector('.tower-dialog-content')?.scrollTop||0):0;
-    const cards=(lightingUI?.merchantCard(nearest.id)||'')+nearest.offer.supplies.map(id=>{const item=C.ITEMS[id],quantity=id==='arrow'?Math.max(0,Math.min(10,C.itemLimit('arrow',run)-run.bag.arrow)):1,cost=C.supplyPrice(id,quantity),full=run.bag[id]>=C.itemLimit(id,run);return '<article class="tower-item grocery-supply"><div class="grocery-heading">'+(window.TowerHeroIcons?.svg('item_'+id)||'')+'<div><h3>'+text(item.name)+'</h3><small>持有 '+run.bag[id]+'／'+C.itemLimit(id,run)+'</small></div></div>'+(id==='haste'?'<p>移動與攻速 +'+C.HASTE_PERCENT+'% · 五分鐘</p>':'')+'<details class="supply-guide"><summary>用途</summary><p>'+text(item.description)+'</p></details>'+action(full?(id==='arrow'?'箭袋已滿':'已達容量上限'):(id==='arrow'&&quantity<10?'補滿 '+quantity+' 支':'買'+(id==='arrow'?' '+quantity+' 支':''))+' · '+cost+' 幣','buy',id,full||quantity===0||run.coins<cost)+(item.sellPrice>0?action('賣出 · '+item.sellPrice+' 幣','sell',id,!run.bag[id]):'')+'</article>';}).join('');
-    const ingredientCards=ingredients.map(offer=>'<article class="tower-item grocery-ingredient'+(offer.specialty?' is-specialty':'')+'" data-grocery-offer="'+text(offer.id)+'"><div class="grocery-heading">'+(window.TowerPartyRuntime?.foodArt(offer.ingredientId)||'')+'<div><small>'+(offer.specialty?'遠方特產':'常用食材')+'</small><h3>'+text(offer.ingredientId==='herb'?offer.name+'（藥草）':offer.name)+'</h3></div></div>'+(offer.specialty?'<p>'+text(floorLabel(offer.sourceFloor)+' · '+offer.sourceName)+'</p>':'')+'<p>持有 '+run.party.ingredients[offer.ingredientId]+' · 本層剩 <strong>'+offer.remaining+'</strong>／'+offer.stock+' 份</p>'+action(offer.remaining?'買 1 份 · '+offer.price+' 幣':'本層已售完','buy-ingredient',offer.id,!offer.remaining||run.party.ingredients[offer.ingredientId]>=99||run.coins<offer.price)+'</article>').join('');
-    const gear=nearest.offer.gear.map(({kind,gear,price})=>'<article class="tower-item tower-gear-card"><h3>'+text(gear.name)+'</h3><p>'+text(gearDescription(gear))+'</p>'+action(run.adventure.claimed.includes('stock:'+run.floor+':'+nearest.id+':'+kind)?'本層已售出':'購買 '+price+' 幣','buy-gear',kind,run.adventure.claimed.includes('stock:'+run.floor+':'+nearest.id+':'+kind)||run.coins<price)+'</article>').join('');
+    if(!quiet||tradeMerchant!==nearest.id){tradeCategory='supplies';tradeMerchant=nearest.id;}
+    if(!ingredients.length)tradeCategory='supplies';
+    const heading=(art,name,stat)=>art+'<div><h3>'+text(name)+'</h3><small>'+text(stat)+'</small></div><span class="trade-detail-indicator" aria-hidden="true">⌄</span>';
+    const cards=(lightingUI?.merchantCard(nearest.id)||'')+nearest.offer.supplies.map(id=>{
+      const item=C.ITEMS[id],quantity=id==='arrow'?Math.max(0,Math.min(10,C.itemLimit('arrow',run)-run.bag.arrow)):1,cost=C.supplyPrice(id,quantity),full=run.bag[id]>=C.itemLimit(id,run);
+      return '<article class="tower-item grocery-supply"><details class="trade-item-details"><summary>'+heading(window.TowerHeroIcons?.svg('item_'+id)||'',item.name,'持有 '+run.bag[id]+'／'+C.itemLimit(id,run))+'</summary><p>'+text(item.description)+'</p></details><div class="trade-card-actions">'+action(full?(id==='arrow'?'箭袋已滿':'已達上限'):(id==='arrow'&&quantity<10?'補滿'+' '+quantity+' 支':'買'+(id==='arrow'?' '+quantity+' 支':''))+' · '+cost+' 幣','buy',id,full||quantity===0||run.coins<cost)+(item.sellPrice>0?action('賣 '+item.sellPrice+' 幣','sell',id,!run.bag[id]):'')+'</div></article>';
+    }).join('');
+    const ingredientCards=ingredients.map(offer=>'<article class="tower-item grocery-ingredient'+(offer.specialty?' is-specialty':'')+'" data-grocery-offer="'+text(offer.id)+'"><details class="trade-item-details"><summary>'+heading(window.TowerPartyRuntime?.foodArt(offer.ingredientId)||'',offer.ingredientId==='herb'?offer.name+'（藥草）':offer.name,'持有 '+run.party.ingredients[offer.ingredientId]+' · 剩 '+offer.remaining+'/'+offer.stock)+'</summary><p>'+(offer.specialty?'遠方特產 · '+text(floorLabel(offer.sourceFloor)+' · '+offer.sourceName):'常用食材')+'；本層限量，不會補貨。</p></details><div class="trade-card-actions">'+action(offer.remaining?'買 1 份 · '+offer.price+' 幣':'本層已售完','buy-ingredient',offer.id,!offer.remaining||run.party.ingredients[offer.ingredientId]>=99||run.coins<offer.price)+'</div></article>').join('');
+    const gear=nearest.offer.gear.map(({kind,gear,price})=>'<article class="tower-item tower-gear-card"><details class="trade-item-details"><summary>'+heading(window.TowerHeroIcons?.svg(kind)||'',gear.name,'耐久 '+gear.durability+'/'+gear.maxDurability)+'</summary><p>'+text(gearDescription(gear))+'</p></details><div class="trade-card-actions">'+action(run.adventure.claimed.includes('stock:'+run.floor+':'+nearest.id+':'+kind)?'本層已售出':'購買 '+price+' 幣','buy-gear',kind,run.adventure.claimed.includes('stock:'+run.floor+':'+nearest.id+':'+kind)||run.coins<price)+'</div></article>').join('');
     const stockVoice=grocer?'這裡可以買藥品、道具與限量食材。':('出售：'+nearest.offer.gear.map(g=>gearSpeech(g.gear)).join('、')+'。也可以維護與強化裝備。');
     const voiceSummary=nearest.name+'。'+stockVoice;
-    dialog(nearest.name+' · 行商營地',grocer?'旅行雜貨與遠方食材':'專門裝備與維護','剩餘銅幣 '+run.coins,(grocer?'':'<p class="tower-copy">'+text(nearest.offer.greeting||'')+'</p>')+(grocer?'<section class="grocery-stock"><h3>本層限量食材</h3><p class="tower-copy">各限 1～5 份，本層不補貨；特產可能來自其他樓層。</p><div class="tower-grid">'+ingredientCards+'</div></section><section class="grocery-stock"><h3>藥品與旅途道具</h3><div class="tower-grid">'+cards+'</div></section>':'<div class="tower-grid">'+gear+'</div><p class="tower-copy">買到的裝備放入行囊，請在背包選擇「裝備」；每件本層限一件，讀檔不會補貨。'+(run.party?'可修復與強化本店專賣的裝備，銅幣費比隊內鍛匠高 20%，材料不加價。':'')+'藥品、食材與道具請向雜貨商購買。</p>'),(run.party&&!grocer?action('維護與強化','party-merchant-forge',nearest.id):'')+action('整理背包','bag')+action('結束交易','close'),{silent:quiet===true,summary:voiceSummary,asset:'merchant.'+nearest.id,afterText:stockVoice+'。整理背包。結束交易。'});
+    const tabs=grocer&&ingredients.length?'<nav class="trade-categories" aria-label="商品分類">'+['supplies','ingredients'].map(id=>'<button class="tower-btn" data-tower="trade-tab" data-item="'+id+'" aria-pressed="'+(tradeCategory===id)+'">'+(id==='supplies'?'藥品與道具':'限量食材')+'</button>').join('')+'</nav>':'';
+    const stock=grocer?tabs+'<section class="grocery-stock" data-trade-category="supplies"'+(tradeCategory!=='supplies'?' hidden':'')+'><div class="tower-grid trade-stock-grid">'+cards+'</div></section><section class="grocery-stock" data-trade-category="ingredients"'+(tradeCategory!=='ingredients'?' hidden':'')+'><div class="tower-grid trade-stock-grid">'+ingredientCards+'</div></section>':'<div class="tower-grid trade-stock-grid">'+gear+'</div><details class="tower-trade-note"><summary>購買與維護說明</summary><p>'+text(nearest.offer.greeting||'')+'</p><p>裝備放入背包後可更換穿戴；每件本層限一件。'+(run.party?'本店維護及強化費比隊內鍛匠多 20%，材料不加價。':'')+'藥品、食材與道具請向雜貨商購買。</p></details>';
+    dialog(nearest.name+' · 行商營地',grocer?'旅行雜貨與遠方食材':'專門裝備與維護','',stock,(run.party&&!grocer?action('維護與強化','party-merchant-forge',nearest.id):'')+action('整理背包','bag')+action('結束交易','close'),{silent:quiet===true,commerce:grocer?'grocery':'merchant',wallet:run.coins,summary:voiceSummary,asset:'merchant.'+nearest.id,afterText:stockVoice+'。整理背包。結束交易。'});
     if(quiet)el('towerDialog').querySelector('.tower-dialog-content').scrollTop=scrollTop;
   }
   function useItem(id) {
@@ -1523,6 +1570,7 @@
     if(key==='battle-settings'){openBattleSettings();return;}
     if(key==='battle-auto-aim'&&modern()){autoAim=!autoAim;try{localStorage.setItem(AUTO_AIM_SETTING,autoAim?'on':'off');}catch(_){showToast('此裝置無法保存操作設定，本次遊戲仍可使用。',1800,false);}openBattleSettings(true);return;}
     if(key==='quest-view'){questDialog(false,true);return;}
+    if(key==='trade-tab'&&['supplies','ingredients'].includes(id)){tradeCategory=id;trade(true);el('towerDialog').querySelector('.tower-dialog-content').scrollTop=0;return;}
     if(key==='battle-music'){el('soundToggle').click();openBattleSettings();return;}
     if(partyUI?.handle(key,id))return;
     if(lightingUI?.handle(key,id))return;

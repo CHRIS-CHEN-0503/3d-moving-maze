@@ -32,7 +32,7 @@ for(const asset of ['story-atlas-rules','story-atlas-items','story-atlas-coopera
   new vm.Script(await readFile(new URL(`../docs/${asset}.js`,import.meta.url),'utf8'),{filename:asset+'.js'});
 }
 
-for (const asset of ['battle-dock','pickup-objects','native-symbols','room-lifecycle','shop-collection-core','shop-collection','shop-chaos','shop-sale','tag-rage','mobile-controls','magic-map','maze-materials','gameplay-rules']) {
+for (const asset of ['battle-dock','pickup-objects','native-symbols','room-lifecycle','shop-collection-core','shop-collection','shop-claims-core','shop-claims','mode-variants-core','mode-variants','shop-chaos','shop-sale','tag-rage','mobile-controls','magic-map','maze-materials','gameplay-rules']) {
   new vm.Script(await readFile(new URL(`../assets/${asset}.js`, import.meta.url), 'utf8'), {filename:asset+'.js'});
   assert.match(html, new RegExp(`src="(?:\\./)?assets/${asset}\\.js(?:\\?v=[\\d.]+)?"`), `缺少遊戲模組：${asset}`);
 }

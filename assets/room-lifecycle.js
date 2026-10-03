@@ -48,6 +48,8 @@
       }
     }
     window.TagRage?.tick();
+    // Reuse this existing timer when the host's animation frame is suspended.
+    if(document.hidden&&MP.started&&!MP.ended){window.ModeVariants?.frame();window.ShopClaims?.tick();}
     if(MP.host){
       if(startPacket&&now-lastRetry>800&&Date.now()<startPacket.launchAt+5000){lastRetry=now;if(MP.net)baseSend(startPacket);}
       if(MP.started&&!MP.ended){

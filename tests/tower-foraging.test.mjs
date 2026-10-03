@@ -33,8 +33,10 @@ test('all 149 valid floors have explicit profiles and deterministic independent 
   assert.equal(Object.keys(F.REGIONS).length,15);
   assert.deepEqual(Object.keys(F.REGIONS).sort(),M.ECOLOGIES.map(region=>region.id).sort());
   assert.deepEqual(F.LEGACY_PROFILES,{suitable:{0:0,1:40,2:35,3:25},neutral:{0:30,1:30,2:25,3:15},unsuitable:{0:60,1:20,2:15,3:5}});
-  assert.equal(F.BASE_APPEARANCE,30);assert.equal(F.ENVIRONMENT_BONUS,20);
-  assert.deepEqual(F.APPEARANCE,{suitable:50,neutral:30,unsuitable:10});
+  assert.equal(F.FORMAT_VERSION,4);assert.equal(F.HARVEST_RULE,3);assert.equal(F.POWER_RULE,4);assert.equal(F.POWER_DEPOSIT_QUANTITY,1);
+  assert.equal(F.BASE_APPEARANCE,40);assert.equal(F.ENVIRONMENT_BONUS,20);
+  assert.deepEqual(F.APPEARANCE,{suitable:60,neutral:40,unsuitable:20});
+  assert.deepEqual(F.V3_APPEARANCE,{suitable:50,neutral:30,unsuitable:10});
   for(const [name,weights]of Object.entries(F.PROFILES)){
     assert.equal(weights[0],100-F.APPEARANCE[name]);assert.ok(Math.abs(Object.values(weights).reduce((sum,chance)=>sum+chance,0)-100)<1e-10);
     for(const quantity of [1,2,3])assert.ok(Math.abs(weights[quantity]/F.APPEARANCE[name]-F.LEGACY_PROFILES[name][quantity]/(100-F.LEGACY_PROFILES[name][0]))<1e-10);
@@ -46,11 +48,13 @@ test('all 149 valid floors have explicit profiles and deterministic independent 
     assert.ok([0,1,2,3].includes(amount.herb)&&[0,1,2,3].includes(amount.ore));
     assert.equal(F.specs(run).filter(entry=>entry.kind==='herb').length,amount.herb);
     assert.equal(F.specs(run).filter(entry=>entry.kind==='ore').length,amount.ore);
+    assert.ok(F.specs(run).filter(entry=>entry.kind==='power').length<=1);
     assert.equal(new Set(F.specs(run).map(entry=>entry.id)).size,F.specs(run).length);
-    assert.ok(F.specs(run).every(entry=>entry.kind==='power'?entry.quantity>=1&&entry.quantity<=3:entry.quantity===1));assert.deepEqual(run,before);
+    assert.ok(F.specs(run).every(entry=>entry.quantity===1));assert.deepEqual(run,before);
   }
   for(const floor of [0,100,-51,NaN])assert.throws(()=>F.fresh({floor,seed:31}),RangeError);
   for(const seed of [0,-1,0x100000000,1.5])assert.equal(F.validate(undefined,99,seed),null);
+  for(const rule of [0,4,NaN])assert.throws(()=>F.drawCounts({floor:99,seed:31},rule),RangeError);
 });
 
 test('environment classifications follow plant growth and mineral-friendly regions',()=>{
@@ -114,8 +118,8 @@ test('surface and underground harvest records survive the real save validator on
 test('forged, duplicate, future-floor and foreign-seed harvest receipts are rejected',()=>{
   const run=withResources(),first=F.specs(run)[0];
   const changes=[
-    state=>state.version=4,state=>state.floor=98,state=>state.seed++,state=>state.claimed=null,
-    state=>state.harvestRule=3,state=>delete state.counts,state=>state.counts.herb=4,state=>state.counts.ore=-1,
+    state=>state.version=5,state=>state.floor=98,state=>state.seed++,state=>state.claimed=null,
+    state=>state.harvestRule=4,state=>delete state.counts,state=>state.counts.herb=4,state=>state.counts.ore=-1,
     state=>state.claimed=['foraging:99:herb:999'],state=>state.claimed=['foraging:98:herb:0'],
     state=>state.claimed=['foraging:99:ore:999'],state=>state.claimed=[first.id,first.id],
     state=>state.claimed=[{}],state=>state.claimed=Array(7).fill(first.id),

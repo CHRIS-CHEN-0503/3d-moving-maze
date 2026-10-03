@@ -85,6 +85,8 @@
     chef:{name:'棘殼食材箱',verb:'處理食材',description:'當地食材藏在帶刺硬殼裡。廚師能快速處理；也可以慢慢去除外殼。',reward:'取得兩份當地特色食材。'},
     healer:{name:'受污染的泉眼',verb:'淨化泉水',description:'泉水混著灰色雜質。療癒師能淨化；也可以反覆過濾。',reward:'恢復主角十二點生命、同伴十點生命。'},
     smith:{name:'損壞的機關箱',verb:'修復機關',description:'齒輪箱裡的卡榫斷了。鍛匠能修復；也可以慢慢拆開重組。',reward:'取得四份金屬零件，穿戴裝備恢復兩點耐久。'},
+    archer:{name:'斷索箭臺',verb:'重新繫索',description:'高處的箭臺斷了繩索。射手能以弓繩接回；也可以慢慢搬石搭梯。',reward:'取得三十支箭矢，顯示十二秒出口路線；箭袋放不下的部分不會加入。'},
+    robot:{name:'沉睡動力閘',verb:'校準動力閘',description:'牆邊的動力閘失去了同步。機器人能重新校準；也可以慢慢調整轉輪。',reward:'取得兩份金屬零件，為所有能行動的機器人補充25%能源。'},
   });
   const emptyMaterials=()=>Object.fromEntries(Object.keys(Materials().MATERIALS).map(k=>[k,0]));
   function materialStock(value){
@@ -92,13 +94,14 @@
     if(!value||typeof value!=='object'||Array.isArray(value)||Object.keys(value).length!==Object.keys(Materials().MATERIALS).length||!Object.keys(Materials().MATERIALS).every(k=>own(value,k)&&integer(value[k],0,99)))return null;
     return {...value};
   }
-  function newJourney(floor){return {version:1,scrap:0,materials:emptyMaterials(),maintenance:[],site:{floor,progress:0,done:false,method:null}};}
+  function newJourney(floor){return {version:1,scrap:0,materials:emptyMaterials(),maintenance:[],site:{floor,progress:0,done:false,method:null,catalogVersion:2}};}
   function validateJourney(value,floor){if(value===undefined)return newJourney(floor);const v=value,s=v?.site;
     if(!v||v.version!==1||!integer(v.scrap,0,99)||!s||s.floor!==floor||!number(s.progress,0,12)||typeof s.done!=='boolean'||![null,'profession','work'].includes(s.method)||s.done!==(s.method!==null)||s.done&&s.progress!==12)return null;
     const materials=materialStock(v.materials),maintenance=v.maintenance===undefined?[]:v.maintenance;if(!materials||!Array.isArray(maintenance)||maintenance.length>149||new Set(maintenance).size!==maintenance.length||!maintenance.every(f=>integer(f,1,99)||integer(f,-50,-1)))return null;
-    return {version:1,scrap:v.scrap,materials,maintenance:[...maintenance],site:{floor,progress:s.progress,done:s.done,method:s.method}};
+    const catalogVersion=s.catalogVersion===undefined?1:s.catalogVersion;if(![1,2].includes(catalogVersion))return null;
+    return {version:1,scrap:v.scrap,materials,maintenance:[...maintenance],site:{floor,progress:s.progress,done:s.done,method:s.method,catalogVersion}};
   }
-  function siteOffer(run){if(!run.party||BOSSES[run.floor])return null;const job=Object.keys(SITES)[hash(run.seed,`site:${run.floor}`)%6];return {id:`site:${run.floor}:${run.seed}`,job,...SITES[job],...(job==='chef'?{reward:'取得兩份'+Materials().INGREDIENTS[Materials().signature(run)]+'。'}:{})};}
+  function siteOffer(run){if(!run.party||BOSSES[run.floor])return null;const jobs=Object.keys(SITES),count=run.party.journey?.site?.catalogVersion===2?jobs.length:6,job=jobs[hash(run.seed,`site:${run.floor}`)%count];return {id:`site:${run.floor}:${run.seed}`,job,...SITES[job],...(job==='chef'?{reward:'取得兩份'+Materials().INGREDIENTS[Materials().signature(run)]+'。'}:{})};}
   function explore(run,id,method,revision){return C().transaction(run,revision,n=>{
     const offer=siteOffer(n),s=n.party?.journey.site;if(n.expedition.active||!offer||id!==offer.id||s.done)return {ok:false,message:'這處探索已完成，或不在當前樓層。'};
     if(method==='profession'){if(!P().has(n,offer.job))return {ok:false,message:'隊伍目前沒有能出手的對應職業。'};}
@@ -109,11 +112,13 @@
     if(offer.job==='scout')n.effects.reveal=Math.max(n.effects.reveal,18);
     if(offer.job==='chef'){const key=Materials().signature(n);n.party.ingredients[key]=Math.min(99,n.party.ingredients[key]+2);}
     if(offer.job==='healer'){if(n.party.loadouts)H().ids(n).forEach(id=>H().heal(n,id,id==='hero'?12:10));else{n.hp=Math.min(C().MAX_HP,n.hp+12);n.party.members.forEach(m=>m.hp=Math.min(P().memberMax(m),m.hp+10));}}
-    if(offer.job==='smith'){n.party.journey.scrap=Math.min(99,n.party.journey.scrap+4);Object.values(n.equipment).filter(g=>g&&g.durability>0).forEach(g=>g.durability=Math.min(g.maxDurability,g.durability+2));}
+    if(offer.job==='smith'){n.party.journey.scrap=Math.min(99,n.party.journey.scrap+4);Object.values(n.equipment).filter(g=>g&&!H().ROBOT.isCore(g)&&g.durability>0).forEach(g=>g.durability=Math.min(g.maxDurability,g.durability+2));}
+    if(offer.job==='archer'){n.bag.arrow=Math.max(n.bag.arrow,Math.min(C().itemLimit('arrow',n),n.bag.arrow+30));n.effects.reveal=Math.max(n.effects.reveal,12);}
+    if(offer.job==='robot'){n.party.journey.scrap=Math.min(99,n.party.journey.scrap+2);if(n.party.loadouts)for(const actorId of H().ids(n))if(H().job(n,actorId)==='robot'&&H().hp(n,actorId)>0)H().ROBOT.fillFuel(n,'power_glimmer',actorId);}
     return {ok:true,message:'完成探索，獲得八枚銅幣。'+offer.reward,effect:{passage:['swordsman','scout'].includes(offer.job)}};
   });}
   const TRAITS=Object.freeze(Object.fromEntries(Object.entries({
-    durable:{name:'耐用',description:'每級多承受兩次耐久消耗；修理不會補回這層保護。',parts:3,coins:8,materialCost:{ironore:1}},
+    durable:{name:'耐用',description:'一級持續節省10%耐久損耗，二級20%；按實際損耗決定性累計，修理不重置進度。舊有未用完的保護次數保留。',parts:3,coins:8,materialCost:{ironore:1}},
     light:{name:'輕巧',description:'武器每級縮短揮擊間隔 0.08 秒；防具每級移速增加 3%，全身最高 6%。',parts:3,coins:8,materialCost:{toughfiber:1}},
     grip:{name:'防滑',description:'僅防具：每級降低一點陷阱傷害，全身最多四點，並減輕緩速。',parts:3,coins:8,materialCost:{toughfiber:1},slots:['helmet','armor','shield']},
     sharp:{name:'鋒銳',description:'物理武器每級增加 8% 傷害；可用於劍、鎚、鍋、雙短刃及弓，不適用法杖與法書。',parts:4,coins:10,materialCost:{ironore:2,embercore:1},modernOnly:true,slots:['weapon'],types:['blade','hammer','pan','daggers','bow'],effects:{physicalPct:.08}},
@@ -122,7 +127,7 @@
     abyssward:{name:'鎮淵',description:'地下限定。每級在防禦減傷前抵銷 1 點怪物攻擊，全身最高 4 點；不抵銷陷阱或飢餓，仍至少承受 1 點原始攻擊。',parts:6,coins:18,materialCost:{abyssalloy:2,embercore:1},modernOnly:true,underground:true,slots:['helmet','armor','shield'],effects:{monsterFlat:1}},
   }).map(([id,t])=>[id,Object.freeze({...t,id,icon:'forge_'+id,maxLevel:2,materialCost:Object.freeze(t.materialCost),slots:Object.freeze(t.slots||['weapon','helmet','armor','shield']),...(t.types?{types:Object.freeze(t.types)}:{}),effects:Object.freeze(t.effects||{})})])));
   function traitFits(trait,definition){const t=TRAITS[trait];return !!t&&!!definition&&!definition.integrated&&!definition.core&&t.slots.includes(definition.slot)&&(!t.types||t.types.includes(definition.type));}
-  function validateForge(value,slot,definition){if(value===undefined)return undefined;if(!value||!own(TRAITS,value.trait)||!integer(value.level,1,2)||!integer(value.reserve,0,value.trait==='durable'?value.level*2:0)||!TRAITS[value.trait].slots.includes(slot)||definition&&!traitFits(value.trait,definition))return null;return {trait:value.trait,level:value.level,reserve:value.reserve};}
+  function validateForge(value,slot,definition){if(value===undefined)return undefined;if(!value||!own(TRAITS,value.trait)||!integer(value.level,1,2)||!integer(value.reserve,0,value.trait==='durable'?value.level*2:0)||!TRAITS[value.trait].slots.includes(slot)||definition&&!traitFits(value.trait,definition)||value.wearCredit!==undefined&&(value.trait!=='durable'||!integer(value.wearCredit,0,9)))return null;return {trait:value.trait,level:value.level,reserve:value.reserve,...(value.trait==='durable'?{wearCredit:value.wearCredit??0}:{})};}
   const traitPower=(gear,key)=>gear?.durability>0?(TRAITS[gear.forge?.trait]?.effects[key]||0)*(gear.forge?.level||0):0;
   const H=()=>typeof module==='object'&&module.exports?require('./tower-heroes-core.js'):globalThis.TowerHeroes;
   const allGear=run=>run.party?.loadouts?H().allGear(run):[...run.gearBag,...Object.values(run.equipment).filter(Boolean)];
@@ -133,7 +138,7 @@
     return {merchant:service?.kind==='merchant',allowed,reason:'這位商人不在本層，或不承作這類裝備。'};
   }
   function repairQuote(run,id,service){
-    const g=allGear(run).find(g=>g.id===id);if(!run.party||!g||g.durability===g.maxDurability)return null;
+    const g=allGear(run).find(g=>g.id===id);if(!run.party||!g||H().ROBOT?.isCore(g)||g.durability===g.maxDurability)return null;
     const broken=g.durability===0,units=Math.ceil((g.maxDurability-g.durability)/(4*C().durabilityMultiplier(g.kind)));
     const discount=run.party.loadouts?H().teamPassive(run,'economy'):P().has(run,'smith')?50:0;
     const rule=serviceRule(run,g,service),normalCoins=Math.ceil(units*6*(1-discount/100)),baseCoins=broken?Math.ceil(normalCoins*1.5):normalCoins,coins=rule.merchant?Math.ceil(baseCoins*1.2):baseCoins,parts=Math.max(1,Math.ceil(units/2));
@@ -146,23 +151,32 @@
     const g=allGear(n).find(g=>g.id===id);n.coins-=q.coins;n.party.journey.scrap-=q.parts;g.durability=g.maxDurability;
     return {ok:true,message:'修復 '+g.name+'，耐久已補滿。',effect:{repaired:g.id,broken:q.broken}};
   });}
-  function repairAllQuote(run,service){
+  function repairAllQuote(run,service,options={}){
     const valid=service?.kind==='merchant'&&E().serviceContext(run,service.merchantId);
-    const entries=valid?allGear(run).map(g=>({gear:g,quote:repairQuote(run,g.id,service)})).filter(e=>e.quote?.allowed):[];
+    const below=options.below===undefined?1:options.below,validOptions=number(below,0,1);
+    const entries=valid&&validOptions?allGear(run).map(g=>({gear:g,quote:repairQuote(run,g.id,service)})).filter(e=>e.quote?.allowed&&e.gear.durability/e.gear.maxDurability<below):[];
     const coins=entries.reduce((sum,e)=>sum+e.quote.coins,0),parts=entries.reduce((sum,e)=>sum+e.quote.parts,0);
-    return {allowed:entries.length>0,affordable:!!run.party&&run.coins>=coins&&run.party.journey.scrap>=parts,coins,parts,entries:entries.map(({gear,quote})=>({id:gear.id,name:gear.name,kind:gear.kind,broken:quote.broken,coins:quote.coins,parts:quote.parts})),reason:entries.length?'':'這位商人負責的裝備目前無需修理。'};
+    return {allowed:entries.length>0,affordable:!!run.party&&run.coins>=coins&&run.party.journey.scrap>=parts,coins,parts,below,entries:entries.map(({gear,quote})=>({id:gear.id,name:gear.name,kind:gear.kind,broken:quote.broken,coins:quote.coins,parts:quote.parts})),reason:entries.length?'':!validOptions?'維修門檻不合法。':below<1?'沒有低於指定耐久比例、且由這位商人負責的裝備。':'這位商人負責的裝備目前無需修理。'};
   }
-  function repairAll(run,revision,service){return C().transaction(run,revision,n=>{
-    const q=repairAllQuote(n,service);if(!q.allowed)return {ok:false,message:q.reason};
+  function repairAll(run,revision,service,options={}){return C().transaction(run,revision,n=>{
+    const q=repairAllQuote(n,service,options);if(!q.allowed)return {ok:false,message:q.reason};
     if(!q.affordable)return {ok:false,message:`全部修復需 ${q.coins} 枚銅幣與 ${q.parts} 份金屬零件，尚未扣款或修理。`};
     const ids=new Set(q.entries.map(e=>e.id));for(const g of allGear(n))if(ids.has(g.id))g.durability=g.maxDurability;
     n.coins-=q.coins;n.party.journey.scrap-=q.parts;
     return {ok:true,message:`已修復 ${q.entries.length} 件裝備。`,effect:{repaired:[...ids],coins:q.coins,parts:q.parts}};
   });}
+  // An explicit alternative to full repair: pool only small, non-broken losses.
+  // Full/all repair above keeps its promised individual-quote pricing.
+  function maintenanceAllQuote(run,service){
+    const valid=service?.kind==='merchant'&&E().serviceContext(run,service.merchantId),entries=valid?allGear(run).filter(g=>g.durability>0&&g.durability<g.maxDurability&&g.durability/g.maxDurability>=.7&&!H().ROBOT.isCore(g)&&E().serviceAvailable(run,service,g)):[],units=entries.reduce((sum,g)=>sum+(g.maxDurability-g.durability)/(4*C().durabilityMultiplier(g.kind)),0),discount=run.party?.loadouts?H().teamPassive(run,'economy'):P().has(run,'smith')?50:0,coins=entries.length?Math.ceil(Math.ceil(Math.max(1,Math.ceil(units))*6*(1-discount/100))*1.2):0,parts=entries.length?Math.max(1,Math.ceil(units/2)):0;
+    return {allowed:entries.length>0,affordable:!!run.party&&run.coins>=coins&&run.party.journey.scrap>=parts,coins,parts,entries:entries.map(g=>({id:g.id,name:g.name,kind:g.kind})),reason:entries.length?'':'沒有可合批保養的裝備；此服務只處理耐久至少70%、尚未損壞的專門裝備。'};
+  }
+  function maintenanceAll(run,revision,service){return C().transaction(run,revision,n=>{const q=maintenanceAllQuote(n,service);if(!q.allowed)return {ok:false,message:q.reason};if(!q.affordable)return {ok:false,message:`合批保養需 ${q.coins} 枚銅幣與 ${q.parts} 份金屬零件，尚未扣款。`};const selected=new Set(q.entries.map(e=>e.id));for(const g of allGear(n))if(selected.has(g.id))g.durability=g.maxDurability;n.coins-=q.coins;n.party.journey.scrap-=q.parts;return {ok:true,message:`已合批保養 ${q.entries.length} 件裝備。`,effect:{repaired:[...selected],coins:q.coins,parts:q.parts,maintenance:true}};});}
+  function emergencyRepairAmount(gear,percent){return !gear||H().ROBOT.isCore(gear)||gear.durability<=0||!number(percent,0,100)||percent===0?0:Math.min(30,Math.max(1,Math.ceil(gear.maxDurability*percent/100)),gear.maxDurability-gear.durability);}
   function dismantle(run,id,revision,service){return C().transaction(run,revision,n=>{
     if(!n.party)return {ok:false,message:'請先選擇冒險職業。'};const g=allGear(n).find(g=>g.id===id);if(!g)return {ok:false,message:'裝備已不在背包裡。'};
     if(H().ROBOT?.isPart(g.kind))return {ok:false,message:'機殼與雙拳不能拆解，請使用機體強化。'};
-    if(H().ROBOT?.isCore(g.kind))return {ok:false,message:'動力核心不能拆解，請保留、維修或更換。'};
+    if(H().ROBOT?.isCore(g.kind))return {ok:false,message:'動力核心不能拆解或維修，耗盡後請重新製作。'};
     const access=serviceRule(n,g,service);if(!access.allowed)return {ok:false,message:access.reason};
     const value=salvageValue(g);if(n.party.journey.scrap+value>99)return {ok:false,message:'零件袋放不下，請先使用零件。'};
     n.party.journey.scrap+=value;n.gearBag=n.gearBag.filter(x=>x.id!==id);if(n.equipment[g.slot]?.id===id)n.equipment[g.slot]=null;if(n.party.loadouts)for(const id of H().ids(n)){const e=H().equipment(n,id);if(e[g.slot]?.id===g.id)e[g.slot]=null;}
@@ -181,11 +195,11 @@
   function forge(run,id,trait,revision,service){return C().transaction(run,revision,n=>{
     const q=forgeQuote(n,id,trait,service);if(!q)return {ok:false,message:'無效的鍛造選項。'};if(!q.allowed)return {ok:false,message:q.reason};
     if(!q.affordable)return {ok:false,message:`需要${q.parts}份金屬零件、${q.coins}枚銅幣，以及`+Object.entries(q.materialCost).map(([key,count])=>count+'份'+Materials().MATERIALS[key]).join('、')+'。'};
-    const g=allGear(n).find(g=>g.id===id);n.party.journey.scrap-=q.parts;n.coins-=q.coins;for(const[key,count]of Object.entries(q.materialCost))n.party.journey.materials[key]-=count;g.forge={trait,level:q.level,reserve:(g.forge?.reserve||0)+(trait==='durable'?2:0)};
+    const g=allGear(n).find(g=>g.id===id);n.party.journey.scrap-=q.parts;n.coins-=q.coins;for(const[key,count]of Object.entries(q.materialCost))n.party.journey.materials[key]-=count;g.forge={trait,level:q.level,reserve:g.forge?.reserve||0,...(trait==='durable'?{wearCredit:g.forge?.wearCredit||0}:{})};
     return {ok:true,message:`${g.name}獲得${TRAITS[trait].name}，第${q.level}級。`};
   });}
-  function wear(run,g){if(g.durability<=0)return;if(g.forge?.reserve>0)g.forge.reserve--;else g.durability--;if(g.durability===0&&run.party&&!run.party.loadouts)run.party.journey.scrap=Math.min(99,run.party.journey.scrap+1);}
+  function wear(run,g){if(g.durability<=0)return;if(g.forge?.reserve>0){g.forge.reserve--;return;}if(g.forge?.trait==='durable'){g.forge.wearCredit=(g.forge.wearCredit||0)+g.forge.level;if(g.forge.wearCredit>=10){g.forge.wearCredit-=10;return;}}g.durability--;if(g.durability===0&&run.party&&!run.party.loadouts)run.party.journey.scrap=Math.min(99,run.party.journey.scrap+1);}
   function traits(run){let light=0,grip=0;for(const g of Object.values(run.equipment||{}).filter(g=>g&&g.durability>0&&g.slot!=='weapon')){if(g.forge?.trait==='light')light+=g.forge.level;if(g.forge?.trait==='grip')grip+=g.forge.level;}return {speed:1+Math.min(2,light)*.03,grip:Math.min(4,grip)};}
   function attackInterval(run){const f=run.equipment.weapon?.forge;return .8-(f?.trait==='light'?f.level*.08:0);}
-  return Object.freeze({BOSSES,SITES,TRAITS,newBoss,validateBoss,phase,cycle,target,hint,bossAction,danger,newJourney,validateJourney,siteOffer,explore,validateForge,traitFits,traitPower,allGear,salvageValue,dismantle,repairQuote,repair,repairAllQuote,repairAll,forgeQuote,forgeOptions,forge,wear,traits,attackInterval});
+  return Object.freeze({BOSSES,SITES,TRAITS,newBoss,validateBoss,phase,cycle,target,hint,bossAction,danger,newJourney,validateJourney,siteOffer,explore,validateForge,traitFits,traitPower,allGear,salvageValue,dismantle,repairQuote,repair,repairAllQuote,repairAll,maintenanceAllQuote,maintenanceAll,emergencyRepairAmount,forgeQuote,forgeOptions,forge,wear,traits,attackInterval});
 });

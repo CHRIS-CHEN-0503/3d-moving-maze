@@ -60,7 +60,7 @@ test('shell grades visibly thicken chest, shoulders, knees and shins; armor and 
 test('mechanical expressions reuse surfaces and only own bounded original 32-square core halos',()=>{
  for(const sex of ['male','female']){const m=figure(sex,5),references=[];m.traverse(o=>{references.push([o,o.geometry,o.material]);if(o.isSprite){assert.equal(o.material.map.isDataTexture,true);assert.equal(o.material.map.userData.byteBudget,4096);assert.equal(o.material.userData.robotGlow,true);}else assert.equal(o.material?.map||null,null);});let t=.2;for(const mood of F.moods){F.react(m,mood,.1);F.update(m,t,mood);t+=.3;metrics(m);}for(const time of [NaN,Infinity,-Infinity])F.update(m,time,'hurt');const after=[];m.traverse(o=>after.push([o,o.geometry,o.material]));assert.deepEqual(after,references);release(m);}
 });
-test('all core colors follow highest installed grade including broken cores; light changes never rebuild armor or fists',()=>{
+test('all core colors follow highest unexpired installed grade; expiry never rebuilds armor or fists',()=>{
  assert.deepEqual([...V.ROBOT_CORE_COLORS],[...R.CORE_COLORS]);
  for(const sex of ['male','female']){
   const m=figure(sex,5),eq=equipment(5),pieces=m.userData.heroPieces.slice(),refs=[];m.traverse(p=>refs.push([p,p.geometry,p.material]));let disposed=0;
@@ -71,7 +71,7 @@ test('all core colors follow highest installed grade including broken cores; lig
    for(let i=0;i<5;i++){if(eq.core1)eq.core1.durability=Math.max(0,eq.core1.durability-1);V.dress(T,m,eq,()=>disposed++);}assert.equal(disposed,0);
   }
   const after=[];m.traverse(p=>after.push([p,p.geometry,p.material]));assert.deepEqual(after,refs);metrics(m);
-  const broken=figure(sex,1),none={armor:null,weapon:null,core1:{kind:'robot_core_t5',slot:'core',durability:0},core2:null};V.dress(T,broken,none,release);assert.ok(broken.userData.body.visible);assert.equal(broken.userData.robotLightTier,5);assert.equal(broken.userData.heroPieces.length,0);assert.ok(broken.userData.body.children.some(p=>p.material?.userData.robotEnergy&&p.material.color.getHex()===R.CORE_COLORS[4]));release(broken);release(m);
+  const broken=figure(sex,1),none={armor:null,weapon:null,core1:{kind:'robot_core_t5',slot:'core',durability:0},core2:null};V.dress(T,broken,none,release);assert.ok(broken.userData.body.visible);assert.equal(broken.userData.robotLightTier,1);assert.equal(broken.userData.heroPieces.length,0);assert.ok(broken.userData.body.children.some(p=>p.material?.userData.robotEnergy&&p.material.color.getHex()===R.CORE_COLORS[0]));release(broken);release(m);
  }
 });
 test('five socketed core models own finite native crystal geometry and release their resources exactly once',()=>{

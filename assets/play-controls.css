@@ -25,7 +25,7 @@ body.story-active #towerTalkBtn {right:calc(100% + 12px);bottom:136px;}
 #shopTrapCount {position:absolute;right:-6px;top:-7px;font-size:13px;background:#152638;padding:3px 6px;border-radius:9px;}
 #shopItemName {position:absolute;bottom:3px;left:0;right:0;font-size:10px;line-height:1.1;}
 #shopTrapBtn svg {margin-top:-10px;}
-#shopMission {position:absolute;top:54px;left:10px;z-index:25;width:220px;max-width:calc(100vw - 170px);padding:4px 6px;border:1px solid #5a8e9f;border-radius:9px;background:#102537df;color:#fff3cf;}
+#shopMission {position:absolute;top:var(--shop-mission-top,126px);left:10px;z-index:25;width:220px;max-width:calc(100vw - 170px);padding:4px 6px;border:1px solid #5a8e9f;border-radius:9px;background:#102537df;color:#fff3cf;}
 #shopMission[hidden],#shopEggSplat[hidden] {display:none;}
 #shopMissionTitle {font-size:12px;line-height:16px;font-weight:700;margin-bottom:2px;}
 #shopMissionItems {display:flex;gap:3px;}
@@ -43,10 +43,9 @@ body.story-active #towerTalkBtn {right:calc(100% + 12px);bottom:136px;}
 #shopEggSplat i {position:absolute;width:49%;height:65%;left:10%;top:4%;border-radius:46% 57% 41% 62%;background:radial-gradient(ellipse at 45% 45%,#ffd13b 0 25%,#fff4cffc 27% 62%,#fff7d300 71%);transform:rotate(-20deg);}
 #shopEggSplat i:nth-child(2) {left:45%;top:23%;width:45%;height:65%;transform:rotate(24deg);}
 #shopEggSplat i:nth-child(3) {left:37%;top:53%;width:20%;height:55%;background:#fff4cff5;transform:rotate(-8deg);}
-#shopSaleHud {position:absolute;top:122px;left:10px;z-index:25;max-width:240px;padding:5px 8px;border:1px solid #ffd367;border-radius:8px;background:#772d24ed;color:#fff5cf;font-size:12px;line-height:1.4;pointer-events:none;}
+#shopSaleHud {position:absolute;top:var(--shop-sale-top,194px);left:10px;z-index:25;max-width:240px;padding:5px 8px;border:1px solid #ffd367;border-radius:8px;background:#772d24ed;color:#fff5cf;font-size:12px;line-height:1.4;pointer-events:none;}
 #shopSaleHud[hidden] {display:none;}
-@media(max-height:500px){#shopSaleHud{top:114px;max-width:220px;font-size:11px;}}
-@media(max-height:500px){#shopMission{top:48px;}}
+@media(max-height:500px){#shopSaleHud{max-width:220px;font-size:11px;}}
 #lookZone {height:78%;width:55%;}
 #toast {top:auto;bottom:calc(8px + env(safe-area-inset-bottom));left:50%;transform:translateX(-50%);max-width:58%;padding:6px 10px;font-size:13px;line-height:1.3;pointer-events:none;max-height:44px;overflow:hidden;}
 #tagAnnounce {top:auto!important;bottom:calc(55px + env(safe-area-inset-bottom))!important;left:50%!important;transform:translateX(-50%)!important;font-size:15px!important;padding:6px 10px!important;pointer-events:none;max-width:60%;}

@@ -36,14 +36,16 @@ function documentStub(){
 }
 
 const siteSeeds={};
-for(let seed=1;seed<200&&Object.keys(siteSeeds).length<6;seed++){
+const siteJobs=Object.keys(X.SITES);
+for(let seed=1;seed<200&&Object.keys(siteSeeds).length<siteJobs.length;seed++){
   const run=P.enable(C.newRun({seed}),'swordsman').run,offer=X.siteOffer(run);
   siteSeeds[offer.job]??=seed;
 }
-assert.equal(Object.keys(siteSeeds).length,6,'fixture seed pool covers each optional exploration profession');
+assert.deepEqual(Object.keys(siteSeeds).sort(),siteJobs.sort(),'fixture seed pool covers every actual version-two exploration profession');
 
 function harness(job='healer',options={}){
   let run=P.enable(C.newRun({seed:siteSeeds[job]}),options.profession||'swordsman').run;
+  assert.equal(X.siteOffer(run).job,job,'seed must represent the requested site rather than a legacy six-job selection');
   let paused=false,wall=false,hurt=false,inDungeon=false,failSave=false,saves=0,dialog=null,closed=0;
   const document=documentStub(),world=new T.Group(),player=new T.Group(),messages=[],G={px:0,pz:0,running:true,shifting:false};
   const heroRuntime=options.workProgress?{create:()=>({install(){},reset(){},handle(){return false;},workProgress:options.workProgress})}:undefined;
@@ -90,7 +92,9 @@ test('all site panels disclose progress rather than work seconds, including spok
     const h=harness(job),s=h.atSite();h.ui.interact();
     assert.equal(h.dialog[1],X.SITES[job].name);assert.ok(h.dialog[3].includes('尚未開始'));
     assert.ok(h.dialog[4].includes('慢慢處理|party-explore-work'));
-    for(const value of [h.dialog[3],h.dialog[4],h.dialog[5].summary])assert.doesNotMatch(value,/十二秒|12\s*秒|已完成\s*\d+\s*秒|需要\s*\d+\s*秒/);
+    // A reward may disclose how long its exit route lasts; that is not work time.
+    // Remove only the exact shared reward copy and retain all other disclosures.
+    for(const value of [h.dialog[3],h.dialog[4],h.dialog[5].summary])assert.doesNotMatch(value.replace(X.SITES[job].reward,''),/十二秒|12\s*秒|已完成\s*\d+\s*秒|需要\s*\d+\s*秒/);
     h.paused=false;h.ui.handle('party-explore-work',s.offer.id);h.ui.tick(6,6000);h.hurt=true;h.ui.tick(0,6000);h.hurt=false;h.ui.interact();
     assert.ok(h.dialog[3].includes('value="50"'));assert.ok(h.dialog[4].includes('繼續處理|party-explore-work'));
     assert.doesNotMatch(h.messages.map(m=>m[2]).filter(Boolean).join(' '),/\d+\s*秒|十二秒/);

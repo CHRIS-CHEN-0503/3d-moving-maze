@@ -150,5 +150,5 @@
     const f=view.flag,p=f.holder?botPosOf(f.holder):f;if(p){const v=point(p);ctx.fillStyle='#ffdf76';ctx.fillText('旗',v.x,v.y-6);}
     ctx.restore();
   }
-  window.CaptureFlag={start,spawnCell,handle,frame,attack,pass,leave,stop,speed,map,goal,wall,collect};
+  window.CaptureFlag={start,spawnCell,handle,frame,attack,pass,leave,stop,speed,map,goal,wall,collect,view:()=>view};
 })();

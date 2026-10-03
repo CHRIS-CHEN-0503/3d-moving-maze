@@ -19,8 +19,8 @@ test('regional ingredients and minerals start empty, preserve the six original s
 
 test('legacy six-ingredient and sixteen-meal saves migrate losslessly and without gifting resources',()=>{
   const source=move(underground(),-50);source.party.ingredients.meat=9;source.party.ingredients.shell=11;source.party.journey.scrap=17;source.coins=412;
-  for(const key of previousRecipes)source.party.meals[key]=2;source.equipment.weapon.forge={trait:'durable',level:1,reserve:1};
-  const old=structuredClone(source);old.party.ingredients=Object.fromEntries(legacyIngredients.map(k=>[k,old.party.ingredients[k]]));old.party.meals=Object.fromEntries(previousRecipes.map(k=>[k,old.party.meals[k]]));delete old.party.journey.materials;
+  for(const key of previousRecipes)source.party.meals[key]=2;source.equipment.weapon.forge={trait:'durable',level:1,reserve:1,wearCredit:0};
+  const old=structuredClone(source);old.party.ingredients=Object.fromEntries(legacyIngredients.map(k=>[k,old.party.ingredients[k]]));old.party.meals=Object.fromEntries(previousRecipes.map(k=>[k,old.party.meals[k]]));delete old.party.journey.materials;delete old.equipment.weapon.forge.wearCredit;
   const raw=JSON.stringify(old),migrated=C.validateSave(raw);assert.ok(migrated);assert.equal(JSON.stringify(old),raw);assert.deepEqual(migrated,source);
   assert.equal(migrated.party.meals.ember_crab,2,'B21 recipe retains the historical identity');assert.deepEqual(C.validateSave(JSON.stringify(migrated)),migrated);
 });

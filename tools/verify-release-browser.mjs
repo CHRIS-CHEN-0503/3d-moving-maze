@@ -6,7 +6,9 @@ import path from 'node:path';
 import {createHash} from 'node:crypto';
 import {createRequire} from 'node:module';
 const require=createRequire(import.meta.url),{chromium}=require(process.env.PLAYWRIGHT_MODULE||'playwright');
-const [base,releaseDir,version,sha,out='.agent-run/releases/v1.51.0']=process.argv.slice(2);
+const [base,releaseDir,version,sha,outArg]=process.argv.slice(2);
+assert.match(version,/^\d+\.\d+\.\d+$/,'release version');
+const out=outArg||'.agent-run/releases/v'+version;
 assert.equal(new URL(base).hostname,'3d-moving-maze.pages.dev');assert.match(sha,/^[a-f0-9]{40}$/);assert.ok(path.isAbsolute(releaseDir));
 await mkdir(out,{recursive:true});
 const report={base,version,sha,hashes:[],services:[],views:[],errors:[],blocked:[]};
@@ -15,11 +17,24 @@ const digest=b=>createHash('sha256').update(b).digest('hex');
 // asset validator explicitly excludes .wrangler; never inspect that cache.
 const roots=(await readdir(releaseDir)).filter(name=>name!=='.wrangler');assert.deepEqual(roots.sort(),['assets','docs','functions','index.html','lib','manifest.webmanifest','package.json','story','wrangler.toml'].sort());
 const index=await readFile(path.join(releaseDir,'index.html'),'utf8');assert.match(index,new RegExp("GAME_VERSION='"+version.replaceAll('.','\\.')+"'"));
-const files=new Set(['index.html','manifest.webmanifest','package.json','assets/equipment-surfaces.js','assets/character-face.js','assets/character-sculpt.js','assets/character-motion.js','story/story-core.js','story/tower-combat-motion.js','story/tower-heroes-visuals.js','story/tower-characters.js','story/tower-party-runtime.js','story/tower-lighting-runtime.js','story/tower-party.css','story/tower-mobile.css','story/tower-mode.js','docs/職業裝備圖鑑.html','docs/story-atlas-rules.js','docs/story-atlas-items.js']);
+const coreSource=await readFile(path.join(releaseDir,'story/story-core.js'),'utf8');
+const durabilityDefinition=coreSource.match(/const\s+DURABILITY_VERSION\s*=\s*(\d+)\s*;/);
+assert.ok(durabilityDefinition,'fixed source defines durability format');
+const durabilityVersion=Number(durabilityDefinition[1]);report.durabilityVersion=durabilityVersion;
+assert.ok(durabilityVersion>0,'fixed source durability format is valid');
+const files=new Set(['index.html','manifest.webmanifest','package.json','assets/equipment-surfaces.js','assets/character-face.js','assets/character-sculpt.js','assets/character-motion.js','story/story-core.js','story/tower-combat-motion.js','story/tower-heroes-visuals.js','story/tower-characters.js','story/tower-party-runtime.js','story/tower-lighting-runtime.js','story/tower-party.css','story/tower-mobile.css','story/tower-mode.js','docs/職業裝備圖鑑.html','docs/story-atlas-rules.js','docs/story-atlas-items.js','docs/story-atlas-cooperation.js','story/tower-affixes.js','story/tower-adventure-events.js','story/tower-landmarks.js','story/tower-cooperation-core.js','story/tower-cooperation-runtime.js','assets/mode-variants-core.js','assets/mode-variants.js','assets/shop-claims-core.js','assets/shop-claims.js']);
 for(const m of index.matchAll(/(?:src|href)="([^"#]+)"/g)){
  if(/^(?:https?:|data:|\/\/)/.test(m[1]))continue;
  const name=m[1].split(/[?#]/)[0].replace(/^\.\//,'');
  if(!name||name.startsWith('/')||name.includes('..'))continue;
+ if(await stat(path.join(releaseDir,name)).then(s=>s.isFile()).catch(()=>false))files.add(name);
+}
+// Also verify dependencies used only by the atlas, including cooperative rules.
+const atlas=await readFile(path.join(releaseDir,'docs/職業裝備圖鑑.html'),'utf8');
+for(const m of atlas.matchAll(/(?:src|href)="([^"#]+)"/g)){
+ if(/^(?:https?:|data:|\/\/)/.test(m[1]))continue;
+ const name=path.posix.normalize('docs/'+m[1].split(/[?#]/)[0]);
+ if(name.startsWith('/')||name.startsWith('../'))continue;
  if(await stat(path.join(releaseDir,name)).then(s=>s.isFile()).catch(()=>false))files.add(name);
 }
 let browser;
@@ -33,7 +48,7 @@ try{
  for(const name of ['api/runtime-config','api/scores']){
   const response=await fetch(new URL(name,base),{signal:AbortSignal.timeout(20000)});assert.equal(response.status,200,name);await response.json();report.services.push({path:name,status:response.status,json:true});
  }
- const excluded=await fetch(new URL('.agent-run/releases/v1.51.0/report.json',base),{signal:AbortSignal.timeout(20000)});
+ const excluded=await fetch(new URL('.agent-run/releases/v'+version+'/report.json',base),{signal:AbortSignal.timeout(20000)});
  // Pages can serve the SPA index for an unknown path. It must never serve a
  // development report; the clean archive and exact root allowlist are primary.
  if(excluded.ok)assert.equal(digest(Buffer.from(await excluded.arrayBuffer())),digest(Buffer.from(index)),'development report was published');
@@ -50,7 +65,7 @@ try{
    await page.locator('#mpBtn').tap();await page.locator('#playerName').fill('發布檢查');await page.locator('#profileNextBtn').tap();await page.locator('#startBtn').tap();assert.ok(await page.locator('#mpCreate').isVisible());assert.ok(await page.locator('#mpJoin').isVisible());assert.equal(await page.evaluate(()=>MP.on),false);assert.deepEqual(await page.evaluate(()=>__releaseSockets),[]);await page.locator('#mpClose').tap();
    await page.goto(base,{waitUntil:'networkidle'});await page.evaluate(()=>{GameVoice.configure({enabled:false});G.muted=true;});await page.locator('#enterMenuBtn').tap();await page.locator('#storyEntryBtn').tap();await page.locator('[data-tower="new"]').tap();assert.equal(await page.locator('[data-tower="profession"]').count(),8);assert.equal(await page.locator('.hero-skill-list').count(),0);
    await page.locator('#heroNameInput').fill('發布檢查');await page.locator('[data-tower="hero-sex"][data-item="female"]').tap();await page.locator('[data-tower="profession"][data-item="'+job+'"]').tap();assert.equal(await page.locator('.hero-skill-list article').count(),5);await page.locator('[data-tower="hero-create-start"]').tap();const close=page.locator('[data-tower="close"]').first();if(await close.isVisible())await close.tap();await page.waitForFunction(()=>TowerMode.active&&!TowerMode.paused&&G.running);await page.waitForTimeout(1400);
-   const state=await page.evaluate(()=>{const r=TowerCore.validateSave(JSON.parse(localStorage.getItem('maze3d_tower_v1')));return {valid:!!r,floor:r.floor,job:r.party.profession,sex:r.party.sex,gear:Object.values(r.equipment).filter(Boolean).map(g=>({kind:g.kind,version:g.durabilityVersion,max:g.maxDurability})),model:playerGroup.userData.heroJob};});assert.ok(state.valid);assert.equal(state.floor,99);assert.equal(state.job,job);assert.equal(state.sex,'female');assert.equal(state.model,job);assert.ok(state.gear.every(g=>g.version===5));assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth),width);await page.screenshot({path:out+'/'+width+'-story.png'});
+   const state=await page.evaluate(()=>{const r=TowerCore.validateSave(JSON.parse(localStorage.getItem('maze3d_tower_v1')));return {valid:!!r,floor:r.floor,job:r.party.profession,sex:r.party.sex,gear:Object.values(r.equipment).filter(Boolean).map(g=>({kind:g.kind,version:g.durabilityVersion,max:g.maxDurability})),durabilityVersion:TowerCore.DURABILITY_VERSION,model:playerGroup.userData.heroJob};});assert.ok(state.valid);assert.equal(state.floor,99);assert.equal(state.job,job);assert.equal(state.sex,'female');assert.equal(state.model,job);assert.equal(state.durabilityVersion,durabilityVersion,'live rules match fixed durability format');assert.ok(state.gear.every(g=>g.version===durabilityVersion),'new equipment uses fixed source durability format');assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth),width);await page.screenshot({path:out+'/'+width+'-story.png'});
    await page.locator('#towerBagBtn').tap();assert.ok(await page.locator('#towerDialog').isVisible());await page.screenshot({path:out+'/'+width+'-equipment.png'});await page.locator('[data-tower="close"]').first().tap();
    await page.locator('#viewToggle').tap();await page.waitForFunction(()=>G.view==='fp'&&TowerMode.sightRoot()?.getObjectByName('hero-first-person-weapon')?.visible);await page.waitForTimeout(350);await page.screenshot({path:out+'/'+width+'-first-person.png'});
    report.views.push({width,height,home:true,multiplayerEntry:true,story:state,firstPerson:true});

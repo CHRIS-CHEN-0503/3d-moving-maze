@@ -11,6 +11,7 @@ const N=require('../story/tower-narrative.js'),L=require('../story/tower-lightin
 const Atlas=require('../docs/story-atlas-items.js'),Icons=require('../story/tower-resource-icons.js');
 const Materials=require('../story/tower-materials.js'),Foraging=require('../story/tower-foraging.js');
 const Robot=require('../story/tower-robot-core.js'),HeroIcons=require('../story/tower-heroes-icons.js');
+const Affixes=require('../story/tower-affixes.js'),Events=require('../story/tower-adventure-events.js'),Landmarks=require('../story/tower-landmarks.js'),Expedition=require('../story/tower-expedition-core.js');
 require('../story/tower-party-runtime.js');require('../story/tower-lighting-runtime.js');
 const entries=Atlas.records(),find=id=>entries.find(r=>r.id===id),fresh=()=>H.enable(P.enable(C.newRun({seed:71}),'mage').run).run;
 
@@ -20,7 +21,7 @@ test('atlas derives every current inventory item, ingredient, recipe and all 15 
   assert.deepEqual(entries.filter(e=>e.id.startsWith('meal:')).map(e=>e.key).sort(),Object.keys(P.RECIPES).sort());
   assert.equal(N.allChapters().length,15);
   for(const chapter of N.allChapters()){const item=find(chapter.clueId);assert.equal(item.name,chapter.clueName);assert.equal(item.midFloor,chapter.mid);assert.equal(item.gateFloor,chapter.low);assert.equal(item.spoiler,true);}
-  assert.equal(entries.length,Object.keys(C.ITEMS).length+Object.keys(P.INGREDIENTS).length+Object.keys(Materials.MATERIALS).length+Object.keys(P.RECIPES).length+N.allChapters().length+8);assert.equal(new Set(entries.map(e=>e.id)).size,entries.length);
+  assert.equal(entries.length,Object.keys(C.ITEMS).length+Object.keys(P.INGREDIENTS).length+Object.keys(Materials.MATERIALS).length+Object.keys(P.RECIPES).length+N.allChapters().length+8+Object.keys(Events.KINDS).length+Object.keys(Landmarks.NAMES).length+Object.keys(Expedition.SITES).length+2);assert.equal(new Set(entries.map(e=>e.id)).size,entries.length);
   for(const e of entries){for(const field of ['id','name','category','description','effect','acquisition'])assert.ok(e[field]?.length,e.id+' '+field);assert.ok(e.sources.length);for(const source of e.sources)assert.ok(fs.existsSync(path.join(base,source)),source);assert.ok(Object.isFrozen(e));}
 });
 
@@ -34,6 +35,9 @@ test('all inventory illustrations resolve to the exact shared game provider or o
     if(e.icon.provider==='party-dish')assert.equal(svg,globalThis.TowerPartyRuntime.dishArt(e.key));
     if(e.icon.provider==='lighting')assert.equal(svg,globalThis.TowerLightingRuntime.icon(e.icon.key));
     if(e.icon.provider==='resource')assert.equal(svg,Icons.svg(e.icon.key));
+    if(e.icon.provider==='event')assert.equal(svg,Events.svg(e.icon.key));
+    if(e.icon.provider==='landmark')assert.equal(svg,Landmarks.svg(e.icon.key));
+    if(e.icon.provider==='portrait')assert.equal(svg,globalThis.TowerPartyRuntime.portrait(e.icon.key));
   }
   assert.equal(Icons.svg('not-an-item'),'');assert.equal(Atlas.iconHtml({icon:{provider:'unknown',key:'unsafe'}}),'');
 });
@@ -113,8 +117,8 @@ test('robot fuel stones derive real recovery, rarity, exclusive merchant rules a
   for(const [key,def]of Object.entries(Robot.FUEL_ITEMS)){
     const e=find('item:'+key);assert.equal(e.name,def.name);assert.equal(e.fuel,def.fuel);assert.match(e.effect,new RegExp(def.fuel+'% 能源'));assert.match(e.effect,new RegExp(Robot.FUEL_SECONDS+' 秒'));assert.match(e.effect,/不能攻擊或施放技能.*內建光源與核心自修仍保留/);
     assert.equal(e.buyPrice,def.buyPrice);assert.equal(e.sellPrice,def.sellPrice);assert.equal(e.drop.rarity,def.dropRarity);assert.equal(e.drop.conditionalPercent,Loot.CHANCES[def.dropRarity]);assert.equal(e.drop.quantity,1);
-    assert.equal(e.foraging.tier,Foraging.POWER_STONES.indexOf(key)+1);assert.equal(e.foraging.cluster,true);assert.deepEqual(e.foraging.quantity,[1,3]);assert.deepEqual(e.foraging.profiles,Foraging.POWER_PROFILES);
-    assert.match(e.acquisition,/靠牆角落.*1～3 顆.*一次整簇採取.*初始持有零/);assert.match(e.acquisition,/有能行動的機器人.*候選/);assert.ok(e.sources.includes(Atlas.SOURCES.robot));assert.ok(e.sources.includes(Atlas.SOURCES.foraging));
+    assert.equal(e.foraging.tier,Foraging.POWER_STONES.indexOf(key)+1);assert.equal(e.foraging.cluster,true);assert.deepEqual(e.foraging.quantity,[1,1]);assert.deepEqual(e.foraging.profiles,Foraging.POWER_PROFILES);
+    assert.match(e.acquisition,/靠牆角落.*新樓層每處 1 顆.*初始持有零/);assert.match(e.acquisition,/有能行動的機器人.*候選/);assert.ok(e.sources.includes(Atlas.SOURCES.robot));assert.ok(e.sources.includes(Atlas.SOURCES.foraging));
     assert.equal(Atlas.iconHtml(e),HeroIcons.svg(key));assert.equal(HeroIcons.svg(key),HeroIcons.svg('item_'+key));
     if(def.fuel===25)assert.match(e.acquisition,/雜貨商・蘇禾.*購買 6 幣/);else{assert.doesNotMatch(e.acquisition,/雜貨商・蘇禾/);assert.match(e.acquisition,/商人不販售/);assert.equal(e.buyPrice,null);assert.equal(e.sellPrice,null);}
   }
@@ -123,7 +127,7 @@ test('robot fuel stones derive real recovery, rarity, exclusive merchant rules a
     assert.ok(Atlas.powerForagingExplanation.includes(weights[0]+'% 不出現'));assert.equal(weights[0],100-Foraging.POWER_APPEARANCE[profile]);
     assert.ok(Math.abs(Object.values(weights).reduce((sum,n)=>sum+n,0)-100)<1e-9);
   }
-  assert.match(Atlas.powerForagingExplanation,/每層至多一處礦簇/);assert.match(Atlas.powerForagingExplanation,/一次採取整簇/);assert.match(Atlas.powerForagingExplanation,/同層變形與讀檔不補回/);
+  assert.match(Atlas.powerForagingExplanation,/每層至多一處礦簇/);assert.match(Atlas.powerForagingExplanation,/新樓層每處只有 1 顆動力石/);assert.match(Atlas.powerForagingExplanation,/同層變形與讀檔不補回/);
   const light=find('light:robot-core');assert.equal(Atlas.iconHtml(light),HeroIcons.svg('robot_core'));assert.match(light.effect,/單核心小於火把.*雙核心大於火把且小於日光術/);assert.doesNotMatch(light.effect,/一至三階.*四五階/);assert.match(light.effect,/能源耗盡仍保留照明/);assert.match(light.notes.join(' '),/眼睛.*身份色/);
   assert.match(find('item:heal').effect,/機器人不能/);assert.match(find('item:feather').effect,/機器人不適用/);for(const r of entries.filter(e=>e.recipe))assert.match(r.notes.join(' '),/一般治療不會修復機器人/);
   for(const [tier,cost]of Object.entries(Robot.CORE_COSTS))for(const key of Object.keys(cost.materials))assert.match(find('material:'+key).effect,new RegExp(Robot.CORES[Robot.kind('robot_core',Number(tier))].name+'製作'));
@@ -153,7 +157,7 @@ test('regional ingredient and forging records use real ecological sources, costs
 });
 
 test('browser module can create the same catalogue without timers, storage or network',()=>{
-  const host={TowerRobotCore:require('../story/tower-robot-core.js'),TowerCommissionCooking:require('../story/tower-commission-cooking.js'),TowerMaterials:Materials,TowerForaging:Foraging,TowerCore:C,TowerPartyCore:P,TowerHeroes:H,TowerLighting:L,TowerEncounters:require('../story/tower-encounters.js'),TowerNarrative:N,TowerLoot:Loot,TowerExpedition:require('../story/tower-expedition-core.js'),TowerFieldGuide:require('../story/tower-field-guide.js'),TowerHeroIcons:require('../story/tower-heroes-icons.js'),TowerResourceIcons:Icons,TowerPartyRuntime:globalThis.TowerPartyRuntime,TowerLightingRuntime:globalThis.TowerLightingRuntime};
+  const host={TowerAffixes:Affixes,TowerAdventureEvents:Events,TowerLandmarks:Landmarks,TowerRobotCore:require('../story/tower-robot-core.js'),TowerCommissionCooking:require('../story/tower-commission-cooking.js'),TowerMaterials:Materials,TowerForaging:Foraging,TowerCore:C,TowerPartyCore:P,TowerHeroes:H,TowerLighting:L,TowerEncounters:require('../story/tower-encounters.js'),TowerNarrative:N,TowerLoot:Loot,TowerExpedition:require('../story/tower-expedition-core.js'),TowerFieldGuide:require('../story/tower-field-guide.js'),TowerHeroIcons:require('../story/tower-heroes-icons.js'),TowerResourceIcons:Icons,TowerPartyRuntime:globalThis.TowerPartyRuntime,TowerLightingRuntime:globalThis.TowerLightingRuntime};
   host.globalThis=host;vm.runInNewContext(fs.readFileSync(path.join(base,'docs/story-atlas-items.js'),'utf8'),host);
   assert.deepEqual(JSON.parse(JSON.stringify(host.StoryAtlasItems.records())),JSON.parse(JSON.stringify(entries)));
   assert.equal(host.StoryAtlasItems.iconHtml(find('item:heal')),Atlas.iconHtml(find('item:heal')));

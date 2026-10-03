@@ -10,8 +10,8 @@
     const input=document.createElement(def.choices?'select':'input');input.id='rule-'+key;
     if(def.choices)for(const size of def.choices){const option=document.createElement('option');option.value=size;option.textContent=def.labels?.[size]||(key==='teamSize'?size+' 對 '+size:size+' × '+size);input.appendChild(option);}
     else{input.type='number';input.min=def.min;input.max=def.max;input.step=def.step;input.inputMode='decimal';}
-    input.value=CFG[key];label.appendChild(input);panel.appendChild(label);
-    input.addEventListener('change',()=>{const rules=GameRules.normalize({...CFG,[key]:input.value});CFG[key]=rules[key];input.value=rules[key];saveCfg();});
+    input.value=CFG[key]??def.value;label.appendChild(input);panel.appendChild(label);
+    input.addEventListener('change',()=>{const rules=GameRules.normalize({...CFG,[key]:input.value});CFG[key]=rules[key];CFG.shopOrders=rules.shopOrders;input.value=rules[key];document.getElementById('rule-shopOrders').value=CFG.shopOrders;document.getElementById('rule-shopOrders').disabled=!rules.shopCollect;saveCfg();});
   }
   const viewRow=document.createElement('fieldset');viewRow.className='match-views';
   const legend=document.createElement('legend');legend.textContent='允許的視角';viewRow.appendChild(legend);
@@ -34,6 +34,7 @@
     }
     const shown=GameRules.visible(G.spMode);
     panel.querySelectorAll('[data-rule]').forEach(row=>{row.hidden=!shown.includes(row.dataset.rule);});
+    document.getElementById('rule-shopOrders').disabled=!Number(document.getElementById('rule-shopCollect').value);
     panel.querySelector('[data-rule="itemCount"] > span').textContent=G.spMode==='shop'?'每次出現的？道具箱':'每次出現的道具（不含額外魔法地圖）';
     document.getElementById('matchSettingsHint').textContent=entryMode==='multi'?'建立房間時使用這組規則；加入朋友房間則跟隨房主。':G.spMode==='tag'?'飽足感歸零會變慢，鬼抓人不會因此失敗。':'本次冒險使用以下規則，可隨時在開始前調整。';
     if(G.spMode==='ctf')document.getElementById('matchSettingsHint').textContent='中央搶旗，送進敵方基地守住 3 秒。同隊不誤傷；持旗減速 18%；R 傳旗。受擊回基地、掉旗 20 秒自動歸中。單人可與電腦練習；多人由房主選擇電腦補位，關閉時須等雙方人數到齊。';

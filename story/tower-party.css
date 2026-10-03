@@ -1,6 +1,14 @@
 .party-glyph {width:54px;height:54px;fill:none;stroke:currentColor;stroke-width:2.3;stroke-linecap:round;stroke-linejoin:round;flex:none}
 .tower-resource-line{display:flex;align-items:center;flex-wrap:wrap;gap:7px 12px;margin-bottom:12px;color:#d3e7e6}.tower-resource-line .resource-icon,.tower-copy .resource-icon,.tower-guard-summary .resource-icon,.tower-light-card p .resource-icon,.tower-stat .resource-icon{display:inline-block;width:25px;height:25px;vertical-align:middle;margin:0 4px 0 0;flex:none}.tower-stat .resource-icon{width:18px;height:18px}.tower-clue-list{display:flex;flex-wrap:wrap;gap:8px}.tower-clue-list span{display:inline-flex;align-items:center}.tower-atlas-link{display:inline-block;padding:10px 16px;min-height:44px;border:1px solid #a5b995;border-radius:10px;color:#ffe1a2;text-decoration:none}
 .party-food {width:70px;height:52px;display:block;margin:0 auto 5px;filter:drop-shadow(0 3px 3px #0005)}
+.affix-icon,.gear-affix svg{display:inline-flex;width:26px;height:26px;flex:none;vertical-align:middle}
+.gear-affix{display:inline-flex;gap:4px;align-items:center;font-size:12px;margin:4px 0}
+.forge-affixes{margin:12px 0;padding-top:10px;border-top:1px solid #aa9be166}
+.hero-statuses{display:flex;justify-content:center;flex-wrap:wrap;gap:2px;max-width:100%;pointer-events:none}
+.hero-statuses:empty{display:none}
+.hero-status{display:flex;align-items:center;gap:1px;border-radius:4px;background:#101725c9;border:1px solid var(--status-color);color:var(--status-color);padding:1px;line-height:1.1}
+.hero-status svg{width:15px;height:16px}.hero-status small{font-size:9px;font-variant-numeric:tabular-nums}
+.hero-status.is-ward{border-style:dotted;background:#244132c9}
 .party-professions .tower-item {background:linear-gradient(140deg,#213748,#122434);border-color:#81b7b63b}
 .party-professions .tower-item h3 {color:#f5deb0;font-size:20px}
 .party-professions .tower-btn {border-color:#94c8c7aa}
@@ -232,6 +240,14 @@ body:not(.story-active) #heroTeamBar {display:none!important}
   #towerLeftHud[data-working="true"] .tower-hud-meta {justify-content:flex-start}
   #towerLeftHud[data-working="true"] .tower-guard-status {margin-top:0}
   #towerLeftHud[data-working="true"] .tower-gear-status,#towerLeftHud[data-working="true"] #towerLightStatus {padding-top:0;font-size:11px}
+  /* Alerts live below each card; compact the expanded details when that extra
+     row is needed, keeping the full team above the phone's battle controls. */
+  #towerLeftHud:has(.hero-gear-alert) #towerHudDetails {display:grid;grid-template-columns:max-content max-content;gap:0 8px;padding:2px 0;margin-top:2px}
+  #towerLeftHud:has(.hero-gear-alert) #towerChapter {display:none}
+  #towerLeftHud:has(.hero-gear-alert) .tower-hud-meta {justify-content:flex-start}
+  #towerLeftHud:has(.hero-gear-alert) .tower-guard-status {margin-top:0}
+  #towerLeftHud:has(.hero-gear-alert) #towerHud .party-status {min-height:18px;padding:0;font-size:12px}
+  #towerLeftHud:has(.hero-gear-alert) .tower-gear-status,#towerLeftHud:has(.hero-gear-alert) #towerLightStatus {padding-top:0;font-size:11px}
 }
 /* Supplemental copy only: prices, shortages and actions stay outside this panel. */
 .tower-compact-help{display:flex;flex-wrap:wrap;justify-content:flex-end;align-items:flex-start;gap:0;margin:0 0 6px;min-width:0}

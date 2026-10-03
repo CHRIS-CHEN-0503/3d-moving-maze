@@ -36,6 +36,8 @@
   const heroRules = () => typeof module === 'object' && module.exports ? require('./tower-heroes-core.js') : globalThis.TowerHeroes;
   const expeditionRules = () => typeof module === 'object' && module.exports ? require('./tower-expedition-core.js') : globalThis.TowerExpedition;
   const underworldRules = () => typeof module === 'object' && module.exports ? require('./tower-underworld.js') : globalThis.TowerUnderworld;
+  function adventureEventRules(){if(typeof module!=='object'||!module.exports)return globalThis.TowerAdventureEvents;try{return require('./tower-adventure-events.js');}catch(error){if(error.code!=='MODULE_NOT_FOUND')throw error;return undefined;}}
+  function validateGearAffixes(value){let rules=globalThis.TowerAffixes;if(typeof module==='object'&&module.exports){try{rules=require('./tower-affixes.js');}catch(error){if(error.code!=='MODULE_NOT_FOUND')throw error;}}return rules?rules.validateGear(value):value.affix===undefined&&value.affixRoll===undefined?{}:null;}
   const GEAR = Object.freeze({
     helmet: Object.freeze({ kind: 'helmet', slot: 'helmet', name: '頭盔', defense: 2, stunSeconds: 0, buyPrice: 14 }),
     armor: Object.freeze({ kind: 'armor', slot: 'armor', name: '盔甲', defense: 4, stunSeconds: 0, buyPrice: 22 }),
@@ -167,6 +169,8 @@
     const rawPurchases=value.groceryPurchases,emptyPurchases=rawPurchases===undefined||rawPurchases&&Object.prototype.toString.call(rawPurchases)==='[object Object]'&&Object.keys(rawPurchases).length===0;
     const purchases = typeof encounters?.validateGroceryPurchases==='function'?encounters.validateGroceryPurchases(rawPurchases,floor,seed):emptyPurchases?{}:null;
     if (!purchases) return null;
+    const events=value.events===undefined?undefined:adventureEventRules()?.validate(value.events,{floor,seed});
+    if(value.events!==undefined&&!events)return null;
     let quest = null;
     if (value.quest !== null) {
       const q = value.quest;
@@ -174,19 +178,21 @@
       if ((q.status === 'active' && q.progress >= q.goal) || (q.status !== 'active' && q.progress !== q.goal)) return null;
       quest = { id: q.id, floor: q.floor, type: q.type, status: q.status, target: q.target, goal: q.goal, progress: q.progress, events: [...q.events] };
     }
-    return { version: 1, claimed: [...value.claimed], quest, groceryPurchases: purchases };
+    return { version: 1, claimed: [...value.claimed], quest, groceryPurchases: purchases,...(events?{events}:{}) };
   }
 
-  function durabilityMultiplier(kind) {
+  function originalDurabilityMultiplier(kind) {
     const robot=heroRules()?.ROBOT;
     if(robot?.isPart(kind))return robot.repairMultiplier(kind);
     const item=GEAR[kind];
     return (item?.slot==='weapon'||item?.type==='heavy'||['helmet','armor','shield','round_shield','tower_shield'].includes(item?.baseKind||kind)?15:10)*4/3;
   }
-  // Double the previous rounded value: light gear's old 47/67 become 94/134,
-  // not 93/133. One shared roll helper keeps generation and the guide identical.
-  const DURABILITY_VERSION=5;
-  function durabilityForRoll(kind,roll) { return Math.round(roll*(durabilityMultiplier(kind)/2))*2; }
+  const DURABILITY_VERSION=6;
+  function durabilityMultiplier(kind) {const item=GEAR[kind],base=item?.baseKind||kind;return originalDurabilityMultiplier(kind)*(['spellbook','cooking_pan'].includes(base)?1.25:1);}
+  function durabilityMinimumRoll(kind) {return Math.min(7,Math.max(3,2+(GEAR[kind]?.tier||1)));}
+  // Higher ranks improve minimum workmanship, without inflating the upper end.
+  // Version five's double-rounded light values remain the migration source.
+  function durabilityForRoll(kind,roll) {const base=originalDurabilityMultiplier(kind),v5=Math.round(Math.max(durabilityMinimumRoll(kind),roll)*(base/2))*2;return Math.round(v5*durabilityMultiplier(kind)/base);}
   function createGear(kind, floor, seed, sourceId, enhanced = false) {
     floorConfig(floor);
     if (!Object.hasOwn(GEAR, kind) || !validNumber(seed, 1, 0xffffffff, true) || typeof sourceId !== 'string' || !sourceId || sourceId.length > 96 || typeof enhanced !== 'boolean') throw new RangeError('無效的裝備來源。');
@@ -196,7 +202,8 @@
     const tier = floor >= 70 ? 1 : floor >= 40 ? 2 : 3;
     const bonus = enhanced ? 1 + hash % tier : 0;
     const maximum = [0, 13, 16, 20][tier];
-    const maxDurability = durabilityForRoll(kind,enhanced ? 10 + (hash >>> 8) % (maximum - 9) : 3 + (hash >>> 8) % 8);
+    const minimum=durabilityMinimumRoll(kind);
+    const maxDurability = durabilityForRoll(kind,enhanced ? 10 + (hash >>> 8) % (maximum - 9) : minimum + (hash >>> 8) % (11-minimum));
     const item = GEAR[kind];
     return { id: `gear:${floor}:${seed}:${sourceId}:${kind}`, kind, slot: item.slot, name: item.name + (bonus ? ` +${bonus}` : ''), durability: maxDurability, maxDurability, durabilityVersion:DURABILITY_VERSION, defense: item.slot === 'weapon' ? 0 : item.defense + bonus, bonus };
   }
@@ -205,20 +212,21 @@
     if (!value || typeof value !== 'object' || !Object.hasOwn(GEAR, value.kind) || typeof value.id !== 'string' || !value.id || value.id.length > 160) return null;
     if(heroRules()?.ROBOT?.definition(value.kind))return heroRules().ROBOT.validateGear(value);
     const item = GEAR[value.kind];
-    const legacy=value.durabilityVersion===undefined,priorMultiplier=durabilityMultiplier(value.kind)/2;
-    if(!legacy&&![2,3,4,DURABILITY_VERSION].includes(value.durabilityVersion))return null;
+    const legacy=value.durabilityVersion===undefined,priorMultiplier=originalDurabilityMultiplier(value.kind)/2;
+    if(!legacy&&![2,3,4,5,DURABILITY_VERSION].includes(value.durabilityVersion))return null;
     // Validate in the source version's units before upgrading, exactly once.
     const mult=legacy?1:value.durabilityVersion===2?priorMultiplier*1.5/5:value.durabilityVersion===3?priorMultiplier*1.5:priorMultiplier;
     if (value.slot !== item.slot || !validNumber(value.bonus, 0, 3, true) || !validNumber(value.maxDurability, 1, 800, true) || !validNumber(value.durability, 0, value.maxDurability, true)) return null;
-    const start=value.bonus?10:3,rolls=Array.from({length:value.bonus?11:8},(_,i)=>i+start),sourceMax=rolls.map(n=>value.durabilityVersion===DURABILITY_VERSION?durabilityForRoll(value.kind,n):Math.round(n*mult)),roll=rolls[sourceMax.indexOf(value.maxDurability)];
+    const start=value.bonus?10:value.durabilityVersion===DURABILITY_VERSION?durabilityMinimumRoll(value.kind):3,rolls=Array.from({length:value.bonus?11:11-start},(_,i)=>i+start),sourceMax=rolls.map(n=>value.durabilityVersion===DURABILITY_VERSION?durabilityForRoll(value.kind,n):value.durabilityVersion===5?Math.round(n*priorMultiplier)*2:Math.round(n*mult)),roll=rolls[sourceMax.indexOf(value.maxDurability)];
     if(roll===undefined)return null;
     const name = item.name + (value.bonus ? ` +${value.bonus}` : '');
     const defense = item.slot === 'weapon' ? 0 : item.defense + value.bonus;
     if (value.name !== name || value.defense !== defense) return null;
     const forge=value.forge===undefined?undefined:expeditionRules()?.validateForge(value.forge,item.slot,item);
     if(value.forge!==undefined&&!forge)return null;
+    const affixes=validateGearAffixes(value);if(!affixes)return null;
     const maxDurability=durabilityForRoll(value.kind,roll),durability=value.durability===0?0:Math.max(1,Math.min(maxDurability,Math.round(value.durability*maxDurability/value.maxDurability)));
-    return { id: value.id, kind: value.kind, slot: item.slot, name, durability, maxDurability, durabilityVersion:DURABILITY_VERSION, defense, bonus: value.bonus,...(forge?{forge}:{}) };
+    return { id: value.id, kind: value.kind, slot: item.slot, name, durability, maxDurability, durabilityVersion:DURABILITY_VERSION, defense, bonus: value.bonus,...(forge?{forge}:{}),...affixes };
   }
 
   function gearPrice(gear) {
@@ -376,7 +384,7 @@
     if (run.party !== undefined && !party) return null;
     if(party?.loadouts&&!heroRules().validEquipment({party,equipment,gearBag,floor:run.floor,underworld}))return null;
     if(party?.loadouts&&run.hp>heroRules().maxHp({party}))return null;
-    return {
+    const validated = {
       // Preserve the old health percentage once; subsequent reads are already v2.
       stateVersion: STATE_VERSION, mode: 'tower', floor: run.floor, hp: legacyHealth ? run.hp * MAX_HP / 100 : run.hp, hunger: run.hunger,
       coins: run.coins, bag, effects, revision: run.revision, seed: run.seed, name: run.name,
@@ -386,6 +394,10 @@
       equipment, gearBag, monsterStuns, adventure,
       chronicle, expedition, ...(party ? { party } : {}), ...(underworld ? { underworld } : {}),
     };
+    // Only strictly validated gear may be pruned. Do not hide malformed or
+    // duplicate cores, and never replace an expired six-slot core with a gift.
+    heroRules()?.ROBOT?.pruneExpiredCores(validated);
+    return validated;
   }
 
   function failure(run, message) { return { ok: false, run, message }; }
@@ -404,7 +416,7 @@
   // These helpers mutate only a transaction's private, validated copy.
   function receiveGear(next, value) {
     const gear = validateGear(value);
-    if (!gear) return { ok: false, message: '無效的裝備。' };
+    if (!gear || heroRules()?.ROBOT?.isExpiredCore(gear)) return { ok: false, message: '無效或已耗盡的裝備。' };
     if (next.gearBag.length >= 24) return { ok: false, message: '裝備行囊已滿，請先捨棄不需要的裝備。' };
     if ((next.party?.loadouts?heroRules().allGear(next):[...next.gearBag, ...Object.values(next.equipment).filter(Boolean)]).some(item => item.id === gear.id)) return { ok: false, message: '你已經擁有這件裝備。' };
     next.gearBag.push(gear);
@@ -625,10 +637,10 @@
     });
   }
 
-  function applyDamage(next, amount, source = 'monster', invulnerable = false) {
+  function applyDamage(next, amount, source = 'monster', invulnerable = false, monsterId = null) {
     if (!validNumber(amount, 0, 10000) || !['monster', 'trap', 'hunger'].includes(source)) return { ok: false, message: '無效的傷害數值或來源。' };
     if(invulnerable===true)return {ok:true,message:'受傷保護中。',effect:{damage:0,revived:false,defense:0,broken:[],source,protected:true}};
-    if(next.party?.loadouts)return heroRules().hurt(next,next.party.loadouts.active,amount,source);
+    if(next.party?.loadouts)return heroRules().hurt(next,next.party.loadouts.active,amount,source,monsterId);
     if (next.party) amount = partyRules().reduceDamage(next, amount, source);
     const defense = source === 'hunger' ? 0 : equipmentStats(next).defense;
     const reduced = Math.max(0, amount - defense);
@@ -650,8 +662,8 @@
     return { ok: true, message: revived ? '復甦羽化作光芒，讓你重新站起。' : next.status === 'dead' ? '旅程暫時停在這裡。' : damage === 0 ? '防具擋住了這次攻擊。' : '受到傷害。', effect: { damage, revived, defense, broken, source } };
   }
 
-  function takeDamage(run, amount, source = 'monster') {
-    return transaction(run, undefined, next => applyDamage(next, amount, source));
+  function takeDamage(run, amount, source = 'monster', monsterId = null) {
+    return transaction(run, undefined, next => applyDamage(next, amount, source, false, monsterId));
   }
 
   function tickEffects(run, seconds) {
@@ -718,6 +730,7 @@
 
   function descend(run, expectedRevision) {
     return transaction(run, expectedRevision, (next) => {
+      const previousFloor=next.floor,events=next.adventure.events;
       if (next.expedition.active) return { ok: false, message: '請先離開裂隙副本，再繼續往下探索。' };
       if (next.party && !partyRules().canDescend(next)) return { ok: false, message: '請先解除迷宮封印並擊敗樓層主，才能往下走。' };
       if (!narrativeRules().canDescend(next)) return { ok: false, message: '章末之門尚未開啟，請先找到本章主線印記。' };
@@ -728,6 +741,7 @@
       next.claimed = []; next.floorElapsed = 0; next.defeatedMonsters = [];
       delete next.engine.sightMemory; delete next.engine.mapKnowledge;
       next.monsterStuns = {}; next.adventure = newAdventure();
+      if(events)next.adventure.events=events;
       next.expedition.discovered = false;
       if (next.warrior && next.warrior.mode === 'holding') next.warrior = null;
       if (next.floor === 1 || next.floor === -50) {
@@ -738,10 +752,11 @@
       }
       next.floor -= 1;
       if (next.party) partyRules().advance(next);
+      if(events)adventureEventRules()?.advance(next,previousFloor);
       next.expedition.version = dungeonRules().CATALOG_VERSION;
       return { ok: true, message: next.floor < 0 ? `抵達地下第 ${-next.floor} 層。` : `抵達第 ${next.floor} 層。`, effect: { floor: next.floor } };
     });
   }
 
-  return Object.freeze({ STATE_VERSION, MAX_HP, MAX_MONSTERS, HASTE_DURATION, HASTE_PERCENT, hasteMultiplier, validMonsterId, isFloor, isUnderworld, ITEMS, itemLimit, itemStorageLimit, GEAR, MONSTERS, CHAPTERS, OPENING, ENDING, EXCHANGES, floorConfig, newRun, validateSave, supplyPrice, buy, sell, exchange, useItem, collect, takeDamage, tickEffects, startUnderworld, descend, monsterStrength, warriorOffer, hireWarrior, interceptMonster, createGear, validateGear, durabilityMultiplier, durabilityForRoll, DURABILITY_VERSION, gearPrice, equipmentStats, receiveGear, grantGear, equipGear, discardGear, buyGear, effectiveMonsterStrength, hitMonster, resolveHeldMonster, transaction, applyDamage, newAdventure, validateAdventure });
+  return Object.freeze({ STATE_VERSION, MAX_HP, MAX_MONSTERS, HASTE_DURATION, HASTE_PERCENT, hasteMultiplier, validMonsterId, isFloor, isUnderworld, ITEMS, itemLimit, itemStorageLimit, GEAR, MONSTERS, CHAPTERS, OPENING, ENDING, EXCHANGES, floorConfig, newRun, validateSave, supplyPrice, buy, sell, exchange, useItem, collect, takeDamage, tickEffects, startUnderworld, descend, monsterStrength, warriorOffer, hireWarrior, interceptMonster, createGear, validateGear, originalDurabilityMultiplier, durabilityMultiplier, durabilityMinimumRoll, durabilityForRoll, DURABILITY_VERSION, gearPrice, equipmentStats, receiveGear, grantGear, equipGear, discardGear, buyGear, effectiveMonsterStrength, hitMonster, resolveHeldMonster, transaction, applyDamage, newAdventure, validateAdventure });
 });

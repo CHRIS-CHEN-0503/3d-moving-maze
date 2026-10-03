@@ -75,9 +75,9 @@
     const fit=!validActor?'適用：'+def.jobs.map(j=>h.JOBS[j].name).join('、'):!def.jobs.includes(job)?'這件裝備不適合目前選取的職業。':level<def.requiredLevel?'還需要升到 '+def.requiredLevel+' 級才能穿戴。':'符合目前角色的職業與等級。';
     const pct=typeof value==='object'&&Number.isFinite(value?.durability)&&Number.isFinite(value?.maxDurability)&&value.maxDurability>0?Math.max(0,Math.min(100,Math.ceil(value.durability/value.maxDurability*100))):null;
     const severity=pct===null?'unknown':pct===0?'broken':pct<=10?'critical':pct<=20?'warning':'good';
-    const condition=severity==='broken'?def.core?'核心已耗盡，自修與防禦暫停；內建光源保留，可在安全營地由鍛匠修復，或請鐵嶺維修，銅幣另加20%。':'已損壞，能力暫停；有能行動的鍛匠可在營地付費重建，否則找專門商人，銅幣另加20%。':severity==='critical'?'耐久快用完了，先換備用裝備或回營地修理。':severity==='warning'?'耐久偏低，下次經過營地記得修理。':'裝備未損壞時才提供能力。';
+    const condition=severity==='broken'?def.core?'核心耐久耗盡即消失，不能修復；請在安全營地重新製作，沒有核心時保留較弱內建微光。':'已損壞，能力暫停；有能行動的鍛匠可在營地付費重建，否則找專門商人，銅幣另加20%。':severity==='critical'?'耐久快用完了，先換備用品；一般裝備可修理，動力核心只能再製作。':severity==='warning'?'耐久偏低，下次經過營地記得維護；動力核心不能修理。':'裝備未損壞時才提供能力。';
     return {name:def.name,tier:def.tier,requiredLevel:def.requiredLevel,...role,fit,condition,severity,durabilityPercent:pct,
-      wear:def.core?'每三秒實際參與生命自修的核心消耗一耐久；滿血不消耗，受擊或照明不耗核心耐久。':def.integrated?(def.slot==='weapon'?'普通拳擊每四次有效命中消耗一次耐久；攻擊技能首次有效命中消耗一次，同次多目標不重扣，揮空不扣。':'受到有效傷害消耗一次機殼耐久；飢餓或護盾完全吸收時不消耗，緩震結構可免除此消耗。'):def.slot!=='weapon'?'受到有效傷害時，穿戴中的每件防具各消耗耐久。':['bow','staff','book'].includes(def.type)?'遠程攻擊發射就消耗武器耐久，射空也會消耗。':'近戰命中才消耗武器耐久，揮空不扣。'};
+      wear:def.core?'每三秒實際參與生命自修的核心消耗一耐久；滿血不消耗，受擊或照明不耗核心耐久。耐久歸零立即消失，不能修理，需重新製作。':def.integrated?(def.slot==='weapon'?'普通拳擊每四次有效命中消耗一次耐久；攻擊技能首次有效命中消耗一次，同次多目標不重扣，揮空不扣。':'受到有效傷害消耗一次機殼耐久；飢餓或護盾完全吸收時不消耗，緩震結構可免除此消耗。'):def.slot!=='weapon'?'受到有效傷害時，穿戴中的每件防具各消耗耐久。':['bow','staff','book'].includes(def.type)?'遠程攻擊發射就消耗武器耐久，射空也會消耗。':'近戰命中才消耗武器耐久，揮空不扣。'};
   }
   function progression(run){
     const loadouts=run?.party?.loadouts,h=H(),growth=G();if(!loadouts||!h||!growth)return null;

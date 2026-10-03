@@ -17,7 +17,8 @@
   });
   // All natural resources use the same overall appearance rate. Retain the
   // old conditional quantity/grade weights and their historical save rules.
-  const ENVIRONMENT_BONUS=20,BASE_APPEARANCE=30;
+  const FORMAT_VERSION=4,HARVEST_RULE=3,POWER_RULE=4,POWER_DEPOSIT_QUANTITY=1;
+  const ENVIRONMENT_BONUS=20,BASE_APPEARANCE=40;
   const APPEARANCE=freeze({suitable:BASE_APPEARANCE+ENVIRONMENT_BONUS,neutral:BASE_APPEARANCE,unsuitable:BASE_APPEARANCE-ENVIRONMENT_BONUS});
   const profilesFor=appearance=>freeze(Object.fromEntries(Object.entries(LEGACY_PROFILES).map(([name,weights])=>{
     const original=100-weights[0],chance=appearance[name];
@@ -26,6 +27,7 @@
   const PROFILES=profilesFor(APPEARANCE),POWER_PROFILES=PROFILES;
   const POWER_ENVIRONMENT_BONUS=ENVIRONMENT_BONUS,POWER_BASE_APPEARANCE=BASE_APPEARANCE,POWER_APPEARANCE=APPEARANCE;
   const DRAFT_POWER_APPEARANCE=freeze({suitable:40,neutral:30,unsuitable:20}),DRAFT_POWER_PROFILES=profilesFor(DRAFT_POWER_APPEARANCE);
+  const V3_APPEARANCE=freeze({suitable:50,neutral:30,unsuitable:10}),V3_PROFILES=profilesFor(V3_APPEARANCE);
   // Every existing surface and underground ecology has an explicit classification.
   const REGIONS=freeze({
     summoning:{herb:'neutral',ore:'neutral'},
@@ -73,9 +75,10 @@
     for(const count of [1,2,3]){const weight=weights[count]*chance;if(roll<weight)return count;roll-=weight;}
     return 0;
   }
-  function drawCounts(run,rule=2){
+  function drawCounts(run,rule=HARVEST_RULE){
     if(!validContext(run?.floor,run?.seed))throw new RangeError('無效的採集樓層或旅程種子。');
-    return Object.fromEntries(['herb','ore'].map(kind=>{const name=profileName(run,kind);return [kind,rule===1?rollCount(run.seed,run.floor,kind,LEGACY_PROFILES[name]):rollWeighted(run.seed,run.floor,kind,name,APPEARANCE)];}));
+    if(![1,2,3].includes(rule))throw new RangeError('無效的草藥與礦石採集規則。');
+    return Object.fromEntries(['herb','ore'].map(kind=>{const name=profileName(run,kind);return [kind,rule===1?rollCount(run.seed,run.floor,kind,LEGACY_PROFILES[name]):rollWeighted(run.seed,run.floor,kind,name,rule===2?V3_APPEARANCE:APPEARANCE)];}));
   }
   function counts(run){
     if(!validContext(run?.floor,run?.seed))throw new RangeError('無效的採集樓層或旅程種子。');
@@ -90,11 +93,12 @@
     // A region without mineral-bearing creatures can still contain ordinary rock ore.
     return ores.length?ores:['ironore'];
   }
-  function drawPowerDeposit(run,rule=3){
+  function drawPowerDeposit(run,rule=POWER_RULE){
     if(!validContext(run?.floor,run?.seed))throw new RangeError('無效的動力石採集樓層。');
+    if(![1,2,3,4].includes(rule))throw new RangeError('無效的動力石採集規則。');
     const name=profileName(run,'herb');
-    const tier=rule===1?rollCount(run.seed,run.floor,'power',LEGACY_PROFILES[name]):rollWeighted(run.seed,run.floor,'power',name,rule===2?DRAFT_POWER_APPEARANCE:APPEARANCE);
-    return tier?{tier,key:POWER_STONES[tier-1],quantity:1+hash(run.seed,`foraging:${run.floor}:power:quantity`)%3}:null;
+    const tier=rule===1?rollCount(run.seed,run.floor,'power',LEGACY_PROFILES[name]):rollWeighted(run.seed,run.floor,'power',name,rule===2?DRAFT_POWER_APPEARANCE:rule===3?V3_APPEARANCE:APPEARANCE);
+    return tier?{tier,key:POWER_STONES[tier-1],quantity:rule===POWER_RULE?POWER_DEPOSIT_QUANTITY:1+hash(run.seed,`foraging:${run.floor}:power:quantity`)%3}:null;
   }
   function powerDeposit(run){
     if(!validContext(run?.floor,run?.seed))throw new RangeError('無效的動力石採集樓層。');
@@ -115,19 +119,19 @@
   }
   function fresh(run){
     if(!validContext(run?.floor,run?.seed))throw new RangeError('無效的採集樓層或旅程種子。');
-    return {version:3,floor:run.floor,seed:run.seed,claimed:[],harvestRule:2,counts:drawCounts(run),powerRule:3,power:drawPowerDeposit(run)};
+    return {version:FORMAT_VERSION,floor:run.floor,seed:run.seed,claimed:[],harvestRule:HARVEST_RULE,counts:drawCounts(run),powerRule:POWER_RULE,power:drawPowerDeposit(run)};
   }
   function samePower(value,expected){return expected===null?value===null:!!value&&typeof value==='object'&&!Array.isArray(value)&&value.tier===expected.tier&&value.key===expected.key&&value.quantity===expected.quantity;}
   function validate(value,floor,seed){
     if(!validContext(floor,seed))return null;
     if(value===undefined)return fresh({floor,seed});
-    if(!value||typeof value!=='object'||Array.isArray(value)||![1,2,3].includes(value.version)||value.floor!==floor||value.seed!==seed||!Array.isArray(value.claimed)||value.claimed.length>7||new Set(value.claimed).size!==value.claimed.length)return null;
+    if(!value||typeof value!=='object'||Array.isArray(value)||![1,2,3,4].includes(value.version)||value.floor!==floor||value.seed!==seed||!Array.isArray(value.claimed)||value.claimed.length>7||new Set(value.claimed).size!==value.claimed.length)return null;
     // Production v1 and provisional v2 both used the original herb/ore draws.
     // Freeze those counts and the old power allocation before changing rates.
     const harvestRule=value.version<3?1:value.harvestRule;
-    if(![1,2].includes(harvestRule))return null;
+    if(!(value.version<4?[1,2]:[1,2,3]).includes(harvestRule))return null;
     const amount=drawCounts({floor,seed},harvestRule);
-    if(value.version===3&&(!value.counts||typeof value.counts!=='object'||Array.isArray(value.counts)||Object.keys(value.counts).length!==2||value.counts.herb!==amount.herb||value.counts.ore!==amount.ore))return null;
+    if(value.version>=3&&(!value.counts||typeof value.counts!=='object'||Array.isArray(value.counts)||Object.keys(value.counts).length!==2||value.counts.herb!==amount.herb||value.counts.ore!==amount.ore))return null;
     let powerRule=value.version===1?1:value.powerRule;
     if(value.version===2&&powerRule===2){
       // v2 existed only locally while the environment modifier was confirmed.
@@ -136,12 +140,12 @@
       else if(samePower(value.power,drawPowerDeposit({floor,seed},3)))powerRule=3;
       else return null;
     }
-    if(![1,2,3].includes(powerRule))return null;
+    if(!(value.version<4?[1,2,3]:[1,2,3,4]).includes(powerRule))return null;
     const power=drawPowerDeposit({floor,seed},powerRule);
     if(value.version>1&&!samePower(value.power,power))return null;
     const allowed=new Set(resources({floor,seed},power,amount).map(entry=>entry.id));
     if(!value.claimed.every(id=>typeof id==='string'&&allowed.has(id)))return null;
-    return {version:3,floor,seed,claimed:[...value.claimed],harvestRule,counts:{...amount},powerRule,power:power?{...power}:null};
+    return {version:FORMAT_VERSION,floor,seed,claimed:[...value.claimed],harvestRule,counts:{...amount},powerRule,power:power?{...power}:null};
   }
   function specs(run){
     if(!run?.party||run.expedition?.active)return [];
@@ -199,5 +203,5 @@
       return [{...entry,cx:point.cx,cy:point.cy,offsetX:point.offsetX,offsetY:point.offsetY,wallSides:[...point.wallSides]}];
     });
   }
-  return freeze({PROFILES,LEGACY_PROFILES,APPEARANCE,BASE_APPEARANCE,ENVIRONMENT_BONUS,POWER_PROFILES,POWER_APPEARANCE,POWER_BASE_APPEARANCE,POWER_ENVIRONMENT_BONUS,DRAFT_POWER_PROFILES,DRAFT_POWER_APPEARANCE,REGIONS,NATURAL_ORES,POWER_STONES,OFFSET,hash,profile,powerProfile,rollCount,rollWeighted,drawCounts,counts,orePool,drawPowerDeposit,powerDeposit,fresh,validate,specs,claim,label,wallsAt,plan});
+  return freeze({FORMAT_VERSION,HARVEST_RULE,POWER_RULE,POWER_DEPOSIT_QUANTITY,PROFILES,LEGACY_PROFILES,APPEARANCE,BASE_APPEARANCE,ENVIRONMENT_BONUS,POWER_PROFILES,POWER_APPEARANCE,POWER_BASE_APPEARANCE,POWER_ENVIRONMENT_BONUS,DRAFT_POWER_PROFILES,DRAFT_POWER_APPEARANCE,V3_PROFILES,V3_APPEARANCE,REGIONS,NATURAL_ORES,POWER_STONES,OFFSET,hash,profile,powerProfile,rollCount,rollWeighted,drawCounts,counts,orePool,drawPowerDeposit,powerDeposit,fresh,validate,specs,claim,label,wallsAt,plan});
 });

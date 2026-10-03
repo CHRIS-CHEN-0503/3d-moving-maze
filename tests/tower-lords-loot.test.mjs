@@ -9,7 +9,19 @@ function fresh(floor=99,seed=31,job='swordsman',sex='male'){const r=H.enable(P.e
 const living=r=>P.monsterSpecs(r).filter(m=>!r.defeatedMonsters.includes(m.id));
 const cells=[{x:2,y:2},{x:3,y:3},{x:4,y:4}];
 function defeat(r,spec){r.defeatedMonsters.push(spec.id);delete r.party.health[spec.id];delete r.party.poise[spec.id];delete r.party.loadouts.enemy[spec.id];delete r.monsterStuns[spec.id];return L.recordKill(r,spec,{x:2,y:3});}
-function killByAttack(r,id){for(let i=0;i<100&&!r.defeatedMonsters.includes(id);i++){H.tick(r,2);const hit=H.strike(r,id,{lootCell:{x:2,y:3}});assert.ok(hit.ok,hit.message);r=hit.run;}assert.ok(r.defeatedMonsters.includes(id));return r;}
+function killByAttack(r,id){
+  const Events=require('../story/tower-adventure-events.js');
+  for(let i=0;i<100&&!r.defeatedMonsters.includes(id);i++){
+    H.tick(r,2);const hit=H.strike(r,id,{lootCell:{x:2,y:3}});assert.ok(hit.ok,hit.message);r=hit.run;
+    // Defeating the two revised lords includes their real half-health counter,
+    // rather than assuming ordinary strikes can bypass a scene guard.
+    const guard=r.adventure.events?.lord;if(id===B.ID&&guard?.phase==='guarded'){
+      if(guard.floor===60){const arm=Events.armCounter(r);assert.ok(arm.ok);r=arm.run;}
+      for(let j=0;j<guard.broken.length;j++)if(!guard.broken[j]){const counter=Events.counter(r,j);assert.ok(counter.ok,counter.message);r=counter.run;}
+    }
+  }
+  assert.ok(r.defeatedMonsters.includes(id));return r;
+}
 test('ten original environmental lords only spawn on main-tower chapter finales, once each',()=>{
   assert.equal(Object.keys(B.LORDS).length,10);const names=new Set(),shapes=new Set();
   for(const [floor,d]of Object.entries(B.LORDS)){const r=fresh(+floor),spec=P.monsterSpecs(r).filter(m=>m.lord);assert.equal(spec.length,1);assert.equal(spec[0].id,B.ID);assert.equal(spec[0].strength,d.strength);assert.equal(spec[0].maxHp,Math.round(Math.min(240,85+Math.round((99-floor)*1.5))*1.3));assert.ok(d.personality);names.add(d.name);const m=B.build(T,d);let triangles=0,meshes=0;m.traverse(o=>{assert.ok(!o.isLight);if(o.isMesh){meshes++;triangles+=(o.geometry.index?.count??o.geometry.attributes.position.count)/3;assert.equal(o.material.map,null);}});assert.ok(meshes<=28&&triangles<6000);shapes.add(JSON.stringify(m.children[0].children.map(o=>[o.geometry.type,o.position.toArray(),o.scale.toArray()])));r.expedition.active={};assert.equal(B.forRun(r),null);}

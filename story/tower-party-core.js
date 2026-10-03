@@ -43,10 +43,10 @@
     honey_roast:{name:'向陽蜜籽盤',cost:{sunseed:1,nectar:1},hp:12,hunger:30,buff:'focus',description:'庭園的日輪籽裹上蛾蜜烘烤，香氣讓出手更專注。'},
     crab_pot:{name:'蓮心蟹肉煲',cost:{lotus:1,meat:1},hp:18,hunger:45,buff:'guard',description:'霧河蓮心與真正蟹類掉落的蟹肉同煮；其他怪物不會憑空提供蟹肉。'},
     herbal_platter:{name:'墨香菇燴盤',cost:{inkcap:1,mushroom:1},hp:18,hunger:25,team:8,description:'藏書區的墨菇與月傘菇慢燴，分成小盤分享給同伴。'},
-    crystal_pudding:{name:'共鳴晶凍',cost:{crystaljelly:2},hp:16,hunger:30,buff:'guard',description:'回聲石窟的晶凍經溫熱凝成甜點，不必把礦石當成食材。'},
+    crystal_pudding:{name:'共鳴晶凍',cost:{crystaljelly:2},hp:16,hunger:30,buff:'guard',ward:'shock',description:'回聲石窟的晶凍經溫熱凝成甜點。享用後五分鐘內，可抵擋一次電麻。'},
     forest_roast:{name:'森果根莖燴',cost:{forestnut:1,root:1},hp:10,hunger:45,team:8,description:'根林的堅果與甜根莖一起燜熟，是適合隊伍分享的耐餓料理。'},
-    ember_skewer:{name:'餘火椒根串',cost:{emberpepper:1,root:1},hp:12,hunger:40,buff:'focus',description:'熔爐怪物帶出的餘火椒為根莖串添上辛香，暖身也提振精神。'},
-    frost_compote:{name:'霜莓蜜煮',cost:{frostberry:1,nectar:1},hp:28,hunger:20,buff:'trail',description:'霜地莓果以雪蜜蛾的花蜜慢煮，酸甜果汁有助於恢復生命。'},
+    ember_skewer:{name:'餘火椒根串',cost:{emberpepper:1,root:1},hp:12,hunger:40,buff:'focus',ward:'burn',description:'熔爐怪物帶出的餘火椒為根莖串添上辛香。享用後五分鐘內，可抵擋一次灼傷。'},
+    frost_compote:{name:'霜莓蜜煮',cost:{frostberry:1,nectar:1},hp:28,hunger:20,buff:'trail',ward:'poison',description:'霜地莓果以雪蜜蛾的花蜜慢煮。享用後五分鐘內，可抵擋一次中毒。'},
     copper_flatbread:{name:'米香齒輪餅',cost:{coppergrain:1,root:1},hp:10,hunger:50,buff:'guard',description:'工坊的銅穗米磨粉烤成齒輪形狀；名字像金屬，實際上是可食穀物。'},
     heart_jam:{name:'塔心蜜果醬',cost:{heartfruit:1,nectar:1},hp:24,hunger:30,team:12,description:'塔心怪物攜帶的心燈果熬成蜜醬，為最後幾層的同行者補充力量。'},
     root_banquet:{name:'根脈遠征鍋',cost:{deeproot:2,herb:1},hp:26,hunger:55,team:16,buff:'trail',requiredDepth:1,description:'地下根脈特有的深根與香草燉成大鍋；地上甜根莖不能取代主材料。'},
@@ -173,12 +173,13 @@
   function eat(run,id,revision){return transact(run,revision,(n,p)=>{
     if(p.loadouts&&H().job(n)==='robot')return {ok:false,message:'機器人不能享用料理，請使用動力核心或零件回補修復。'};
     if(!recipeUnlocked(n,id)||!p.meals[id])return {ok:false,message:'料理盒裡沒有可享用的這道料理。'};const r=RECIPES[id];
-    n.hp=Math.min(p.loadouts?H().maxHp(n):C().MAX_HP,n.hp+r.hp);n.hunger=Math.min(100,n.hunger+r.hunger*(p.loadouts?1+H().teamPassive(n,'gourmet')/100:1));if(r.team){if(p.loadouts)H().ids(n).filter(k=>k!==p.loadouts.active&&H().hp(n,k)>0).forEach(k=>H().heal(n,k,r.team));else p.members.forEach(m=>m.hp=Math.min(memberMax(m),m.hp+r.team));}if(p.loadouts){H().food(n);G().recipe(n,id);}
+    if(p.loadouts)H().heal(n,p.loadouts.active,r.hp);else n.hp=Math.min(C().MAX_HP,n.hp+r.hp);n.hunger=Math.min(100,n.hunger+r.hunger*(p.loadouts?1+H().teamPassive(n,'gourmet')/100:1));if(r.team){if(p.loadouts)H().ids(n).filter(k=>k!==p.loadouts.active&&H().hp(n,k)>0).forEach(k=>H().heal(n,k,r.team));else p.members.forEach(m=>m.hp=Math.min(memberMax(m),m.hp+r.team));}if(p.loadouts){H().food(n);G().recipe(n,id);}
     if(r.buff){p.buffs=p.buffs.filter(b=>b.id!==r.buff);p.buffs.push({id:r.buff,floors:3});if(p.buffs.length>2)p.buffs.shift();}
+    if(r.ward&&p.loadouts)H().setBuff(n,p.loadouts.active,'meal_'+r.ward,300,1);
     p.meals[id]--;return {ok:true,message:`享用${r.name}。`};
   });}
   const CAMP_MAINTENANCE_RATIO=.1;
-  const campGear=run=>(run.party?.loadouts?H().ids(run).flatMap(id=>Object.values(H().equipment(run,id)).filter(Boolean)):Object.values(run.equipment||{}).filter(Boolean)).filter(g=>g.durability>0&&g.durability<g.maxDurability);
+  const campGear=run=>(run.party?.loadouts?H().ids(run).flatMap(id=>Object.values(H().equipment(run,id)).filter(Boolean)):Object.values(run.equipment||{}).filter(Boolean)).filter(g=>!H().ROBOT.isCore(g)&&g.durability>0&&g.durability<g.maxDurability);
   function campMaintenanceQuote(run){
     const cost=6,used=!!run?.party?.journey?.maintenance?.includes(run.floor),gear=run?.party?campGear(run):[];
     const reason=!run?.party?'尚未選擇冒險職業。':used?'本層已進行過營地保養，下一層才能再次保養。':!gear.length?'沒有可保養的裝備；破損裝備需請鍛匠或對應商人修復。':'';
@@ -222,7 +223,7 @@
     let drops=[];if(hp===0){n.defeatedMonsters.push(id);delete p.health[id];delete p.poise[id];delete n.monsterStuns[id];n.coins=Math.min(999999,n.coins+8+spec.strength*2);drops=Loot().recordKill(n,spec,options.lootCell);}
     return {ok:true,message:hp===0?`擊敗${spec.def.name}。`:`命中${spec.def.name}。`,effect:{target:'monster',damage,hp,dead:hp===0,broken,stunned,drops,lord:!!spec.lord}};
   });}
-  function hurtMember(run,id,amount,revision){if(run.party?.loadouts)return transact(run,revision,n=>H().hurt(n,id,amount));return transact(run,revision,(n,p)=>{
+  function hurtMember(run,id,amount,revision,monsterId=null){if(run.party?.loadouts)return transact(run,revision,n=>H().hurt(n,id,amount,'monster',monsterId));return transact(run,revision,(n,p)=>{
     const m=p.members.find(x=>x.id===id);if(!m||m.hp<=0||!num(amount,0,100))return {ok:false,message:'無效的隊友傷害。'};
     if(m.hurtLeft>0)return {ok:true,message:'',effect:{target:'companion',damage:0}};const damage=Math.max(1,amount-m.level);m.hp=Math.max(0,m.hp-damage);m.hurtLeft=2;return {ok:true,message:m.hp===0?`${PROFESSIONS[m.profession].person}需要休息！帶他回營地或分享料理。`:'劍士擋下了攻擊。',effect:{target:'companion',damage,down:m.hp===0}};
   });}
@@ -230,7 +231,7 @@
     if(p.cooldown>0)return {ok:false,message:'技能還在準備中。'};const j=p.profession;
     if(j==='chef'){if(!p.ingredients.root)return {ok:false,message:'需要一份甜根莖。'};if(n.hunger>=100)return {ok:false,message:'肚子還很飽。'};p.ingredients.root--;n.hunger=Math.min(100,n.hunger+25);}
     if(j==='healer'){if(!p.ingredients.herb)return {ok:false,message:'需要一份香草。'};if(n.hp>=C().MAX_HP)return {ok:false,message:'生命已滿。'};p.ingredients.herb--;n.hp=Math.min(C().MAX_HP,n.hp+20);}
-    if(j==='smith'){const gear=Object.values(n.equipment).filter(g=>g&&g.durability<g.maxDurability);if(!gear.length)return {ok:false,message:'沒有需要修補的裝備。'};if(!p.ingredients.shell)return {ok:false,message:'需要一份硬殼。'};p.ingredients.shell--;gear.forEach(g=>g.durability=Math.min(g.maxDurability,g.durability+3));}
+    if(j==='smith'){const gear=Object.values(n.equipment).filter(g=>g&&!H().ROBOT.isCore(g)&&g.durability<g.maxDurability);if(!gear.length)return {ok:false,message:'沒有需要修補的裝備。'};if(!p.ingredients.shell)return {ok:false,message:'需要一份硬殼。'};p.ingredients.shell--;gear.forEach(g=>g.durability=Math.min(g.maxDurability,g.durability+3));}
     if(j==='swordsman')p.guardLeft=6;
     if(j==='scout'){p.trapWard=6;n.effects.reveal=Math.max(18,n.effects.reveal);}
     p.cooldown=PROFESSIONS[j].cooldown;return {ok:true,message:PROFESSIONS[j].skill,effect:{skill:j}};

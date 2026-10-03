@@ -18,17 +18,18 @@
 .forge-detail .party-forge-traits{display:flex;flex-direction:column;gap:10px}.forge-detail .party-forge-traits section{display:flex;flex-direction:row;align-items:center;gap:12px;padding:12px}
 .forge-detail .party-forge-traits section>div{flex:1;min-width:0}.forge-detail .party-forge-traits .tower-btn{flex:none;max-width:48%;white-space:normal}
 .forge-detail p{font-size:15px;line-height:1.6}.forge-salvage{margin-top:18px;border-top:1px solid #7690a344;padding-top:12px}
-.hero-gear-alerts{display:flex;align-items:center;flex-wrap:wrap;gap:2px;max-width:62px}
-.hero-gear-alert{display:grid;place-items:center;color:#ffb44f;background:#4b341c;border:1px solid currentColor;border-radius:5px;width:25px;height:27px}
-.hero-gear-alert.critical{color:#ff7a80;background:#481f2a;border-width:2px}
+#heroTeamBar .hero-team-member{display:flex;flex:none;flex-direction:column;align-items:stretch;width:58px;gap:4px}
+#heroTeamBar .hero-team-member>button{width:100%;min-height:64px;box-sizing:border-box}
+.hero-gear-alerts{display:flex;justify-content:center;align-items:center;flex-wrap:wrap;gap:3px;width:100%;pointer-events:none}
+.hero-gear-alert{display:grid;place-items:center;color:#ffb44f;background:#4b341ca6;border:1px solid currentColor;border-radius:5px;width:23px;height:25px;opacity:.65}
+.hero-gear-alert.critical{color:#ff7a80;background:#481f2aa6;border-width:2px}
 .hero-gear-alert.broken{border-style:dashed}.hero-gear-alert .hero-icon{width:23px;height:25px;filter:none;stroke:currentColor}
 .hero-gear-alert svg{color:inherit!important}.hero-member-heading{display:flex;align-items:center;gap:4px;justify-content:center}
 .hero-gear-alert svg g{stroke:currentColor}
-#heroTeamBar button:has(.hero-gear-alert){width:auto;min-width:70px;max-width:125px}
 #heroTeamBar{flex-wrap:nowrap;overflow-x:auto;scrollbar-width:thin}
-#heroTeamBar button{flex:none}#heroTeamBar button:has(.hero-gear-alert){grid-template-columns:auto auto;align-items:center}
-#heroTeamBar button:has(.hero-gear-alert)>.party-glyph,#heroTeamBar button:has(.hero-gear-alert)>meter{grid-column:1/-1}
+#heroTeamBar button{flex:none}
 .hero-gear-alerts:empty{display:none}
+@media(max-height:500px){#heroTeamBar .hero-team-member{width:60px;gap:3px}#heroTeamBar .hero-team-member>button{min-height:58px}.hero-gear-alerts{gap:2px}.hero-gear-alert{width:20px;height:22px}.hero-gear-alert .hero-icon{width:19px;height:21px}}
 @media(max-width:1000px),(max-height:600px){
   #towerOverlay{padding:max(6px,env(safe-area-inset-top)) max(8px,env(safe-area-inset-right)) max(6px,env(safe-area-inset-bottom)) max(8px,env(safe-area-inset-left))}
   #towerDialog.tower-card,#towerDialog.hero-management{padding:0;width:100%;max-width:none;height:100%;max-height:calc(100dvh - 12px - env(safe-area-inset-top) - env(safe-area-inset-bottom));border-radius:13px}

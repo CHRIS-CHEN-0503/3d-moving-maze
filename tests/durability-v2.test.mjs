@@ -6,7 +6,7 @@ const fresh=(job='smith')=>H.enable(P.enable(C.newRun({seed:43}),job).run).run;
 test('all weapon and armor multipliers match category; legacy damaged items upgrade once without healing',()=>{
   const ordinary=Object.entries(C.GEAR).filter(([,def])=>!def.integrated&&!def.core);assert.equal(ordinary.length,96);
   for(const [kind,def]of ordinary){
-    const expected=def.slot==='weapon'||def.type==='heavy'||['helmet','armor','shield','round_shield','tower_shield'].includes(def.baseKind||kind)?20:40/3;
+    const category=def.slot==='weapon'||def.type==='heavy'||['helmet','armor','shield','round_shield','tower_shield'].includes(def.baseKind||kind)?20:40/3,expected=category*(['spellbook','cooking_pan'].includes(def.baseKind||kind)?1.25:1);
     assert.equal(C.durabilityMultiplier(kind),expected);
     const gear=C.createGear(kind,49,13,'migration'),price=C.gearPrice(gear),old={...gear,durability:2,maxDurability:Math.round(gear.maxDurability/expected)};delete old.durabilityVersion;
     const upgraded=C.validateGear(old);assert.equal(upgraded.durability,Math.round(old.durability*gear.maxDurability/old.maxDurability));assert.equal(upgraded.maxDurability,gear.maxDurability);assert.deepEqual(C.validateGear(upgraded),upgraded);assert.equal(C.gearPrice(upgraded),price);

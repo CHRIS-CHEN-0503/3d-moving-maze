@@ -8,13 +8,15 @@ const require=createRequire(import.meta.url);
 const T=require('../lib/three.min.js'),C=require('../story/story-core.js'),P=require('../story/tower-party-core.js'),X=require('../story/tower-expedition-core.js');
 const source=readFileSync(new URL('../story/tower-party-runtime.js',import.meta.url),'utf8');
 const seeds={};
-for(let seed=1;seed<200&&Object.keys(seeds).length<6;seed++){
+const siteJobs=Object.keys(X.SITES);
+for(let seed=1;seed<200&&Object.keys(seeds).length<siteJobs.length;seed++){
   const run=P.enable(C.newRun({seed}),'swordsman').run;seeds[X.siteOffer(run).job]??=seed;
 }
-assert.equal(Object.keys(seeds).length,6);
+assert.deepEqual(Object.keys(seeds).sort(),siteJobs.sort(),'fixture uses actual version-two site offers for every profession');
 
 function harness(job,save){
   let run=save?C.validateSave(JSON.stringify(save)):P.enable(C.newRun({seed:seeds[job]}),job).run,failSave=false,cell=0;
+  assert.equal(X.siteOffer(run).job,job,'seed must represent the requested site, including archer and robot');
   const world=new T.Group(),player=new T.Group(),G={px:0,pz:0,running:true,shifting:false},passages=[],disposed=[];
   const context=vm.createContext({TowerPartyCore:P,TowerExpedition:X,TowerCharacters:require('../story/tower-characters.js'),TowerMaterials:require('../story/tower-materials.js'),document:{hidden:false,getElementById(){return null;}}});
   vm.runInContext(source,context);

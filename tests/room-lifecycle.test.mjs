@@ -36,6 +36,11 @@ test('等待五秒才開始，重送或回送開始封包不會重建遊戲',()=
   r.advance(1);r.flush();assert.equal(r.host.starts.length,1);assert.equal(r.guest.starts.length,1);
   r.advance(1000);r.flush();assert.equal(r.host.starts.length,1);assert.equal(r.guest.starts.length,1);
 });
+test('背景分頁沿用既有房間計時更新新地標與回條，不新增計時器；前景與已結束不重複跑',()=>{
+  const r=room();let variants=0,claims=0;r.host.c.window.ModeVariants={frame:()=>variants++};r.host.c.window.ShopClaims={tick:()=>claims++};r.start();r.advance(5000);r.flush();assert.equal(variants,0);assert.equal(claims,0);
+  r.host.c.document.hidden=true;r.advance(250);assert.equal(variants,1);assert.equal(claims,1);r.host.c.MP.ended=true;r.advance(250);assert.equal(variants,1);assert.equal(claims,1);
+  assert.equal((src.match(/setInterval\(/g)||[]).length,1);
+});
 test('房主不收到自己結束封包仍準時完成，遺失的訪客結果在下一次心跳補送',()=>{
   const r=room();r.start();r.advance(5000);r.flush();r.advance(10000);
   assert.equal(r.host.ends.length,1);assert.equal(r.guest.ends.length,0);r.packets.length=0;

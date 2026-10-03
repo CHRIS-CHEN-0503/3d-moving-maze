@@ -7,10 +7,11 @@ export function add(run,job,key,id='ally-'+job){const m={id,profession:job,sex:'
 export function fixture(key,under=Co.DEFINITIONS.find(d=>d.id===key).underground){const def=Co.DEFINITIONS.find(d=>d.id===key);let run=H.enable(P.enable(C.newRun({seed:53,name:'合作測試'}),def.participants[0].job).run).run;
   if(under){run.floor=1;run.floorsCleared=99;run.status='won';run.chronicle=N.newChronicle(1);run.chronicle.ending='release';run.chronicle.clues=N.CHAPTERS.map(c=>c.clueId);P.advance(run,{reward:false});const v=C.startUnderworld(run);assert.ok(v.ok,v.message);run=v.run;}
   ownSkill(run,'hero',def.participants[0].skill);const ids=['hero',...def.participants.slice(1).map(p=>add(run,p.job,p.skill))];
-  for(const k of Object.keys(run.party.ingredients))run.party.ingredients[k]=20;run.bag.arrow=50;
+  for(const k of Object.keys(run.party.ingredients))run.party.ingredients[k]=20;run.bag.arrow=50;run.party.journey.scrap=20;
   const positions=Object.fromEntries(ids.map((id,i)=>[id,{x:i*.8,z:0}])),monster=P.monsterSpecs(run)[0],monsters=[{id:monster.id,alive:true,x:0,z:2.5}];
   if(def.formation.kind==='front'){for(const id of ids)positions[id]={x:0,z:0};positions[ids[def.formation.front]]={x:0,z:1.2};}
   if(def.formation.kind==='pincer'){positions[ids[0]]={x:-1,z:1};positions[ids[1]]={x:1,z:1};monsters[0]={...monsters[0],x:0,z:1};}
   if(def.effect.injured)for(const id of ids)H.setHp(run,id,Math.max(1,H.maxHp(run,id)-20));
+  if(def.effect.mechanicalHealPercent){const id=ids[def.effect.targetMember];H.setHp(run,id,Math.max(1,H.maxHp(run,id)-30));H.equipment(run,id).armor.durability-=10;}
   const space={ready:true,positions,monsters,clear:()=>true,blocked:[]};assert.ok(C.validateSave(run),'fixture should be saveable');return {run,space,ids,def};
 }

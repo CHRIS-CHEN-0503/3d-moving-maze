@@ -4,9 +4,9 @@
   const ID='monster-11',UNDERWORLD_ID='monster-12';
   const TACTICS=Object.freeze(Object.fromEntries(Object.entries({
     cloud:{role:'守誓近衛',threat:'守在章末門前，靠太近會接連承受碰撞與重擊。',counter:'先留好退路，等重擊落空，再與同伴一起上前。'},
-    garden:{role:'庭園守門',threat:'會沿通道逼近；花根與牆角可能縮小你的退路。',counter:'選較寬的通道交戰，別讓隊伍退進死路。'},
+    garden:{role:'庭園守門',threat:'會沿通道逼近；半血時，兩根供能藤會撐起根盾。',counter:'保留退路；根盾亮起後，靠近兩根供能藤點對話斬斷，再進攻園后。'},
     roots:{role:'緩行重衛',threat:'行動較慢，但近身碰撞與揮擊都很有力。',counter:'用遠程隊員拉開距離，近戰隊員趁出手間隔反擊。'},
-    echo:{role:'晶光射手',threat:'隔著長通道聚集晶光，射擊時不必貼近你。',counter:'瞄準開始後立刻側移；轉角是阻擋晶光的掩護。'},
+    echo:{role:'晶光射手',threat:'遠處蓄力射晶光；半血會啟動晶罩，普通攻擊暫時無效。',counter:'蓄力時先側移；半血後轉動晶柱，躲到它後方引晶光擊中晶柱破罩；晶柱熄滅可再轉一次。'},
     library:{role:'書庫術衛',threat:'從書架間瞄準旅人，接近也不能免去碰撞傷害。',counter:'沿書架轉角接近，留下能躲回去的掩護。'},
     mist:{role:'霧中遠衛',threat:'警戒範圍大，會從霧中的通道蓄力射擊。',counter:'先保持照明，看清蓄力後側移，別直直追著走。'},
     frost:{role:'警覺獵手',threat:'能看見很遠的動靜，追上後會近身重擊。',counter:'在踏進長通道前整隊，保留緩速或護盾應付追擊。'},

@@ -52,6 +52,9 @@
       if(e.type==='item'&&(!Object.hasOwn(C().ITEMS,e.key)||e.key==='coin')||e.type==='ingredient'&&!Object.hasOwn(P().INGREDIENTS,e.key)||e.type==='material'&&(!Object.hasOwn(M().MATERIALS,e.key)||floor>0&&['starore','abyssalloy'].includes(e.key))||e.type==='fuel'&&e.key!=='kit')return null;
       if(e.type==='item'&&C().ITEMS[e.key]?.fuel&&(e.quantity!==1||e.rarity!==C().ITEMS[e.key].dropRarity))return null;
       const gear=e.type==='gear'?C().validateGear(e.gear):undefined;if(e.type==='gear'&&(!gear||gear.kind!==e.key||e.quantity!==1||e.source!==(floor<0?'monster-12':'monster-11')))return null;
+      // Expired cores vanish only after full entry validation. Keep the kill
+      // receipt so loading or later claiming cannot roll a replacement drop.
+      if(gear&&H().ROBOT.isExpiredCore(gear))continue;
       entries.push({id:e.id,source:e.source,type:e.type,key:e.key,quantity:e.quantity,rarity:e.rarity,cx:e.cx,cy:e.cy,...(gear?{gear}:{})});
     }return {version:1,rolled:[...value.rolled],entries};
   }

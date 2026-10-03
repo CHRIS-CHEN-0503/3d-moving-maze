@@ -7,6 +7,7 @@
   const P = window.TowerPartyCore, Heroes=window.TowerHeroes, HeroVisual=window.TowerHeroVisuals, Cooking=window.TowerCommissionCooking;
   const Lords=window.TowerFloorLords,Loot=window.TowerLoot,Foraging=window.TowerForaging,Reinforcements=window.TowerReinforcements;
   const Underworld=window.TowerUnderworld;
+  const Landmarks=window.TowerLandmarks,AdventureEvents=window.TowerAdventureEvents;
   const reducedMotion=window.matchMedia?.('(prefers-reduced-motion: reduce)');
   const modern=()=>!!run?.party?.loadouts;
   let partyUI = null, lightingUI = null, lightingRig = null, pendingProfession = null, pendingHero = null, pendingSex = 'male', upgradingProfession = false;
@@ -33,6 +34,7 @@
   let mainClue = null, rift = null, dungeonObjects = [], nearbyJourney = null, exploredCells = new Set(), reader = null, sideReader = null;
   let pendingDungeonShift = null;
   let hazards = [], hazardSlow = 1, hazardGrace = 3;
+  let landmark=null,eventMarker=null,followupMarker=null,counterObjects=[],nearbyAdventure=null,lordCounterNotice=false;
   const color = { heal: 0xff719a, ration: 0xe7b86c, shield: 0x5edfff, hourglass: 0xcda5ff, bell: 0xffd677, map: 0x85e9ac, feather: 0xeaf6ff, coin: 0xffd76a, arrow:0xb3d79b };
   // 十區使用獨立色盤與建築輪廓；只有當層載入，不預載九十九個場景。
   const ENVIRONMENTS = [
@@ -351,8 +353,9 @@
       if(run.party?.journey?.materials&&previous?.party&&previous.party.journey?.materials===undefined&&C.validateSave(previous)&&!localStorage.getItem(SAVE+'_before_regional_crafting'))localStorage.setItem(SAVE+'_before_regional_crafting',raw);
       if(run.party?.travellers&&previous?.party&&previous.party.travellers===undefined&&C.validateSave(previous)&&!localStorage.getItem(SAVE+'_before_traveller_reunion'))localStorage.setItem(SAVE+'_before_traveller_reunion',raw);
       if(run.party?.foraging&&previous?.party&&previous.party.foraging===undefined&&C.validateSave(previous)&&!localStorage.getItem(SAVE+'_before_foraging_v1'))localStorage.setItem(SAVE+'_before_foraging_v1',raw);
-      if(run.party?.foraging?.version===3&&[1,2].includes(previous?.party?.foraging?.version)&&C.validateSave(previous)&&!localStorage.getItem(SAVE+'_before_foraging_v3'))localStorage.setItem(SAVE+'_before_foraging_v3',raw);
+      if(run.party?.foraging?.version===4&&[1,2,3].includes(previous?.party?.foraging?.version)&&C.validateSave(previous)&&!localStorage.getItem(SAVE+'_before_foraging_v4'))localStorage.setItem(SAVE+'_before_foraging_v4',raw);
       if(previous&&typeof Heroes!=='undefined'&&Heroes?.ROBOT?.needsMigration(previous)&&C.validateSave(previous)&&!localStorage.getItem(SAVE+'_before_robot_power_v1'))localStorage.setItem(SAVE+'_before_robot_power_v1',raw);
+      if(previous&&typeof Heroes!=='undefined'&&Heroes?.ROBOT?.needsCoreExpiryMigration(previous)&&C.validateSave(previous)&&!localStorage.getItem(SAVE+'_before_core_expiry_v1'))localStorage.setItem(SAVE+'_before_core_expiry_v1',raw);
       if(run.party?.loadouts?.growth&&previous?.party?.loadouts&&!previous.party.loadouts.growth&&C.validateSave(previous)&&!localStorage.getItem(SAVE+'_before_hero_growth'))localStorage.setItem(SAVE+'_before_hero_growth',raw);
       if(run.party?.loadouts?.growth?.version===2&&previous?.party?.loadouts&&previous.party.loadouts.growth?.version!==2&&C.validateSave(previous)&&!localStorage.getItem(SAVE+'_before_underground_growth_v2'))localStorage.setItem(SAVE+'_before_underground_growth_v2',raw);
       if(run.party?.loadouts?.xpScale===10&&previous?.party?.loadouts&&previous.party.loadouts.xpScale===undefined&&C.validateSave(previous)&&!localStorage.getItem(SAVE+'_before_xp10'))localStorage.setItem(SAVE+'_before_xp10',raw);
@@ -360,7 +363,8 @@
       if(previous&&C.validateSave(previous)&&previousGear.some(g=>g.durabilityVersion===undefined)&&!localStorage.getItem(SAVE+'_before_durability2'))localStorage.setItem(SAVE+'_before_durability2',raw);
       if(previous&&C.validateSave(previous)&&previousGear.some(g=>g.durabilityVersion===undefined||g.durabilityVersion===2)&&!localStorage.getItem(SAVE+'_before_durability3'))localStorage.setItem(SAVE+'_before_durability3',raw);
       if(previous&&C.validateSave(previous)&&previousGear.some(g=>g.durabilityVersion===undefined||g.durabilityVersion===2||g.durabilityVersion===3)&&!localStorage.getItem(SAVE+'_before_durability4'))localStorage.setItem(SAVE+'_before_durability4',raw);
-      if(previous&&C.validateSave(previous)&&previousGear.some(g=>g.durabilityVersion!==C.DURABILITY_VERSION)&&!localStorage.getItem(SAVE+'_before_durability5'))localStorage.setItem(SAVE+'_before_durability5',raw);
+      if(previous&&C.validateSave(previous)&&previousGear.some(g=>g.durabilityVersion===undefined||g.durabilityVersion<5)&&!localStorage.getItem(SAVE+'_before_durability5'))localStorage.setItem(SAVE+'_before_durability5',raw);
+      if(C.DURABILITY_VERSION>=6&&previous&&C.validateSave(previous)&&previousGear.some(g=>g.durabilityVersion===undefined||g.durabilityVersion<6)&&!localStorage.getItem(SAVE+'_before_durability6'))localStorage.setItem(SAVE+'_before_durability6',raw);
       if(run.status==='won'&&run.floor===1&&C.validateSave(run))localStorage.setItem(SURFACE_CLEAR,JSON.stringify(run));
       localStorage.setItem(SAVE, JSON.stringify(run)); return true;
     }
@@ -369,9 +373,11 @@
   function canCollectOriginal(id) { return !active || !run.claimed.includes(id); }
   function itemConfig() { return {itemCount:0,foodCount:0,storyCount:0,total:0}; }
   function preserveFloorPickups() { return active && floorStarted; }
-  function occupiedCells(includeForaging=true){return [...traders,...loot.filter(item=>includeForaging||!item.foraging),...dungeonObjects,...hazards,...(partyUI?.reserved()||[]),...(lightingUI?.reserved()||[]),...[warriorNpc,explorer,chest,relic,mainClue,rift].filter(Boolean)].map(item=>item.cx+','+item.cy);}
+  function occupiedCells(includeForaging=true){return [...(landmark?.cells||[]).map(c=>c.x+','+c.y),...traders,...loot.filter(item=>includeForaging||!item.foraging),...dungeonObjects,...hazards,...counterObjects,...(partyUI?.reserved()||[]),...(lightingUI?.reserved()||[]),...[warriorNpc,explorer,chest,relic,mainClue,rift,eventMarker,followupMarker].filter(Boolean)].map(item=>typeof item==='string'?item:item.cx+','+item.cy);}
   function reservedCells() {
-    return floorStarted?occupiedCells():[];
+    // startGame asks before buildWorld exists; reserve the same seeded island
+    // already here so the initial magic-map pickups cannot occupy its scenery.
+    return floorStarted?occupiedCells():(Landmarks?.plan(run,G.mazeW)?.cells||[]).map(c=>c.x+','+c.y);
   }
   function collectedOriginal(id) {
     if (!active || !run || inDungeon() || run.claimed.includes(id)) return;
@@ -422,6 +428,7 @@
     // manager-owned particle programs/textures must survive the floor change.
     partyUI?.reset();
     floorConfig = C.floorConfig(run.floor,run.seed);
+    AdventureEvents?.ensure(run);
     const instance=dungeonOffer();
     if(instance)floorConfig={...floorConfig,size:instance.size,name:instance.title,shiftSeconds:instance.shiftSeconds,monsterCount:0,narrative:'',environmentId:sideStory(instance.kind)?.environmentId||{archive:'library',bells:'echo',lantern:'furnace'}[instance.kind]};
     const settings = { mazeSize: CFG.mazeSize, itemCount: CFG.itemCount, foodCount: CFG.foodCount };
@@ -622,7 +629,7 @@
   }
   function mapMarkers() {
     if(!active)return [];
-    return [...[mainClue,rift,...dungeonObjects].filter(o=>o&&o.model.visible).map(o=>({cx:o.cx,cy:o.cy,label:o===mainClue?'印':o===rift?'裂':String(o.index+1),color:o===mainClue?'#ffe295':o===rift?'#8ee5df':run.expedition.active.progress.includes(o.index)?'#83e7ae':'#edc789'})),...(partyUI?.markers()||[])];
+    return [...[mainClue,rift,...dungeonObjects].filter(o=>o&&o.model.visible).map(o=>({cx:o.cx,cy:o.cy,label:o===mainClue?'印':o===rift?'裂':String(o.index+1),color:o===mainClue?'#ffe295':o===rift?'#8ee5df':run.expedition.active.progress.includes(o.index)?'#83e7ae':'#edc789'})),...[eventMarker,followupMarker,...counterObjects].filter(o=>o?.model.visible).map(o=>({cx:o.cx,cy:o.cy,label:o===eventMarker?'選':o===followupMarker?'信':run.floor===80?'藤':'晶',color:'#bcd991'})),...(partyUI?.markers()||[])];
   }
   function buildTowerEnvironment() {
     if (envGroup) { disposeSceneObject(envGroup); scene.remove(envGroup); }
@@ -707,7 +714,10 @@
     explorer=chest=relic=nearbyEncounter=null;lastSurveyCell='';exitDeclined=false;
     world = new THREE.Group(); scene.add(world);
     mainClue=rift=nearbyJourney=null;dungeonObjects=[];exploredCells=new Set();
+    landmark=null;eventMarker=followupMarker=nearbyAdventure=null;counterObjects=[];lordCounterNotice=false;
     const random = mulberry32(floorSeed() ^ 0x712da), used = new Set(['0,0', G.exitCell.x + ',' + G.exitCell.y]);
+    landmark=Landmarks?.plan(run,G.mazeW)||null;
+    if(landmark){for(const c of landmark.cells)used.add(c.x+','+c.y);const model=Landmarks.build(THREE,landmark,G.cell),center=cellPoint(landmark.center.x,landmark.center.y);model.position.set(center.x,0,center.z);world.add(model);landmark.model=model;}
     const originalPickups = [...(G.items||[]), ...(G.foods||[])];
     for(const item of originalPickups){const c=worldToCell(item.x,item.z);used.add(c.x+','+c.y);}
     if(inDungeon()){buildDungeonWorld(random,used);lightingUI?.build(random,used);buildHazards(used);return;}
@@ -721,7 +731,14 @@
     for (let i = 0; i < (partyMonsters?partyMonsters.length:floorConfig.monsterCount); i++) {
       const kind = partyMonsters?partyMonsters[i].kind:run.floor<=54&&i===floorConfig.monsterCount-1?'shardseer':floorConfig.monsterTypes[i % floorConfig.monsterTypes.length], def = partyMonsters?partyMonsters[i].def:C.MONSTERS[kind];
       const spec=partyMonsters?.[i],strength = spec?spec.strength:C.monsterStrength(kind, run.floor), id = spec?.id||'monster-' + i;
-      const point = spec?.reinforcement?cellPoint(spec.cx,spec.cy):chooseCell(random, used, Math.min(7, floorConfig.size - 1)), model = monsterModel(kind, strength, def);
+      let point = spec?.reinforcement?cellPoint(spec.cx,spec.cy):chooseCell(random, used, Math.min(7, floorConfig.size - 1));
+      if(spec?.reinforcement){
+        if(landmark?.cells.some(c=>c.x===point.cx&&c.y===point.cy)){
+          point=chooseCell(random,used,2);const saved=run.party.reinforcements.monsters.find(m=>m.id===spec.id);if(saved){saved.cx=point.cx;saved.cy=point.cy;}
+        }
+        used.add(point.cx+','+point.cy);
+      }
+      const model = monsterModel(kind, strength, def);
       const alive = !run.defeatedMonsters.includes(id);
       model.position.set(point.x, 0, point.z); model.visible = alive; model.userData.monsterId=id; world.add(model);
       monsters.push({ ...point, id, strength, kind, def, model, alive,lord:!!spec?.lord,maxHp:spec?.maxHp, path: [], pathLeft: i * .15, windup: 0, cooldown: 2, phase: i,voiceEvents:new Set() });
@@ -741,6 +758,50 @@
     buildHazards(used);
     restoreDrops();
     buildForaging(used);
+    buildAdventureWorld(random,used);
+  }
+  function prepareMaze(maze,start){return active&&!inDungeon()&&Landmarks?Landmarks.prepareMaze(run,maze,start):maze;}
+  function buildAdventureWorld(random,used){
+    if(!AdventureEvents||!run.party||inDungeon())return;
+    for(const cell of occupiedCells())used.add(cell);
+    const state=AdventureEvents.ensure(run),offer=AdventureEvents.offer(run);
+    const marker=(cx,cy,label,tint)=>{const point=cellPoint(cx,cy),model=journeyMarker(label,tint);model.position.set(point.x,0,point.z);world.add(model);return {...point,model};};
+    if(landmark&&offer){eventMarker=marker(landmark.x,landmark.y,offer.name,0xa3d38d);eventMarker.model.visible=state.current.choice===null;eventMarker.offer=offer;}
+    if(landmark&&state.chain?.status==='active'&&state.chain.targetFloor===run.floor)followupMarker=marker(landmark.x+2,landmark.y+2,AdventureEvents.KINDS[state.chain.kind].person+'的留言',0xdccc90);
+    const lord=monsters.find(m=>m.lord);
+    if(state.lord&&lord)for(let i=0;i<state.lord.broken.length;i++){
+      let point;if(run.floor===60){const near=[];for(let y=0;y<G.mazeH;y++)for(let x=0;x<G.mazeW;x++)if(!used.has(x+','+y)){const p=cellPoint(x,y),d=Math.hypot(p.x-lord.x,p.z-lord.z);if(d>=G.cell*.8&&d<=G.cell*2.1)near.push({p,d});}near.sort((a,b)=>a.d-b.d);point=near.find(v=>hasClearPath(lord.x,lord.z,v.p.x,v.p.z))?.p||near[0]?.p;}
+      point=point||chooseCell(random,used,4);used.add(point.cx+','+point.cy);
+      const model=new THREE.Group(),material=new THREE.MeshLambertMaterial({color:run.floor===80?0x78a768:0x89d6e1,emissive:run.floor===80?0x345e32:0x498498,emissiveIntensity:.15});
+      if(run.floor===80){for(let j=0;j<3;j++){const vine=new THREE.Mesh(new THREE.CylinderGeometry(.12,.22,1.4,6),material);vine.position.set((j-1)*.22,.7,0);vine.rotation.z=(j-1)*.22;model.add(vine);}const bud=new THREE.Mesh(new THREE.SphereGeometry(.32,8,6),material);bud.position.y=1.6;model.add(bud);}
+      else{const crystal=new THREE.Mesh(new THREE.OctahedronGeometry(.65,0),material);crystal.position.y=1.05;crystal.scale.y=1.65;model.add(crystal);}
+      model.position.set(point.x,0,point.z);model.name='lord-counter-'+i;world.add(model);counterObjects.push({...point,model,index:i});
+    }
+    refreshAdventureWorld();
+  }
+  function refreshAdventureWorld(){
+    const s=run.adventure?.events;if(!s)return;
+    if(eventMarker)eventMarker.model.visible=s.current?.choice===null;
+    if(followupMarker)followupMarker.model.visible=s.chain?.status==='active'&&s.chain.targetFloor===run.floor;
+    for(const item of counterObjects){item.model.visible=s.lord?.phase==='guarded'&&!s.lord.broken[item.index];item.model.traverse(o=>{if(o.isMesh)o.material.emissiveIntensity=s.lord?.armed>0?.65:.15;});}
+    if(s.lord?.phase==='guarded'&&!lordCounterNotice){lordCounterNotice=true;showToast(run.floor===80?'園后的根盾亮起了！找出兩根供能藤。':'伯爵的晶罩亮起了！轉動晶柱，引晶光擊中它。',4200);AudioEng.sfxAction?.('barrier');}
+    nearbyAdventure=[eventMarker,followupMarker,...counterObjects].find(o=>o?.model.visible&&Math.hypot(G.px-o.x,G.pz-o.z)<2.6&&hasClearPath(G.px,G.pz,o.x,o.z))||null;
+  }
+  function adventureDialog(){
+    const item=nearbyAdventure;if(!item||!item.model.visible)return;
+    if(item===eventMarker){const o=item.offer;dialog('迷宮小事件 · 兩種選擇都可繼續',o.name,o.copy,'<p class="tower-copy">'+AdventureEvents.svg(o.kind)+(landmark?Landmarks.svg(landmark.kind):'')+'景觀不隨移牆改變。</p><div class="tower-grid">'+o.choices.map(c=>'<article class="tower-item"><h3>'+text(c.label)+'</h3><p>'+text(c.description)+'</p></article>').join('')+'</div>',o.choices.map((c,i)=>action(c.label,'adventure-choice',o.id+':'+i)).join('')+action('稍後再選','close'),{full:true});return;}
+    if(item===followupMarker){if(transact(AdventureEvents.inspect(run))){refreshAdventureWorld();questDialog(false,true);}return;}
+    if(run.floor===80){if(transact(AdventureEvents.counter(run,item.index))){AudioEng.sfxBreak();refreshAdventureWorld();closeDialog();}return;}
+    if(transact(AdventureEvents.armCounter(run))){AudioEng.sfxAction?.('mechanism');refreshAdventureWorld();closeDialog();showToast('躲在晶柱後方，讓伯爵的晶光打中晶柱！',3600);}
+  }
+  function followupPanel(){
+    const q=AdventureEvents?.brief(run);if(!q)return false;
+    dialog('旅途後續 · 不影響主線',q.name,q.copy,AdventureEvents.svg(q.kind)+'<section class="tower-guard-summary"><h3>接下來</h3><p>'+text(q.next)+'</p><p>'+text(AdventureEvents.KINDS[q.kind].reward)+'</p></section>',action('繼續探索','close')+(q.status==='ready'?action('領取答謝','adventure-claim'):'')+action('放下這次委託','adventure-abandon')+(run.adventure.quest&&run.adventure.quest.status!=='claimed'?action('本層委託','quest-local'):'')+(run.adventure.events.lord?.phase==='guarded'?action('樓主場景提示','adventure-lord-help'):''),{summary:q.name+'。'+q.next});return true;
+  }
+  function lordCounterPanel(){
+    const state=run.adventure?.events?.lord;if(state?.phase!=='guarded')return false;
+    const garden=state.floor===80,copy=garden?'根盾正在保護園后。靠近亮起的供能藤，點對話斬斷；兩根都斬斷後，再攻擊園后。':'晶罩正在保護伯爵。靠近晶柱點對話轉向，亮光期間繞到它後面，引伯爵的晶光擊中晶柱；若晶柱熄滅，再轉一次。';
+    dialog('樓主場景 · 先觀察再進攻',garden?'斬斷供能藤':'借晶光破晶罩',copy,AdventureEvents.svg(garden?'rootCounter':'crystalCounter')+'<p class="tower-copy">'+(garden?'已斬斷 '+state.broken.filter(Boolean).length+' / 2 根供能藤。':'躲在晶柱後方，而不是站在伯爵與晶柱之間。')+'</p>',action('繼續作戰','close')+(AdventureEvents.brief(run)?action('旅途後續','adventure-followup'):'')+(run.adventure.quest&&run.adventure.quest.status!=='claimed'?action('本層委託','quest-local'):''),{summary:copy});return true;
   }
   function buildForaging(used){
     if(!run.party||!partyUI||inDungeon())return;
@@ -770,7 +831,15 @@
   }
   function restoreDrops(){
     if(!run.party||inDungeon())return;
-    for(const entry of run.party.loot.entries){if(loot.some(l=>l.id===entry.id))continue;const point=cellPoint(entry.cx,entry.cy),model=new THREE.Group(),icon=new THREE.Group();model.position.set(point.x,0,point.z);model.name='combat-drop';
+    for(const entry of run.party.loot.entries){if(loot.some(l=>l.id===entry.id))continue;
+      // Older saves and roaming monsters can leave drops inside a newly reserved
+      // landscape. Relocate the saved entry once, never recreate the reward.
+      if(landmark?.cells.some(c=>c.x===entry.cx&&c.y===entry.cy)){
+        const blocked=new Set([...occupiedCells().filter(cell=>!loot.some(l=>l.entry&&l.cx+','+l.cy===cell)),'0,0',G.exitCell.x+','+G.exitCell.y]);
+        const cells=[];for(let y=0;y<G.mazeH;y++)for(let x=0;x<G.mazeW;x++)if(!blocked.has(x+','+y))cells.push({x,y,d:Math.abs(x-entry.cx)+Math.abs(y-entry.cy)});
+        cells.sort((a,b)=>a.d-b.d||a.y-b.y||a.x-b.x);if(cells[0]){entry.cx=cells[0].x;entry.cy=cells[0].y;}
+      }
+      const point=cellPoint(entry.cx,entry.cy),model=new THREE.Group(),icon=new THREE.Group();model.position.set(point.x,0,point.z);model.name='combat-drop';
       if(entry.type==='ingredient')icon.add(partyUI.ingredientModel(entry.key));
       else if(entry.type==='material')icon.add(partyUI.materialModel(entry.key));
       else if(entry.type==='gear'){const gear=HeroVisual.gear(THREE,entry.gear.kind);gear.scale.setScalar(.48);gear.updateMatrixWorld(true);const box=new THREE.Box3().setFromObject(gear),center=box.getCenter(new THREE.Vector3());gear.position.sub(center);icon.add(gear);}
@@ -811,6 +880,7 @@
   }
   function allowMonsterHit(m){
     if(cinema?.active)return false;
+    if(m.lord&&run.adventure?.events?.lord?.phase==='guarded')return false;
     if(!cinema||!m.lord||momentSeen('lord:'+m.id+':encounter'))return true;
     checkLordEntrance();return false;
   }
@@ -827,7 +897,7 @@
   }
   function buildHazards(used) {
     const H=window.TowerHazards,offer=dungeonOffer();
-    if(!H||(offer&&offer.catalogVersion!==3))return;
+    if(!H||(offer&&![3,4].includes(offer.catalogVersion)))return;
     hazards=H.layout({floor:run.floor,seed:floorSeed(),size:G.mazeW,hWalls:G.hWalls,vWalls:G.vWalls,blocked:[...used],count:offer?.trapCount,allKinds:!!offer}).map(spec=>{
       const trap=H.place(spec,cellToWorld(spec.cx,spec.cy),G.cell,hasClearPath,G.wallT||.7),model=H.build(THREE,trap),prefix=run.floor+':'+trap.cx+':'+trap.cy+':';
       // A previously disarmed location stays disarmed even if its new wall skin differs.
@@ -1056,6 +1126,7 @@
     else if(N&&!nearest&&!nearestWarrior)el('towerObjective').textContent=N.objective(run);
     if(inDungeon()){const offer=dungeonOffer(),state=run.expedition.active;el('towerFloor').textContent='裂隙 · '+run.floor+' F';el('towerObjective').textContent=offer.title+' · '+state.progress.length+'/3 · 剩 '+Math.ceil(Math.max(0,offer.timeLimit-state.elapsed))+' 秒'+(['bells','threads'].includes(offer.kind)?' · '+offer.order.map(i=>i+1).join('→'):offer.kind==='stars'&&state.progress.length===1?(state.shiftCount>state.shiftAtStart?' · 星路已更新':' · 等待牆壁變形'):'');el('towerAttackBtn').disabled=true;if(window.BattleDock)BattleDock.attackLabel('探索',0);else el('towerAttackBtn').textContent='探索試煉';}
     if(nearbyJourney){el('towerTalkBtn').disabled=false;el('towerTalkBtn').ariaLabel=nearbyJourney===rift?'裂隙（R）':nearbyJourney===mainClue?'印記（R）':'調查（R）';el('towerObjective').textContent=nearbyJourney===rift?'裂隙副本 · 自願進入，結束回到原層':nearbyJourney===mainClue?'主線印記 · '+N.chapterForFloor(run.floor).clueName:el('towerObjective').textContent;}
+    if(nearbyAdventure){el('towerTalkBtn').disabled=false;el('towerTalkBtn').ariaLabel='調查（R）';el('towerObjective').textContent=nearbyAdventure===eventMarker?eventMarker.offer.name:nearbyAdventure===followupMarker?'後續留言 · 靠近查看':run.floor===80?'供能藤 · 靠近斬斷':'晶柱 · 轉向後引來晶光';}
     el('towerTalkBtn').hidden=paused||!G.running||el('towerTalkBtn').disabled;
     document.body.classList.toggle('tower-danger',run.hp<=C.MAX_HP*.25);
     partyUI?.hud();
@@ -1097,7 +1168,11 @@
     if(checkLordEntrance())return;
     run.hunger = G.satiety;
     if(modern())run.engine.shovels=G.shovels;
+    const previousControlled=modern()?Heroes.state(run).active:null,previousControlledHp=previousControlled?Heroes.hp(run,previousControlled):0;
     const ticked = C.tickEffects(run, dt); run = ticked.run || ticked;
+    if(previousControlled&&Heroes.hp(run,previousControlled)<previousControlledHp){hurtFlash=.65;el('towerHurtGlow').style.opacity='1';AudioEng.sfxHurt?.();}
+    if(previousControlled&&previousControlled!==Heroes.state(run).active){partyUI?.switchControl(previousControlled,Heroes.state(run).active);hurtLeft=Heroes.actor(run).hurt;refreshGear();partyUI?.refreshActors();updateHud();save();}
+    AdventureEvents?.tick(run,dt);
     lightingUI?.tick(dt);
     if(ticked.effect && ticked.effect.warriorReleased){dismissEscort();showToast('護衛已盡力撤退，怪物將恢復追擊！',3500);save();}
     if (run.effects.freeze<=0) shiftLeft -= dt;
@@ -1138,6 +1213,7 @@
     nearbyEncounter=closeEntities.sort((a,b)=>Math.hypot(G.px-a.model.position.x,G.pz-a.model.position.z)-Math.hypot(G.px-b.model.position.x,G.pz-b.model.position.z))[0]||null;
     if(nearbyEncounter){const d=Math.hypot(G.px-nearbyEncounter.model.position.x,G.pz-nearbyEncounter.model.position.z);if([nearest,nearestWarrior].some(n=>n&&Math.hypot(G.px-n.x,G.pz-n.z)<d))nearbyEncounter=null;}
     updateJourneyNearby();
+    refreshAdventureWorld();
     partyUI?.tick(dt,now);
     if(paused)return;
     updateWarrior(dt,now);
@@ -1181,20 +1257,22 @@
     if(isHeld(m)){m.windup=0;m.path=[];m.cooldown=2;m.model.userData.ring.material.opacity=.65;return;}
     if(partyUI?.guard(m,dt))return;
     const p=m.model.position, distance=Math.hypot(G.px-p.x,G.pz-p.z),status=modern()?Heroes.state(run).enemy[m.id]:null;
-    const weakening=Math.max(status?.weak||0,status?.relayWeak>0?.25:0),monsterDamage=(m.def.damage||12)*(1-weakening);
+    const affixes=window.TowerAffixes,blocked=!!affixes?.attackBlocked(run,m.id,true);
+    if(blocked){m.windup=0;m.aim=null;}
+    const weakening=Math.max(status?.weak||0,status?.relayWeak>0?.25:0),monsterDamage=(m.def.damage||12)*(1-weakening)*(affixes?.offense(run,m.id,true)??1);
     // Physical contact is dangerous even during windup/recovery or invisibility.
     // Stunned and guard-held monsters returned above; walls still block contact.
-    if(distance<1.15&&hasClearPath(p.x,p.z,G.px,G.pz)){damage(monsterDamage);if(status)status.weak=0;}
+    if(!blocked&&distance<1.15&&hasClearPath(p.x,p.z,G.px,G.pz)){damage(monsterDamage,'monster','',m.id);if(status)status.weak=0;}
     if(run.status!=='playing')return;
     const safe=traders.some(n=>Math.hypot(G.px-n.x,G.pz-n.z)<2.6&&hasClearPath(G.px,G.pz,n.x,n.z));
     const hidden=modern()&&(Heroes.buff(run,'stealth')||status?.blind>0);
     const repelled=run.effects.repel>0||safe||now<G.invisUntil;
-    const sense=window.TowerMonsterSense,profile=sense?.profile(m.def)||{range:m.def.sight},inRange=distance<=profile.range+(m.alertLeft>0?4:0),line=inRange&&hasClearPath(p.x,p.z,G.px,G.pz),detected=sense?sense.detect(m.def,{distance,line,hidden:hidden||now<G.invisUntil,alert:m.alertLeft>0?4:0}):inRange&&line&&!hidden;
+    const sense=window.TowerMonsterSense,baseProfile=sense?.profile(m.def)||{range:m.def.sight},profile={...baseProfile,range:baseProfile.range*(AdventureEvents?.senseScale(run)??1)},inRange=distance<=profile.range+(m.alertLeft>0?4:0),line=inRange&&hasClearPath(p.x,p.z,G.px,G.pz),concealed=hidden||now<G.invisUntil,detected=distance<=(concealed?Math.min(2,profile.range):profile.range)+(m.alertLeft>0?4:0)&&(line||profile.hearing&&!concealed);
     m.awarenessLeft=Math.max(0,(m.awarenessLeft||0)-dt);if(detected&&!repelled){m.awarenessLeft=2.5;m.lastKnown={x:G.px,z:G.pz};if(m.lord){if(!cinema)lordVoice(m,'encounter');if((run.party.health[m.id]??m.maxHp)<=m.maxHp*.5)lordVoice(m,'wounded');}}
     m.cooldown=Math.max(0,m.cooldown-dt);m.pathLeft-=dt;
     m.model.userData.body.position.y=(m.kind==='clockmite' ? .6 : 1)+Math.sin(now*.004+m.phase)*.1;
     m.model.userData.ring.material.opacity=m.windup>0?.9:.35;
-    if(m.def.ranged){
+    if(m.def.ranged&&!blocked){
       if(repelled){m.windup=0;m.aim=null;}
       else if(m.windup>0){
         m.windup-=dt;
@@ -1205,8 +1283,8 @@
       }
       if(!repelled&&detected&&distance<=Math.min(7,profile.range)&&!hidden)return;
     }
-    if(!m.def.ranged&&m.windup>0){m.windup-=dt;if(m.windup<=0){if(!repelled&&distance<2.05&&hasClearPath(p.x,p.z,G.px,G.pz)){m.cueRelease=(m.cueRelease||0)+1;damage(monsterDamage);if(status)status.weak=0;}m.cooldown=2.3;}return;}
-    if(!m.def.ranged&&!repelled&&distance<1.85&&m.cooldown<=0&&hasClearPath(p.x,p.z,G.px,G.pz)){m.windup=.8;return;}
+    if(!m.def.ranged&&!blocked&&m.windup>0){m.windup-=dt;if(m.windup<=0){if(!repelled&&distance<2.05&&hasClearPath(p.x,p.z,G.px,G.pz)){m.cueRelease=(m.cueRelease||0)+1;damage(monsterDamage,'monster','',m.id);if(status)status.weak=0;}m.cooldown=2.3;}return;}
+    if(!m.def.ranged&&!blocked&&!repelled&&distance<1.85&&m.cooldown<=0&&hasClearPath(p.x,p.z,G.px,G.pz)){m.windup=.8;return;}
     if(distance>22)return;
     if(m.pathLeft<=0){
       m.pathLeft=.8+m.phase*.1;
@@ -1219,14 +1297,14 @@
     if(!m.path.length)return;
     if(status?.root>0){m.path=[];return;}
     const waypoint=cellToWorld(m.path[0][0],m.path[0][1]),dx=waypoint.x-p.x,dz=waypoint.z-p.z,len=Math.hypot(dx,dz);
-    const speed=(status?.slow>0?1-Math.min(.5,status.slowPower||.2):1)*Math.min(3.8,m.def.speed??2.1)*(m.kind==='wisp'?(Math.sin(now*.002)>0?1.25:.6):1);
+    const speed=(affixes?.movement(run,m.id,true)??1)*(status?.slow>0?1-Math.min(.5,status.slowPower||.2):1)*Math.min(3.8,m.def.speed??2.1)*(m.kind==='wisp'?(Math.sin(now*.002)>0?1.25:.6):1);
     const step=Math.min(len,speed*dt);
     if(len>.001){const nx=p.x+dx/len*step,nz=p.z+dz/len*step;if(!playerInWall(nx,nz,.28)){p.x=nx;p.z=nz;}else{m.path=[];m.pathLeft=0;}m.model.rotation.y=Math.atan2(dx,dz);}
     if(len<.12)m.path.shift();
   }
-  function damage(amount,source='monster',message='') {
+  function damage(amount,source='monster',message='',monsterId=null) {
     if(hurtLeft>0||paused||run.status!=='playing')return;
-    const before=modern()?Heroes.state(run).active:null,result=C.takeDamage(run,amount,source);if(!result.ok)return;run=result.run;
+    const before=modern()?Heroes.state(run).active:null,result=C.takeDamage(run,amount,source,monsterId);if(!result.ok)return;run=result.run;
     if(result.effect.switched){partyUI?.switchControl(before,Heroes.state(run).active);hurtLeft=Heroes.actor(run).hurt;}
     if(result.effect.damage===0){hurtLeft=2;refreshGear();save();return;}
     damageFeedback(result.effect);refreshGear();
@@ -1236,11 +1314,11 @@
   function clearHurtFeedback(){hurtFlash=0;el('towerHurtGlow').style.opacity='0';}
   function clearBolts(){for(const b of bolts){world?.remove(b.model);disposeSceneObject(b.model);}bolts=[];}
   function launchBolt(m){
-    if(bolts.length>=8||!world)return;
+    if(bolts.length>=8||!world||window.TowerAffixes?.attackBlocked(run,m.id,true))return;
     const p=m.model.position,dx=m.aim.x-p.x,dz=m.aim.z-p.z,len=Math.hypot(dx,dz);if(len<.01)return;
     const model=new THREE.Mesh(new THREE.OctahedronGeometry(.22),new THREE.MeshBasicMaterial({color:0x84f1ff}));
     m.cueRelease=(m.cueRelease||0)+1;
-    model.position.set(p.x,1,p.z);world.add(model);bolts.push({model,owner:m.id,vx:dx/len*5,vz:dz/len*5,left:2.2,damage:m.def.damage*(modern()?1-Math.max(Heroes.state(run).enemy[m.id]?.weak||0,Heroes.state(run).enemy[m.id]?.relayWeak>0?.25:0):1)});if(modern()&&Heroes.state(run).enemy[m.id])Heroes.state(run).enemy[m.id].weak=0;AudioEng.sfxSwing();
+    model.position.set(p.x,1,p.z);world.add(model);bolts.push({model,owner:m.id,vx:dx/len*5,vz:dz/len*5,left:2.2,damage:m.def.damage*(window.TowerAffixes?.offense(run,m.id,true)??1)*(modern()?1-Math.max(Heroes.state(run).enemy[m.id]?.weak||0,Heroes.state(run).enemy[m.id]?.relayWeak>0?.25:0):1)});if(modern()&&Heroes.state(run).enemy[m.id])Heroes.state(run).enemy[m.id].weak=0;AudioEng.sfxSwing();
   }
   function updateBolts(dt){
     if(paused||G.frozen||G.shifting||!G.running||run.status!=='playing')return;
@@ -1252,7 +1330,9 @@
         const nx=p.x+b.vx*step,nz=p.z+b.vz*step;
         if(playerInWall(nx,nz,.18)){remove=true;break;}
         p.x=nx;p.z=nz;b.left-=step;
-        if(Math.hypot(G.px-p.x,G.pz-p.z)<.8&&hasClearPath(p.x,p.z,G.px,G.pz)){damage(b.damage);remove=true;}
+        const crystal=run.floor===60&&b.owner==='monster-11'&&run.adventure?.events?.lord?.phase==='guarded'&&run.adventure.events.lord.armed>0?counterObjects[0]:null;
+        if(crystal?.model.visible&&Math.hypot(crystal.x-p.x,crystal.z-p.z)<.85){if(transact(AdventureEvents.counter(run,0))){refreshAdventureWorld();AudioEng.sfxBreak();showToast('晶光被反射了，伯爵的護罩破開！',3000);}remove=true;}
+        if(!remove&&Math.hypot(G.px-p.x,G.pz-p.z)<.8&&hasClearPath(p.x,p.z,G.px,G.pz)){damage(b.damage,'monster','',b.owner);remove=true;}
         if(b.left<=0)remove=true;
       }
       if(remove){world?.remove(b.model);disposeSceneObject(b.model);bolts.splice(i,1);}
@@ -1441,8 +1521,10 @@
   function rewardSpeech(reward) {
     return '獲得 '+[reward.coins?'銅幣':'',...Object.keys(reward.items||{}).map(id=>C.ITEMS[id].name),reward.gear?gearSpeech(reward.gear):''].filter(Boolean).join('、');
   }
-  function questDialog(quiet=false,viewOnly=false) {
+  function questDialog(quiet=false,viewOnly=false,localOnly=false) {
     if(!active||G.shifting||run.status!=='playing')return;
+    if(viewOnly&&!localOnly&&lordCounterPanel())return;
+    if(viewOnly&&!localOnly&&followupPanel())return;
     const offer=E.explorerOffer(run),q=run.adventure.quest;
     if(!offer||(!q&&!nearExplorer())||viewOnly&&(!q||q.status==='claimed')){dialog('探索者委託','目前未接受任何任務','靠近迷宮中的探索者交談，可以接受委託。','',action('回到迷宮','close'),{summary:'目前未接受任何任務。'});return;}
     if(explorer)explorer.offer=offer;
@@ -1485,6 +1567,7 @@
   }
   function trade(quiet=false) {
     if(!active||G.shifting||run.status!=='playing')return;
+    if(nearbyAdventure&&!quiet){adventureDialog();return;}
     if(partyUI?.interact())return;
     if(nearbyJourney){if(nearbyJourney===mainClue)mainClueDialog();else if(nearbyJourney===rift)riftDialog();else dungeonObjectDialog(nearbyJourney.index);return;}
     if(nearbyEncounter){if(nearbyEncounter===chest)chestDialog();else questDialog();return;}
@@ -1605,7 +1688,7 @@
   }
   function stop() {
     cinema?.cancel();
-    const previous=C.validateAdventure(run.adventure,run.floor);cancelFloorQuest();
+    const previous=C.validateAdventure(run.adventure,run.floor,run.seed);cancelFloorQuest();
     if(!save()){run.adventure=previous;dialog('尚未保存','目前無法保存旅程','瀏覽器儲存空間可能不足。請先繼續遊戲並保持此分頁開啟，避免遺失目前樓層。','',action('回到旅程','close'));return;}
     cancelSceneTransition();G.running=false;G.frozen=true;
     window.GameVoice?.stop(true);
@@ -1634,6 +1717,17 @@
     if(key==='battle-settings'){openBattleSettings();return;}
     if(key==='battle-auto-aim'&&modern()){autoAim=!autoAim;try{localStorage.setItem(AUTO_AIM_SETTING,autoAim?'on':'off');}catch(_){showToast('此裝置無法保存操作設定，本次遊戲仍可使用。',1800,false);}openBattleSettings(true);return;}
     if(key==='quest-view'){questDialog(false,true);return;}
+    if(key==='quest-local'){questDialog(false,true,true);return;}
+    if(key==='adventure-lord-help'){lordCounterPanel();return;}
+    if(key==='adventure-followup'){followupPanel();return;}
+    if(key==='adventure-choice'){
+      const match=typeof id==='string'&&id.match(/^(event:-?\d{1,2}:\d{1,10}:(?:forest|workshop|river)):([01])$/);
+      if(!match||!active||G.shifting||nearbyAdventure!==eventMarker||!eventMarker?.model.visible||Math.hypot(G.px-eventMarker.x,G.pz-eventMarker.z)>=2.6||!hasClearPath(G.px,G.pz,eventMarker.x,eventMarker.z))return;
+      const result=AdventureEvents.choose(run,match[1],Number(match[2]));if(transact(result)){refreshAdventureWorld();closeDialog();showToast(result.message,4000);}return;
+    }
+    if(key==='adventure-claim'){const result=AdventureEvents.settle(run);if(transact(result)){refreshAdventureWorld();closeDialog();showToast(result.message,3000);AudioEng.sfxPickup();}return;}
+    if(key==='adventure-abandon'){dialog('放下後續委託','這次先不追蹤留言？','不會失去物品，也不影響主線；之後的小事件仍可遇到。','',action('保留委託','quest-view')+action('放下委託','adventure-abandon-confirm'));return;}
+    if(key==='adventure-abandon-confirm'){if(transact(AdventureEvents.settle(run,true))){refreshAdventureWorld();closeDialog();}return;}
     if(key==='trade-tab'&&['supplies','ingredients'].includes(id)){tradeCategory=id;trade(true);el('towerDialog').querySelector('.tower-dialog-content').scrollTop=0;return;}
     if(key==='commission-cooking'){commissionCooking();return;}
     if(key==='commission-cook-back'){pendingCooking=null;if(cookingServiceReady())trade(true);else closeDialog();return;}
@@ -1708,7 +1802,7 @@
   function toolUsed(){if(active&&modern()){Heroes.toolSpent(run);run.engine.shovels=G.shovels;}}
   function robotEnergy(){if(!active||!modern()||Heroes.job(run)!=='robot')return null;return {value:Heroes.actor(run).robot.fuel};}
   function movementScale(){if(!active||paused||G.shifting)return 1;const traits=run.party?window.TowerExpedition.traits(run):{speed:1,grip:0};return (modern()?Heroes.speed(run):C.hasteMultiplier(run))*Math.min(1,hazardSlow+(traits.grip>0?.15:0))*(run.party?.slowLeft>0?(traits.grip>0?.8:.6):1)*(modern()?1:traits.speed);}
-  window.TowerMode = { get cinematicActive(){return !!cinema?.active;},cinematicFrame:dt=>cinema?.frame(dt),openBattleSettings, sightRoot:()=>active?world:null, voiceProfile, toolUsed, robotEnergy, get active(){return active;}, get paused(){return paused;}, get partyActive(){return active&&!!run?.party;}, temporaryMapRadius:()=>modern()?(Heroes.buff(run,'path_eye')?.power||0):0, lightRadius:()=>active?lightingUI?.radius():null, useProfessionSkill:()=>partyUI?.skill(), movementScale, open, beginNew, tick, floorSeed, atmosphereStyle, scheduleShift, updateShift, reachExit, defeat, requestQuit, canCollectOriginal, collectedOriginal, itemConfig, reservedCells, preserveFloorPickups, soundChanged, mapMarkers };
+  window.TowerMode = { get cinematicActive(){return !!cinema?.active;},cinematicFrame:dt=>cinema?.frame(dt),prepareMaze,openBattleSettings, sightRoot:()=>active?world:null, voiceProfile, toolUsed, robotEnergy, get active(){return active;}, get paused(){return paused;}, get partyActive(){return active&&!!run?.party;}, temporaryMapRadius:()=>modern()?(Heroes.buff(run,'path_eye')?.power||0):0, lightRadius:()=>active?lightingUI?.radius():null, useProfessionSkill:()=>partyUI?.skill(), movementScale, open, beginNew, tick, floorSeed, atmosphereStyle, scheduleShift, updateShift, reachExit, defeat, requestQuit, canCollectOriginal, collectedOriginal, itemConfig, reservedCells, preserveFloorPickups, soundChanged, mapMarkers };
   window.TowerMode.cinematicRender=draw=>cinema?cinema.render(draw):draw();
   install();
 })();

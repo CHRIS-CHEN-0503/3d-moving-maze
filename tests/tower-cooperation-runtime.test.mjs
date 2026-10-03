@@ -41,3 +41,17 @@ test('catalog and battle use the same single SVG composed only of actual constit
   const h=harness();for(const d of Co.DEFINITIONS){const svg=h.sandbox.TowerCooperationRuntime.icon(d.id);assert.equal((svg.match(/<svg\b/g)||[]).length,1);assert.ok(d.iconKeys.every(k=>svg.includes(I.svg(k).replace(/^<svg[^>]*>|<\/svg>$/g,''))));assert.doesNotMatch(svg,/http[^" ]*\.(png|webp)|<image|<script/);}
   h.ui.hud();assert.ok(h.nodes.heroCooperationBar.innerHTML.includes(h.sandbox.TowerCooperationRuntime.icon('thunder_blades')));assert.equal(h.sandbox.TowerCooperationRuntime.icon('unknown'),'');
 });
+
+test('robot combinations charge for 0.5 or 0.9 seconds and release real attacks, defense and mechanical repair',()=>{
+  for(const key of ['thunder_fist','steel_oath','core_reconstruction']){const h=harness(key),before=structuredClone(h.run),seconds=h.f.def.preparation;assert.ok(h.ui.start(key));assert.equal(h.ui.preparing('hero').total,seconds);h.ui.tick(.1);assert.deepEqual(h.run,before);h.finish();assert.ok(C.validateSave(h.run));assert.ok(h.sounds.length>=h.f.ids.length*2);assert.ok(h.glows.length>=h.f.ids.length*2);
+    assert.equal(h.run.party.journey.scrap,before.party.journey.scrap-h.f.def.costs.scrap);if(key==='thunder_fist')assert.ok(h.hits.length);if(key==='steel_oath')assert.ok(H.buff(h.run,'robot_guard','hero'));if(key==='core_reconstruction'){assert.ok(H.hp(h.run,'hero')>H.hp(before,'hero'));assert.ok(H.equipment(h.run,'hero').armor.durability>before.equipment.armor.durability);assert.equal(H.equipment(h.run,'hero').core1.durability,before.equipment.core1.durability);}assert.ok(h.ui.start(key)===false);
+  }
+});
+
+test('fuel depletion, lost scrap, lost repair need and movement during robot preparation cancel atomically',()=>{
+  for(const change of [h=>H.actor(h.run,'hero').robot.fuel=0,h=>h.run.party.journey.scrap=0,h=>H.equipment(h.run,'hero').armor.durability=H.equipment(h.run,'hero').armor.maxDurability,h=>h.f.space.positions.hero.x+=1,h=>h.setClear(false)]){const h=harness('core_reconstruction');assert.ok(h.ui.start('core_reconstruction'));change(h);const before=structuredClone(h.run);h.finish();assert.equal(h.ui.preparing('hero'),null);assert.deepEqual(h.run,before);assert.equal(h.saves,0);assert.equal(h.hits.length,0);}
+});
+
+test('a pushed target leaving the second skill range is not hit remotely through the old combo plan',()=>{
+  const h=harness('thunder_fist');assert.ok(h.ui.start('thunder_fist'));const initial=h.world[0].model.position;Object.defineProperty(initial,'z',{get(){return h.hits.length?8:2.5;}});h.finish();assert.equal(h.hits.length,1);assert.ok(C.validateSave(h.run));
+});

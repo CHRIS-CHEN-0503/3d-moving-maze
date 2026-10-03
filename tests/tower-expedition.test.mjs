@@ -45,13 +45,13 @@ test('malformed journey, boss charge and forged gear fail closed',()=>{
   for(const change of [r=>r.party.journey.scrap=-1,r=>r.party.journey.site.done=true,r=>r.party.journey.site.progress=13,r=>r.party.boss=null,r=>r.party.boss.charges[0]=3,r=>r.party.boss.lastCycles[0]=10]){const r=fresh(20);change(r);assert.equal(C.validateSave(r),null);}
   for(const f of [{trait:'grip',level:1,reserve:0},{trait:'__proto__',level:1,reserve:0},{trait:'durable',level:3,reserve:6},{trait:'durable',level:1,reserve:3}]){const r=fresh();r.equipment.weapon.forge=f;assert.equal(C.validateSave(r),null);}
 });
-test('all six optional sites have profession and no-cost time alternatives; rewards never repeat',()=>{
+test('all eight optional sites have profession and no-cost time alternatives; rewards never repeat',()=>{
   const seen=new Set();for(let seed=1;seed<60;seed++){
     let r=fresh(99,'swordsman',seed),site=X.siteOffer(r);seen.add(site.job);r.party.profession=site.job;
     const result=X.explore(r,site.id,'profession',r.revision);assert.equal(result.ok,true);assert.equal(result.run.party.journey.site.done,true);assert.equal(X.explore(result.run,site.id,'profession').ok,false);
     r=fresh(99,site.job==='mage'?'chef':'mage',seed);assert.equal(X.explore(r,site.id,'profession').ok,false);assert.equal(X.explore(r,site.id,'work').ok,false);
     r.party.journey.site.progress=12;assert.equal(X.explore(r,site.id,'work').ok,true);assert.equal(r.party.journey.site.done,false);assert.equal(X.siteOffer(fresh(90)),null);
-  }assert.equal(seen.size,6);
+  }assert.equal(seen.size,8);
 });
 test('forging is revision guarded, class-discounted, one immutable trait and two ranks only',()=>{
   let r=fresh(99,'smith');r.coins=100;r.party.journey.scrap=30;r.party.journey.materials.ironore=3;const id=r.equipment.weapon.id,rev=r.revision;
@@ -61,6 +61,7 @@ test('forging is revision guarded, class-discounted, one immutable trait and two
 });
 test('durable gear consumes reserve first, repairs do not refill it; broken gear yields one scrap',()=>{
   let r=fresh(84,'smith');r.coins=100;r.party.journey.scrap=30;r.party.journey.materials.ironore=1;const id=r.equipment.weapon.id;r=X.forge(r,id,'durable').run;
+  r.equipment.weapon.forge.reserve=2; // Unused protection from the historical forge remains valid.
   const g=r.equipment.weapon,before=g.durability;X.wear(r,g);X.wear(r,g);assert.equal(g.durability,before);assert.equal(g.forge.reserve,0);X.wear(r,g);assert.equal(g.durability,before-1);
   r=P.camp(r,'repair').run;assert.equal(r.equipment.weapon.forge.reserve,0);
   r.equipment.weapon.durability=1;const scrap=r.party.journey.scrap;r=P.strike(r,P.monsterSpecs(r)[0].id).run;assert.equal(r.equipment.weapon,null);assert.equal(r.party.journey.scrap,scrap+1);

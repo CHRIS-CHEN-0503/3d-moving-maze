@@ -4,18 +4,21 @@ import assert from 'node:assert/strict';
 import {readFile,mkdir,writeFile} from 'node:fs/promises';
 import {createRequire} from 'node:module';
 const require=createRequire(import.meta.url),{chromium}=require(process.env.PLAYWRIGHT_MODULE||'playwright');
-const out='.agent-run/foraging-qa',report={regions:[],pickups:[],layouts:[],dom:[],screenshots:[],errors:[],limitations:'Desktop Chrome touch emulation, not physical phone performance. Isolated fixtures position the real player; resources are claimed through the actual proximity update and camp maintenance through the actual UI button. Resource screenshots use the real first-person camera after a real tick initializes lighting.'};
+const base=process.env.MAZE_QA_URL||'http://127.0.0.1:8795/';assert.ok(['127.0.0.1','localhost'].includes(new URL(base).hostname));
+const out=process.env.MAZE_FORAGING_QA_OUT||'.agent-run/v1543-foraging-qa',report={regions:[],pickups:[],power:[],migrations:[],layouts:[],dom:[],screenshots:[],errors:[],blocked:[],limitations:'Desktop Chrome touch emulation, not physical phone performance. Isolated fixtures position the real player; resources are claimed through the actual proximity update and camp maintenance through the actual UI button. Resource screenshots use the real first-person camera after a real tick initializes lighting.'};
 await mkdir(out,{recursive:true});
 const browser=await chromium.launch({executablePath:'/Applications/Google Chrome.app/Contents/MacOS/Google Chrome',headless:true,args:['--use-angle=swiftshader','--enable-webgl']});
 let page;
 try{
-  const context=await browser.newContext({viewport:{width:844,height:390},hasTouch:true});page=await context.newPage();page.setDefaultTimeout(12000);page.on('pageerror',error=>report.errors.push(error.stack));
+  const context=await browser.newContext({viewport:{width:844,height:390},hasTouch:true,serviceWorkers:'block'});page=await context.newPage();page.setDefaultTimeout(12000);page.on('pageerror',error=>report.errors.push(error.stack));
+  await context.route('**/*',route=>{const request=route.request(),url=new URL(request.url());if(url.origin!==new URL(base).origin||!['GET','HEAD'].includes(request.method())){report.blocked.push({url:url.origin+url.pathname,method:request.method()});return route.abort();}return route.continue();});
+  await page.addInitScript(()=>{window.__foragingRoomAttempts=[];window.WebSocket=class{constructor(url){window.__foragingRoomAttempts.push(url);throw Error('No multiplayer connection in isolated forage QA');}};});
   const source=await readFile(new URL('../story/tower-mode.js',import.meta.url),'utf8'),anchor='  install();\n})();';assert.ok(source.includes(anchor));
   const bridge=`
   window.__foragingQA={
-    load({floor=89,seed:requestedSeed=null,maximum=false}={}){
+    load({floor=89,seed:requestedSeed=null,maximum=false,powerTier=0,legacyVersion=0}={}){
       closeDialog();let seed=requestedSeed;
-      if(seed===null){for(seed=1;seed<=5000;seed++){const count=Foraging.counts({floor,seed});if(maximum?count.herb===3&&count.ore===3:count.herb>0&&count.ore>0)break;}if(seed>5000)throw Error('No finite forage fixture');}
+      if(seed===null){for(seed=1;seed<=12000;seed++){const at={floor,seed},count=legacyVersion?Foraging.drawCounts(at,legacyVersion===3?2:1):Foraging.counts(at),power=Foraging.drawPowerDeposit(at,legacyVersion||4);if(!(maximum?count.herb===3&&count.ore===3:count.herb>0&&count.ore>0))continue;if(powerTier&&power?.tier!==powerTier)continue;if(legacyVersion&&power?.quantity!==3)continue;break;}if(seed>12000)throw Error('No finite forage fixture');}
       let n=Heroes.enable(P.enable(C.newRun({seed,name:'牆角採集驗證'}),'mage','female').run).run;
       if(floor<0){n.floor=1;n.floorsCleared=99;n.status='won';n.chronicle=N.newChronicle(1);n.chronicle.clues=N.CHAPTERS.map(c=>c.clueId);n.chronicle.ending='release';P.advance(n,{reward:false});const v=C.startUnderworld(n,n.revision);if(!v.ok)throw Error(v.message);n=v.run;}
       n.floor=floor;n.floorsCleared=floor<0?99-floor-1:99-floor;n.chronicle=N.newChronicle(floor);if(floor<0)n.chronicle.ending=n.underworld.surfaceEnding;
@@ -36,10 +39,22 @@ try{
       const projected=target.clone().project(camera);this.focusEvidence={id,distance,target:target.toArray(),camera:camera.position.toArray(),projected:projected.toArray(),clear:hasClearPath(G.px,G.pz,target.x,target.z)};return this.state();
     },
     collect(id){closeDialog();this.peace();const item=loot.find(item=>item.foraging&&item.id===id&&item.model.visible);if(!item)throw Error('Forage missing '+id);item.retry=0;this.locate(item);G.frozen=false;tick(.016,performance.now());G.frozen=true;return this.state();},
-    stock(id,quantity){const item=loot.find(item=>item.foraging&&item.id===id);if(!item)throw Error('Forage missing '+id);const stock=item.foraging.type==='ingredient'?run.party.ingredients:run.party.journey.materials;stock[item.foraging.key]=quantity;save();},
+    stock(id,quantity){const item=loot.find(item=>item.foraging&&item.id===id);if(!item)throw Error('Forage missing '+id);const stock=item.foraging.type==='item'?run.bag:item.foraging.type==='ingredient'?run.party.ingredients:run.party.journey.materials;stock[item.foraging.key]=quantity;save();},
+    legacy(version){
+      const old=structuredClone(run),at={floor:old.floor,seed:old.seed},harvestRule=version===3?2:1,powerRule=version,count=Foraging.drawCounts(at,harvestRule),power=Foraging.drawPowerDeposit(at,powerRule),claimed=count.herb?['foraging:'+old.floor+':herb:0']:[];
+      old.party.foraging=version===1?{version,...at,claimed}:version===2?{version,...at,claimed,powerRule,power}:{version,...at,claimed,harvestRule,counts:count,powerRule,power};
+      const valid=C.validateSave(old);if(!valid)throw Error('Invalid historical forage fixture');
+      // The fixture represents a closed historical tab. Disable this tab's
+      // pagehide autosave before replacing storage, or it overwrites the old
+      // raw snapshot with its still-active v4 run during the real reload.
+      active=false;floorStarted=false;
+      const raw=JSON.stringify(old,null,2);localStorage.removeItem(SAVE+'_before_foraging_v4');localStorage.setItem(SAVE,raw);
+      return {raw,counts:count,power,claimed,remaining:Foraging.specs(valid),bag:{...old.bag},ingredients:{...old.party.ingredients},materials:{...old.party.journey.materials}};
+    },
+    storage(){return {raw:localStorage.getItem(SAVE),backup:localStorage.getItem(SAVE+'_before_foraging_v4')};},
     state(){
       const occupied=[...traders,...dungeonObjects,...hazards,...(partyUI?.reserved()||[]),...(lightingUI?.reserved()||[]),...[warriorNpc,explorer,chest,relic,mainClue,rift].filter(Boolean),...loot.filter(item=>!item.foraging)].map(item=>item.cx+','+item.cy);
-      return {floor:run.floor,seed:run.seed,valid:!!C.validateSave(run),counts:Foraging.counts(run),specs:Foraging.specs(run),receipt:structuredClone(run.party.foraging),ingredients:{...run.party.ingredients},materials:{...run.party.journey.materials},coins:run.coins,shifting:G.shifting||wasShifting,maintenance:P.campMaintenanceQuote(run),gear:TowerExpedition.allGear(run).map(gear=>({id:gear.id,durability:gear.durability,maxDurability:gear.maxDurability})),occupied,focus:this.focusEvidence,
+      return {floor:run.floor,seed:run.seed,valid:!!C.validateSave(run),counts:Foraging.counts(run),specs:Foraging.specs(run),receipt:structuredClone(run.party.foraging),bag:{...run.bag},ingredients:{...run.party.ingredients},materials:{...run.party.journey.materials},coins:run.coins,shifting:G.shifting||wasShifting,maintenance:P.campMaintenanceQuote(run),gear:TowerExpedition.allGear(run).map(gear=>({id:gear.id,durability:gear.durability,maxDurability:gear.maxDurability})),occupied,focus:this.focusEvidence,
         objects:loot.filter(item=>item.foraging&&item.model.visible).map(item=>{const center=cellPoint(item.cx,item.cy),offsetX=(item.x-center.x)/G.cell,offsetY=(item.z-center.z)/G.cell,walls=Foraging.wallsAt(item.cx,item.cy,G.mazeW,G.mazeH,G.hWalls,G.vWalls),sides=[offsetX<0?3:1,offsetY<0?0:2];let meshes=0,triangles=0,lights=0;item.model.traverse(object=>{if(object.isLight)lights++;if(object.isMesh){meshes++;triangles+=(object.geometry.index?.count||object.geometry.attributes.position.count)/3;}});return {id:item.id,key:item.foraging.key,kind:item.foraging.kind,type:item.foraging.type,quantity:item.foraging.quantity,cx:item.cx,cy:item.cy,x:item.x,z:item.z,offsetX,offsetY,support:sides.filter(side=>walls[side]),inWall:playerInWall(item.x,item.z,.35),meshes,triangles,lights,name:item.model.name};})};
     },
     shift(){closeDialog();this.peace();G.frozen=false;wasShifting=true;doShift();},
@@ -79,12 +94,15 @@ try{
     }
   }
   async function layout(label){const actual=await page.evaluate(()=>{const panel=document.getElementById('towerDialog'),content=panel.querySelector('.tower-dialog-content'),box=panel.getBoundingClientRect();return {width:innerWidth,height:innerHeight,root:document.documentElement.scrollWidth,scroll:content.scrollWidth,client:content.clientWidth,left:box.left,top:box.top,right:box.right,bottom:box.bottom};});assert.ok(actual.root<=actual.width+1&&actual.scroll<=actual.client+2,label);assert.ok(actual.left>=-1&&actual.top>=-1&&actual.right<=actual.width+1&&actual.bottom<=actual.height+1,label);report.layouts.push({label,...actual});}
-  await page.goto('http://127.0.0.1:8795/',{waitUntil:'networkidle'});await page.evaluate(()=>GameVoice.configure({enabled:false}));await page.locator('#enterMenuBtn').tap();
+  await page.goto(base,{waitUntil:'networkidle'});await page.evaluate(()=>GameVoice.configure({enabled:false}));await page.locator('#enterMenuBtn').tap();
+  report.appearance=await page.evaluate(()=>TowerForaging.APPEARANCE);assert.deepEqual(report.appearance,{suitable:60,neutral:40,unsuitable:20});
+  report.phase='fifteen regional layouts';
   for(const floor of [99,89,79,69,59,49,39,29,19,9,-1,-11,-21,-31,-41]){
     const actual=await load({floor});placement(actual,'floor '+floor);assert.equal(actual.objects.filter(object=>object.kind==='herb').length,actual.counts.herb);assert.equal(actual.objects.filter(object=>object.kind==='ore').length,actual.counts.ore);
     if(floor>0)assert.ok(actual.objects.filter(object=>object.kind==='ore').every(object=>object.key!=='starore'));
     report.regions.push({floor,seed:actual.seed,counts:actual.counts,objects:actual.objects});
   }
+  report.phase='herb and ore pickup, full stock and persistence';
   let actual=await load({floor:89,maximum:true});assert.deepEqual(actual.counts,{herb:3,ore:3});placement(actual,'six resources');
   const herb=actual.objects.find(object=>object.kind==='herb'),ore=actual.objects.find(object=>object.kind==='ore');
   await page.evaluate(id=>__foragingQA.focus(id),herb.id);await page.waitForTimeout(250);await shot('garden-herb-wall-corner');
@@ -98,12 +116,31 @@ try{
   const saved=await state(),reloaded=await resume();placement(reloaded,'reload');assert.deepEqual(reloaded.receipt,saved.receipt);assert.deepEqual(reloaded.ingredients,saved.ingredients);assert.deepEqual(reloaded.materials,saved.materials);assert.deepEqual(reloaded.objects.map(object=>object.id).sort(),saved.objects.map(object=>object.id).sort());report.reload=true;
   await page.evaluate(()=>__foragingQA.shift());await page.waitForFunction(()=>!__foragingQA.state().shifting);actual=await page.evaluate(()=>__foragingQA.freeze());placement(actual,'real shift');assert.deepEqual(actual.receipt,saved.receipt);assert.deepEqual(actual.counts,saved.counts);assert.deepEqual(actual.objects.map(object=>object.id).sort(),saved.objects.map(object=>object.id).sort());report.realShift=true;
   actual=await page.evaluate(()=>__foragingQA.next());assert.equal(actual.floor,88);assert.deepEqual(actual.receipt.claimed,[]);placement(actual,'new floor');assert.ok(actual.objects.every(object=>object.id.startsWith('foraging:88:')));report.newFloor={floor:actual.floor,counts:actual.counts};
+  for(const tier of [1,2,3]){
+    report.phase='new single-stone tier '+tier;
+    actual=await load({powerTier:tier});placement(actual,'single power tier '+tier);assert.equal(actual.receipt.version,4);assert.equal(actual.receipt.harvestRule,3);assert.equal(actual.receipt.powerRule,4);
+    const power=actual.objects.filter(item=>item.kind==='power');assert.equal(power.length,1);const item=power[0];assert.equal(item.quantity,1);assert.equal(actual.receipt.power.tier,tier);
+    await page.evaluate(id=>__foragingQA.stock(id,99),item.id);const full=await state(),blocked=await page.evaluate(id=>__foragingQA.collect(id),item.id);assert.deepEqual(blocked.receipt,full.receipt);assert.equal(blocked.bag[item.key],99);assert.ok(blocked.objects.some(object=>object.id===item.id));
+    await page.evaluate(id=>__foragingQA.stock(id,98),item.id);const before=await state(),picked=await page.evaluate(id=>__foragingQA.collect(id),item.id);assert.equal(picked.bag[item.key],before.bag[item.key]+1);assert.ok(picked.receipt.claimed.includes(item.id));assert.ok(!picked.objects.some(object=>object.id===item.id));
+    let stable=await resume();assert.deepEqual(stable.receipt,picked.receipt);assert.deepEqual(stable.bag,picked.bag);assert.ok(!stable.objects.some(object=>object.id===item.id));
+    await page.evaluate(()=>__foragingQA.shift());await page.waitForFunction(()=>!__foragingQA.state().shifting);stable=await page.evaluate(()=>__foragingQA.freeze());assert.deepEqual(stable.receipt,picked.receipt);assert.deepEqual(stable.bag,picked.bag);assert.ok(!stable.objects.some(object=>object.id===item.id));await shot('single-power-tier-'+tier+'-claimed');
+    report.power.push({tier,key:item.key,quantity:1,onePlace:true,fullStockPreserved:true,pickedOnce:true,reload:true,realShift:true});
+  }
+  for(const version of [1,2,3]){
+    report.phase='historical foraging v'+version+' migration';
+    await load({floor:99,legacyVersion:version});const old=await page.evaluate(version=>__foragingQA.legacy(version),version);actual=await resume();assert.equal(actual.receipt.version,4);assert.deepEqual(actual.receipt.counts,old.counts);assert.deepEqual(actual.receipt.power,old.power);assert.deepEqual(actual.receipt.claimed,old.claimed);assert.deepEqual(actual.specs,old.remaining);assert.deepEqual(actual.bag,old.bag);assert.deepEqual(actual.ingredients,old.ingredients);assert.deepEqual(actual.materials,old.materials);assert.equal((await page.evaluate(()=>__foragingQA.storage())).backup,old.raw);
+    const remainingPower=actual.objects.find(item=>item.kind==='power');assert.ok(remainingPower);assert.equal(remainingPower.quantity,3);
+    const picked=await page.evaluate(id=>__foragingQA.collect(id),remainingPower.id);assert.equal(picked.bag[remainingPower.key],old.bag[remainingPower.key]+3);assert.ok(picked.receipt.claimed.includes(remainingPower.id));
+    const stable=await resume();assert.deepEqual(stable.receipt,picked.receipt);assert.deepEqual(stable.bag,picked.bag);assert.ok(!stable.objects.some(item=>item.id===remainingPower.id));assert.equal((await page.evaluate(()=>__foragingQA.storage())).backup,old.raw);await shot('legacy-foraging-v'+version+'-preserved');
+    report.migrations.push({from:version,to:4,backupExact:true,originalCounts:true,originalThreeStoneCluster:true,pickedQuantity:3,noRespawn:true,claimedPreserved:true});
+  }
+  report.phase='camp maintenance and mobile layouts';
   await load({floor:89});const beforeCamp=await page.evaluate(()=>__foragingQA.kitchen());assert.equal(beforeCamp.maintenance.ratio,.1);assert.equal(beforeCamp.maintenance.cost,6);assert.match(await page.locator('.camp-service-strip').innerText(),/耐久\s*\+10%/);assert.equal(await button('party-repair').isDisabled(),false);
   await button('party-repair').tap();const afterCamp=await state();assert.equal(afterCamp.coins,beforeCamp.coins-6);assert.ok(afterCamp.maintenance.used);assert.equal(await button('party-repair').isDisabled(),true);
   for(const gear of beforeCamp.gear){const repaired=afterCamp.gear.find(item=>item.id===gear.id);assert.equal(repaired.durability,Math.min(gear.maxDurability,gear.durability+Math.ceil(gear.maxDurability*.1)),gear.id+' exactly ten percent');}
   report.maintenance={ratio:.1,cost:6,oncePerFloor:true,gear:afterCamp.gear};
   for(const [width,height] of [[844,390],[568,320],[1280,720]]){await page.setViewportSize({width,height});await page.evaluate(()=>__foragingQA.kitchen());await layout('camp ten percent '+width);await shot(width+'-camp-ten-percent');await page.evaluate(()=>__foragingQA.close());const object=(await state()).objects[0];if(object){await page.evaluate(id=>__foragingQA.focus(id),object.id);await page.waitForTimeout(200);await shot(width+'-wall-resources');}}
   await page.setViewportSize({width:390,height:844});assert.equal(await page.locator('#landscapeGate').isVisible(),true);await shot('portrait-rotation-gate');report.portraitGate=true;
-  assert.deepEqual(report.errors,[]);report.pass=true;
+  assert.deepEqual(report.errors,[]);assert.equal(await page.evaluate(()=>__foragingRoomAttempts.length),0);assert.equal(report.blocked.filter(item=>!['GET','HEAD'].includes(item.method)).length,0);report.pass=true;report.phase='complete';
 }catch(error){report.failure=error.stack;if(page)await page.screenshot({path:out+'/failure.png'}).catch(()=>{});throw error;}
-finally{await writeFile(out+'/report.json',JSON.stringify(report,null,2));await browser.close();console.log(JSON.stringify({pass:report.pass,failure:report.failure,regions:report.regions.length,pickups:report.pickups,maintenance:report.maintenance,reload:report.reload,realShift:report.realShift,newFloor:report.newFloor,errors:report.errors,screenshots:report.screenshots}));}
+finally{await writeFile(out+'/report.json',JSON.stringify(report,null,2));await browser.close();console.log(JSON.stringify({pass:report.pass,phase:report.phase,failure:report.failure,regions:report.regions.length,pickups:report.pickups,power:report.power,migrations:report.migrations,appearance:report.appearance,maintenance:report.maintenance,reload:report.reload,realShift:report.realShift,newFloor:report.newFloor,errors:report.errors,screenshots:report.screenshots}));}

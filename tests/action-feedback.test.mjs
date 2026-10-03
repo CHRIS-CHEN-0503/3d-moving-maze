@@ -54,7 +54,7 @@ function fixture(skill,options={}){
   const sounds=[],voiceCalls=[],world=new T.Group(),player=new T.Group(),m={...P.monsterSpecs(run)[0],alive:true,model:new T.Group()};m.model.position.set(0,0,1.5);
   const trap={x:0,z:1,id:'test-trap',model:new T.Group()},g={running:true,shifting:false,px:0,pz:0};let runtime,paused=false,blocked=false,hits=0;
   let voiceEnabled=false,speaking=false;const voice={status:()=>({enabled:voiceEnabled,supported:true,speaking}),announceAsset:id=>voiceCalls.push(id)};
-  const env=vm.createContext({TowerHeroes:H,TowerPartyCore:P,TowerHeroGrowth:R,GameVoice:voice,TowerHeroIcons:{svg:()=>''},TowerCombatMotion:require('../story/tower-combat-motion.js'),CombatAudio:A,document:{getElementById:()=>null},Math});
+  const env=vm.createContext({TowerHeroes:H,TowerAffixes:require('../story/tower-affixes.js'),TowerPartyCore:P,TowerHeroGrowth:R,GameVoice:voice,TowerHeroIcons:{svg:()=>''},TowerCombatMotion:require('../story/tower-combat-motion.js'),CombatAudio:A,document:{getElementById:()=>null},Math});
   for(const file of ['assets/character-voices.js','story/tower-combat-intent.js','story/tower-skill-effects.js','story/tower-growth-runtime.js','story/tower-heroes-runtime.js'])vm.runInContext(code(file),env);
   const ctx={THREE:T,G:g,core:C,run:()=>run,world:()=>world,player:()=>player,actors:()=>actors,monsters:()=>[m],hazards:()=>[trap],paused:()=>paused,text:s=>s,action:()=>'',portrait:()=>'',clear:()=>!blocked,walkClear:()=>true,
     audio:{sfxAction:k=>{sounds.push(k);},sfxHit(){}},toast(message,ms,read=true){if(voiceEnabled&&read)speaking=true;},save(){},swing(){},close(){},dialog(){},dispose(){},
@@ -63,8 +63,12 @@ function fixture(skill,options={}){
     hit(enemy,memberId,skillId){const res=H.strike(run,enemy.id,{memberId,skillId},run.revision);if(res.ok){run=res.run;hits++;runtime.impact(enemy,memberId||H.state(run).active,skillId);if(res.effect.dead)enemy.alive=false;}return res;}
   };
   runtime=env.TowerHeroesRuntime.create(ctx);runtime.tick(0);
-  return {runtime,sounds,voiceCalls,enableVoice:()=>{voiceEnabled=true;},world,g,target,trap,motion:()=>player.userData.combatMotion,run:()=>run,hits:()=>hits,block:v=>blocked=v,pause:v=>paused=v};
+  return {runtime,monster:m,sounds,voiceCalls,enableVoice:()=>{voiceEnabled=true;},world,g,target,trap,motion:()=>player.userData.combatMotion,run:()=>run,hits:()=>hits,block:v=>blocked=v,pause:v=>paused=v};
 }
+test('electric ailment stops barricade attacks until it expires',()=>{
+  const f=fixture(H.SKILLS.barricade);assert.ok(f.runtime.cast('barricade'));for(let i=0;i<15;i++)f.runtime.tick(.1);f.monster.model.position.set(0,0,1.1);f.monster.def={...f.monster.def,damage:10000};const F=require('../story/tower-affixes.js');F.apply(f.run(),f.monster.id,'shock',{enemy:true});
+  assert.equal(f.runtime.blocker(f.monster,.1),true);assert.equal(f.runtime.blocker(f.monster,.1),true,'stunned strikes cannot destroy the barricade');F.state(f.run()).enemies[f.monster.id]=[];assert.equal(f.runtime.blocker(f.monster,.1),true);assert.equal(f.runtime.blocker(f.monster,.1),false,'unstunned real strike destroys the barrier');f.runtime.reset();
+});
 test('every successful active skill emits action audio and geometry; failed repeat casts stay silent',()=>{
   for(const s of Object.values(H.SKILLS)){
     const f=fixture(s);assert.equal(f.runtime.cast(s.id,f.target),true,s.id);
@@ -84,8 +88,8 @@ test('projectile impact is emitted only on a confirmed hit, never when occluded;
     f.runtime.reset();
   }
 });
-test('all approved preparations add 0.5 seconds, defer effects/costs/cooldowns, and freeze while paused',()=>{
-  const expected={starfall:1.5,star_ring:1.9,decisive_slash:1.3,whirlwind:.8,dawn_sanctuary:1.3,revive:1.5,moving_fortress:1.1,barricade:1,hero_feast:1.3,worldtree_arrow:1.5,iron_charge:1.1,shoulder_quake:1.1,steel_meteor_fist:1.5};
+test('every approved ordinary or awakened preparation is 0.3 seconds shorter, defers costs, and freezes while paused',()=>{
+  const expected={starfall:1.2,star_ring:1.6,decisive_slash:1,whirlwind:.5,dawn_sanctuary:1,revive:1.2,moving_fortress:.8,barricade:.7,hero_feast:1,worldtree_arrow:1.2,iron_charge:.8,shoulder_quake:.8,steel_meteor_fist:1.2};
   assert.deepEqual(H.PREPARATION,expected);
   for(const [id,seconds] of Object.entries(expected)){
     const f=fixture(H.SKILLS[id]),before=JSON.stringify(f.run());
@@ -110,11 +114,17 @@ test('preparation cancellation and release validation never grant effects or spe
     f.runtime.tick(2);assert.equal(f.runtime.preparing(),null);assert.equal(H.actor(f.run()).cooldowns.moving_fortress,0);assert.equal(f.run().party.journey.scrap,30);assert.ok(C.validateSave(f.run()),reason);f.runtime.reset();
   }
 });
-test('disarm work increases by 0.5 seconds at every tier and remains interruptible',()=>{
-  assert.deepEqual(H.SKILLS.disarm.power,[3.5,3.1,2.7,2.3,1.9,1.5]);
-  const f=fixture(H.SKILLS.disarm);f.runtime.cast('disarm','hero');assert.equal(f.runtime.preparing().total,3.5);
-  f.runtime.tick(3.49);assert.equal(f.trap.heroRemoved,undefined);f.runtime.tick(.02);assert.equal(f.trap.heroRemoved,true);f.runtime.reset();
+test('disarm work is 0.3 seconds shorter at every tier and remains interruptible',()=>{
+  assert.deepEqual(H.SKILLS.disarm.power,[3.2,2.8,2.4,2,1.6,1.2]);
+  const f=fixture(H.SKILLS.disarm);f.runtime.cast('disarm','hero');assert.equal(f.runtime.preparing().total,3.2);
+  f.runtime.tick(3.19);assert.equal(f.trap.heroRemoved,undefined);f.runtime.tick(.02);assert.equal(f.trap.heroRemoved,true);f.runtime.reset();
   const g=fixture(H.SKILLS.disarm);g.runtime.cast('disarm','hero');H.actor(g.run()).hurt=1;g.runtime.tick(.1);assert.equal(g.runtime.preparing(),null);assert.equal(g.trap.heroRemoved,undefined);g.runtime.reset();
+});
+test('all underground preparations also shorten exactly 0.3 and canonical skill metadata matches execution',()=>{
+  const catalog=require('../story/tower-ascension-catalog.js');assert.equal(H.PREPARATION_REDUCTION,.3);
+  for(const s of Object.values(H.SKILLS)){assert.equal(s.preparation,H.preparationSeconds(s.id),s.id);assert.ok(s.preparation>=0,s.id);if(s.preparation)assert.ok(s.description.endsWith('準備 '+s.preparation+' 秒後生效。'),s.id);}
+  for(const s of catalog.actives){const seconds=Math.max(0,Math.round(((s.preparation||0)-.3)*10)/10);assert.equal(H.preparationSeconds(s.id),seconds,s.id);if(!seconds)continue;const f=fixture(H.SKILLS[s.id]),before=JSON.stringify(f.run());assert.equal(f.runtime.cast(s.id,f.target),true,s.id);assert.equal(f.runtime.preparing().total,seconds);assert.equal(JSON.stringify(f.run()),before);f.runtime.tick(seconds-.01);assert.equal(H.actor(f.run()).cooldowns[s.id],0);f.runtime.tick(.02);assert.equal(f.runtime.preparing(),null);assert.ok(H.actor(f.run()).cooldowns[s.id]>0);assert.ok(C.validateSave(f.run()));f.runtime.reset();}
+  for(const id of ['arcane_bolt','flying_fist','parts_restore','mech_aid','not-a-skill'])assert.equal(H.preparationSeconds(id),0);
 });
 test('successful guard, healing and completed disarm play the acting gender specialty, not generic overlapping narration',()=>{
   for(const sex of ['male','female'])for(const skill of ['guard_stance','herbal_heal','disarm']){

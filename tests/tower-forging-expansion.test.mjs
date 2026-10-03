@@ -80,7 +80,7 @@ test('save validation rejects mismatched weapon types, old traits retain exact b
   const staff=under('mage');staff.equipment.weapon.forge={trait:'sharp',level:1,reserve:0};assert.equal(C.validateSave(staff),null);
   for(const trait of ['durable','light','grip']){
     let r=equip(fresh(),'heavy_armor'),id=r.equipment.armor.id,q=X.forgeQuote(r,id,trait);assert.equal(q.parts,3);assert.equal(q.coins,Math.ceil(8*(1-H.teamPassive(r,'economy')/100)));r=forge(r,id,trait);r=forge(r,id,trait);const restored=C.validateSave(r);assert.deepEqual(restored,r);assert.deepEqual(C.validateSave(restored),restored);
-    if(trait==='durable'){assert.equal(r.equipment.armor.forge.reserve,4);const dur=r.equipment.armor.durability;X.wear(r,r.equipment.armor);assert.equal(r.equipment.armor.durability,dur);assert.equal(r.equipment.armor.forge.reserve,3);}
+    if(trait==='durable'){assert.equal(r.equipment.armor.forge.reserve,0);const dur=r.equipment.armor.durability;for(let i=0;i<5;i++)X.wear(r,r.equipment.armor);assert.equal(r.equipment.armor.durability,dur-4);assert.equal(r.equipment.armor.forge.wearCredit,0);}
   }
   const legacy=P.enable(C.newRun({seed:22}),'smith').run;assert.ok(X.forgeOptions(legacy,legacy.equipment.weapon).every(q=>['durable','light','grip'].includes(q.trait)));
 });

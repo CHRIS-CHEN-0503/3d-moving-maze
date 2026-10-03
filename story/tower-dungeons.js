@@ -7,7 +7,8 @@
   'use strict';
   const getCore = () => typeof module === 'object' && module.exports ? require('./story-core.js') : globalThis.TowerCore;
   const getStories = () => typeof module === 'object' && module.exports ? require('./tower-side-stories.js') : globalThis.TowerSideStories;
-  const CATALOG_VERSION = 3;
+  const CATALOG_VERSION = 4;
+  const SHIFT_INTERVAL_BONUS = 10;
   const TYPES = Object.freeze({
     archive: Object.freeze({ title: '無聲信庫', description: '被高塔遺忘的信件仍在等待收信人。穿過移動書架，帶回三封未寄出的家書。', objective: '找回三封家書，順序不限。', size: 7, timeLimit: 150, shiftSeconds: 30 }),
     bells: Object.freeze({ title: '逆時鐘室', description: '鐘擺向後擺動，三枚符印維繫著裂隙。依照門上的順序敲響它們；錯誤會觸發陷阱。', objective: '依照提示順序敲響三枚符印。', size: 7, timeLimit: 120, shiftSeconds: 24 }),
@@ -63,7 +64,7 @@
     if (catalogVersion >= 2 && !stories) return null;
     const pool = [...Object.entries(TYPES).map(([kind, spec]) => ({ kind, ...spec })), ...(stories ? stories.eligible(floor) : [])];
     const draw = random();
-    const spec = catalogVersion === 3 ? varietyPlan(seed)[floor] : pool[Math.floor(draw * pool.length)], kind = spec.kind;
+    const spec = catalogVersion >= 3 ? varietyPlan(seed)[floor] : pool[Math.floor(draw * pool.length)], kind = spec.kind;
     const id = `rift:${floor}:${seed}`, order = [0, 1, 2];
     for (let index = 2; index > 0; index -= 1) {
       const other = Math.floor(random() * (index + 1));
@@ -76,8 +77,11 @@
     const reward = { coins: 22 + Math.floor((99 - floor) / 10) * 3, items: enhanced ? {} : { heal: 1, ration: floor < 40 ? 2 : 1 }, gear: enhanced ? C.createGear(gearKind, floor, seed, id, true) : null };
     // Do not add fields to a v1 offer; saved v1 sessions remain byte-for-byte stable.
     if (catalogVersion === 1) return { id, kind, ...TYPES[kind], order, reward };
-    if (catalogVersion === 3) {
+    if (catalogVersion >= 3) {
       const scaled = difficulty(floor, spec);
+      // Only new catalogue sessions change timing. Saved star-shift checkpoints
+      // retain their original interval until this floor is left, without rerolls.
+      if (catalogVersion >= 4) scaled.shiftSeconds += SHIFT_INTERVAL_BONUS;
       reward.coins += (scaled.tier - 1) * 5;
       return { id, kind, ...spec, ...scaled, order, reward, catalogVersion };
     }
@@ -89,12 +93,12 @@
   function validateExpedition(value, floor, seed) {
     if (!validFloor(floor) || !validSeed(seed)) return null;
     if (value === undefined) return newExpedition(1);
-    if (!value || typeof value !== 'object' || Array.isArray(value) || ![1, 2, 3].includes(value.version) || typeof value.discovered !== 'boolean' || !Array.isArray(value.history) || value.history.length > 99) return null;
+    if (!value || typeof value !== 'object' || Array.isArray(value) || ![1, 2, 3, 4].includes(value.version) || typeof value.discovered !== 'boolean' || !Array.isArray(value.history) || value.history.length > 99) return null;
     const history = [], ids = new Set();
     for (const item of value.history) {
       if (!item || !towerFloor(item.floor) || item.floor < floor || !['completed', 'abandoned', 'expired'].includes(item.outcome)) return null;
       const version = catalogVersion(item.catalogVersion);
-      if (![1, 2, 3].includes(version) || version > value.version || item.floor === floor && version !== value.version) return null;
+      if (![1, 2, 3, 4].includes(version) || version > value.version || item.floor === floor && version !== value.version) return null;
       const generated = rawOffer(item.floor, seed, version);
       if (!generated || generated.id !== item.id || generated.kind !== item.kind || ids.has(item.id)) return null;
       ids.add(item.id); history.push({ id: item.id, kind: item.kind, floor: item.floor, outcome: item.outcome, ...(version >= 2 ? { catalogVersion: version } : {}) });
@@ -121,7 +125,7 @@
   function offer(run) {
     if (!run || !validFloor(run.floor) || !validSeed(run.seed)) return null;
     const version = run.expedition ? run.expedition.version : CATALOG_VERSION;
-    if (![1, 2, 3].includes(version)) return null;
+    if (![1, 2, 3, 4].includes(version)) return null;
     const generated = rawOffer(run.floor, run.seed, version);
     if (!generated || run.expedition && (!Array.isArray(run.expedition.history) || run.expedition.history.some(entry => entry.id === generated.id))) return null;
     if(run.party?.loadouts&&generated.reward.gear){const C=getCore(),kinds=Object.keys(C.GEAR).filter(k=>C.GEAR[k].tier<=(run.floor>=70?1:run.floor>=40?2:3)),kind=kinds[(run.seed+run.floor*7)%kinds.length];generated.reward.gear=C.createGear(kind,run.floor,run.seed,generated.id,true);}
@@ -221,5 +225,5 @@
     }
     return C.transaction(run, expectedRevision, settle);
   }
-  return Object.freeze({ TYPES, CATALOG_VERSION, newExpedition, validateExpedition, offer, discover, enter, interact, observeShift, tick, finish });
+  return Object.freeze({ TYPES, CATALOG_VERSION, SHIFT_INTERVAL_BONUS, newExpedition, validateExpedition, offer, discover, enter, interact, observeShift, tick, finish });
 });

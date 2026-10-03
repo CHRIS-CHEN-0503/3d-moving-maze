@@ -72,7 +72,7 @@ test('v3 九種副本可續存、完成、一次性領獎；v2 中途進度不�
   }
   let r=active(fixture('archive',95,2));r=D.interact(r,0).run;r=D.tick(r,7).run;
   assert.deepEqual(C.validateSave(JSON.stringify(r)),r);assert.equal(D.offer(r).catalogVersion,2);
-  r=D.finish(r,'abandoned').run;r=C.descend(r).run;assert.equal(r.expedition.version,3);assert.equal(r.expedition.history[0].catalogVersion,2);assert.ok(C.validateSave(r));
+  r=D.finish(r,'abandoned').run;r=C.descend(r).run;assert.equal(r.expedition.version,D.CATALOG_VERSION);assert.equal(r.expedition.history[0].catalogVersion,2);assert.ok(C.validateSave(r));
 });
 test('無牆資料時四種地板陷阱配置固定、有安全區，數量與繪製成本有上限',()=>{
   assert.deepEqual(H.layout({floor:99,size:7,seed:1}),[]);
@@ -125,8 +125,8 @@ test('真實場景機關接入：防具耗損、暫停與變形安全期、同�
   h.api.setClock(12);h.context.G.px=vine.x;h.context.G.pz=vine.z;h.api.tickHazards(.01);for(let i=0;i<7;i++)h.api.tickHazards(.1);assert.equal(h.context.TowerMode.movementScale(),.55);
   h.context.G.px=h.context.G.pz=0;h.api.tickHazards(.01);assert.equal(h.context.TowerMode.movementScale(),1);
 });
-test('舊副本不突然新增陷阱，v3 副本有機關且重載配置相同',()=>{
-  for(const version of [2,3]){
+test('舊副本不突然新增陷阱，v3/v4 副本有機關且重載配置相同',()=>{
+  for(const version of [2,3,4]){
     const r=active(fixture('archive',35,version)),h=runtime(r);h.start();const traps=h.api.state().hazards;
     if(version===2)assert.equal(traps.length,0);else{
       assert.ok(traps.length>0&&traps.length<=D.offer(r).trapCount);

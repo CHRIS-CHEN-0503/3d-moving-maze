@@ -99,7 +99,9 @@
       if ((q.status === 'active' && q.progress >= q.goal) || (q.status !== 'active' && q.progress !== q.goal)) return null;
       quest = { id: q.id, floor: q.floor, type: q.type, status: q.status, target: q.target, goal: q.goal, progress: q.progress, events: [...q.events] };
     }
-    return { version: 1, claimed: [...value.claimed], quest, groceryPurchases: purchases };
+    const Events=typeof module==='object'&&module.exports?require('./tower-adventure-events.js'):globalThis.TowerAdventureEvents,events=value.events===undefined?undefined:Events?.validate(value.events,{floor,seed});
+    if(events===null||value.events!==undefined&&!events)return null;
+    return { version: 1, claimed: [...value.claimed], quest, groceryPurchases: purchases,...(events?{events}:{}) };
   }
   function floorLootCounts(size) {
     if (!Object.hasOwn(COUNTS, size)) throw new RangeError('未知的迷宮尺寸。');
@@ -237,7 +239,7 @@
   function explorerOffer(run) {
     const C = core(), random = randomFor(run.floor, run.seed, 0x5b31e);
     if (random() >= .2) return null;
-    const adventure = validateAdventure(run.adventure, run.floor);
+    const adventure = validateAdventure(run.adventure, run.floor, run.seed);
     if (!adventure) return null;
     if (adventure.quest) return describeQuest(adventure.quest, run);
     if (adventure.claimed.includes(`abandoned:${run.floor}`)) return null;

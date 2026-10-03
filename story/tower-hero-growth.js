@@ -45,8 +45,8 @@
     passive('forest_echo','archer','森靈追擊',Array(6).fill(40),'射擊已被緩速的怪物額外增傷40%；纏枝箭與隊友的緩速都能觸發。',true),
     passive('kinetic_core','robot','動能護核',Array(6).fill(60),'實際承受怪物傷害後儲能八秒；下次普通拳擊追加60%傷害與20%最大生命護盾五分鐘。間隔三十秒；陷阱、飢餓及完全吸收的傷害不觸發。',true),
   ];
-  const itemIds=['heal','ration','shield','hourglass','bell','map','haste'];
-  function policy(){return {strategy:'support',materials:false,heal:{enabled:false,threshold:30,reserve:2},shield:false,bell:false,hourglass:false,map:false,haste:false,itemLeft:0,thinkLeft:0};}
+  const itemIds=['heal','ration','shield','hourglass','bell','map','haste','power_glimmer','power_starlight','power_sunheart'];
+  function policy(){return {strategy:'support',materials:false,heal:{enabled:false,threshold:30,reserve:2},fuel:{enabled:false,threshold:25,reserve:0},shield:false,bell:false,hourglass:false,map:false,haste:false,itemLeft:0,thinkLeft:0};}
   function freshRecord(){return {choices:[],awakening:null,tastes:[],tasteLeft:0,echo:0,defiance:0,covenant:0};}
   function fresh(ids=['hero']){return {version:2,...freshRecord(),members:Object.fromEntries(ids.filter(id=>id!=='hero').map(id=>[id,freshRecord()])),quick:['heal','ration','shield','bell'],useActive:false,food:{enabled:false,threshold:20,reserve:2},policies:Object.fromEntries(ids.map(id=>[id,policy()])),imprints:{},route:null,nearby:{}};}
   const state=run=>H().state(run).growth||(H().state(run).growth=fresh(H().ids(run)));
@@ -80,15 +80,18 @@
   function consumeCost(run,id,cost){const h=H();let saved=false;for(const[k,v]of Object.entries(cost)){let count=v;if(!saved&&h.roll(run,id,'ingredient-care')<h.pv(run,'ingredient_care',id)){count--;saved=true;}run.party.ingredients[k]-=count;}}
   function afterCast(run,id,s,near){const h=H(),m=modifiers(run,id,s.id);if(s.effect==='fortress'){shield(run,id,h.maxHp(run,id)*power(run,id,s)/100);h.setBuff(run,id,'fortress',s.params?.duration||15,1);h.setBuff(run,id,'fortify',s.params?.duration||15,Math.round(4*m.power));run.party.journey.scrap-=2;}
     if(s.effect==='feast'){const keys=Object.keys(run.party.ingredients).filter(k=>run.party.ingredients[k]>0).slice(0,3);keys.forEach(k=>run.party.ingredients[k]--);run.hunger=Math.min(100,run.hunger+power(run,id,s));near.filter(k=>h.hp(run,k)>0).forEach(k=>{h.setBuff(run,k,'regen',10,h.maxHp(run,k)*.02*m.power*(id==='hero'?1+.02*(h.level(run,id)-1):1));h.setBuff(run,k,'rally',45,15*m.power);});}
-    if(s.effect==='sanctuary'){const down=near.find(k=>h.hp(run,k)<=0);if(down)h.setHp(run,down,h.maxHp(run,down)*.3*m.power);h.setBuff(run,id,'sanctuary',10,1);}
+    if(s.effect==='sanctuary'){const down=near.find(k=>h.organicHealable(run,k)&&h.hp(run,k)<=0);if(down)h.setHp(run,down,h.maxHp(run,down)*.3*m.power);h.setBuff(run,id,'sanctuary',10,1);}
   }
   function recipe(run,key){const h=H();for(const owner of h.ids(run).filter(k=>has(run,'many_flavors',k))){const g=record(run,owner),m=modifiers(run,owner,'many_flavors');if(!g.tastes.includes(key))g.tastes.push(key);if(g.tastes.length>=2&&g.tasteLeft<=0){h.ids(run).filter(id=>h.hp(run,id)>0).forEach(id=>{h.heal(run,id,h.maxHp(run,id)*.25*m.power);shield(run,id,h.maxHp(run,id)*.3*m.power,owner);});g.tastes=[];g.tasteLeft=90*m.cooldown;}}
     const bonus=h.teamPassive(run,'food_sharing');if(bonus)h.ids(run).filter(id=>h.hp(run,id)>0).forEach(id=>h.heal(run,id,bonus));
   }
-  function imprint(run,id,gearId,safe){return C().transaction(run,run.revision,n=>{const h=H(),owner=h.ids(n).find(k=>has(n,'artisan_soul',k)),g=h.equipment(n,id)&&Object.values(h.equipment(n,id)).find(g=>g?.id===gearId);if(!safe||!owner||!g||g.durability!==g.maxDurability||n.party.journey.scrap<2)return {ok:false,message:'需要營地、存活的刻印鍛匠、修滿的裝備及兩份零件。'};n.party.journey.scrap-=2;const boost=modifiers(n,owner,'artisan_soul').power;state(n).imprints[id]={gearId,left:Math.ceil(g.maxDurability*.2*boost),boost};return {ok:true,message:'完成匠魂刻印'};});}
+  function imprint(run,id,gearId,safe){return C().transaction(run,run.revision,n=>{const h=H(),owner=h.ids(n).find(k=>has(n,'artisan_soul',k)),g=h.equipment(n,id)&&Object.values(h.equipment(n,id)).find(g=>g?.id===gearId);if(!safe||!owner||!g||h.ROBOT.isCore(g)||g.durability!==g.maxDurability||n.party.journey.scrap<2)return {ok:false,message:'需要營地、存活的刻印鍛匠、修滿的普通裝備及兩份零件。'};n.party.journey.scrap-=2;const boost=modifiers(n,owner,'artisan_soul').power;state(n).imprints[id]={gearId,left:Math.ceil(g.maxDurability*.2*boost),boost};return {ok:true,message:'完成匠魂刻印'};});}
   function imprintFor(run,id,gear){const mark=state(run).imprints[id];return mark?.left>0&&mark.gearId===gear?.id?mark:null;}
   function use(run,key,id=H().state(run).active,automatic=false,revision=run.revision){return C().transaction(run,revision,n=>{const h=H(),g=state(n),p=g.policies[id];if(!p||!itemIds.includes(key)||h.hp(n,id)<=0||p.itemLeft>0||n.bag[key]<=0)return {ok:false,message:'道具不足、人物倒地或正在使用道具。'};
-    if(automatic){if(id===h.state(n).active&&!g.useActive)return {ok:false,message:'目前操控人物未啟用自動道具。'};if(key==='heal'&&(!p.heal.enabled||n.bag.heal<=p.heal.reserve||h.hp(n,id)/h.maxHp(n,id)*100>p.heal.threshold))return {ok:false};if(key==='ration'&&(!g.food.enabled||n.bag.ration<=g.food.reserve||n.hunger>g.food.threshold))return {ok:false};if(!['heal','ration'].includes(key)&&!p[key])return {ok:false};}
+    const fuel=h.ROBOT.fuelItemIds.includes(key);
+    if(['heal','ration'].includes(key)&&!h.organicHealable(n,id))return {ok:false,message:'食物與療癒藥不能修復機器人，請使用動力核心或零件回補。'};
+    if(automatic){if(id===h.state(n).active&&!g.useActive)return {ok:false,message:'目前操控人物未啟用自動道具。'};if(key==='heal'&&(!p.heal.enabled||n.bag.heal<=p.heal.reserve||h.hp(n,id)/h.maxHp(n,id)*100>p.heal.threshold))return {ok:false};if(key==='ration'&&(!g.food.enabled||n.bag.ration<=g.food.reserve||n.hunger>g.food.threshold))return {ok:false};if(fuel&&(!p.fuel.enabled||n.bag[key]<=p.fuel.reserve||h.actor(n,id)?.robot?.fuel>p.fuel.threshold))return {ok:false};if(!['heal','ration'].includes(key)&&!fuel&&!p[key])return {ok:false};}
+    if(fuel){const filled=h.ROBOT.fillFuel(n,key,id);if(!filled.ok)return filled;}
     if(key==='heal'){if(h.hp(n,id)>=h.maxHp(n,id))return {ok:false,message:'生命已滿。'};h.heal(n,id,35);}
     if(key==='ration'){if(n.hunger>=100)return {ok:false,message:'飽食度已滿。'};n.hunger=Math.min(100,n.hunger+45*(1+h.teamPassive(n,'gourmet')/100));h.food(n,id);}
     if(key==='shield'){if(h.buff(n,'barrier',id)?.power>=h.maxHp(n,id)*.35)return {ok:false,message:'護盾仍充足。'};shield(n,id,h.maxHp(n,id)*.35);}
@@ -96,13 +99,15 @@
     const timed={hourglass:['freeze',25],bell:['repel',20],map:['reveal',18]};if(timed[key]){const [k,t]=timed[key];if(n.effects[k]>0)return {ok:false,message:'效果仍在持續。'};n.effects[k]=t*(1+h.pv(n,'extension',id)/100);}
     n.bag[key]--;p.itemLeft=automatic?5:1;return {ok:true,message:'使用 '+C().ITEMS[key].name,effect:{item:key,actorId:id}};});}
   function autoItems(run,threats=[]){const h=H(),g=state(run),order=h.ids(run).filter(id=>h.hp(run,id)>0&&(id!==h.state(run).active||g.useActive)).sort((a,b)=>h.hp(run,a)/h.maxHp(run,a)-h.hp(run,b)/h.maxHp(run,b));
-    for(const id of order){const p=g.policies[id];if(p.itemLeft>0)continue;if(p.heal.enabled&&run.bag.heal>p.heal.reserve&&h.hp(run,id)/h.maxHp(run,id)*100<=p.heal.threshold)return {id,key:'heal'};
-      if(g.food.enabled&&run.hunger<=g.food.threshold&&run.bag.ration>g.food.reserve)return {id,key:'ration'};
+    for(const id of order){const p=g.policies[id];if(p.itemLeft>0)continue;if(h.job(run,id)==='robot'&&p.fuel.enabled&&h.actor(run,id).robot.fuel<=p.fuel.threshold){const key=h.ROBOT.fuelItemIds.find(key=>run.bag[key]>p.fuel.reserve);if(key)return {id,key};}
+      if(h.organicHealable(run,id)&&p.heal.enabled&&run.bag.heal>p.heal.reserve&&h.hp(run,id)/h.maxHp(run,id)*100<=p.heal.threshold)return {id,key:'heal'};
+      if(h.organicHealable(run,id)&&g.food.enabled&&run.hunger<=g.food.threshold&&run.bag.ration>g.food.reserve)return {id,key:'ration'};
       if(threats.includes(id)){if(p.shield&&run.bag.shield&&h.hp(run,id)<h.maxHp(run,id)*.5&&!h.buff(run,'barrier',id)?.power)return {id,key:'shield'};for(const [key,e]of [['bell','repel'],['hourglass','freeze']])if(p[key]&&run.bag[key]&&h.hp(run,id)<h.maxHp(run,id)*.3&&!run.effects[e])return {id,key};if(p.haste&&run.bag.haste&&!h.buff(run,'haste',id))return {id,key:'haste'};if(p.map&&run.bag.map&&!run.effects.reveal&&!run.engine.mapKnowledge?.revealed)return {id,key:'map'};}
     }return null;
   }
   function aiChoice(run,id,near,threat){const h=H(),a=h.actor(run,id),p=state(run).policies[id];if(!p||p.strategy==='manual'||p.thinkLeft>0||h.hp(run,id)<=0)return null;
-    const low=near.filter(k=>h.hp(run,k)>0&&h.hp(run,k)<h.maxHp(run,k)*.5).sort((a,b)=>h.hp(run,a)/h.maxHp(run,a)-h.hp(run,b)/h.maxHp(run,b))[0],down=near.find(k=>h.hp(run,k)===0);
+    if(h.job(run,id)==='robot'&&!h.ROBOT.powered(run,id))return null;
+    const low=near.filter(k=>h.organicHealable(run,k)&&h.hp(run,k)>0&&h.hp(run,k)<h.maxHp(run,k)*.5).sort((a,b)=>h.hp(run,a)/h.maxHp(run,a)-h.hp(run,b)/h.maxHp(run,b))[0],down=near.find(k=>h.organicHealable(run,k)&&h.hp(run,k)===0);
     const priorities=p.strategy==='attack'?['revive','heal','robot_restore','attack','barrier','guard','robot_guard','mech_aid']:p.strategy==='survive'?['revive','heal','robot_restore','sanctuary','barrier','mech_aid','guard','robot_guard','robot_speed','ward','cleanse','escape','smoke','stealth','attack']:['revive','heal','robot_restore','soup','sanctuary','barrier','mech_aid','fortress','guard','robot_guard','ward','rally','polish','fortify','repair','daylight','feast','meal','stomach','speed','robot_speed','frost','taunt','attack'];
     const skills=[...a.skills].sort((a,b)=>Number(!!h.SKILLS[b].unique)-Number(!!h.SKILLS[a].unique));
     for(const kind of priorities)for(const key of skills){const s=h.SKILLS[key];if((kind==='attack'?!s.attack:s.effect!==kind)||s.attack&&a.attack>0||a.cooldowns[key]>0||Object.keys(s.cost).length&&!p.materials||['feast','fortress'].includes(s.effect)&&!p.materials)continue;
@@ -120,7 +125,8 @@
     g.version=2;
     if(!Array.isArray(g.quick)||g.quick.length!==4||!g.quick.every(k=>itemIds.includes(k)||k===null)||typeof g.useActive!=='boolean')return null;
     const recovery=p=>p&&typeof p.enabled==='boolean'&&Number.isInteger(p.threshold)&&p.threshold>=10&&p.threshold<=90&&p.threshold%5===0&&Number.isInteger(p.reserve)&&num(p.reserve,0,99);
-    if(!recovery(g.food)||!g.policies||typeof g.policies!=='object')return null;for(const id of ids){const p=g.policies[id];if(p&&p.haste===undefined)p.haste=false;if(!p||!['manual','attack','support','survive'].includes(p.strategy)||!recovery(p.heal)||typeof p.materials!=='boolean'||!['shield','bell','hourglass','map','haste'].every(k=>typeof p[k]==='boolean')||!num(p.itemLeft,0,5)||!num(p.thinkLeft,0,5))return null;}
+    const fuelRecovery=p=>recovery(p)&&Object.keys(p).length===3&&Object.keys(p).every(k=>['enabled','threshold','reserve'].includes(k));
+    if(!recovery(g.food)||!g.policies||typeof g.policies!=='object')return null;for(const id of ids){const p=g.policies[id];if(p&&p.haste===undefined)p.haste=false;if(p&&p.fuel===undefined)p.fuel={enabled:false,threshold:25,reserve:0};if(!p||!['manual','attack','support','survive'].includes(p.strategy)||!recovery(p.heal)||!fuelRecovery(p.fuel)||typeof p.materials!=='boolean'||!['shield','bell','hourglass','map','haste'].every(k=>typeof p[k]==='boolean')||!num(p.itemLeft,0,5)||!num(p.thinkLeft,0,5))return null;}
     g.policies=Object.fromEntries(ids.map(id=>[id,g.policies[id]]));if(!g.imprints||typeof g.imprints!=='object'||Object.keys(g.imprints).length>5)return null;for(const [id,m]of Object.entries(g.imprints))if(!ids.includes(id)||typeof m.gearId!=='string'||m.gearId.length>160||!num(m.left,0,200)||m.boost!==undefined&&!num(m.boost,1,1.3))return null;
     if(g.route!==null&&(!g.route||!num(g.route.left,0,12)||!C().isFloor(g.route.floor)||g.route.power!==undefined&&!num(g.route.power,0,100)||!Array.isArray(g.route.points)||g.route.points.length>6||!g.route.points.every(p=>num(p.x,-1000,1000)&&num(p.z,-1000,1000))))return null;
     if(!g.nearby||typeof g.nearby!=='object'||Object.entries(g.nearby).some(([id,list])=>!ids.includes(id)||!Array.isArray(list)||list.length>5||!list.every(k=>ids.includes(k))))return null;return g;

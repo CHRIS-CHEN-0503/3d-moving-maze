@@ -20,8 +20,8 @@ test('independent grocery draw keeps all three professional merchant identities 
     assert.deepEqual(E.merchantOffers(floor,seed,modern),shops);
   }
 });
-test('grocery appears around forty percent independently and sells all supplies but no gear or forge services',()=>{
-  let count=0;for(let seed=1;seed<=2000;seed++){const m=E.merchantOffers(92,seed,true).find(m=>m.id==='suHe');if(!m)continue;count++;assert.deepEqual(m.supplies,Object.keys(C.ITEMS).filter(k=>k!=='coin'));assert.deepEqual(m.gear,[]);assert.equal(m.ingredientOffers.length,5);}
+test('grocery appears around forty percent independently and sells all purchasable supplies but no higher fuel grades, gear or forge services',()=>{
+  let count=0;for(let seed=1;seed<=2000;seed++){const m=E.merchantOffers(92,seed,true).find(m=>m.id==='suHe');if(!m)continue;count++;assert.deepEqual(m.supplies,Object.keys(C.ITEMS).filter(k=>C.ITEMS[k].buyPrice>0));assert.ok(m.supplies.includes('power_glimmer'));assert.ok(!m.supplies.includes('power_starlight'));assert.ok(!m.supplies.includes('power_sunheart'));assert.deepEqual(m.gear,[]);assert.equal(m.ingredientOffers.length,5);}
   assert.ok(count>720&&count<880,count);const r=fresh();assert.equal(E.serviceContext(r,'suHe'),null);assert.equal(E.merchantHandles('suHe','longsword'),false);assert.equal(E.buyMerchantGear(r,'suHe','longsword').ok,false);
 });
 test('each shelf has four common ingredients and one geographically correct limited specialty',()=>{

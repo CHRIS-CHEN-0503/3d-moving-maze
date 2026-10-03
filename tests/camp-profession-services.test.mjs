@@ -50,8 +50,8 @@ test('camp full repair, forge and dismantle all require an actionable smith, reg
 });
 
 test('all 90 human equipment definitions, ten fixed robot parts and legacy items have exactly one specialist',()=>{
-  assert.equal(Object.values(H.GEAR).filter(g=>!g.integrated).length,90);assert.equal(Object.values(H.GEAR).filter(g=>g.integrated).length,10);
-  for(const kind of Object.keys(H.GEAR)){const merchants=Object.keys(E.MERCHANTS).filter(id=>E.merchantHandles(id,kind));assert.equal(merchants.length,1,kind);const owner=E.MERCHANT_SERVICES[merchants[0]],gear=H.GEAR[kind];if(gear.integrated){assert.deepEqual(merchants,['tieLing']);assert.deepEqual(gear.jobs,['robot']);}else assert.ok(gear.slot===owner.slot||owner.weaponKinds.includes(gear.baseKind));}
+  assert.equal(Object.values(H.GEAR).filter(g=>!g.integrated&&!g.core).length,90);assert.equal(Object.values(H.GEAR).filter(g=>g.integrated).length,10);assert.equal(Object.values(H.GEAR).filter(g=>g.core).length,5);
+  for(const kind of Object.keys(H.GEAR)){const merchants=Object.keys(E.MERCHANTS).filter(id=>E.merchantHandles(id,kind));assert.equal(merchants.length,1,kind);const owner=E.MERCHANT_SERVICES[merchants[0]],gear=H.GEAR[kind];if(gear.integrated||gear.core){assert.deepEqual(merchants,['tieLing']);assert.deepEqual(gear.jobs,['robot']);}else assert.ok(gear.slot===owner.slot||owner.weaponKinds.includes(gear.baseKind));}
   for(const kind of ['helmet','armor','shield','bat','pan','staff'])assert.equal(Object.keys(E.MERCHANTS).filter(id=>E.merchantHandles(id,kind)).length,1);
   for(const floor of [99,50,1,-1,-21,-50])for(let seed=1;seed<15;seed++)for(const shop of E.merchantOffers(floor,seed,true))for(const gear of shop.gear){assert.equal(E.merchantHandles(shop.id,gear.kind),true);assert.equal(H.GEAR[gear.kind].integrated,undefined,'fixed parts are serviced but never sold as loose equipment');}
   assert.equal(E.merchantHandles('__proto__','longsword'),false);assert.equal(E.merchantHandles('tieLing','unknown'),false);

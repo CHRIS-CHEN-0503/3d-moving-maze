@@ -39,7 +39,7 @@ test('all 149 valid floors have explicit profiles and deterministic independent 
     assert.equal(F.specs(run).filter(entry=>entry.kind==='herb').length,amount.herb);
     assert.equal(F.specs(run).filter(entry=>entry.kind==='ore').length,amount.ore);
     assert.equal(new Set(F.specs(run).map(entry=>entry.id)).size,F.specs(run).length);
-    assert.ok(F.specs(run).every(entry=>entry.quantity===1));assert.deepEqual(run,before);
+    assert.ok(F.specs(run).every(entry=>entry.kind==='power'?entry.quantity>=1&&entry.quantity<=3:entry.quantity===1));assert.deepEqual(run,before);
   }
   for(const floor of [0,100,-51,NaN])assert.throws(()=>F.fresh({floor,seed:31}),RangeError);
   for(const seed of [0,-1,0x100000000,1.5])assert.equal(F.validate(undefined,99,seed),null);
@@ -73,6 +73,7 @@ test('deposits use local natural minerals, never body parts or surface-only rare
     for(let seed=1;seed<=100;seed++){
       const run={floor:ecology.high,seed,party:{foraging:F.fresh({floor:ecology.high,seed})}};
       for(const entry of F.specs(run)){
+        if(entry.kind==='power'){assert.ok(F.POWER_STONES.includes(entry.key));assert.equal(entry.type,'item');continue;}
         assert.equal(entry.quantity,1);
         if(entry.kind==='herb'){assert.equal(entry.key,'herb');assert.equal(entry.type,'ingredient');}
         else{seen.add(entry.key);assert.equal(entry.type,'material');assert.ok(F.NATURAL_ORES.includes(entry.key));if(!ecology.underground)assert.notEqual(entry.rarity,'rare');}
@@ -183,9 +184,9 @@ test('placement stays in walkable wall-side corners and excludes entrances, stai
   // Connected zigzag corridors provide real, reachable two-wall corners.
   maze.vWalls.forEach(row=>row.fill(false));maze.hWalls.forEach((row,index)=>{row[index%2?0:8]=false;});
   maze.blockedCells=[{x:5,y:5}];maze.entranceCell={x:0,y:0};maze.exitCell={x:8,y:8};
-  const placements=F.plan(run,maze,{excludeCells:excluded});assert.equal(placements.length,6);
+  const placements=F.plan(run,maze,{excludeCells:excluded});assert.equal(placements.length,6+(F.powerDeposit(run)?1:0));
   assert.deepEqual(placements,F.plan(structuredClone(run),maze,{excludeCells:excluded}));
-  assert.equal(new Set(placements.map(point=>point.cx+','+point.cy)).size,6);
+  assert.equal(new Set(placements.map(point=>point.cx+','+point.cy)).size,placements.length);
   for(const point of placements){
     assert.ok(!excluded.has(point.cx+','+point.cy));assert.notDeepEqual([point.cx,point.cy],[0,0]);assert.notDeepEqual([point.cx,point.cy],[8,8]);assert.notDeepEqual([point.cx,point.cy],[5,5]);
     assert.ok(point.cx>=0&&point.cx<9&&point.cy>=0&&point.cy<9);
@@ -200,12 +201,12 @@ test('placement stays in walkable wall-side corners and excludes entrances, stai
 
 test('open cells use real boundary walls; sparse or changed mazes never fabricate a pickup',()=>{
   const run=withResources(89,amount=>amount.herb===3&&amount.ore===3),maze=grid(9),placements=F.plan(run,maze);
-  assert.equal(placements.length,6);assert.ok(placements.every(point=>point.wallSides.length>0));
+  assert.equal(placements.length,6+(F.powerDeposit(run)?1:0));assert.ok(placements.every(point=>point.wallSides.length>0));
   assert.ok(placements.every(point=>point.cx===0||point.cx===8||point.cy===0||point.cy===8));
   assert.deepEqual(F.plan(run,{...maze,walkableCells:[{x:4,y:4}]}),[],'An open corridor centre is not a forage site');
   const allowed=[{x:0,y:4},{x:8,y:4}];assert.equal(F.plan(run,{...maze,walkableCells:allowed}).length,2);
   const claimed=structuredClone(run);claimed.party.foraging.claimed.push(placements[0].id);
-  const changed=F.plan(claimed,grid(9,true));assert.equal(changed.length,5);
+  const changed=F.plan(claimed,grid(9,true));assert.equal(changed.length,placements.length-1);
   assert.ok(!changed.some(point=>point.id===placements[0].id));assert.deepEqual(F.counts(claimed),F.counts(run));
   assert.deepEqual(F.plan(run,{size:NaN}),[]);assert.deepEqual(F.plan(run,{size:9},{excludeCells:Array.from({length:81},(_,index)=>[index%9,Math.floor(index/9)])}),[]);
 });

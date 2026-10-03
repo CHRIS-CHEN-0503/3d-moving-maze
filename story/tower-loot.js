@@ -18,7 +18,7 @@
   }
   const fresh=()=>({version:1,rolled:[],entries:[]});
   function pool(run,spec){
-    const regional=M().dropPool(run,spec),supplies=[{type:'item',key:'ration',rarity:'common',quantity:1},{type:'fuel',key:'kit',rarity:'common',quantity:1},{type:'item',key:'heal',rarity:'uncommon',quantity:1},...['shield','map','bell','hourglass'].map(key=>({type:'item',key,rarity:'rare',quantity:1})),{type:'item',key:'feather',rarity:'legendary',quantity:1},...(P().has(run,'archer')?[{type:'item',key:'arrow',rarity:'common',quantity:ARROW_DROP_QUANTITY}]:[])];
+    const regional=M().dropPool(run,spec),supplies=[{type:'item',key:'ration',rarity:'common',quantity:1},{type:'fuel',key:'kit',rarity:'common',quantity:1},{type:'item',key:'heal',rarity:'uncommon',quantity:1},...['shield','map','bell','hourglass'].map(key=>({type:'item',key,rarity:'rare',quantity:1})),{type:'item',key:'feather',rarity:'legendary',quantity:1},...(P().has(run,'archer')?[{type:'item',key:'arrow',rarity:'common',quantity:ARROW_DROP_QUANTITY}]:[]),...(P().has(run,'robot')?H().ROBOT.fuelItemIds.map(key=>({type:'item',key,rarity:H().ROBOT.FUEL_ITEMS[key].dropRarity,quantity:1})):[])];
     // Weight ecology and ordinary supplies equally before the original rarity
     // roll. A region's only food must not be drowned out by eight rare supplies.
     const harvest=regional.length?Array.from({length:Math.max(supplies.length,regional.length)},(_,i)=>regional[i%regional.length]):[];
@@ -50,6 +50,7 @@
     if(value===undefined)return fresh();if(!value||value.version!==1||!Array.isArray(value.rolled)||value.rolled.length>128||new Set(value.rolled).size!==value.rolled.length||!value.rolled.every(id=>C().validMonsterId(id,floor)&&defeated.includes(id))||!Array.isArray(value.entries)||value.entries.length>128||new Set(value.entries.map(e=>e?.id)).size!==value.entries.length)return null;
     const maxCell=C().floorConfig(floor).size-1,entries=[];for(const e of value.entries){if(!e||!value.rolled.includes(e.source)||!['item','ingredient','material','fuel','gear'].includes(e.type)||!Object.hasOwn(CHANCES,e.rarity)||!num(e.quantity,1,e.type==='item'&&e.key==='arrow'?ARROW_DROP_QUANTITY:20)||!num(e.cx,0,maxCell)||!num(e.cy,0,maxCell)||e.id!==floor+':'+e.source+':'+(e.type==='gear'?'gear':'item'))return null;
       if(e.type==='item'&&(!Object.hasOwn(C().ITEMS,e.key)||e.key==='coin')||e.type==='ingredient'&&!Object.hasOwn(P().INGREDIENTS,e.key)||e.type==='material'&&(!Object.hasOwn(M().MATERIALS,e.key)||floor>0&&['starore','abyssalloy'].includes(e.key))||e.type==='fuel'&&e.key!=='kit')return null;
+      if(e.type==='item'&&C().ITEMS[e.key]?.fuel&&(e.quantity!==1||e.rarity!==C().ITEMS[e.key].dropRarity))return null;
       const gear=e.type==='gear'?C().validateGear(e.gear):undefined;if(e.type==='gear'&&(!gear||gear.kind!==e.key||e.quantity!==1||e.source!==(floor<0?'monster-12':'monster-11')))return null;
       entries.push({id:e.id,source:e.source,type:e.type,key:e.key,quantity:e.quantity,rarity:e.rarity,cx:e.cx,cy:e.cy,...(gear?{gear}:{})});
     }return {version:1,rolled:[...value.rolled],entries};

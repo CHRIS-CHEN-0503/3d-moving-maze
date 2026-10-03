@@ -232,3 +232,19 @@ body:not(.story-active) #heroTeamBar {display:none!important}
   #towerLeftHud[data-working="true"] .tower-guard-status {margin-top:0}
   #towerLeftHud[data-working="true"] .tower-gear-status,#towerLeftHud[data-working="true"] #towerLightStatus {padding-top:0;font-size:11px}
 }
+/* Supplemental copy only: prices, shortages and actions stay outside this panel. */
+.tower-compact-help{display:flex;flex-wrap:wrap;justify-content:flex-end;align-items:flex-start;gap:0;margin:0 0 6px;min-width:0}
+.tower-help-toggle,.tower-help-close,.tower-help-read{font:inherit;cursor:pointer;touch-action:manipulation;min-width:44px;min-height:44px;box-sizing:border-box;border:1px solid #78939d;color:#f2e4be;background:#233d4d;border-radius:10px}
+.tower-help-toggle{display:grid;place-items:center;width:44px;height:44px;padding:4px;background:transparent;border-color:transparent}
+.tower-help-toggle>span{display:grid;place-items:center;width:28px;height:28px;border:1px solid #78939d;border-radius:50%;background:#233d4d;font-size:19px;font-weight:700;line-height:1}
+.tower-help-toggle[aria-expanded="true"]>span{color:#142b35;background:#efcf85;border-color:#efcf85}
+.tower-help-toggle:focus-visible,.tower-help-close:focus-visible,.tower-help-read:focus-visible{outline:2px solid #efcf85;outline-offset:2px}
+.tower-help-panel{flex:0 0 100%;box-sizing:border-box;min-width:0;max-height:min(320px,52vh);overflow:auto;overscroll-behavior:contain;border:1px solid #78939d;border-radius:12px;background:#112533;box-shadow:0 5px 16px #050c1580;padding:8px 12px;color:#d4e2e8;font-size:16px;line-height:1.55}
+.tower-help-panel[hidden]{display:none!important}
+.tower-help-panel>header{display:flex;align-items:center;justify-content:space-between;gap:12px;color:#f2e4be}
+.tower-help-panel .tower-help-copy{min-width:0;overflow-wrap:anywhere}
+.tower-help-copy p{margin:6px 0 10px}
+.tower-help-copy p:last-child{margin-bottom:8px}
+.tower-help-close{font-size:23px;padding:0 6px;flex:0 0 44px}
+.tower-help-read{font-size:15px;padding:7px 12px;margin:3px 0 2px}
+@media(max-height:540px){.tower-help-panel{font-size:14px;line-height:1.45;padding:6px 9px;max-height:46vh}.tower-compact-help{margin-bottom:3px}}

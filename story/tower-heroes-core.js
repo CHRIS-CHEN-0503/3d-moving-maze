@@ -53,7 +53,7 @@
     const factor=[0,1,1.5,2.1][tier],kind=tierKind(g.kind,tier);
     return [kind,Object.freeze({...g,kind,baseKind:g.kind,tier,requiredLevel:[0,1,3,5][tier],name:tier===1?g.name:TIER_NAMES[g.kind][tier-2],damage:Math.round(g.damage*factor),magicDamage:Math.round(g.magicDamage*factor),support:Math.round(g.support*factor*100)/100,defense:g.defense?Math.max(Math.round(g.defense*factor),g.defense+tier-1):0,reach:g.type==='bow'?g.reach+(tier-1)*1.2:g.reach,buyPrice:Math.round(g.buyPrice*[0,1,2.2,3.6][tier])})];
   }))),...ROBOT.GEAR});
-  const gearPool=floor=>Object.values(GEAR).filter(g=>!g.integrated&&g.tier<=(floor<0?(floor<=-21?5:4):floor>=70?1:floor>=40?2:3)).map(g=>g.kind);
+  const gearPool=floor=>Object.values(GEAR).filter(g=>!g.integrated&&!g.craftOnly&&g.tier<=(floor<0?(floor<=-21?5:4):floor>=70?1:floor>=40?2:3)).map(g=>g.kind);
   const skill=(id,job,name,attack,power,cooldown,effect,description,cost={})=>Object.freeze({id,job,name,attack,power:Object.freeze(power),cooldown,effect,description,cost:Object.freeze(cost)});
   const SKILLS=Object.freeze(Object.fromEntries([
     skill('wind_slash','swordsman','裂風斬',true,[140,160,180,200,220],8,'cleave','向前扇形揮砍，不能穿過牆壁。'),
@@ -192,7 +192,7 @@
   function makeActor(run,id,profession){
     const draw=draft(run.seed,profession,id==='hero'?'hero':profession),j=JOBS[profession],head={heavy:'heavy_helm',light:'light_hood',robe:'rune_crown'}[j.armor],body={heavy:'heavy_armor',light:'light_armor',robe:'robe'}[j.armor];
     const make=kind=>C().createGear(kind,run.floor,run.seed,id+':starter:'+kind);
-    return {...draw,learned:null,showHelmet:true,equipment:profession==='robot'?{helmet:null,armor:make('robot_shell'),weapon:make('robot_fists'),shield:null}:{helmet:make(head),armor:make(body),weapon:make(j.starter),shield:GEAR[j.starter].hands===1?make('buckler'):null},cooldowns:Object.fromEntries(draw.skills.map(s=>[s,0])),buffs:[],attack:0,hurt:0,tool:0,autoLeft:0,autoRescue:false,roll:0,pending:null,shot:null,...(profession==='robot'?{robot:ROBOT.freshState()}:{} )};
+    return {...draw,learned:null,showHelmet:true,equipment:profession==='robot'?{helmet:null,armor:make('robot_shell'),weapon:make('robot_fists'),shield:null,core1:make('robot_core'),core2:null}:{helmet:make(head),armor:make(body),weapon:make(j.starter),shield:GEAR[j.starter].hands===1?make('buckler'):null},cooldowns:Object.fromEntries(draw.skills.map(s=>[s,0])),buffs:[],attack:0,hurt:0,tool:0,autoLeft:0,autoRescue:false,roll:0,pending:null,shot:null,...(profession==='robot'?{robot:ROBOT.freshState()}:{} )};
   }
   function preview(run,offer){if(offer.returning){const saved=R().remembered(run,offer.profession,offer.sex)?.loadout;return {...(saved?clone(saved):draft(run.seed,offer.profession,offer.profession)),equipment:offer.profession==='robot'&&saved?.robotEquipment?clone(saved.robotEquipment):Object.fromEntries(SLOTS.map(k=>[k,null]))};}return makeActor(run,offer.id,offer.profession);}
   function enable(run){return C().transaction(run,run.revision,n=>{
@@ -209,18 +209,18 @@
   function addMember(run,member){if(enabled(run)){member.xp=G.XP[member.level-1];state(run).actors[member.id]=makeActor(run,member.id,member.profession);G.state(run).policies[member.id]=G.policy();G.state(run).members[member.id]=G.freshRecord();if(member.profession==='robot')member.hp=maxHp(run,member.id);if(member.profession==='archer')run.bag.arrow=Math.max(run.bag.arrow,Math.min(C().itemLimit('arrow',run),run.bag.arrow+15));}}
   // Returning travellers keep learned talents, not a second starter kit or
   // expired combat effects. The save validator below shares the live rules.
-  function recruitSnapshot(run,id){const a=actor(run,id),g=G.record(run,id);return a?{skills:[...a.skills],passives:[...a.passives],learned:a.learned??null,showHelmet:a.showHelmet!==false,roll:a.roll,growth:{choices:[...g.choices],awakening:g.awakening},...(job(run,id)==='robot'?{robotEquipment:clone(equipment(run,id))}:{} )}:null;}
+  function recruitSnapshot(run,id){const a=actor(run,id),g=G.record(run,id);return a?{skills:[...a.skills],passives:[...a.passives],learned:a.learned??null,showHelmet:a.showHelmet!==false,roll:a.roll,growth:{choices:[...g.choices],awakening:g.awakening},...(job(run,id)==='robot'?{robotEquipment:clone(equipment(run,id)),robotResources:{fuel:a.robot.fuel,repairClock:a.robot.repairClock}}:{} )}:null;}
   function restoreMember(run,member,snapshot){if(!enabled(run))return;
     const saved=snapshot||{...draft(run.seed,member.profession,member.profession),learned:null,showHelmet:true,roll:0,growth:{choices:[],awakening:null}},a={skills:[...saved.skills],passives:[...saved.passives],learned:saved.learned,showHelmet:saved.showHelmet,roll:saved.roll,equipment:Object.fromEntries(SLOTS.map(k=>[k,null])),cooldowns:Object.fromEntries(saved.skills.map(k=>[k,0])),buffs:[],attack:0,hurt:0,tool:0,autoLeft:0,autoRescue:false,pending:null,shot:null};
-    if(member.profession==='robot'){a.equipment=saved.robotEquipment?clone(saved.robotEquipment):{helmet:null,armor:C().createGear('robot_shell',run.floor,run.seed,member.id+':restored-shell'),weapon:C().createGear('robot_fists',run.floor,run.seed,member.id+':restored-fists'),shield:null};a.robot=ROBOT.freshState();}
+    if(member.profession==='robot'){a.equipment=saved.robotEquipment?clone(saved.robotEquipment):ROBOT.normalizeEquipment({helmet:null,armor:C().createGear('robot_shell',run.floor,run.seed,member.id+':restored-shell'),weapon:C().createGear('robot_fists',run.floor,run.seed,member.id+':restored-fists'),shield:null});a.robot={...ROBOT.freshState(),...(saved.robotResources||{})};}
     state(run).actors[member.id]=a;G.state(run).policies[member.id]=G.policy();G.state(run).members[member.id]={...G.freshRecord(),choices:[...saved.growth.choices],awakening:saved.growth.awakening};
   }
   function validateRecruitSnapshot(value,profession,actorLevel,floor){
-    if(!value||typeof value!=='object'||Array.isArray(value)||Object.keys(value).some(k=>!['skills','passives','learned','showHelmet','roll','growth','robotEquipment'].includes(k))||typeof value.showHelmet!=='boolean'||!num(value.roll,0,Number.MAX_SAFE_INTEGER-1,true))return null;
+    if(!value||typeof value!=='object'||Array.isArray(value)||Object.keys(value).some(k=>!['skills','passives','learned','showHelmet','roll','growth','robotEquipment','robotResources'].includes(k))||typeof value.showHelmet!=='boolean'||!num(value.roll,0,Number.MAX_SAFE_INTEGER-1,true))return null;
     const g=value.growth;if(!g||typeof g!=='object'||Array.isArray(g)||Object.keys(g).some(k=>!['choices','awakening'].includes(k))||!Array.isArray(g.choices)||g.choices.length>3||new Set(g.choices).size!==g.choices.length||!(g.awakening===null||typeof g.awakening==='string'))return null;
     if(!validTalents(value,profession,actorLevel,g,'returning',floor))return null;
-    let robotEquipment;if(profession==='robot'){const e=value.robotEquipment;if(!e||Object.keys(e).length!==4||e.helmet!==null||e.shield!==null)return null;robotEquipment={helmet:null,shield:null};for(const slot of ['armor','weapon']){const item=ROBOT.validateGear(e[slot]),d=GEAR[item?.kind];if(!item||item.slot!==slot||d.requiredLevel>actorLevel||d.tier>3&&floor>0)return null;robotEquipment[slot]=item;}}else if(value.robotEquipment!==undefined)return null;
-    return {skills:[...value.skills],passives:[...value.passives],learned:value.learned??null,showHelmet:value.showHelmet,roll:value.roll,growth:{choices:[...g.choices],awakening:g.awakening},...(robotEquipment?{robotEquipment}:{} )};
+    let robotEquipment,robotResources;if(profession==='robot'){robotEquipment=validateActorEquipment(value.robotEquipment,profession,actorLevel,floor);if(!robotEquipment)return null;const old=Object.keys(value.robotEquipment).length===4;robotResources=value.robotResources??(old?{fuel:100,repairClock:0}:null);if(!robotResources||Object.keys(robotResources).length!==2||!num(robotResources.fuel,0,100)||!num(robotResources.repairClock,0,ROBOT.REPAIR_SECONDS)||robotResources.repairClock===ROBOT.REPAIR_SECONDS)return null;robotResources={...robotResources};}else if(value.robotEquipment!==undefined||value.robotResources!==undefined)return null;
+    return {skills:[...value.skills],passives:[...value.passives],learned:value.learned??null,showHelmet:value.showHelmet,roll:value.roll,growth:{choices:[...g.choices],awakening:g.awakening},...(robotEquipment?{robotEquipment,robotResources}:{} )};
   }
   function removeMember(run,id){if(!enabled(run))return true;if(id===state(run).active)return false;delete state(run).actors[id];const growth=G.state(run);delete growth.policies[id];delete growth.members[id];delete growth.imprints[id];delete growth.nearby[id];for(const k of Object.keys(growth.nearby))growth.nearby[k]=growth.nearby[k].filter(x=>x!==id);for(const e of Object.values(state(run).enemy)){if(e.tauntId===id){delete e.tauntId;delete e.tauntLeft;}if(e.relayOwner===id){delete e.relayOwner;delete e.relay;}}return true;}
   function sync(run){if(!enabled(run))return;const s=state(run);run.hp=Math.min(maxHp(run),run.hp);if(s.active==='hero')s.heroHp=run.hp;else{const m=run.party.members.find(m=>m.id===s.active);if(m)m.hp=run.hp;}}
@@ -238,7 +238,7 @@
   function allGear(run){return [...run.gearBag,...Object.values(run.equipment).filter(Boolean),...(enabled(run)?Object.values(state(run).actors).flatMap(a=>Object.values(a.equipment||{}).filter(Boolean)):[])];}
   function canEquip(run,id,gear){
     const d=GEAR[gear?.kind];if(!d||!actor(run,id)||!d.jobs.includes(job(run,id))||level(run,id)<d.requiredLevel||d.tier>3&&!C().isUnderworld(run))return false;
-    if(d.integrated||job(run,id)==='robot')return false;
+    if(d.integrated||d.core||job(run,id)==='robot')return false;
     return !(d.slot==='shield'&&GEAR[equipment(run,id)?.weapon?.kind]?.hands===2);
   }
   function equip(run,id,gearId,revision){return C().transaction(run,revision,n=>{
@@ -265,7 +265,7 @@
     return {damage:((d?.damage||3)+bonus*2)*growth*offense*imprint*(1+X().traitPower(w,'physicalPct')),spellDamage:((d?.magicDamage||d?.damage||3)+bonus*2)*growth*(1+pv(run,'spell_precision',id)/100)*imprint*(1+X().traitPower(w,'spellPct')),interval:Math.max(.35,((d?.interval||.9)-(w?.forge?.trait==='light'?w.forge.level*.08:0))*(1-(pv(run,'quick_hands',id)+pv(run,'nimble_shot',id))/100))/C().hasteMultiplier(run,id),reach:d?.reach||2.3,hands:d?.hands||0,armor:totalArmor,mitigation:Math.min(.45,totalArmor/(totalArmor+20)),magic:robes*.04,heal:robes*.05+(d?.support||0)+X().traitPower(w,'support'),support:(d?.support||0)+X().traitPower(w,'support'),weapon:w};
   }
   function wear(run,id,g){if(!g||g.durability<=0)return;const protect=buff(run,'fortify',id);if(protect?.power>0){protect.power--;return;}const imprint=G.imprintFor(run,id,g);if(imprint){imprint.left--;return;}if(roll(run,id,'wear')<pv(run,'care',id))return;if(GEAR[g.kind]?.baseKind==='robot_shell'&&roll(run,id,'robot-shell-wear')<pv(run,'shock_absorber',id))return;X().wear(run,g);}
-  function durabilityWarnings(run,id){return SLOTS.map(slot=>equipment(run,id)?.[slot]).filter(g=>g&&g.durability/g.maxDurability<=.2).map(g=>({kind:g.kind,name:g.name,slot:g.slot,durability:g.durability,maxDurability:g.maxDurability,severity:g.durability/g.maxDurability<=.1?'critical':'warning',broken:g.durability===0}));}
+  function durabilityWarnings(run,id){return equipmentSlots(run,id).map(slot=>equipment(run,id)?.[slot]).filter(g=>g&&g.durability/g.maxDurability<=.2).map(g=>({kind:g.kind,name:g.name,slot:g.slot,durability:g.durability,maxDurability:g.maxDurability,severity:g.durability/g.maxDurability<=.1?'critical':'warning',broken:g.durability===0}));}
   function damageReduction(run,id,amount,source){
     if(source==='hunger')return amount;let reduction=stats(run,id).mitigation;
     if(id===state(run).active&&run.effects.shield>0)reduction=1-(1-reduction)*.35;
@@ -282,6 +282,7 @@
   }
   function hurt(run,id,amount,source='monster'){
     const a=actor(run,id);if(!a||!num(amount,0,10000))return {ok:false,message:'無效的受傷目標。'};
+    if(source==='hunger'&&job(run,id)==='robot')return {ok:true,message:'',effect:{damage:0,broken:[],source}};
     if(a.hurt>0||hp(run,id)<=0)return {ok:true,message:'',effect:{damage:0,broken:[],source}};
     if(source==='trap'&&buff(run,'escape',id))return {ok:true,effect:{damage:0,broken:[],source}};
     const damage=G.beforeDamage(run,id,damageReduction(run,id,amount,source),source),before=Object.values(equipment(run,id)).filter(Boolean),broken=[];
@@ -289,12 +290,13 @@
     let revived=false,switched=false;
     G.afterDamage(run,id,damage,source);
     if(hp(run,id)===0&&id===state(run).active){
-      if(run.bag.feather>0){run.bag.feather--;setHp(run,id,Math.min(40,maxHp(run,id)));revived=true;}
+      if(run.bag.feather>0&&job(run,id)!=='robot'){run.bag.feather--;setHp(run,id,Math.min(40,maxHp(run,id)));revived=true;}
       else {const next=ids(run).find(k=>k!==id&&hp(run,k)>0);if(next){switchRaw(run,next);switched=true;}else run.status='dead';}
     }
     return {ok:true,message:hp(run,id)===0?'隊友倒下了，靠近後可以救援。':'受到攻擊。',effect:{damage,broken,source,revived,switched,from:id,to:state(run).active,target:id===state(run).active?'player':'companion',defense:before.reduce((n,g)=>n+g.defense,0)}};
   }
-  function heal(run,id,amount){const before=hp(run,id);setHp(run,id,before+amount);return hp(run,id)-before;}
+  const organicHealable=(run,id)=>!!actor(run,id)&&job(run,id)!=='robot';
+  function heal(run,id,amount,options={}){if(!actor(run,id)||!Number.isFinite(amount)||amount<=0||hp(run,id)<=0||!organicHealable(run,id)&&options.mechanical!==true)return 0;const before=hp(run,id);setHp(run,id,before+amount);return hp(run,id)-before;}
   function gainXp(run,amount){if(!enabled(run)||!Number.isFinite(amount)||amount<0)return;if(amount===0){G.awaken(run);sync(run);return;}const s=state(run),oldHero=s.level,beforeHero=hp(run,'hero'),gain=Math.floor(amount),under=C().isUnderworld(run);s.xp=Math.min(G.XP[maxLevel(run)-1],s.xp+gain);const next=Math.min(maxLevel(run),G.XP.filter(x=>s.xp>=x).length);s.level=Math.max(s.level,next);if(beforeHero>0)setHp(run,'hero',beforeHero+(s.level-oldHero)*3);for(const m of run.party.members){const old=m.level,before=hp(run,m.id);if(under){m.xp=Math.min(G.XP[9],experience(run,m.id)+gain);m.level=Math.max(old,Math.min(10,G.XP.filter(x=>m.xp>=x).length));}else{m.level=Math.max(old,Math.min(5,next));m.xp=G.XP[m.level-1];}if(before>0)setHp(run,m.id,before+(m.level-old)*6);}G.awaken(run);sync(run);}
   const ranged=(run,id=state(run)?.active)=>!!actor(run,id)&&['bow','staff','book'].includes(GEAR[stats(run,id).weapon?.kind]?.type);
   function fireProjectile(run,id,monsterId=null,revision=run.revision){return C().transaction(run,revision,n=>{
@@ -309,6 +311,7 @@
   function strike(run,monsterId,options={},revision){return C().transaction(run,revision,n=>{
     const id=options.memberId||state(n)?.active,a=actor(n,id),spec=P().monsterSpecs(n).find(m=>m.id===monsterId);
     if(!a||hp(n,id)<=0||!spec||n.defeatedMonsters.includes(monsterId))return {ok:false,message:'前方沒有可攻擊的怪物。'};
+    if(job(n,id)==='robot'&&!ROBOT.powered(n,id))return {ok:false,message:'能源耗盡，先使用動力石補能。'};
     const skill=options.skillId?SKILLS[options.skillId]:null;
     if(options.skillId&&!skill)return {ok:false,message:'不存在的技能。'};
     if(skill&&(!a.skills.includes(skill.id)||!skill.attack))return {ok:false,message:'沒有這個攻擊技能。'};
@@ -342,6 +345,7 @@
   function cast(run,skillId,options={},revision){return C().transaction(run,revision,n=>{
     const id=options.actorId||state(n)?.active,a=actor(n,id),s=SKILLS[skillId];
     if(!a||hp(n,id)<=0||!s||!a.skills.includes(skillId))return {ok:false,message:'這位人物沒有這個技能。'};
+    if(job(n,id)==='robot'&&!ROBOT.powered(n,id))return {ok:false,message:'能源耗盡，先使用動力石補能。'};
     if(s.attack&&a.attack>0)return {ok:false,message:'正在收招，稍等一下。'};
     if(a.cooldowns[skillId]>0)return {ok:false,message:'技能還在準備中。'};
     const l=G.skillLevel(n,id),power=G.power(n,id,s),near=(options.nearby||ids(n)).filter(k=>ids(n).includes(k)),target=options.targetId||id;
@@ -351,13 +355,16 @@
     if(Object.entries(s.cost).some(([k,v])=>n.party.ingredients[k]<v))return {ok:false,message:'材料不足：'+Object.entries(s.cost).map(([k,v])=>P().INGREDIENTS[k]+' '+v).join('、')};
     const effect={skill:skillId,kind:s.effect,actorId:id,targetId:target,power,level:l,attack:s.attack};
     if(['heal','barrier','ward','fortify','polish','repair','mech_aid'].includes(s.effect)&&hp(n,target)<=0)return {ok:false,message:'這位隊友需要先被扶起。'};
+    if(['heal','revive'].includes(s.effect)&&!organicHealable(n,target))return {ok:false,message:'機器人不能接受一般治療，請使用動力核心或零件回補。'};
+    if(s.effect==='meal'&&!organicHealable(n,id))return {ok:false,message:'機器人不需要食物。'};
     if(s.effect==='meal'&&n.hunger>=100)return {ok:false,message:'大家還很飽，先留著食材。'};
     if(s.effect==='heal'&&hp(n,target)>=maxHp(n,target))return {ok:false,message:'生命已滿，不需要消耗香草。'};
     if(s.effect==='revive'&&hp(n,target)>0)return {ok:false,message:'這位隊友沒有倒下。'};
     if(s.effect==='daylight'&&n.party.light.cooldown>0)return {ok:false,message:'日光術仍在持續。'};
     let repairGear=null;if(s.effect==='repair'){repairGear=Object.values(equipment(n,target)).filter(g=>g&&g.durability>0&&g.durability<g.maxDurability).sort((a,b)=>a.durability/a.maxDurability-b.durability/b.maxDurability)[0];if(!repairGear)return {ok:false,message:'沒有可應急修補的裝備；完全損壞需到營地工坊修復。'};}
     if(s.effect==='polish'&&!stats(n,target).weapon)return {ok:false,message:'請先裝備武器。'};
-    if(s.effect==='soup'&&!near.some(k=>hp(n,k)>0&&hp(n,k)<maxHp(n,k)))return {ok:false,message:'附近隊友的生命都已全滿。'};
+    if(s.effect==='soup'&&!near.some(k=>organicHealable(n,k)&&hp(n,k)>0&&hp(n,k)<maxHp(n,k)))return {ok:false,message:'附近沒有需要治療的隊友。'};
+    if(s.effect==='sanctuary'&&!near.some(k=>organicHealable(n,k)&&hp(n,k)<maxHp(n,k)))return {ok:false,message:'附近沒有需要治療的隊友。'};
     if(s.effect==='fortress'&&n.party.journey.scrap<2)return {ok:false,message:'還需要兩份零件。'};
     if(s.scrapCost&&n.party.journey.scrap<s.scrapCost)return {ok:false,message:'需要 '+s.scrapCost+' 份金屬零件。'};
     if(s.effect==='robot_restore'&&hp(n,id)>=maxHp(n,id))return {ok:false,message:'機體生命已滿，不需要消耗零件。'};
@@ -372,7 +379,7 @@
     if(s.effect==='guard')setBuff(n,id,'guard',s.params?.duration??8,power*support);
     if(s.effect==='robot_guard')setBuff(n,id,'robot_guard',6,power);
     if(s.effect==='robot_speed')setBuff(n,id,'robot_speed',8,power);
-    if(s.effect==='robot_restore')heal(n,id,power);
+    if(s.effect==='robot_restore')heal(n,id,power,{mechanical:true});
     if(s.effect==='mech_aid'){G.shield(n,id,maxHp(n,id)*.35*G.modifiers(n,id,s.id).power,id);if(target!==id)G.shield(n,target,maxHp(n,target)*.2*G.modifiers(n,id,s.id).power,id);}
     if(s.effect==='barrier')G.shield(n,target,power*support*(id==='hero'?1+.02*(level(n,id)-1):1),id);
     if(s.effect==='ward')setBuff(n,target,'ward',power*support,1);
@@ -394,14 +401,14 @@
     sync(n);return {ok:true,message:s.name,effect};
   });}
   function food(run,id=state(run)?.active){const power=pv(run,'nourishment',id);if(power)setBuff(run,id,'regen',10,power/10);}
-  function speed(run,id=state(run)?.active){const light=Object.values(equipment(run,id)||{}).filter(g=>g&&g.durability>0&&g.slot!=='weapon'&&g.forge?.trait==='light').reduce((sum,g)=>sum+g.forge.level,0);return (job(run,id)==='robot'?.9:1)*(buff(run,'robot_guard',id)?.5:1)*(1+(pv(run,'fleet',id)+pv(run,'leaf_steps',id))/100+(buff(run,'speed',id)?.power||0)/100+(buff(run,'robot_speed',id)?.power||0)/100+(buff(run,'escape',id)?.power||0)/100)*(buff(run,'slow',id)?.power||1)*(1+Math.min(2,light)*.03)*C().hasteMultiplier(run,id);}
+  function speed(run,id=state(run)?.active){const light=Object.values(equipment(run,id)||{}).filter(g=>g&&g.durability>0&&g.slot!=='weapon'&&g.forge?.trait==='light').reduce((sum,g)=>sum+g.forge.level,0);return (job(run,id)==='robot'?.9*(ROBOT.powered(run,id)?1:ROBOT.EMPTY_SPEED):1)*(buff(run,'robot_guard',id)?.5:1)*(1+(pv(run,'fleet',id)+pv(run,'leaf_steps',id))/100+(buff(run,'speed',id)?.power||0)/100+(buff(run,'robot_speed',id)?.power||0)/100+(buff(run,'escape',id)?.power||0)/100)*(buff(run,'slow',id)?.power||1)*(1+Math.min(2,light)*.03)*C().hasteMultiplier(run,id);}
   function inflict(run,id,key,seconds,power){const ward=buff(run,'ward',id);if(ward?.power>0){ward.power=0;ward.left=0;return false;}setBuff(run,id,key,seconds*(1-(pv(run,'purity',id)+(key==='slow'?pv(run,'stable_feet',id):0))/100),power);return true;}
   function noteMovement(run,id,moving,dt){const a=actor(run,id);if(!a?.robot||!Number.isFinite(dt)||dt<0||dt>.5)return;if(moving||hp(run,id)<=0){a.robot.stationary=0;a.robot.calibrationReady=false;}else if(pv(run,'power_calibration',id)&&a.robot.calibrationLeft<=0){a.robot.stationary=Math.min(1,a.robot.stationary+dt);if(a.robot.stationary>=1)a.robot.calibrationReady=true;}}
-  function hungerScale(run){return Math.max(.4,(1-teamPassive(run,'endurance')/100)*(1-Math.max(0,...ids(run).filter(id=>hp(run,id)>0).map(id=>buff(run,'stomach',id)?.power||0))/100));}
+  function hungerScale(run){if(ids(run).every(id=>job(run,id)==='robot'||hp(run,id)<=0))return 0;return Math.max(.4,(1-teamPassive(run,'endurance')/100)*(1-Math.max(0,...ids(run).filter(id=>hp(run,id)>0).map(id=>buff(run,'stomach',id)?.power||0))/100));}
   function toolSpent(run){if(!enabled(run))return;run.engine.shovels=Math.max(0,run.engine.shovels-1);for(const id of ids(run)){const cd=pv(run,'tool_supply',id);if(cd)actor(run,id).tool=cd;}}
-  function rescueChoice(run,id,nearby=ids(run)){const a=actor(run,id);if(!a?.autoRescue||!pv(run,'rescue',id)||a.autoLeft>0||hp(run,id)<=0)return null;for(const skill of ['revive','herbal_heal']){if(!a.skills.includes(skill)||a.cooldowns[skill]>0||Object.entries(SKILLS[skill].cost).some(([k,v])=>run.party.ingredients[k]<v))continue;const target=nearby.find(k=>ids(run).includes(k)&&(skill==='revive'?hp(run,k)===0:hp(run,k)>0&&hp(run,k)<maxHp(run,k)*.5));if(target)return {skill,target};}return null;}
-  function tick(run,dt){if(!enabled(run))return;G.tick(run,dt);const s=state(run);s.switchLeft=Math.max(0,s.switchLeft-dt);
-    for(const id of ids(run)){const a=actor(run,id);if(a.robot){for(const key of ['calibrationLeft','energyLeft','energyCooldown'])a.robot[key]=Math.max(0,a.robot[key]-dt);if(hp(run,id)<=0){a.robot.stationary=0;a.robot.calibrationReady=false;a.robot.energyLeft=0;}}if(a.pending){a.pending.left-=dt;if(a.pending.left<=0)a.pending=null;}if(a.shot){a.shot.left-=dt;if(a.shot.left<=0)a.shot=null;}for(const key of ['attack','hurt','tool','autoLeft'])a[key]=Math.max(0,a[key]-dt);for(const key of a.skills)a.cooldowns[key]=Math.max(0,a.cooldowns[key]-dt);for(const b of a.buffs){if(b.id==='regen'&&hp(run,id)>0)heal(run,id,Math.min(dt,b.left)*b.power);b.left=Math.max(0,b.left-dt);}a.buffs=a.buffs.filter(b=>b.left>0);
+  function rescueChoice(run,id,nearby=ids(run)){const a=actor(run,id);if(!a?.autoRescue||!pv(run,'rescue',id)||a.autoLeft>0||hp(run,id)<=0)return null;for(const skill of ['revive','herbal_heal']){if(!a.skills.includes(skill)||a.cooldowns[skill]>0||Object.entries(SKILLS[skill].cost).some(([k,v])=>run.party.ingredients[k]<v))continue;const target=nearby.find(k=>ids(run).includes(k)&&organicHealable(run,k)&&(skill==='revive'?hp(run,k)===0:hp(run,k)>0&&hp(run,k)<maxHp(run,k)*.5));if(target)return {skill,target};}return null;}
+  function tick(run,dt,options={}){if(!enabled(run)||!Number.isFinite(dt)||dt<0||dt>ROBOT.FUEL_SECONDS)return;G.tick(run,dt);const s=state(run);s.switchLeft=Math.max(0,s.switchLeft-dt);
+    for(const id of ids(run)){const a=actor(run,id);if(a.robot){ROBOT.tick(run,id,dt,options);for(const key of ['calibrationLeft','energyLeft','energyCooldown'])a.robot[key]=Math.max(0,a.robot[key]-dt);if(hp(run,id)<=0){a.robot.stationary=0;a.robot.calibrationReady=false;a.robot.energyLeft=0;}}if(a.pending){a.pending.left-=dt;if(a.pending.left<=0)a.pending=null;}if(a.shot){a.shot.left-=dt;if(a.shot.left<=0)a.shot=null;}for(const key of ['attack','hurt','tool','autoLeft'])a[key]=Math.max(0,a[key]-dt);for(const key of a.skills)a.cooldowns[key]=Math.max(0,a.cooldowns[key]-dt);for(const b of a.buffs){if(b.id==='regen'&&hp(run,id)>0)heal(run,id,Math.min(dt,b.left)*b.power);b.left=Math.max(0,b.left-dt);}a.buffs=a.buffs.filter(b=>b.left>0);
       if(pv(run,'tool_supply',id)&&hp(run,id)>0&&a.tool===0&&run.engine.shovels<1){run.engine.shovels=1;a.tool=pv(run,'tool_supply',id);}
     }
     for(const e of Object.values(s.enemy))for(const key of ['slow','root','blind','mark','tauntLeft','relay','relayCooldown','relayWeak'])if(e[key])e[key]=Math.max(0,e[key]-dt);pruneTaunts(run);sync(run);
@@ -416,6 +423,15 @@
     if(id==='hero'){if(learned!==null)return false;}else{const s=SKILLS[learned]||PASSIVES[learned];if(learned&&(!s||s.unique||s.job!==profession||![...a.skills,...a.passives].includes(learned)||actorLevel<4))return false;if(learned!==(progress.choices[0]??null))return false;}
     const all=[...a.skills,...a.passives],continuation=floor<0?G.branches(progress.awakening,actorLevel,id):[],bonus=[...progress.choices,...(progress.awakening?[progress.awakening]:[]),...continuation],steps=id!=='hero'&&floor>0?[4]:[4,6,8];
     return !(all.length!==5+bonus.length||progress.choices.length>steps.filter(l=>actorLevel>=l).length||!progress.choices.every(k=>all.includes(k)&&(SKILLS[k]||PASSIVES[k])?.job===profession&&!(SKILLS[k]||PASSIVES[k]).unique)||progress.awakening&&(!all.includes(progress.awakening)||![...G.actives,...G.passives.filter(s=>s.unique)].some(s=>s.id===progress.awakening&&s.job===profession)||actorLevel<10||id!=='hero'&&floor>0)||!continuation.every(k=>all.includes(k))||all.filter(k=>(SKILLS[k]||PASSIVES[k]).unique).some(k=>!bonus.includes(k))||new Set(bonus).size!==bonus.length);
+  }
+  const equipmentSlots=(run,id=state(run)?.active)=>job(run,id)==='robot'?[...SLOTS,...ROBOT.CORE_SLOTS]:[...SLOTS];
+  function validateActorEquipment(source,profession,actorLevel,floor){
+    const e=profession==='robot'?ROBOT.normalizeEquipment(source):source,slots=profession==='robot'?[...SLOTS,...ROBOT.CORE_SLOTS]:SLOTS;
+    if(!e||typeof e!=='object'||Array.isArray(e)||Object.keys(e).length!==slots.length||!slots.every(k=>Object.hasOwn(e,k)))return null;
+    const result={},seen=new Set();for(const slot of slots){const g=e[slot];if(g===null){result[slot]=null;continue;}const item=C().validateGear(g),d=GEAR[item?.kind];if(!item||item.slot!==(ROBOT.CORE_SLOTS.includes(slot)?'core':slot)||!d?.jobs.includes(profession)||d.requiredLevel>actorLevel||d.tier>3&&floor>0||seen.has(item.id))return null;seen.add(item.id);result[slot]=item;}
+    if(GEAR[result.weapon?.kind]?.hands===2&&result.shield)return null;
+    if(profession==='robot'&&(result.helmet!==null||result.shield!==null||!ROBOT.isPart(result.armor)||!ROBOT.isPart(result.weapon)||ROBOT.CORE_SLOTS.some(slot=>result[slot]&&!ROBOT.isCore(result[slot]))))return null;
+    return result;
   }
   function validate(value,party){
     const bodyBonus=party.profession==='robot'&&value?.actors?.hero?.passives?.includes('robot_body')?5*(value.level>=10?6:Math.min(5,value.level)):0;
@@ -445,7 +461,7 @@
       if(a.buffs.some(b=>b.id==='haste'&&(b.left>C().HASTE_DURATION||b.power!==C().HASTE_PERCENT)))return null;
       if(a.buffs.some(b=>b.id==='robot_guard'&&(profession!=='robot'||b.left>6||b.power>50)||b.id==='robot_speed'&&(profession!=='robot'||b.left>8||b.power>27)))return null;
       const robot=profession==='robot'?ROBOT.validateState(a.robot):null;if(profession==='robot'&&!robot||profession!=='robot'&&a.robot!==undefined)return null;
-      let gear=null;if(id!==value.active){if(!a.equipment||Object.keys(a.equipment).length!==4)return null;gear={};for(const slot of SLOTS){const g=a.equipment[slot];if(g===null)gear[slot]=null;else{const v=C().validateGear(g),d=GEAR[v?.kind];if(!v||v.slot!==slot||!d?.jobs.includes(profession)||d.requiredLevel>(id==='hero'?value.level:party.members.find(m=>m.id===id).level))return null;gear[slot]=v;}}if(GEAR[gear.weapon?.kind]?.hands===2&&gear.shield)return null;}else if(a.equipment!==null)return null;
+      let gear=null;if(id!==value.active){gear=validateActorEquipment(a.equipment,profession,actorLevel,party.floor);if(!gear)return null;}else if(a.equipment!==null)return null;
       if(profession==='robot'&&gear&&(gear.helmet!==null||gear.shield!==null||!ROBOT.isPart(gear.armor)||!ROBOT.isPart(gear.weapon)))return null;
       const p=a.pending;if(p&&(!a.skills.includes(p.id)||!SKILLS[p.id].attack||!num(p.left,0,3)||!num(p.damage,0,250)||typeof p.worn!=='boolean'||!Array.isArray(p.targets)||p.targets.length>(SKILLS[p.id].params?.maxTargets||C().MAX_MONSTERS)||new Set(p.targets).size!==p.targets.length||!p.targets.every(id=>C().validMonsterId(id,party.floor))))return null;
       const shot=a.shot?{...a.shot,kind:a.shot.kind??'arrow'}:null;if(shot&&(!(shot.target===null||C().validMonsterId(shot.target,party.floor))||!num(shot.left,0,2)||!num(shot.damage,0,250)||!['arrow','orb'].includes(shot.kind)||(shot.kind==='arrow'?profession!=='archer':!['mage','healer'].includes(profession))))return null;
@@ -458,6 +474,6 @@
     const xp=Math.min(100000,value.xp*(value.xpScale===undefined?10:1));
     return {removedTraps:[...value.removedTraps],version:1,xpScale:G.XP_SCALE,active:value.active,level:value.level,xp,heroHp:value.heroHp,switchLeft:value.switchLeft,actors,enemy,growth};
   }
-  function validEquipment(run){if(!enabled(run))return true;const seen=new Set();for(const g of allGear(run)){if(seen.has(g.id)||(GEAR[g.kind]?.tier>3||X().TRAITS[g.forge?.trait]?.underground)&&!C().isUnderworld(run))return false;seen.add(g.id);}if(run.gearBag.some(ROBOT.isPart))return false;const e=run.equipment,j=job(run);return Object.values(e).filter(Boolean).every(g=>GEAR[g.kind]?.jobs.includes(j)&&GEAR[g.kind].requiredLevel<=level(run))&&!(GEAR[e.weapon?.kind]?.hands===2&&e.shield)&&(j!=='robot'||e.helmet===null&&e.shield===null&&ROBOT.isPart(e.armor)&&ROBOT.isPart(e.weapon));}
-  return Object.freeze({ROBOT,robotUpgradeQuote:ROBOT.upgradeQuote,upgradeRobot:ROBOT.upgrade,JOBS,GEAR,BASE_GEAR,TIER_NAMES,tierKind,gearPool,SKILLS,PASSIVES,SLOTS,PREPARATION,preparationSeconds,scale:readScale,state,enabled,ids,job,sex,level,maxLevel,experience,actor,maxHp,hp,equipment,pv,teamPassive,buff,tauntTargetLimit,applyTaunt,setBuff,draft,reorderSkills,showHeadgear,preview,enable,addMember,recruitSnapshot,restoreMember,validateRecruitSnapshot,removeMember,sync,setHp,returnToHero,switchActor,followerRecords,canLearn,learnCompanion,allGear,canEquip,equip,unequip,stats,wear,durabilityWarnings,hurt,heal,gainXp,ranged,fireProjectile,fireArrow,strike,cast,food,speed,inflict,noteMovement,hungerScale,toolSpent,rescueChoice,tick,advance,validate,validEquipment,roll});
+  function validEquipment(run){if(!enabled(run))return true;const seen=new Set();for(const g of allGear(run)){if(seen.has(g.id)||(GEAR[g.kind]?.tier>3||X().TRAITS[g.forge?.trait]?.underground)&&!C().isUnderworld(run))return false;seen.add(g.id);}if(run.gearBag.some(ROBOT.isPart)||Object.values(G.state(run).imprints).some(mark=>ROBOT.isCore(allGear(run).find(g=>g.id===mark.gearId))))return false;return ids(run).every(id=>!!validateActorEquipment(equipment(run,id),job(run,id),level(run,id),run.floor));}
+  return Object.freeze({ROBOT,robotUpgradeQuote:ROBOT.upgradeQuote,upgradeRobot:ROBOT.upgrade,JOBS,GEAR,BASE_GEAR,TIER_NAMES,tierKind,gearPool,SKILLS,PASSIVES,SLOTS,PREPARATION,preparationSeconds,scale:readScale,state,enabled,ids,job,sex,level,maxLevel,experience,actor,maxHp,hp,equipment,equipmentSlots,validateActorEquipment,pv,teamPassive,buff,tauntTargetLimit,applyTaunt,setBuff,draft,reorderSkills,showHeadgear,preview,enable,addMember,recruitSnapshot,restoreMember,validateRecruitSnapshot,removeMember,sync,setHp,returnToHero,switchActor,followerRecords,canLearn,learnCompanion,allGear,canEquip,equip,unequip,stats,wear,durabilityWarnings,hurt,heal,organicHealable,gainXp,ranged,fireProjectile,fireArrow,strike,cast,food,speed,inflict,noteMovement,hungerScale,toolSpent,rescueChoice,tick,advance,validate,validEquipment,roll});
 });

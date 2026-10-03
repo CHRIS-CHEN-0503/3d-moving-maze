@@ -171,6 +171,7 @@
     if(p.loadouts){const chef=H().ids(n).find(k=>H().hp(n,k)>0&&H().pv(n,'ingredient_care',k)>0)||p.loadouts.active;G().consumeCost(n,chef,r.cost);}else for(const[k,v]of Object.entries(r.cost))p.ingredients[k]-=v;p.meals[id]+=amount;return {ok:true,message:`完成${r.name}，共${amount}份。`};
   });}
   function eat(run,id,revision){return transact(run,revision,(n,p)=>{
+    if(p.loadouts&&H().job(n)==='robot')return {ok:false,message:'機器人不能享用料理，請使用動力核心或零件回補修復。'};
     if(!recipeUnlocked(n,id)||!p.meals[id])return {ok:false,message:'料理盒裡沒有可享用的這道料理。'};const r=RECIPES[id];
     n.hp=Math.min(p.loadouts?H().maxHp(n):C().MAX_HP,n.hp+r.hp);n.hunger=Math.min(100,n.hunger+r.hunger*(p.loadouts?1+H().teamPassive(n,'gourmet')/100:1));if(r.team){if(p.loadouts)H().ids(n).filter(k=>k!==p.loadouts.active&&H().hp(n,k)>0).forEach(k=>H().heal(n,k,r.team));else p.members.forEach(m=>m.hp=Math.min(memberMax(m),m.hp+r.team));}if(p.loadouts){H().food(n);G().recipe(n,id);}
     if(r.buff){p.buffs=p.buffs.filter(b=>b.id!==r.buff);p.buffs.push({id:r.buff,floors:3});if(p.buffs.length>2)p.buffs.shift();}

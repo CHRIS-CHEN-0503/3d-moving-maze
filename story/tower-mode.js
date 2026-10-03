@@ -220,7 +220,7 @@
     });
     window.addEventListener('pagehide', () => { if (active) save(); });
     if(P&&window.TowerPartyRuntime){
-      partyUI=window.TowerPartyRuntime.create({THREE,G,core:C,text,action,dialog,transact,save,toast:showToast,audio:AudioEng,quest:questEvent,
+      partyUI=window.TowerPartyRuntime.create({THREE,G,core:C,text,action,dialog,help:(title,html)=>window.TowerCompactHelp?.render(title,html)||html,transact,save,toast:showToast,audio:AudioEng,quest:questEvent,
         run:()=>run,paused:()=>paused,world:()=>world,monsters:()=>monsters,traders:()=>traders,player:()=>playerGroup,camera:()=>camera,inDungeon,autoAim:()=>autoAim,
         clear:hasClearPath,followClear:followerClear,followDistance:followerDistance,cell:cellPoint,worldToCell,chooseCell,makeText:makeTextSprite,follow:followNpc,dispose:disposeSceneObject,damage,
         close:closeDialog,refreshGear,hurt:()=>hurtLeft>0,passage:openExplorationPassage,
@@ -233,6 +233,7 @@
     if(window.TowerLighting&&window.TowerLightingRuntime){
       lightingUI=window.TowerLightingRuntime.create({THREE,G,run:()=>run,active:()=>active,paused:()=>paused,world:()=>world,traders:()=>traders,player:()=>playerGroup,camera:()=>camera,dispose:disposeSceneObject,inDungeon,
         environment:()=>({id:floorConfig.environmentId,underworld:floorConfig.underworld===true,rig:lightingRig}),clear:hasClearPath,cell:cellPoint,chooseCell,marker:makePickupMarker,daylightCast:()=>partyUI?.heroes.daylight(),
+        robotPanel:()=>partyUI?.heroes.panel(Heroes.state(run).active),robotSources:()=>modern()?Heroes.ids(run).filter(id=>id!==Heroes.state(run).active&&Heroes.job(run,id)==='robot'&&Heroes.hp(run,id)>0).flatMap(id=>{const at=partyUI?.heroes.position(id),power=window.TowerLighting.robotLight(run,id);return at&&power?[{...at,...power,robot:true}]:[];}):[],
         bind:bindActionBtn,action,dialog,transact,toast:showToast,audio:AudioEng,close:closeDialog,trade});
       lightingUI.install();
     }
@@ -263,6 +264,7 @@
     el('towerDialog').setAttribute?.('data-commerce',narration.commerce||'');
     const wallet=Number.isFinite(narration.wallet)?'<span class="tower-trade-wallet" aria-label="持有銅幣 '+text(narration.wallet)+'">'+(window.TowerResourceIcons?.svg('coin')||'')+text(narration.wallet)+' 幣</span>':'';
     el('towerDialog').innerHTML = '<header class="tower-dialog-header"><div class="tower-dialog-titles'+(wallet?' tower-titles-with-wallet':'')+'"><div class="tower-kicker">' + text(kicker) + '</div><h2 class="tower-heading" id="towerDialogTitle">' + text(title) + '</h2>'+wallet+'</div>'+voiceControls+closeButton+'</header><div class="tower-dialog-content" tabindex="0" role="region" aria-label="對話內容">'+(copy?'<p class="tower-copy">' + text(copy) + '</p>':'') + (body || '') + '</div><div class="tower-actions">' + actions + '</div>';
+    window.TowerCompactHelp?.install(document);
     el('towerDialog').focus();
     el('towerDialog').scrollTop=0;
     el('towerDialog').voiceScope=narration.full?'full':'summary';
@@ -349,6 +351,7 @@
       if(run.party?.journey?.materials&&previous?.party&&previous.party.journey?.materials===undefined&&C.validateSave(previous)&&!localStorage.getItem(SAVE+'_before_regional_crafting'))localStorage.setItem(SAVE+'_before_regional_crafting',raw);
       if(run.party?.travellers&&previous?.party&&previous.party.travellers===undefined&&C.validateSave(previous)&&!localStorage.getItem(SAVE+'_before_traveller_reunion'))localStorage.setItem(SAVE+'_before_traveller_reunion',raw);
       if(run.party?.foraging&&previous?.party&&previous.party.foraging===undefined&&C.validateSave(previous)&&!localStorage.getItem(SAVE+'_before_foraging_v1'))localStorage.setItem(SAVE+'_before_foraging_v1',raw);
+      if(previous&&typeof Heroes!=='undefined'&&Heroes?.ROBOT?.needsMigration(previous)&&C.validateSave(previous)&&!localStorage.getItem(SAVE+'_before_robot_power_v1'))localStorage.setItem(SAVE+'_before_robot_power_v1',raw);
       if(run.party?.loadouts?.growth&&previous?.party?.loadouts&&!previous.party.loadouts.growth&&C.validateSave(previous)&&!localStorage.getItem(SAVE+'_before_hero_growth'))localStorage.setItem(SAVE+'_before_hero_growth',raw);
       if(run.party?.loadouts?.growth?.version===2&&previous?.party?.loadouts&&previous.party.loadouts.growth?.version!==2&&C.validateSave(previous)&&!localStorage.getItem(SAVE+'_before_underground_growth_v2'))localStorage.setItem(SAVE+'_before_underground_growth_v2',raw);
       if(run.party?.loadouts?.xpScale===10&&previous?.party?.loadouts&&previous.party.loadouts.xpScale===undefined&&C.validateSave(previous)&&!localStorage.getItem(SAVE+'_before_xp10'))localStorage.setItem(SAVE+'_before_xp10',raw);
@@ -424,7 +427,7 @@
     const counts = itemConfig(); CFG.mazeSize = floorConfig.size; CFG.itemCount = counts.itemCount; CFG.foodCount = counts.foodCount;
     G.lvlIdx = floorConfig.themeIndex;
     try { startGame(); } finally { Object.assign(CFG, settings); }
-    G.hungerLethal = false; G.drainPerSec = 0.12; G.satiety = run.hunger;
+    G.hungerLethal = false; G.drainPerSec = modern() ? .12*Heroes.hungerScale(run) : .12; G.satiety = run.hunger;
     if (run.engine) {
       G.shovels = run.engine.shovels; G.kites = run.engine.kites; G.whistles = run.engine.whistles;
       G.shovelRechargeAt = run.engine.shovelCooldownMs ? performance.now() + run.engine.shovelCooldownMs : 0;
@@ -744,11 +747,15 @@
     for(const spec of Foraging.plan(run,G,{excludeCells:excluded})){
       const center=cellPoint(spec.cx,spec.cy),point={...center,x:center.x+spec.offsetX*G.cell,z:center.z+spec.offsetY*G.cell},model=new THREE.Group();
       model.name='floor-'+spec.kind;model.userData.foragingId=spec.id;model.position.set(point.x,0,point.z);
-      const icon=spec.kind==='herb'?partyUI.ingredientModel(spec.key):partyUI.materialModel(spec.key);
+      const icon=spec.kind==='power'?powerStoneModel(spec.key,spec.quantity):spec.kind==='herb'?partyUI.ingredientModel(spec.key):partyUI.materialModel(spec.key);
       icon.scale.setScalar(spec.kind==='herb'?.8:.7);icon.position.y=spec.kind==='herb'?.23:.2;model.add(icon);
       const bed=new THREE.Mesh(new THREE.CylinderGeometry(.32,.38,.07,7),new THREE.MeshLambertMaterial({color:spec.kind==='herb'?0x665844:0x787a78}));bed.position.y=.035;model.add(bed);
       world.add(model);loot.push({...point,id:spec.id,kind:'foraging',foraging:spec,model,icon,retry:0});
     }
+  }
+  function powerStoneModel(key,quantity=1){
+    const group=new THREE.Group(),hex=Heroes.ROBOT.FUEL_ITEMS[key]?.color||'#48a8ff';group.name='power-stone-cluster';
+    for(let i=0;i<quantity;i++){const mat=new THREE.MeshLambertMaterial({color:hex,emissive:hex,emissiveIntensity:.6}),stone=new THREE.Mesh(new THREE.OctahedronGeometry(.28,0),mat);stone.position.set((i-1)*.23,.2+(i%2)*.08,(i%2)*.17);stone.scale.set(.8,1.35,.8);stone.rotation.z=(i-1)*.2;group.add(stone);}return group;
   }
   function repositionForaging(){
     if(!run.party||inDungeon())return;
@@ -767,6 +774,7 @@
       else if(entry.type==='material')icon.add(partyUI.materialModel(entry.key));
       else if(entry.type==='gear'){const gear=HeroVisual.gear(THREE,entry.gear.kind);gear.scale.setScalar(.48);gear.updateMatrixWorld(true);const box=new THREE.Box3().setFromObject(gear),center=box.getCenter(new THREE.Vector3());gear.position.sub(center);icon.add(gear);}
       else if(entry.type==='fuel'){const wood=new THREE.Mesh(new THREE.CylinderGeometry(.07,.08,.75,6),new THREE.MeshLambertMaterial({color:0xa98a64}));wood.rotation.z=-.5;icon.add(wood);const cloth=new THREE.Mesh(new THREE.BoxGeometry(.35,.26,.18),new THREE.MeshLambertMaterial({color:0xe4d6b4}));cloth.position.set(.16,.12,0);icon.add(cloth);}
+      else if(Heroes?.ROBOT?.fuelItemIds.includes(entry.key))icon.add(powerStoneModel(entry.key,entry.quantity));
       else{const symbols={heal:'🧴',ration:'🍪',shield:'🛡️',hourglass:'⌛',bell:'🔔',map:'🗺️',feather:'🪶',arrow:'🏹'};icon.add(makeEmojiSprite(symbols[entry.key],.9));}
       icon.position.y=.65;model.add(icon,makePickupMarker(entry.type==='gear'?0xffd77c:0x84dfbc,Loot.label(entry)));world.add(model);loot.push({...point,id:entry.id,entry,kind:'combat-drop',model,icon,retry:0});
     }
@@ -1038,7 +1046,7 @@
     el('towerTalkBtn').disabled = !nearest && !nearestWarrior && !nearbyEncounter; el('towerTalkBtn').ariaLabel = nearbyEncounter ? (nearbyEncounter===chest?'開箱（R）':'對話（R）') : nearestWarrior ? '對話：聘請（R）' : nearest ? '對話：交易（R）' : '附近無人';
     if(!run.party){el('towerGuardStatus').hidden = !run.warrior;el('towerGuardStatus').textContent = warriorStatus();}
     el('towerGearStatus').textContent=Object.entries(run.equipment).map(([slot,gear])=>({helmet:'盔',armor:'甲',shield:'盾',weapon:'武'}[slot])+' '+(gear?gear.durability:'—')).join(' · ');
-    el('towerAttackBtn').disabled = attackLeft > 0 || !run.equipment.weapon;if(window.BattleDock)BattleDock.attackLabel(!run.equipment.weapon?'徒手':'揮擊',attackLeft);else el('towerAttackBtn').textContent = !run.equipment.weapon?'需裝備武器':attackLeft > 0 ? '擊暈 ' + attackLeft.toFixed(1) : '擊暈 X';
+    el('towerAttackBtn').disabled = attackLeft > 0 || !run.equipment.weapon || robotEnergy()?.value===0;if(window.BattleDock)BattleDock.attackLabel(!run.equipment.weapon?'徒手':'揮擊',attackLeft);else el('towerAttackBtn').textContent = !run.equipment.weapon?'需裝備武器':attackLeft > 0 ? '擊暈 ' + attackLeft.toFixed(1) : '擊暈 X';
     const effects = Object.entries(run.effects).filter(([,v])=>v>0).map(([k,v])=>({shield:'護盾',freeze:'定牆',repel:'驅怪',reveal:'出口路線',haste:'加速'}[k])+' '+Math.ceil(v)+'秒');
     el('towerObjective').textContent = nearestWarrior ? '戰士 '+nearestWarrior.offer.strength+'/5 · '+costText(nearestWarrior.offer.cost)+' · 點「聘請」查看契約' : effects.length ? effects.join(' · ') : nearest ? nearest.name + '：靠近後可購買／出售補給' : '找到樓梯，前往' + ([1,-50].includes(run.floor)?'歸途':floorLabel(run.floor-1));
     const q=run.adventure.quest;
@@ -1051,6 +1059,7 @@
     document.body.classList.toggle('tower-danger',run.hp<=C.MAX_HP*.25);
     partyUI?.hud();
     lightingUI?.hud();
+    if(typeof updateSatietyBar==='function')updateSatietyBar();
   }
   function saveDungeonShift() {
     if(!inDungeon()||run.expedition.active.kind!=='stars'||!D.observeShift)return;
@@ -1098,7 +1107,7 @@
       if(window.CharacterMotion)window.CharacterMotion.worldWeaponPose(gearVisual.userData.weapon,playerGroup,1-attackLeft/.8,G.view==='fp');
       else gearVisual.userData.weapon.rotation.x=.25+Math.sin((.8-attackLeft)/.8*Math.PI)*1.35;
     }
-    if (G.satiety<=0 && hurtLeft<=0) damage(3,'hunger');
+    if (G.satiety<=0 && hurtLeft<=0 && !robotEnergy()) damage(3,'hunger');
     if(run.status!=='playing')return;
     const portal=cellToWorld(G.exitCell.x,G.exitCell.y);if(Math.hypot(G.px-portal.x,G.pz-portal.z)>2.2)exitDeclined=false;
     tickHazards(dt);if(paused||run.status!=='playing')return;
@@ -1382,6 +1391,7 @@
       for(const piece of heroFp.children)piece.matrixAutoUpdate=false;
       world.add(heroFp);
     }
+    if(appearance.job==='robot')HeroVisual.syncRobotLight?.(heroFp,{tier:playerGroup.userData.robotLightTier,color:playerGroup.userData.robotLightColor});
     heroFp.visible=true;playerGroup.updateWorldMatrix(true,true);world.updateWorldMatrix(true,false);
     const inverse=heroFp.userData.parentInverse,matrix=heroFp.userData.poseMatrix;
     // The sight system tests a dynamic group's origin. Anchor the FP group at
@@ -1486,14 +1496,16 @@
     const heading=(art,name,stat)=>art+'<div><h3>'+text(name)+'</h3><small>'+text(stat)+'</small></div><span class="trade-detail-indicator" aria-hidden="true">⌄</span>';
     const cards=(lightingUI?.merchantCard(nearest.id)||'')+nearest.offer.supplies.map(id=>{
       const item=C.ITEMS[id],quantity=id==='arrow'?Math.max(0,Math.min(10,C.itemLimit('arrow',run)-run.bag.arrow)):1,cost=C.supplyPrice(id,quantity),full=run.bag[id]>=C.itemLimit(id,run);
-      return '<article class="tower-item grocery-supply"><details class="trade-item-details"><summary>'+heading(window.TowerHeroIcons?.svg('item_'+id)||'',item.name,'持有 '+run.bag[id]+'／'+C.itemLimit(id,run))+'</summary><p>'+text(item.description)+'</p></details><div class="trade-card-actions">'+action(full?(id==='arrow'?'箭袋已滿':'已達上限'):(id==='arrow'&&quantity<10?'補滿'+' '+quantity+' 支':'買'+(id==='arrow'?' '+quantity+' 支':''))+' · '+cost+' 幣','buy',id,full||quantity===0||run.coins<cost)+(item.sellPrice>0?action('賣 '+item.sellPrice+' 幣','sell',id,!run.bag[id]):'')+'</div></article>';
+      return '<article class="tower-item grocery-supply"><details class="trade-item-details"><summary>'+heading(window.TowerHeroIcons?.svg(Heroes?.ROBOT?.FUEL_ITEMS[id]?id:'item_'+id)||'',item.name,'持有 '+run.bag[id]+'／'+C.itemLimit(id,run))+'</summary><p>'+text(item.description)+'</p></details><div class="trade-card-actions">'+action(full?(id==='arrow'?'箭袋已滿':'已達上限'):(id==='arrow'&&quantity<10?'補滿'+' '+quantity+' 支':'買'+(id==='arrow'?' '+quantity+' 支':''))+' · '+cost+' 幣','buy',id,full||quantity===0||run.coins<cost)+(item.sellPrice>0?action('賣 '+item.sellPrice+' 幣','sell',id,!run.bag[id]):'')+'</div></article>';
     }).join('');
     const ingredientCards=ingredients.map(offer=>'<article class="tower-item grocery-ingredient'+(offer.specialty?' is-specialty':'')+'" data-grocery-offer="'+text(offer.id)+'"><details class="trade-item-details"><summary>'+heading(window.TowerPartyRuntime?.foodArt(offer.ingredientId)||'',offer.ingredientId==='herb'?offer.name+'（藥草）':offer.name,'持有 '+run.party.ingredients[offer.ingredientId]+' · 剩 '+offer.remaining+'/'+offer.stock)+'</summary><p>'+(offer.specialty?'遠方特產 · '+text(floorLabel(offer.sourceFloor)+' · '+offer.sourceName):'常用食材')+'；本層限量，不會補貨。</p></details><div class="trade-card-actions">'+action(offer.remaining?'買 1 份 · '+offer.price+' 幣':'本層已售完','buy-ingredient',offer.id,!offer.remaining||run.party.ingredients[offer.ingredientId]>=99||run.coins<offer.price)+'</div></article>').join('');
     const gear=nearest.offer.gear.map(({kind,gear,price})=>'<article class="tower-item tower-gear-card"><details class="trade-item-details"><summary>'+heading(window.TowerHeroIcons?.svg(kind)||'',gear.name,'耐久 '+gear.durability+'/'+gear.maxDurability)+'</summary><p>'+text(gearDescription(gear))+'</p></details><div class="trade-card-actions">'+action(run.adventure.claimed.includes('stock:'+run.floor+':'+nearest.id+':'+kind)?'本層已售出':'購買 '+price+' 幣','buy-gear',kind,run.adventure.claimed.includes('stock:'+run.floor+':'+nearest.id+':'+kind)||run.coins<price)+'</div></article>').join('');
     const stockVoice=grocer?'這裡可以買藥品、道具與限量食材，也可以委託料理。':('出售：'+nearest.offer.gear.map(g=>gearSpeech(g.gear)).join('、')+'。也可以維護與強化裝備。');
     const voiceSummary=nearest.name+'。'+stockVoice;
     const tabs=grocer&&ingredients.length?'<nav class="trade-categories" aria-label="商品分類">'+['supplies','ingredients'].map(id=>'<button class="tower-btn" data-tower="trade-tab" data-item="'+id+'" aria-pressed="'+(tradeCategory===id)+'">'+(id==='supplies'?'藥品與道具':'限量食材')+'</button>').join('')+'</nav>':'';
-    const stock=grocer?tabs+'<section class="grocery-stock" data-trade-category="supplies"'+(tradeCategory!=='supplies'?' hidden':'')+'><div class="tower-grid trade-stock-grid">'+cards+'</div></section><section class="grocery-stock" data-trade-category="ingredients"'+(tradeCategory!=='ingredients'?' hidden':'')+'><div class="tower-grid trade-stock-grid">'+ingredientCards+'</div></section>':'<div class="tower-grid trade-stock-grid">'+gear+'</div><details class="tower-trade-note"><summary>購買與維護說明</summary><p>'+text(nearest.offer.greeting||'')+'</p><p>裝備放入背包後可更換穿戴；每件本層限一件。'+(run.party?'本店維護及強化費比隊內鍛匠多 20%，材料不加價。':'')+'藥品、食材與道具請向雜貨商購買。</p></details>';
+    const notes='<p>'+text(nearest.offer.greeting||'')+'</p><p>'+(grocer?'藥品、食材與道具可在這裡購買；限量食材本層售完不補貨。已解鎖菜色也能自備材料委託料理。':'裝備放入背包後可更換穿戴；每件本層限一件。'+(run.party?'本店維護及強化費比隊內鍛匠多 20%，材料不加價。':'')+'藥品、食材與道具請向雜貨商購買。')+'</p>';
+    const help=window.TowerCompactHelp?.render(grocer?'雜貨與委託說明':'購買與維護說明',notes)||notes;
+    const stock=help+(grocer?tabs+'<section class="grocery-stock" data-trade-category="supplies"'+(tradeCategory!=='supplies'?' hidden':'')+'><div class="tower-grid trade-stock-grid">'+cards+'</div></section><section class="grocery-stock" data-trade-category="ingredients"'+(tradeCategory!=='ingredients'?' hidden':'')+'><div class="tower-grid trade-stock-grid">'+ingredientCards+'</div></section>':'<div class="tower-grid trade-stock-grid">'+gear+'</div>');
     dialog(nearest.name+' · 行商營地',grocer?'旅行雜貨與遠方食材':'專門裝備與維護','',stock,(run.party?(grocer?action('委託料理','commission-cooking'):action('維護與強化','party-merchant-forge',nearest.id)):'')+action('整理背包','bag')+action('結束交易','close'),{silent:quiet===true,commerce:grocer?'grocery':'merchant',wallet:run.coins,summary:voiceSummary,asset:'merchant.'+nearest.id,afterText:stockVoice+'。整理背包。結束交易。'});
     if(quiet)el('towerDialog').querySelector('.tower-dialog-content').scrollTop=scrollTop;
   }
@@ -1505,7 +1517,8 @@
     pendingCooking=null;if(!cookingServiceReady()){showToast('請靠近雜貨商蘇禾，再委託料理。');return;}
     const cards=Cooking.recipes(run,nearest.id).map(q=>{const recipe=P.RECIPES[q.recipeId],reason=!q.allowed?q.reason:run.coins<q.fee?'代煮費不足':q.missing.length?'材料不足':'';
       return '<article class="tower-item grocery-supply" data-commission-recipe="'+text(q.recipeId)+'"><details class="trade-item-details"><summary>'+window.TowerPartyRuntime.dishArt(q.recipeId)+'<div><h3>'+text(recipe.name)+'</h3><small>'+text(q.categoryName)+' · 代煮 '+q.fee+' 幣 · 備好 '+q.owned+' 份</small></div><span class="trade-detail-indicator" aria-hidden="true">⌄</span></summary>'+cookingMaterials(recipe)+'<p>生命 +'+recipe.hp+' · 飽食 +'+recipe.hunger+(recipe.team?' · 全隊 +'+recipe.team:'')+(recipe.buff?' · '+text(P.BUFFS[recipe.buff]):'')+'</p></details><div class="trade-card-actions">'+action(reason||'委託一份 · '+q.fee+' 幣','commission-cook-ask',q.recipeId,!q.allowed||!q.affordable)+'</div></article>';}).join('');
-    dialog('蘇禾 · 代煮服務','委託料理','自備原配方材料，依難度付費；每次一份。','<div class="tower-grid trade-stock-grid">'+cards+'</div><details class="tower-trade-note"><summary>代煮規則與收費</summary><p>基本2幣、精製5幣、盛宴8幣、地下12幣。沒有廚師也可委託已解鎖菜色，地下仍有深度限制。不套用廚師雙份與省料效果。確認後才扣材料與費用，取消不消耗。</p></details>',action('回到雜貨攤','commission-cook-back')+action('已備料理','party-kitchen')+action('結束交易','close'),{silent:quiet,commerce:'grocery',wallet:run.coins,summary:'委託料理。自備原配方材料，依難度付費。選擇料理後再確認。'});
+    const notes='<p>自備原配方材料，依難度付費；每次一份。基本2幣、精製5幣、盛宴8幣、地下12幣。沒有廚師也可委託已解鎖菜色，地下仍有深度限制。不套用廚師雙份與省料效果。確認後才扣材料與費用，取消不消耗。</p>';
+    dialog('蘇禾 · 代煮服務','委託料理','',(window.TowerCompactHelp?.render('代煮規則與收費',notes)||notes)+'<div class="tower-grid trade-stock-grid">'+cards+'</div>',action('回到雜貨攤','commission-cook-back')+action('已備料理','party-kitchen')+action('結束交易','close'),{silent:quiet,commerce:'grocery',wallet:run.coins,summary:'委託料理。自備原配方材料，依難度付費。選擇料理後再確認。'});
   }
   function confirmCooking(recipeId){
     if(!cookingServiceReady()){pendingCooking=null;showToast('作業位置已改變，請重新靠近蘇禾。');return;}
@@ -1688,8 +1701,9 @@
   }
   function voiceProfile(){if(!active||!run?.party)return null;const job=modern()?Heroes.job(run):run.party.profession,gender=P.sex(run,modern()?Heroes.state(run).active:'hero');return {identity:'tower-'+(modern()?Heroes.state(run).active:'hero')+'-'+job+'-'+gender,gender,age:'adult'};}
   function toolUsed(){if(active&&modern()){Heroes.toolSpent(run);run.engine.shovels=G.shovels;}}
+  function robotEnergy(){if(!active||!modern()||Heroes.job(run)!=='robot')return null;return {value:Heroes.actor(run).robot.fuel};}
   function movementScale(){if(!active||paused||G.shifting)return 1;const traits=run.party?window.TowerExpedition.traits(run):{speed:1,grip:0};return (modern()?Heroes.speed(run):C.hasteMultiplier(run))*Math.min(1,hazardSlow+(traits.grip>0?.15:0))*(run.party?.slowLeft>0?(traits.grip>0?.8:.6):1)*(modern()?1:traits.speed);}
-  window.TowerMode = { get cinematicActive(){return !!cinema?.active;},cinematicFrame:dt=>cinema?.frame(dt),openBattleSettings, sightRoot:()=>active?world:null, voiceProfile, toolUsed, get active(){return active;}, get paused(){return paused;}, get partyActive(){return active&&!!run?.party;}, temporaryMapRadius:()=>modern()?(Heroes.buff(run,'path_eye')?.power||0):0, lightRadius:()=>active?lightingUI?.radius():null, useProfessionSkill:()=>partyUI?.skill(), movementScale, open, beginNew, tick, floorSeed, atmosphereStyle, scheduleShift, updateShift, reachExit, defeat, requestQuit, canCollectOriginal, collectedOriginal, itemConfig, reservedCells, preserveFloorPickups, soundChanged, mapMarkers };
+  window.TowerMode = { get cinematicActive(){return !!cinema?.active;},cinematicFrame:dt=>cinema?.frame(dt),openBattleSettings, sightRoot:()=>active?world:null, voiceProfile, toolUsed, robotEnergy, get active(){return active;}, get paused(){return paused;}, get partyActive(){return active&&!!run?.party;}, temporaryMapRadius:()=>modern()?(Heroes.buff(run,'path_eye')?.power||0):0, lightRadius:()=>active?lightingUI?.radius():null, useProfessionSkill:()=>partyUI?.skill(), movementScale, open, beginNew, tick, floorSeed, atmosphereStyle, scheduleShift, updateShift, reachExit, defeat, requestQuit, canCollectOriginal, collectedOriginal, itemConfig, reservedCells, preserveFloorPickups, soundChanged, mapMarkers };
   window.TowerMode.cinematicRender=draw=>cinema?cinema.render(draw):draw();
   install();
 })();

@@ -5,7 +5,7 @@ import {readFileSync} from 'node:fs';
 import vm from 'node:vm';
 import {provisionTravellers} from './recruit-fixtures.mjs';
 const require=createRequire(import.meta.url),C=require('../story/story-core.js'),H=require('../story/tower-heroes-core.js'),P=require('../story/tower-party-core.js'),X=require('../story/tower-expedition-core.js'),N=require('../story/tower-narrative.js'),E=require('../story/tower-encounters.js');
-const ordinaryKinds=Object.entries(C.GEAR).filter(([,def])=>!def.integrated).map(([kind])=>kind);
+const ordinaryKinds=Object.entries(C.GEAR).filter(([,def])=>!def.integrated&&!def.core).map(([kind])=>kind);
 function fresh(floor=99,seed=43){const r=C.newRun({seed});r.floor=floor;r.floorsCleared=99-floor;r.chronicle=N.newChronicle(floor);return H.enable(P.enable(r,'smith').run).run;}
 function v4(g,left){return {...g,durabilityVersion:4,maxDurability:g.maxDurability/2,durability:left??g.durability/2};}
 function groundGear(run){const g=C.createGear('heavy_armor',run.floor,run.seed,'lord-drop',true),source='monster-11';run.defeatedMonsters.push(source);run.party.loot={version:1,rolled:[source],entries:[{id:run.floor+':'+source+':gear',source,type:'gear',key:g.kind,rarity:'rare',quantity:1,cx:0,cy:0,gear:g}]};return g;}

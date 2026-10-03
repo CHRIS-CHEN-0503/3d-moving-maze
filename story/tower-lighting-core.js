@@ -40,6 +40,7 @@
     return {version:1,torches:value.torches,wood:value.wood,cloth:value.cloth,fuel:value.fuel,lit:value.lit,daylight:value.daylight,cooldown:value.cooldown,gathered:[...value.gathered],bought:{...value.bought,suHe:value.bought.suHe||0}};
   }
   const heroes=()=>typeof module==='object'&&module.exports?require('./tower-heroes-core.js'):globalThis.TowerHeroes;
+  function robotLight(run,id){const h=heroes();if(!h?.enabled(run))return null;id=id||h.state(run).active;return h.job(run,id)==='robot'&&h.hp(run,id)>0?h.ROBOT?.lightInfo(run,id)||null:null;}
   const canCast=run=>run.party?.loadouts?heroes().ids(run).some(id=>heroes().hp(run,id)>0&&heroes().job(run,id)==='mage'):!!run.party&&(run.party.profession==='mage'||run.party.members.some(m=>m.profession==='mage'&&m.hp>0));
   const tx=(run,revision,fn)=>C().transaction(run,revision,n=>n.party?fn(n,n.party.light):{ok:false,message:'請先選擇冒險職業。'});
   function craft(run,revision){return tx(run,revision,(n,l)=>{
@@ -73,11 +74,11 @@
   });}
   function tick(next,dt){
     const l=next.party?.light;if(!l||!Number.isFinite(dt)||dt<0)return;
-    const burn=Math.max(0,dt-l.daylight);
+    const burn=robotLight(next)?0:Math.max(0,dt-l.daylight);
     l.daylight=Math.max(0,l.daylight-dt);l.cooldown=Math.max(0,l.cooldown-dt);
     if(l.lit){l.fuel=Math.max(0,l.fuel-burn);if(!l.fuel)l.lit=false;}
   }
   function advance(next){const l=next.party?.light;if(l){l.gathered=[];l.bought=Object.fromEntries(SHOPS.map(k=>[k,0]));}}
-  const portable=run=>run?.party?.light?.daylight>0?'daylight':run?.party?.light?.lit?'torch':'none';
-  return Object.freeze({TORCH_SECONDS,DAYLIGHT_SECONDS,DAYLIGHT_COOLDOWN,TORCH_PRICE,SHOP_STOCK,PROFILES,UNDERWORLD_PROFILES,profile,supplyCount,newState,validate,canCast,craft,torch,daylight,buy,gather,tick,advance,portable});
+  const portable=run=>robotLight(run)?.mode||(run?.party?.light?.daylight>0?'daylight':run?.party?.light?.lit?'torch':'none');
+  return Object.freeze({TORCH_SECONDS,DAYLIGHT_SECONDS,DAYLIGHT_COOLDOWN,TORCH_PRICE,SHOP_STOCK,PROFILES,UNDERWORLD_PROFILES,profile,supplyCount,newState,validate,canCast,robotLight,craft,torch,daylight,buy,gather,tick,advance,portable});
 });

@@ -125,14 +125,14 @@
       }) };
     });
     const ingredientOffers = groceryCatalogue(floor, seed);
-    if (ingredientOffers) shops.push({ ...MERCHANTS.suHe, equipmentKinds: [], supplies: [...MERCHANTS.suHe.supplies], gear: [], ingredientOffers });
+    if (ingredientOffers) shops.push({ ...MERCHANTS.suHe, equipmentKinds: [], supplies: [...MERCHANTS.suHe.supplies].filter(key=>!['power_starlight','power_sunheart'].includes(key)), gear: [], ingredientOffers });
     return shops;
   }
   function merchant(run, merchantId) { return merchantOffers(run.floor, run.seed,!!run.party?.loadouts).find(entry => entry.id === merchantId); }
   function merchantHandles(merchantId,gear){
     const rules=Object.hasOwn(MERCHANT_SERVICES,merchantId)?MERCHANT_SERVICES[merchantId]:null,kind=typeof gear==='string'?gear:gear?.kind,definition=core().GEAR[kind];
     if(!rules||!definition)return false;
-    if(definition.integrated)return merchantId==='tieLing';
+    if(definition.integrated||definition.core)return merchantId==='tieLing';
     return definition.slot===rules.slot||definition.slot==='weapon'&&(rules.weaponKinds.includes(definition.baseKind||kind)||rules.legacyWeapons.includes(kind));
   }
   function serviceContext(run,merchantId){return run&&Object.hasOwn(MERCHANT_SERVICES,merchantId)&&merchant(run,merchantId)?{kind:'merchant',merchantId,floor:run.floor,seed:run.seed}:null;}

@@ -8,7 +8,7 @@ const fresh=()=>H.enable(P.enable(C.newRun({seed:43}),'smith').run).run;
 const source=g=>C.durabilityMultiplier(g.kind)*.75;
 const oldGear=(g,v,left)=>{const mult=v===4?C.durabilityMultiplier(g.kind)/2:source(g)/(v===2?5:1),base=Math.round(g.maxDurability/C.durabilityMultiplier(g.kind)),maxDurability=Math.round(base*mult);return {...g,durability:left??maxDurability,maxDurability,durabilityVersion:v};};
 test('all old source versions and categories migrate once to current doubled durability, preserving broken gear',()=>{
-  const ordinary=Object.entries(C.GEAR).filter(([,def])=>!def.integrated).map(([kind])=>kind);assert.equal(ordinary.length,96);
+  const ordinary=Object.entries(C.GEAR).filter(([,def])=>!def.integrated&&!def.core).map(([kind])=>kind);assert.equal(ordinary.length,96);
   for(const kind of ordinary)for(const enhanced of [false,true])for(const floor of [99,49,1])for(const version of [2,3]){
     const generated=C.createGear(kind,floor,43,'migration',enhanced);assert.equal(generated.durabilityVersion,5);
     const old=oldGear(generated,version),ratio=generated.maxDurability/old.maxDurability;

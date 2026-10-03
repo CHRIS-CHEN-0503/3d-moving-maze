@@ -3,3 +3,11 @@
 以下內容可直接貼給 Claude：
 
 > 「3D移動迷宮」已從原本的 `CHRIS-CHEN-0503/ziwei-test/3D迷宮/` 抽離，轉移成獨立專案。新的本機工作目錄是 `/Users/chenziwei/Desktop/自製程式工具/3D移動迷宮`；它包含根目錄 `index.html`、`lib/three.min.js`、`functions/api/scores.js`、生成的首頁迷宮背景與驗證工具，目前版本為 v1.15.2。後續請不要再修改舊的 `ziwei-test/3D迷宮/`，也不要把英文測驗或其他小遊戲檔案帶進來。開始工作前請先讀新專案的 `README.md`、`docs/視覺與多人架構檢查.md` 與目前 Git 歷史，保留現有遊戲玩法、按鈕 ID、分數 API 路徑和 MQTT 多人協定；手機與平板的選擇頁和遊戲頁必須維持固定橫式流程，直式時顯示旋轉提示，請勿恢復成選擇頁直式、進遊戲後才轉橫式。除非我另外授權，不要重寫功能或改成其他多人後端。每次修改後請執行 `npm run check`，並以實際瀏覽器分別確認桌機、手機直式旋轉提示、手機橫式首頁、開始遊戲與多人入口。
+
+## 後續改版交接
+
+上方版本是最初轉移時的歷史描述。最新原始碼與發布狀態以 `README.md`、`package.json`、正式網站回讀及固定提交發布紀錄分開確認，不以原始碼版本推定已部署。
+
+- `story/tower-robot-core.js` 是機器人機件、雙核心、能源、動力石與製作配方的規則來源；圖鑑 `docs/story-atlas-rules.js`／`docs/story-atlas-items.js` 引用它，不重抄數值。核心光色與造型沿用 `story/tower-heroes-visuals.js`，不另開更新迴圈或光源。
+- `story/tower-compact-help.js` 共用 `render(title, html)` 與 `install(document)`，僅收合可信應用程式說明，不更動交易、存檔或暫停。價格、材料、庫存與錯誤必須保留可見。驗證在 `tests/tower-compact-help.test.mjs` 與 `tools/tower-compact-help-browser-qa.mjs`。
+- 機器人能源整合驗證在 `tools/tower-robot-power-browser-qa.mjs`，以 `tools/run-tower-party-qa.sh` 與程序管理技能啟動限時本機服務；驗證後停止8795，不能建立真實房間或向正式服務寫入。

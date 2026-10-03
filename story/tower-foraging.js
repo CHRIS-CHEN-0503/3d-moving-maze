@@ -34,6 +34,7 @@
     'underworld:heart':{herb:'neutral',ore:'suitable'},
   });
   const NATURAL_ORES=freeze(['ironore','crystalshard','starore']);
+  const POWER_STONES=freeze(['power_glimmer','power_starlight','power_sunheart']);
   const OFFSET=.30;
   function hash(seed,text){
     let h=seed>>>0;
@@ -62,6 +63,11 @@
     // A region without mineral-bearing creatures can still contain ordinary rock ore.
     return ores.length?ores:['ironore'];
   }
+  function powerDeposit(run){
+    if(!validContext(run?.floor,run?.seed))throw new RangeError('無效的動力石採集樓層。');
+    const tier=rollCount(run.seed,run.floor,'power',profile(run,'herb'));
+    return tier?{tier,key:POWER_STONES[tier-1],quantity:1+hash(run.seed,`foraging:${run.floor}:power:quantity`)%3}:null;
+  }
   function resources(run){
     const amount=counts(run),ores=orePool(run),entries=[];
     for(const kind of ['herb','ore'])for(let index=0;index<amount[kind];index++){
@@ -69,6 +75,8 @@
       const key=kind==='herb'?'herb':ores[hash(run.seed,id+':mineral')%ores.length];
       entries.push({id,kind,type:kind==='herb'?'ingredient':'material',key,quantity:1,rarity:kind==='herb'?'common':M().MATERIAL_META[key].rarity});
     }
+    const deposit=powerDeposit(run);
+    if(deposit)entries.push({id:`foraging:${run.floor}:power:0`,kind:'power',type:'item',key:deposit.key,quantity:deposit.quantity,rarity:['common','uncommon','rare'][deposit.tier-1]});
     return entries;
   }
   function fresh(run){
@@ -78,7 +86,7 @@
   function validate(value,floor,seed){
     if(!validContext(floor,seed))return null;
     if(value===undefined)return fresh({floor,seed});
-    if(!value||typeof value!=='object'||Array.isArray(value)||value.version!==1||value.floor!==floor||value.seed!==seed||!Array.isArray(value.claimed)||value.claimed.length>6||new Set(value.claimed).size!==value.claimed.length)return null;
+    if(!value||typeof value!=='object'||Array.isArray(value)||value.version!==1||value.floor!==floor||value.seed!==seed||!Array.isArray(value.claimed)||value.claimed.length>7||new Set(value.claimed).size!==value.claimed.length)return null;
     const allowed=new Set(resources({floor,seed}).map(entry=>entry.id));
     if(!value.claimed.every(id=>typeof id==='string'&&allowed.has(id)))return null;
     return {version:1,floor,seed,claimed:[...value.claimed]};
@@ -88,7 +96,7 @@
     const state=validate(run.party.foraging,run.floor,run.seed);
     return state?resources(run).filter(entry=>!state.claimed.includes(entry.id)):[];
   }
-  function label(entry){return entry?.type==='ingredient'?M().INGREDIENTS[entry.key]:M().MATERIALS[entry?.key];}
+  function label(entry){return entry?.type==='item'?C().ITEMS[entry.key]?.name:entry?.type==='ingredient'?M().INGREDIENTS[entry.key]:M().MATERIALS[entry?.key];}
   function claim(run,id,revision=run?.revision){
     return C().transaction(run,revision,next=>{
       if(!next.party||next.expedition.active)return {ok:false,message:'目前無法採集塔層資源。'};
@@ -96,11 +104,11 @@
       if(!state)return {ok:false,message:'採集紀錄不完整，資源留在原地。'};
       const entry=resources(next).find(entry=>entry.id===id&&!state.claimed.includes(id));
       if(!entry)return {ok:false,message:'這處資源已經採集過了。'};
-      const stock=entry.type==='ingredient'?next.party.ingredients:next.party.journey?.materials;
+      const stock=entry.type==='item'?next.bag:entry.type==='ingredient'?next.party.ingredients:next.party.journey?.materials;
       if(!stock||!integer(stock[entry.key],0,99))return {ok:false,message:'材料資料尚未就緒，資源留在原地。'};
-      if(stock[entry.key]>=99)return {ok:false,message:'這種材料已滿，資源留在原地。'};
-      stock[entry.key]++;state.claimed.push(entry.id);next.party.foraging=state;
-      return {ok:true,message:'獲得 '+label(entry),effect:{pickup:{...entry}}};
+      if(stock[entry.key]+entry.quantity>99)return {ok:false,message:'背包已滿或剩餘空間不足，整簇資源留在原地。'};
+      stock[entry.key]+=entry.quantity;state.claimed.push(entry.id);next.party.foraging=state;
+      return {ok:true,message:'獲得 '+label(entry)+(entry.quantity>1?' ×'+entry.quantity:''),effect:{pickup:{...entry}}};
     });
   }
   function cellKey(cell){
@@ -139,5 +147,5 @@
       return [{...entry,cx:point.cx,cy:point.cy,offsetX:point.offsetX,offsetY:point.offsetY,wallSides:[...point.wallSides]}];
     });
   }
-  return freeze({PROFILES,REGIONS,NATURAL_ORES,OFFSET,hash,profile,rollCount,counts,orePool,fresh,validate,specs,claim,label,wallsAt,plan});
+  return freeze({PROFILES,REGIONS,NATURAL_ORES,POWER_STONES,OFFSET,hash,profile,rollCount,counts,orePool,powerDeposit,fresh,validate,specs,claim,label,wallsAt,plan});
 });

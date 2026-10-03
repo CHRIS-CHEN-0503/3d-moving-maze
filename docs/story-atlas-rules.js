@@ -14,7 +14,7 @@
   const Robot=()=>moduleFor('tower-robot-core','TowerRobotCore');
   const row=(label,value)=>({label,value:String(value)}),fmt=n=>Number(n.toFixed(2)).toString(),series=(a,unit)=>a.map(fmt).join('／')+unit;
   const valid=(object,key)=>typeof key==='string'&&Object.hasOwn(object,key);
-  const armorNames={heavy:'重裝',light:'輕裝',robe:'法袍',shield:'盾牌',robot:'一體式機殼'},slotNames={helmet:'頭部',armor:'身體',shield:'副手盾牌',weapon:'武器'};
+  const armorNames={heavy:'重裝',light:'輕裝',robe:'法袍',shield:'盾牌',robot:'一體式機殼',robot_core:'動力核心'},slotNames={helmet:'頭部',armor:'身體',shield:'副手盾牌',weapon:'武器',core:'動力核心'};
   const targetEffects=['heal','revive','barrier','ward','repair','fortify','polish','cleanse'];
   function skillAccess(s){
     if(s.ascension)return '僅地下篇主角 '+s.ascension.level+' 級，自動沿「'+(H().SKILLS[s.ascension.base]||H().PASSIVES[s.ascension.base]).name+'」路線獲得；同伴不會取得。';
@@ -105,7 +105,7 @@
     return {id,name:s.name,category:'skills',job:s.job,jobs:[s.job],description,iconHtml:I().svg(id),tags:[h.JOBS[s.job].name,active?'主動':'被動',s.ascension?'地下主角進階':s.unique?'十級覺醒':'普通技能'],details,notes,levels,skillType:active?'active':'passive',unique:!!s.unique,ascension:s.ascension?{...s.ascension}:null};
   }
   function gear(kind){
-    const h=H(),c=C();if(!valid(h.GEAR,kind))return null;const d=h.GEAR[kind];if(d.integrated)return robotGear(d);const guide=F().gear(kind),mult=c.durabilityMultiplier(kind),normal=[3,10].map(n=>c.durabilityForRoll(kind,n));
+    const h=H(),c=C();if(!valid(h.GEAR,kind))return null;const d=h.GEAR[kind];if(d.integrated)return robotGear(d);if(d.core)return robotCore(d);const guide=F().gear(kind),mult=c.durabilityMultiplier(kind),normal=[3,10].map(n=>c.durabilityForRoll(kind,n));
     const sourceFloors=[99,69,39,-1,-21].filter(f=>h.gearPool(f).includes(kind));
     const floor=d.tier<=3?[99,69,39][d.tier-1]:d.tier===4?-1:-21;
     const merchants=E().merchantOffers(floor,17,true),merchant=merchants.find(m=>m.equipmentKinds.includes(kind))?.name||({longsword:'鐵嶺',greatsword:'鐵嶺',smith_hammer:'鐵嶺',warhammer:'鐵嶺',heavy_helm:'鐵嶺',light_hood:'鐵嶺',rune_crown:'鐵嶺',heavy_armor:'錦禾',light_armor:'錦禾',robe:'錦禾',cooking_pan:'錦禾',twin_daggers:'錦禾'}[d.baseKind]||'嵐舟');
@@ -135,6 +135,14 @@
     const robot=Robot(),cost=robot.COSTS[tier],labels=moduleFor('tower-materials','TowerMaterials').MATERIALS,parts=['robot_shell','robot_fists'].map(base=>H().GEAR[robot.kind(base,tier)]),text=price=>price+' 銅幣／'+cost.scrap+' 金屬零件／'+Object.entries(cost.materials).map(([id,n])=>labels[id]+' ×'+n).join('／');
     return {id:'robot-upgrade-t'+tier,name:'機件進階・第'+tier+'階',category:'forging',jobs:['robot'],description:'將原機殼或拳臂進階；防護與攻擊成長，但保留耐久比例，不免費修復。',iconHtml:I().svg(parts[0].kind),tags:['機器人專用','人物'+robot.GATES[tier-1]+'級',tier>3?'地下限定':'地上／地下'],details:[row('開放條件','人物 '+robot.GATES[tier-1]+' 級；'+(tier>3?'僅地下篇；':'')+'安全營地有能行動的鍛匠，或本層鐵嶺。'),row('上一階',parts.map(part=>H().GEAR[robot.kind(part.baseKind,tier-1)].name).join('／')),row('完成機件',parts.map(part=>part.name).join('／')),row('每件隊內費用',text(cost.coins)),row('每件商人費用',text(Math.ceil(cost.coins*1.2))),row('防護／威力',parts[0].defense+' 防禦／'+parts[1].damage+' 拳力'),row('耐久',parts[0].maxDurability+' 機殼／'+parts[1].maxDurability+' 拳臂')],notes:['兩個部位分開進階並各付一次費用，材料不加價；資源不足不扣款。','機件破損時必須先修復，再進阶。'.replace('阶','階'),'只有五階，不可无限強化。'.replace('无限','無限')],underground:tier>3,robotUpgrade:true};
   }
+  function robotCore(d){
+    const robot=Robot(),cost=robot.CORE_COSTS[d.tier],materials=moduleFor('tower-materials','TowerMaterials').MATERIALS;
+    return {id:d.kind,name:d.name,category:'armor',jobs:['robot'],description:'機器人專用可替換動力核心；每 '+robot.REPAIR_SECONDS+' 秒自我修復 '+d.tier+' 點生命，附加防禦 '+d.defense+'。',iconHtml:I().svg(d.kind),tags:['第'+d.tier+'階',d.requiredLevel+'級','雙核心槽'],details:[row('階級／需求','第 '+d.tier+' 階，人物 '+d.requiredLevel+' 級可用'),row('適用職業','機器人'),row('部位／類型','核心一／核心二；同時最多兩顆，可不同階'),row('基礎防禦',d.defense),row('普通初始耐久',d.maxDurability+'～'+d.maxDurability),row('耐久消耗','每 '+robot.REPAIR_SECONDS+' 秒，有缺血且實際參與修復的核心消耗 1 耐久；滿血不消耗，不因受擊消耗。'),row('恢復方式','每次各核心按其階級恢復生命，兩顆加總但不超過最大生命；不復活倒地機器人。'),row('內建光源','依已安裝核心的最高階級：一至三階火把級、四五階日光術級。永久照明，不扣核心耐久或能源；能源耗盡仍照亮。'),row('核心光色','#'+d.color.toString(16).padStart(6,'0')),row('取得方式','本人在安全營地以 '+cost.scrap+' 金屬零件'+Object.entries(cost.materials).map(([id,n])=>'／'+materials[id]+' ×'+n).join('')+' 製作；不是普通怪物裝備掉落或商店販售。'),row('行商','不販售動力核心；鐵嶺可維修，銅幣另加20%、材料不加價。不能套用一般裝備特性。')],notes:['新機器人配備第一階核心；舊機器人只在格式升級時補一顆，不重複贈送。','兩個核心槽可個別安裝或卸下，核心獨立於機殼與拳臂階級；不能裝到其他職業。','耐久耗盡時停止自修與防禦，但內建光源保留；在安全營地由能行動的鍛匠修復，或找鐵嶺。破損重建費先乘1.5倍，商人銅幣再加20%。',...(d.tier>3?['第四、第五階核心僅地下篇可製作及安裝。']:[])],tier:d.tier,requiredLevel:d.requiredLevel,baseKind:d.baseKind,core:true,rawStats:{damage:d.damage,magicDamage:d.magicDamage,defense:d.defense,support:d.support,interval:d.interval,reach:d.reach,hands:d.hands,normalDurability:[d.maxDurability,d.maxDurability],durabilityMultiplier:C().durabilityMultiplier(d.kind)},sourceFloors:[]};
+  }
+  function robotCoreCraft(tier){
+    const robot=Robot(),d=robot.CORES[robot.kind('robot_core',tier)],cost=robot.CORE_COSTS[tier],materials=moduleFor('tower-materials','TowerMaterials').MATERIALS;
+    return {id:'robot-core-craft-t'+tier,name:'核心製作・'+d.name,category:'forging',jobs:['robot'],description:'機器人在安全營地自行製作一顆動力核心，不需鍛匠；放入共用裝備背包，再指定安裝位置。',iconHtml:I().svg(d.kind),tags:['機器人專用','人物'+d.requiredLevel+'級',tier>3?'地下限定':'地上／地下'],details:[row('開放條件','能行動的機器人、人物 '+d.requiredLevel+' 級，在安全營地；'+(tier>3?'僅地下篇。':'地上與地下皆可。')),row('成品',d.name+' ×1'),row('材料',cost.scrap+' 金屬零件'+Object.entries(cost.materials).map(([id,n])=>'／'+materials[id]+' ×'+n).join('')),row('銅幣費用',cost.coins+' 幣'),row('修復／防禦','每 '+robot.REPAIR_SECONDS+' 秒自修 '+tier+' 點生命／防禦 '+d.defense),row('固定耐久',d.maxDurability)],notes:['與原機殼／拳臂進階分開，不消耗或改造已安裝核心。','需有裝備背包空位，確認前不扣材料；物資或作業位置改變時重新檢查。'],underground:tier>3,robotCoreCraft:true};
+  }
   function forging(id){
     const x=X();if(!valid(x.TRAITS,id))return null;const trait=x.TRAITS[id],affected=Object.values(H().GEAR).filter(g=>x.traitFits(id,g));
     const labels=moduleFor('tower-materials','TowerMaterials').MATERIALS,materialText=level=>Object.entries(trait.materialCost||{}).map(([key,n])=>'／'+labels[key]+' ×'+n*level).join('');
@@ -142,8 +150,8 @@
     return {id,name:trait.name,category:'forging',jobs:[...new Set(affected.flatMap(g=>g.jobs))],description:trait.description,iconHtml:FI().svg(trait.icon),tags:[trait.underground?'地下限定':'地上／地下','最高二級'],details:[row('開放條件',(trait.underground?'正式進入地下篇後；':'')+'需鍛匠同行並在安全營地，或找負責這種裝備的專門商人。'),row('適用部位',trait.slots.map(s=>slotNames[s]).join('、')),row('可用武器／防具類型',H().BASE_GEAR.filter(g=>x.traitFits(id,g)).map(g=>g.name).join('、')),row('一級消耗',trait.parts+' 金屬零件／'+trait.coins+' 銅幣'+materialText(1)),row('升二級消耗',trait.parts*2+' 金屬零件／'+trait.coins*2+' 銅幣'+materialText(2)),row('折扣','存活隊員的「節省工料」降低銅幣費用，零件與素材不打折；顯示上述為未折扣的隊內鍛匠費用；商人按同條件銅幣費再加20%，向上取整，材料不加價。'),...(id==='starvein'?[row('治療與輔助加成','一／二級額外增加5／10個百分點。')]:[]),...(id==='light'?[row('防具作用','每件每級移速增加3%，全身最多6%。')]:[])],levels:[1,2].map(level=>({level,label,value:Number((value*level).toFixed(2)),unit})),notes:['每件裝備只能選一種特性，選定後不能替換；最多強化兩次。','需先修復已損壞裝備。確認才扣款，裝備或資源已改變時會重新驗證，不照過期報價扣款。',id==='durable'?'耐用護層被消耗後不會因修理而恢復。':'裝備損壞後，本特性停止提供能力；修復裝備後恢復。'],underground:!!trait.underground};
   }
   function build(){
-    const h=H(),jobs=Object.keys(h.JOBS).map(profession),skills=[...Object.keys(h.SKILLS),...Object.keys(h.PASSIVES)].map(skill),allGear=Object.keys(h.GEAR).map(gear),forgingEntries=[...Object.keys(X().TRAITS).map(forging),...[2,3,4,5].map(robotUpgrade)];
+    const h=H(),jobs=Object.keys(h.JOBS).map(profession),skills=[...Object.keys(h.SKILLS),...Object.keys(h.PASSIVES)].map(skill),allGear=Object.keys(h.GEAR).map(gear),forgingEntries=[...Object.keys(X().TRAITS).map(forging),...[2,3,4,5].map(robotUpgrade),...Object.values(Robot().CORES).map(d=>robotCoreCraft(d.tier))];
     return {jobs,skills,weapons:allGear.filter(g=>g.category==='weapons'),armor:allGear.filter(g=>g.category==='armor'),gear:allGear,forging:forgingEntries,entries:[...jobs,...skills,...allGear,...forgingEntries],progression:{xp:[...G().XP],skillLevels:'人物一至五級對應技能一至五級；人物六至九級技能維持五級，十級起技能六級。',surface:'地上主角上限十級、同伴五級；主角一／二／三級分別可帶一／二／三名同伴。',underworld:'通關後地下篇主角十五級、同伴十級，最多四名同伴；地下新隊友五級加入並隨機帶四級追加技能。',branches:Object.values(A().BRANCHES).map(b=>({...b,steps:b.steps.map(s=>({...s}))}))},notes:['所有圖示直接沿用遊戲的職業、技能、裝備與鍛造圖示。','技能表為六級基礎數值；技能倍率不是固定傷害。裝備、人物成長、被動、目標減傷會影響最後結果。','此頁列目前 '+jobs.length+' 職業的 '+allGear.length+' 件武器、防具與一體式機件；舊存檔中的球棒、平底鍋、木杖與無職業通用防具屬已退役系統，不能當作目前職業武器規則。']};
   }
-  return Object.freeze({build,skill,gear,profession,forging,robotUpgrade,scale});
+  return Object.freeze({build,skill,gear,profession,forging,robotUpgrade,robotCoreCraft,scale});
 });

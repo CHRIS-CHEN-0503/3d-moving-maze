@@ -46,7 +46,17 @@
     ...(heroRules()?.GEAR||{}),
   });
   const EQUIPMENT_SLOTS = ['helmet', 'armor', 'shield', 'weapon'];
+  // Supply identities must remain available in the standalone/legacy browser
+  // core too. Optional profession scripts must not make valid saved inventory
+  // look like unknown keys or silently discard it. The full bundle uses the
+  // robot catalogue; parity tests keep this compatibility copy exact.
+  const ROBOT_FUEL_COMPAT = Object.freeze({
+    power_glimmer:Object.freeze({id:'power_glimmer',name:'微光動力石',description:'只供機器人使用，補充25%能源。',fuel:25,dropRarity:'common',buyPrice:6,sellPrice:2,color:'#48a8ff'}),
+    power_starlight:Object.freeze({id:'power_starlight',name:'星輝動力石',description:'只供機器人使用，補充50%能源；只可由怪物掉落或採集獲得。',fuel:50,dropRarity:'uncommon',buyPrice:null,sellPrice:null,color:'#a7eeee'}),
+    power_sunheart:Object.freeze({id:'power_sunheart',name:'曜心動力石',description:'只供機器人使用，補滿100%能源；只可由怪物掉落或採集獲得。',fuel:100,dropRarity:'rare',buyPrice:null,sellPrice:null,color:'#ffd04d'}),
+  });
   const ITEMS = Object.freeze({
+    ...(heroRules()?.ROBOT?.FUEL_ITEMS||ROBOT_FUEL_COMPAT),
     heal: Object.freeze({ id: 'heal', name: '療癒藥', description: '恢復 35 點生命。', buyPrice: 14, sellPrice: 6, color: '#ff7889' }),
     ration: Object.freeze({ id: 'ration', name: '乾糧', description: '恢復 45 點飽食度。', buyPrice: 8, sellPrice: 3, color: '#efc073' }),
     haste: Object.freeze({ id: 'haste', name: '加速藥水', description: '使用者的移動速度與普通攻擊速度提高 '+HASTE_PERCENT+'%，持續五分鐘。不能疊加或刷新，不縮短技能冷卻與準備時間。', buyPrice: 24, sellPrice: 10, color: '#f3bc57' }),
@@ -124,7 +134,7 @@
     const seed = Number.isInteger(opts.seed) && opts.seed > 0 && opts.seed <= 0xffffffff ? opts.seed : ((Date.now() >>> 0) || 1);
     return {
       stateVersion: STATE_VERSION, mode: 'tower', floor: 99, hp: MAX_HP, hunger: 100, coins: 24,
-      bag: { heal: 2, ration: 2, haste: 0, shield: 0, hourglass: 0, bell: 0, map: 1, feather: 0, arrow: 0 },
+      bag: { heal: 2, ration: 2, haste: 0, shield: 0, hourglass: 0, bell: 0, map: 1, feather: 0, arrow: 0, ...Object.fromEntries(Object.keys(ITEMS).filter(k=>ITEMS[k].fuel).map(k=>[k,0])) },
       effects: { shield: 0, freeze: 0, repel: 0, reveal: 0, haste: 0 },
       engine: { shovels: 1, kites: 0, whistles: 0, shovelCooldownMs: 0, skillCooldownMs: 0 },
       claimed: [], floorElapsed: 0, warrior: null, hiredWarriors: [], defeatedMonsters: [],
@@ -180,7 +190,7 @@
   function createGear(kind, floor, seed, sourceId, enhanced = false) {
     floorConfig(floor);
     if (!Object.hasOwn(GEAR, kind) || !validNumber(seed, 1, 0xffffffff, true) || typeof sourceId !== 'string' || !sourceId || sourceId.length > 96 || typeof enhanced !== 'boolean') throw new RangeError('無效的裝備來源。');
-    if(heroRules()?.ROBOT?.isPart(kind))return heroRules().ROBOT.createGear(kind,floor,seed,sourceId);
+    if(heroRules()?.ROBOT?.definition(kind))return heroRules().ROBOT.createGear(kind,floor,seed,sourceId);
     let hash = (seed ^ Math.imul(floor, 0x9e3779b9)) >>> 0;
     for (const char of `${sourceId}:${kind}`) hash = Math.imul(hash ^ char.charCodeAt(0), 16777619) >>> 0;
     const tier = floor >= 70 ? 1 : floor >= 40 ? 2 : 3;
@@ -193,7 +203,7 @@
 
   function validateGear(value) {
     if (!value || typeof value !== 'object' || !Object.hasOwn(GEAR, value.kind) || typeof value.id !== 'string' || !value.id || value.id.length > 160) return null;
-    if(heroRules()?.ROBOT?.isPart(value.kind))return heroRules().ROBOT.validateGear(value);
+    if(heroRules()?.ROBOT?.definition(value.kind))return heroRules().ROBOT.validateGear(value);
     const item = GEAR[value.kind];
     const legacy=value.durabilityVersion===undefined,priorMultiplier=durabilityMultiplier(value.kind)/2;
     if(!legacy&&![2,3,4,DURABILITY_VERSION].includes(value.durabilityVersion))return null;
@@ -286,6 +296,7 @@
       // Old journeys get their initial quiver once, without resetting other inventory.
       if (id === 'arrow' && !Object.hasOwn(run.bag,id)) { bag.arrow=run.party?.loadouts&&(run.party.profession==='archer'||run.party.members?.some(m=>m.profession==='archer'))?30:0; continue; }
       if (id === 'haste' && !Object.hasOwn(run.bag,id)) { bag.haste=0; continue; }
+      if (ITEMS[id].fuel && !Object.hasOwn(run.bag,id)) { bag[id]=0; continue; }
       if (!Object.hasOwn(run.bag, id) || !validNumber(run.bag[id], 0, itemStorageLimit(id), true)) return null;
       bag[id] = run.bag[id];
     }
@@ -331,14 +342,16 @@
       warrior = { offerId: guard.offerId, strength: guard.strength, mode: guard.mode, targetId: guard.targetId, remaining: guard.remaining };
     }
     const legacyEquipment = run.equipment === undefined && run.gearBag === undefined;
-    const rawEquipment = legacyEquipment ? { helmet: null, armor: null, shield: null, weapon: createGear('staff', 99, run.seed, 'starter') } : run.equipment;
+    const activeJob=run.party?.loadouts?.active==='hero'?run.party.profession:(Array.isArray(run.party?.members)?run.party.members:[]).find(m=>m?.id===run.party?.loadouts?.active)?.profession;
+    const rawEquipment = legacyEquipment ? { helmet: null, armor: null, shield: null, weapon: createGear('staff', 99, run.seed, 'starter') } : activeJob==='robot'?heroRules().ROBOT.normalizeEquipment(run.equipment):run.equipment;
+    const slots=activeJob==='robot'?[...EQUIPMENT_SLOTS,...heroRules().ROBOT.CORE_SLOTS]:EQUIPMENT_SLOTS;
     const rawBag = legacyEquipment ? [] : run.gearBag;
-    if (!rawEquipment || Array.isArray(rawEquipment) || Object.keys(rawEquipment).length !== 4 || !Array.isArray(rawBag) || rawBag.length > (underworld ? 28 : 24)) return null;
+    if (!rawEquipment || Array.isArray(rawEquipment) || Object.keys(rawEquipment).length !== slots.length || !Array.isArray(rawBag) || rawBag.length > (underworld ? 28 : 24)) return null;
     const equipment = {}, gearBag = [], gearIds = new Set();
-    for (const slot of EQUIPMENT_SLOTS) {
+    for (const slot of slots) {
       if (!Object.hasOwn(rawEquipment, slot)) return null;
       const gear = rawEquipment[slot] === null ? null : validateGear(rawEquipment[slot]);
-      if (rawEquipment[slot] !== null && (!gear || gear.slot !== slot || gearIds.has(gear.id))) return null;
+      if (rawEquipment[slot] !== null && (!gear || gear.slot !== (heroRules()?.ROBOT?.CORE_SLOTS.includes(slot)?'core':slot) || gearIds.has(gear.id))) return null;
       equipment[slot] = gear;
       if (gear) gearIds.add(gear.id);
     }
@@ -450,6 +463,7 @@
 
   function hitMonster(run, monsterId, baseStrength, expectedRevision) {
     return transaction(run, expectedRevision, next => {
+      if(next.party?.loadouts&&heroRules().job(next)==='robot'&&!heroRules().ROBOT.powered(next))return {ok:false,message:'能源耗盡，先使用動力石補能。'};
       if (!validIds([monsterId], 1) || ['__proto__', 'constructor', 'prototype'].includes(monsterId) || !validNumber(baseStrength, 1, 5, true)) return { ok: false, message: '這次沒有擊中怪物。' };
       if (next.defeatedMonsters.includes(monsterId)) return { ok: false, message: '這隻怪物已經被擊敗。' };
       const weapon = next.equipment.weapon;
@@ -575,6 +589,7 @@
       if (!Object.hasOwn(next.bag, itemId) || next.bag[itemId] < 1) return { ok: false, message: '背包裡沒有這件道具。' };
       if (itemId === 'feather') return { ok: false, message: '復甦羽會在受到致命傷時自動保護你。' };
       if (itemId === 'arrow') return { ok: false, message: '箭矢會在弓射時自動使用，不需要手動使用。' };
+      if (ITEMS[itemId]?.fuel) return {ok:false,message:'動力石只供職業旅程中的機器人使用。'};
       const maximum=next.party?.loadouts?heroRules().maxHp(next):MAX_HP;
       if (itemId === 'heal' && next.hp >= maximum) return { ok: false, message: '生命已滿，先把療癒藥留著吧。' };
       if (itemId === 'ration' && next.hunger >= 100) return { ok: false, message: '飽食度已滿，暫時不需要乾糧。' };

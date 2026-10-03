@@ -18,13 +18,13 @@ test('profession invitations and repair-all documentation use the current shared
 });
 
 test('atlas covers every current job, weapon, armor and skill exactly once with its real game icon',()=>{
-  const data=D.build();assert.equal(data.jobs.length,Object.keys(H.JOBS).length);assert.equal(data.jobs.length,8);assert.equal(data.skills.length,Object.keys(H.SKILLS).length+Object.keys(H.PASSIVES).length);assert.equal(data.weapons.length,Object.values(H.GEAR).filter(g=>g.slot==='weapon').length);assert.equal(data.armor.length,Object.values(H.GEAR).filter(g=>g.slot!=='weapon').length);assert.equal(data.forging.length,Object.keys(X.TRAITS).length+4);
+  const data=D.build();assert.equal(data.jobs.length,Object.keys(H.JOBS).length);assert.equal(data.jobs.length,8);assert.equal(data.skills.length,Object.keys(H.SKILLS).length+Object.keys(H.PASSIVES).length);assert.equal(data.weapons.length,Object.values(H.GEAR).filter(g=>g.slot==='weapon').length);assert.equal(data.armor.length,Object.values(H.GEAR).filter(g=>g.slot!=='weapon').length);assert.equal(data.forging.length,Object.keys(X.TRAITS).length+4+Object.keys(H.ROBOT.CORES).length);
   assert.equal(data.entries.length,data.jobs.length+data.skills.length+data.gear.length+data.forging.length);assert.equal(new Set(data.entries.map(e=>e.category+':'+e.id)).size,data.entries.length);
   assert.deepEqual(data.skills.map(s=>s.id).sort(),[...Object.keys(H.SKILLS),...Object.keys(H.PASSIVES)].sort());
   assert.deepEqual(data.gear.map(s=>s.id).sort(),Object.keys(H.GEAR).sort());
   for(const entry of data.entries){
     assert.ok(entry.description.length>5,entry.id);assert.ok(entry.details.length>=3,entry.id);assert.ok(entry.notes.length,entry.id);assert.match(entry.iconHtml,/^<svg /,entry.id);
-    assert.equal(entry.iconHtml,entry.category==='jobs'?globalThis.TowerPartyRuntime.portrait(entry.id):entry.robotUpgrade?I.svg(H.ROBOT.kind('robot_shell',Number(entry.id.at(-1)))):entry.category==='forging'?FI.svg(X.TRAITS[entry.id].icon):I.svg(entry.id));
+    assert.equal(entry.iconHtml,entry.category==='jobs'?globalThis.TowerPartyRuntime.portrait(entry.id):entry.robotUpgrade?I.svg(H.ROBOT.kind('robot_shell',Number(entry.id.at(-1)))):entry.robotCoreCraft?I.svg(H.ROBOT.kind('robot_core',Number(entry.id.at(-1)))):entry.category==='forging'?FI.svg(X.TRAITS[entry.id].icon):I.svg(entry.id));
     assert.ok(entry.details.every(d=>d.label&&d.value&&!/undefined|NaN/.test(d.value)),entry.id);
   }
 });
@@ -62,10 +62,11 @@ test('all gear stats, five tiers, wear and price ranges use game definitions rat
     const def=H.GEAR[record.id],m=C.durabilityMultiplier(record.id);
     assert.equal(record.tier,def.tier);assert.equal(record.requiredLevel,def.requiredLevel);assert.deepEqual(record.jobs,def.jobs);
     for(const key of ['damage','magicDamage','defense','support','interval','reach','hands'])assert.equal(record.rawStats[key],def[key]);
-    if(!def.integrated)assert.equal(detail(record,'普通初始耐久'),[3,10].map(n=>C.durabilityForRoll(record.id,n)).join('～'));
+    if(!def.integrated&&!def.core)assert.equal(detail(record,'普通初始耐久'),[3,10].map(n=>C.durabilityForRoll(record.id,n)).join('～'));
     if(def.slot==='weapon')assert.match(detail(record,'耐久消耗'),['bow','staff','book'].includes(def.type)?/發射就消耗/:/揮空不扣/);
     if(def.tier>3)assert.match(record.notes.join(''),/僅地下篇/);
     if(def.integrated){assert.equal(detail(record,'普通初始耐久'),def.maxDurability+'～'+def.maxDurability);assert.equal(record.integrated,true);assert.deepEqual(record.sourceFloors,[]);assert.match(detail(record,'取得方式'),/初始配備|上一階/);continue;}
+    if(def.core){assert.equal(detail(record,'普通初始耐久'),def.maxDurability+'～'+def.maxDurability);assert.equal(record.core,true);assert.deepEqual(record.sourceFloors,[]);assert.match(detail(record,'取得方式'),/安全營地.*製作/);assert.match(detail(record,'耐久消耗'),/3 秒.*1 耐久.*不因受擊/);continue;}
     const floor=def.tier<=3?[99,69,39][def.tier-1]:def.tier===4?-1:-21;
     for(let seed=1;seed<=24;seed++){
       const gear=C.createGear(record.id,floor,seed,'atlas-check'),price=C.gearPrice(gear),range=detail(record,'一般商店價格').match(/^(\d+)～(\d+)/);
@@ -80,12 +81,21 @@ test('all gear stats, five tiers, wear and price ranges use game definitions rat
 
 test('merchant, acquisition and profession notes reflect the modern rules',()=>{
   const shops=new Map();for(let seed=1;seed<=24;seed++)for(const m of E.merchantOffers(-21,seed,true))for(const kind of m.equipmentKinds)shops.set(kind,m.name);
-  for(const record of D.build().gear)if(record.integrated)assert.match(detail(record,'行商'),/^鐵嶺.*不出售/);else assert.ok(detail(record,'行商').startsWith(shops.get(record.id)),record.id);
+  for(const record of D.build().gear)if(record.integrated)assert.match(detail(record,'行商'),/^鐵嶺.*不出售/);else if(record.core)assert.match(detail(record,'行商'),/^不販售/);else assert.ok(detail(record,'行商').startsWith(shops.get(record.id)),record.id);
   assert.match(D.profession('chef').description,/六道基本菜任何隊伍都能烹飪.*有能行動的廚師.*高階菜譜/);assert.match(D.profession('chef').notes[0],/一料雙份.*等級/);
   assert.match(D.profession('mage').description,/日光術.*不占技能欄/);assert.match(D.profession('smith').description,/完整修理.*重建破損.*專門商人.*20%/);
   for(const job of D.build().jobs)assert.match(job.notes.join(''),/五級.*隨機/);
   assert.deepEqual(D.build().progression.xp,G.XP);assert.equal(D.build().progression.branches.length,Object.keys(require('../story/tower-ascension-catalog.js').BRANCHES).length);
   for(const key of ['undefined','__proto__','constructor','missing']){assert.equal(D.skill(key),null);assert.equal(D.gear(key),null);assert.equal(D.profession(key),null);}
+});
+
+test('robot dual cores mirror the actual five fixed durabilities, defense and material-only craft recipes',()=>{
+  const R=H.ROBOT,M=require('../story/tower-materials.js');
+  for(const d of Object.values(R.CORES)){
+    const entry=D.gear(d.kind),craft=D.robotCoreCraft(d.tier),cost=R.CORE_COSTS[d.tier];assert.equal(entry.requiredLevel,d.requiredLevel);assert.equal(entry.rawStats.defense,d.defense);assert.deepEqual(entry.rawStats.normalDurability,[d.maxDurability,d.maxDurability]);assert.match(detail(entry,'內建光源'),/最高階級.*一至三階.*四五階.*永久.*能源耗盡/);assert.match(detail(entry,'恢復方式'),/两顆|兩顆/);assert.match(entry.description,new RegExp('每 '+R.REPAIR_SECONDS+' 秒自我修復 '+d.tier+' 點'));
+    assert.equal(craft.underground,d.tier>3);assert.match(detail(craft,'銅幣費用'),new RegExp('^'+cost.coins+' 幣$'));assert.match(detail(craft,'材料'),new RegExp(cost.scrap+' 金屬零件'));for(const[key,n]of Object.entries(cost.materials))assert.ok(detail(craft,'材料').includes(M.MATERIALS[key]+' ×'+n));assert.equal(craft.iconHtml,I.svg(d.kind));
+  }
+  assert.match(D.profession('robot').description,/兩個動力核心.*永久照明.*十分鐘.*一般料理.*不能修復/);
 });
 
 test('browser adapter is read-only, needs no DOM or storage, and matches CommonJS output',()=>{

@@ -173,6 +173,19 @@
   });
   // The portrait consumes the same whole machine illustration as the job icon.
   drawings.job_robot=drawings.robot;
+  const coreArt=(fill,shape,trim)=>'<path d="M17 7h30l12 14v25L47 57H17L5 46V21Z" fill="#667983" stroke="#d5bd87"/>'+p('M11 23h8m26 0h8M11 41h8m26 0h8M24 7v8m16-8v8M24 49v8m16-8v8')+'<path d="'+shape+'" fill="'+fill+'" stroke="#eff6ef" stroke-width="2.2"/>'+trim;
+  Object.assign(drawings,{
+    robot_core:coreArt('#48a8ff','M32 17 46 25v15L32 48 18 40V25Z',circle(32,32,7)+p('M20 31h6m12 0h6')),
+    robot_core_t2:coreArt('#f6f9ff','M32 15 48 32 32 49 16 32Z',p('M32 20v24M22 32h20M20 16l-4-4m32 4 4-4')),
+    robot_core_t3:coreArt('#ffd04d','M32 15 48 26l-6 20H22l-6-20Z',p('M24 25h16m-16 8h16M32 18v26')+circle(32,32,4)),
+    robot_core_t4:coreArt('#a7eeee','M21 17h22l8 15-8 15H21l-8-15Z',p('m32 21 10 11-10 11-10-11ZM13 17l6 4m32-4-6 4M13 47l6-4m32 4-6-4')),
+    robot_core_t5:coreArt('#d2b1f5','M32 13 49 23l-3 20-14 8-14-8-3-20Z',p('M32 16v31m-13-20 13 7 13-7M23 20l9 14 9-14M21 42l11-8 11 8')),
+    power_glimmer:'<path d="M18 12 36 8 51 26l-7 27-27 3L8 36Z" fill="#8eb5c3"/>'+p('m18 12 7 22-8 22m19-48-11 26 19 19M8 36l17-2 26-8')+circle(27,26,3),
+    power_starlight:'<path d="M25 6 46 16l10 27-24 15L10 43l3-26Z" fill="#a7eeee"/>'+p('m25 6 7 52M13 17l19 17 14-18M10 43l22-9 24 9m-27-25 6 4-6 4-6-4Z')+circle(41,38,4),
+    power_sunheart:'<path d="M32 5 52 17l5 26-15 15H21L6 42l6-26Z" fill="#ffcc72"/>'+p('m32 5 10 53M12 16l20 17 20-16M6 42l26-9 25 10M21 58l11-25')+circle(32,29,9)+p('M32 15v5m-14 9h5m18 0h5M22 18l4 4m12 14 4 4'),
+  });
+  // Inventory and quick slots use item_ keys; each shares the authored whole stone.
+  for(const id of ['power_glimmer','power_starlight','power_sunheart'])drawings['item_'+id]=drawings[id];
   // Each tier keeps its recognizable whole object and adds its own inlaid trim.
   const tierInlay={2:p('m45 42 5-5 5 5-5 5Z'),3:p('m43 38 7-7 7 7-7 7Zm-3 13 4-4 4 4-4 4m11 0 4-4 4 4-4 4'),4:p('m43 44 7-12 7 12-7 12Zm7-12v24M38 43q-5 10 8 17m16-17q5 10-8 17'),5:circle(50,46,7)+p('M50 32v5m0 18v5M36 46h5m18 0h4M39 35l5 5m12 12 5 5M39 57l5-5m12-12 5-5')};
   for(const kind of ['longsword','greatsword','arcane_staff','spellbook','smith_hammer','warhammer','cooking_pan','twin_daggers','elven_bow','heavy_helm','heavy_armor','light_hood','light_armor','rune_crown','robe','buckler','round_shield','tower_shield','robot_fists','robot_shell'])for(const tier of [2,3,4,5])drawings[kind+'_t'+tier]=drawings[kind]+tierInlay[tier];

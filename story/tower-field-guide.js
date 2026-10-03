@@ -65,6 +65,7 @@
     tower_shield:{role:'單手搭配',handling:'和單手武器一起使用，提供較多防禦。'},
     robot_fists:{role:'機器人拳擊',handling:'一體式雙拳，左右拳輪替；不能配盾、卸下或移交，揮空不消耗耐久。'},
     robot_shell:{role:'機器人防護',handling:'一體式機殼，不能穿一般防具或卸下；以礦材與零件進階，保留原耐久比例。背脊裝甲、斜向散熱格柵與弧形管線隨機殼階級加細；三階增加中央核心護蓋，四階加入能量雕紋與肩背紋章，五階增加鎮淵箭形下背鑲片。'},
+    robot_core:{role:'機體自修與照明',handling:'兩個可替換核心槽，各自按階級提供自修與防禦；內建永久光源跟隨最高核心階級，不消耗能源或核心耐久。'},
   });
   function gear(value,run,actorId){
     const h=H(),kind=typeof value==='string'?value:value?.kind;if(!own(h?.GEAR,kind))return null;const def=h.GEAR[kind];
@@ -74,9 +75,9 @@
     const fit=!validActor?'適用：'+def.jobs.map(j=>h.JOBS[j].name).join('、'):!def.jobs.includes(job)?'這件裝備不適合目前選取的職業。':level<def.requiredLevel?'還需要升到 '+def.requiredLevel+' 級才能穿戴。':'符合目前角色的職業與等級。';
     const pct=typeof value==='object'&&Number.isFinite(value?.durability)&&Number.isFinite(value?.maxDurability)&&value.maxDurability>0?Math.max(0,Math.min(100,Math.ceil(value.durability/value.maxDurability*100))):null;
     const severity=pct===null?'unknown':pct===0?'broken':pct<=10?'critical':pct<=20?'warning':'good';
-    const condition=severity==='broken'?'已損壞，能力暫停；有能行動的鍛匠可在營地付費重建，否則找專門商人，銅幣另加20%。':severity==='critical'?'耐久快用完了，先換備用裝備或回營地修理。':severity==='warning'?'耐久偏低，下次經過營地記得修理。':'裝備未損壞時才提供能力。';
+    const condition=severity==='broken'?def.core?'核心已耗盡，自修與防禦暫停；內建光源保留，可在安全營地由鍛匠修復，或請鐵嶺維修，銅幣另加20%。':'已損壞，能力暫停；有能行動的鍛匠可在營地付費重建，否則找專門商人，銅幣另加20%。':severity==='critical'?'耐久快用完了，先換備用裝備或回營地修理。':severity==='warning'?'耐久偏低，下次經過營地記得修理。':'裝備未損壞時才提供能力。';
     return {name:def.name,tier:def.tier,requiredLevel:def.requiredLevel,...role,fit,condition,severity,durabilityPercent:pct,
-      wear:def.integrated?(def.slot==='weapon'?'普通拳擊每四次有效命中消耗一次耐久；攻擊技能首次有效命中消耗一次，同次多目標不重扣，揮空不扣。':'受到有效傷害消耗一次機殼耐久；飢餓或護盾完全吸收時不消耗，緩震結構可免除此消耗。'):def.slot!=='weapon'?'受到有效傷害時，穿戴中的每件防具各消耗耐久。':['bow','staff','book'].includes(def.type)?'遠程攻擊發射就消耗武器耐久，射空也會消耗。':'近戰命中才消耗武器耐久，揮空不扣。'};
+      wear:def.core?'每三秒實際參與生命自修的核心消耗一耐久；滿血不消耗，受擊或照明不耗核心耐久。':def.integrated?(def.slot==='weapon'?'普通拳擊每四次有效命中消耗一次耐久；攻擊技能首次有效命中消耗一次，同次多目標不重扣，揮空不扣。':'受到有效傷害消耗一次機殼耐久；飢餓或護盾完全吸收時不消耗，緩震結構可免除此消耗。'):def.slot!=='weapon'?'受到有效傷害時，穿戴中的每件防具各消耗耐久。':['bow','staff','book'].includes(def.type)?'遠程攻擊發射就消耗武器耐久，射空也會消耗。':'近戰命中才消耗武器耐久，揮空不扣。'};
   }
   function progression(run){
     const loadouts=run?.party?.loadouts,h=H(),growth=G();if(!loadouts||!h||!growth)return null;
@@ -93,7 +94,7 @@
     healer:{innate:'法書發射遠程光彈。遇到受污染的泉眼，可用職業本領快速淨化。',examples:['herbalism','rescue']},
     smith:{innate:'能穿重裝，使用短鎚配盾或重錘。隊中有能行動的鍛匠，營地才可完整修理、重建破損（耐久歸零）與鍛造強化；否則需找專門商人，銅幣另加20%。',examples:['economy','care']},
     archer:{innate:'精靈長弓進行遠程攻擊，使用輕裝與全隊共用箭袋；發射會消耗箭矢。',examples:['steady_aim','nimble_shot']},
-    robot:{innate:'重防禦拳鬥者，移動速度為一般人物九成。自帶一體式機殼與拳臂，不能穿一般防具、配盾或更換普通武器；以銅幣、零件與礦材進階，仍需要食物與療癒補給。',examples:['robot_body','fist_drive']},
+    robot:{innate:'重防禦拳鬥者，移動速度為一般人物九成。自帶一體式機殼與拳臂，不能穿一般防具、配盾或更換普通武器；以銅幣、零件與礦材進階。兩個動力核心自修生命並提供永久照明，光源按最高核心階級提升。動力能源滿額十分鐘，耗盡慢行且不能攻擊或施放技能，不損失生命，仍保留光源；以動力石補充。一般料理、療癒藥與療癒魔法不能修復機體。',examples:['robot_body','fist_drive']},
   });
   function profession(job,run,actorId){
     const h=H();if(!own(PROFESSIONS,job)||!h)return null;const spec=PROFESSIONS[job];

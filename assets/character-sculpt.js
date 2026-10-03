@@ -3,6 +3,32 @@
 (function(root,factory){const api=factory();if(typeof module==='object'&&module.exports)module.exports=api;root.CharacterSculpt=api;})(globalThis,function(){
   'use strict';
   function ellipsoid(T,w,h,d){const g=new T.SphereGeometry(1,12,8);g.scale(w/2,h/2,d/2);return g;}
+  function catHead(T){
+    const g=new T.SphereGeometry(1,24,16),p=g.attributes.position;
+    for(let i=0;i<p.count;i++){const x=p.getX(i),y=p.getY(i),z=p.getZ(i),front=Math.max(0,z),cheek=Math.exp(-((Math.abs(x)-.52)**2/.16+(y+.22)**2/.18)),snout=Math.exp(-(x*x/.30+(y+.32)**2/.13));p.setXYZ(i,x*.305*(1+.09*cheek),y*.265,z*.25+front*(.053*cheek+.072*snout));}
+    g.computeVertexNormals();g.userData.catSculpt=true;return g;
+  }
+  function catEye(T){const g=new T.SphereGeometry(1,12,8),p=g.attributes.position;for(let i=0;i<p.count;i++){const x=p.getX(i),y=p.getY(i);p.setXYZ(i,x*.055,y*.041*(1-.3*Math.abs(x)),p.getZ(i)*.014);}g.computeVertexNormals();return g;}
+  function catDetails(T,appearance={}){
+    const skin=appearance.skin??0xffa040,hair=appearance.hair??0xef6c00,parts=[],add=(name,geometry,color,position,rotation=[0,0,0])=>parts.push({name,geometry,color,position,rotation});
+    const ear=new T.Shape();ear.moveTo(-.115,-.04);ear.quadraticCurveTo(-.135,.10,-.025,.27);ear.quadraticCurveTo(0,.30,.025,.27);ear.quadraticCurveTo(.135,.10,.115,-.04);ear.quadraticCurveTo(0,-.09,-.115,-.04);
+    for(const side of [-1,1]){
+      const outer=new T.ExtrudeGeometry(ear,{depth:.09,bevelEnabled:true,bevelThickness:.016,bevelSize:.014,bevelSegments:2,curveSegments:4});outer.translate(0,0,-.045);
+      add('cat-continuous-ear',outer,skin,[side*.195,.195,-.025],[0,-side*.12,-side*.18]);
+      const inner=new T.ExtrudeGeometry(ear,{depth:.008,bevelEnabled:true,bevelThickness:.004,bevelSize:.004,bevelSegments:1,curveSegments:3});inner.scale(.67,.65,1);inner.translate(-.007,.035,0);add('cat-cupped-inner-ear',inner,0xe6a29b,[side*.195,.195,.035],[0,-side*.12,-side*.18]);
+      for(let i=0;i<3;i++){const path=new T.CatmullRomCurve3([new T.Vector3(side*.108,-.106-i*.020,.321),new T.Vector3(side*.21,-.10-i*.026,.324),new T.Vector3(side*.365,-.069-i*.042,.287)]);add('cat-whisker',new T.TubeGeometry(path,6,.004,3,false),0x59463c,[0,0,0]);}
+      for(let i=0;i<3;i++){const dot=ellipsoid(T,.010,.010,.005);add('cat-whisker-root',dot,0x805b49,[side*(.085+i*.022),-.084-i%2*.018,.340-i*.006]);}
+    }
+    const muzzle=new T.SphereGeometry(1,16,10),mp=muzzle.attributes.position;
+    for(let i=0;i<mp.count;i++){const x=mp.getX(i),y=mp.getY(i),z=mp.getZ(i);mp.setXYZ(i,x*.18,y*.095,z*.075+Math.max(0,z)*.018*Math.exp(-((Math.abs(x)-.52)**2/.14)));}muzzle.computeVertexNormals();add('cat-connected-muzzle',muzzle,0xffe0b0,[0,-.10,.264]);
+    const nose=new T.Shape();nose.moveTo(-.047,.012);nose.quadraticCurveTo(-.05,.033,-.026,.031);nose.quadraticCurveTo(0,.021,.026,.031);nose.quadraticCurveTo(.05,.033,.047,.012);nose.quadraticCurveTo(.015,-.004,.005,-.022);nose.quadraticCurveTo(0,-.028,-.005,-.022);nose.quadraticCurveTo(-.015,-.004,-.047,.012);
+    const ng=new T.ExtrudeGeometry(nose,{depth:.014,bevelEnabled:true,bevelThickness:.006,bevelSize:.004,bevelSegments:2,curveSegments:4});add('cat-rounded-nose',ng,0xcd8792,[0,-.059,.343]);
+    const philtrum=new T.CatmullRomCurve3([new T.Vector3(0,-.08,.359),new T.Vector3(0,-.101,.358),new T.Vector3(0,-.13,.349)]);add('cat-nose-to-mouth',new T.TubeGeometry(philtrum,4,.004,3,false),0x59463c,[0,0,0]);
+    for(const side of [-1,1]){const path=new T.CatmullRomCurve3([new T.Vector3(side*.045,.218,.165),new T.Vector3(side*.034,.187,.196),new T.Vector3(side*.056,.157,.222)]);add('cat-forehead-fur-mark',new T.TubeGeometry(path,5,.013,4,false),hair,[0,0,0]);}
+    const middle=new T.CatmullRomCurve3([new T.Vector3(0,.232,.146),new T.Vector3(0,.205,.177),new T.Vector3(0,.172,.204)]);add('cat-forehead-fur-mark',new T.TubeGeometry(middle,5,.011,4,false),hair,[0,0,0]);
+    return parts;
+  }
+  function catTail(T){return new T.TubeGeometry(new T.CatmullRomCurve3([new T.Vector3(0,.82,-.18),new T.Vector3(0,.84,-.38),new T.Vector3(.08,.99,-.51),new T.Vector3(.13,1.10,-.46)]),12,.045,6,false);}
   function head(T,w=.54,h=.55,d=.48,{jaw=1,cheek=1,chin=1,detail='shared'}={}){
     const g=new T.SphereGeometry(1,detail==='hero'?26:20,detail==='hero'?18:14),p=g.attributes.position;
     for(let i=0;i<p.count;i++){let x=p.getX(i),y=p.getY(i),z=p.getZ(i);const lower=Math.max(0,-y),front=Math.max(0,z),eye=Math.exp(-((Math.abs(x)-.48)**2/.055+(y-.1)**2/.04));
@@ -63,5 +89,5 @@
     }}
     return {crown,drape,braids,long,braided};
   }
-  return Object.freeze({ellipsoid,head,capsule,torso,roundedBox,cloth,hair});
+  return Object.freeze({ellipsoid,head,catHead,catEye,catDetails,catTail,capsule,torso,roundedBox,cloth,hair});
 });

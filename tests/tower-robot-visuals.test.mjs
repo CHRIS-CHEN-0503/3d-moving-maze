@@ -7,7 +7,7 @@ const require=createRequire(import.meta.url),T=require('../lib/three.min.js'),H=
 const env=vm.createContext({THREE:T,TowerHeroes:H,CharacterSculpt:require('../assets/character-sculpt.js'),CharacterFace:F,CharacterMotion:require('../assets/character-motion.js'),TowerCombatMotion:M});
 for(const file of ['tower-heroes-visuals.js','tower-skill-effects.js'])vm.runInContext(readFileSync(new URL('../story/'+file,import.meta.url),'utf8'),env);
 const V=env.TowerHeroVisuals;
-function release(model){const gs=new Set(),ms=new Set();model.traverse(o=>{if(o.geometry&&(o.isMesh||o.isPoints))gs.add(o.geometry);if(o.material)ms.add(o.material);});gs.forEach(g=>g.dispose());ms.forEach(m=>m.dispose());}
+function release(model){const gs=new Set(),ms=new Set(),ts=new Set();model.traverse(o=>{if(o.geometry&&(o.isMesh||o.isPoints))gs.add(o.geometry);if(o.material){ms.add(o.material);for(const v of Object.values(o.material))if(v?.isTexture)ts.add(v);}});gs.forEach(g=>g.dispose());ms.forEach(m=>m.dispose());ts.forEach(t=>t.dispose());}
 const equipment=t=>Object.fromEntries(['armor','weapon'].map(slot=>{const kind=R.kind(slot==='armor'?'robot_shell':'robot_fists',t);return [slot,{kind,slot,durability:100}];}));
 function figure(sex,tier=1){const m=V.base('robot',()=>{throw Error('human builder must not run');},'hero',sex);V.dress(T,m,equipment(tier),release);return m;}
 function metrics(m){let meshes=0,triangles=0;m.traverse(o=>{assert.equal(!!o.isLight,false);if(o.isMesh){meshes++;triangles+=(o.geometry.index?.count??o.geometry.attributes.position.count)/3;}for(const key of ['position','normal'])if(o.geometry?.attributes[key])assert.ok(Array.from(o.geometry.attributes[key].array).every(Number.isFinite));});return {meshes,triangles};}
@@ -57,8 +57,32 @@ test('shell grades visibly thicken chest, shoulders, knees and shins; armor and 
   assert.equal(m.userData.heroPieces.length,3);metrics(m);release(m);
  }
 });
-test('mechanical expressions and inlaid metal surfaces stay texture-free and reuse their resources',()=>{
- for(const sex of ['male','female']){const m=figure(sex,5),references=[];m.traverse(o=>{references.push([o,o.geometry,o.material]);assert.equal(o.material?.map||null,null);});let t=.2;for(const mood of F.moods){F.react(m,mood,.1);F.update(m,t,mood);t+=.3;metrics(m);}for(const time of [NaN,Infinity,-Infinity])F.update(m,time,'hurt');const after=[];m.traverse(o=>after.push([o,o.geometry,o.material]));assert.deepEqual(after,references);release(m);}
+test('mechanical expressions reuse surfaces and only own bounded original 32-square core halos',()=>{
+ for(const sex of ['male','female']){const m=figure(sex,5),references=[];m.traverse(o=>{references.push([o,o.geometry,o.material]);if(o.isSprite){assert.equal(o.material.map.isDataTexture,true);assert.equal(o.material.map.userData.byteBudget,4096);assert.equal(o.material.userData.robotGlow,true);}else assert.equal(o.material?.map||null,null);});let t=.2;for(const mood of F.moods){F.react(m,mood,.1);F.update(m,t,mood);t+=.3;metrics(m);}for(const time of [NaN,Infinity,-Infinity])F.update(m,time,'hurt');const after=[];m.traverse(o=>after.push([o,o.geometry,o.material]));assert.deepEqual(after,references);release(m);}
+});
+test('all core colors follow highest installed grade including broken cores; light changes never rebuild armor or fists',()=>{
+ assert.deepEqual([...V.ROBOT_CORE_COLORS],[...R.CORE_COLORS]);
+ for(const sex of ['male','female']){
+  const m=figure(sex,5),eq=equipment(5),pieces=m.userData.heroPieces.slice(),refs=[];m.traverse(p=>refs.push([p,p.geometry,p.material]));let disposed=0;
+  for(const [first,second,broken]of [[1,0,false],[2,1,false],[2,3,false],[4,2,false],[2,5,true],[0,0,false]]){
+   eq.core1=first?{kind:R.kind('robot_core',first),slot:'core',durability:broken?0:10}:null;eq.core2=second?{kind:R.kind('robot_core',second),slot:'core',durability:broken?0:10}:null;
+   const expected=R.coreLight(eq);V.dress(T,m,eq,()=>disposed++);assert.equal(disposed,0);assert.deepEqual(m.userData.heroPieces,pieces);assert.equal(m.userData.heroPieces.length,3);assert.equal(m.userData.robotLightTier,expected.tier);assert.equal(m.userData.robotLightColor,expected.color);
+   let lit=0;m.traverse(p=>{if(p.material?.userData.robotEnergy){lit++;assert.equal(p.material.color.getHex(),expected.color);assert.equal(p.material.emissive.getHex(),expected.color);assert.ok(p.material.emissiveIntensity>.5);}if(p.material?.userData.robotGlow)assert.equal(p.material.color.getHex(),expected.color);assert.equal(!!p.isLight,false);});assert.ok(lit>=4);
+   for(let i=0;i<5;i++){if(eq.core1)eq.core1.durability=Math.max(0,eq.core1.durability-1);V.dress(T,m,eq,()=>disposed++);}assert.equal(disposed,0);
+  }
+  const after=[];m.traverse(p=>after.push([p,p.geometry,p.material]));assert.deepEqual(after,refs);metrics(m);
+  const broken=figure(sex,1),none={armor:null,weapon:null,core1:{kind:'robot_core_t5',slot:'core',durability:0},core2:null};V.dress(T,broken,none,release);assert.ok(broken.userData.body.visible);assert.equal(broken.userData.robotLightTier,5);assert.equal(broken.userData.heroPieces.length,0);assert.ok(broken.userData.body.children.some(p=>p.material?.userData.robotEnergy&&p.material.color.getHex()===R.CORE_COLORS[4]));release(broken);release(m);
+ }
+});
+test('five socketed core models own finite native crystal geometry and release their resources exactly once',()=>{
+ const silhouettes=[];
+ for(let tier=1;tier<=5;tier++){
+  const kind=R.kind('robot_core',tier),g=V.gear(T,kind),held=new Set(),counts=new Map();g.traverse(p=>{if(p.geometry)held.add(p.geometry);if(p.material){held.add(p.material);assert.equal(p.material.map||null,null);}});
+  assert.equal(g.userData.baseKind,'robot_core');assert.equal(g.userData.tier,tier);assert.ok(g.children.length<=8);assert.ok(metrics(g).triangles<1500);assert.notEqual(I.svg(kind),'');
+  g.updateMatrixWorld(true);silhouettes.push(JSON.stringify(new T.Box3().setFromObject(g).getSize(new T.Vector3()).toArray()));
+  for(const r of held){counts.set(r,0);r.addEventListener('dispose',()=>counts.set(r,counts.get(r)+1));}release(g);assert.ok([...counts.values()].every(n=>n===1));
+ }
+ assert.equal(new Set(silhouettes).size,5);
 });
 test('rear engineering is flush, separately graded and visible from behind without a backpack or new lights',()=>{
  const names=g=>{const list=[];g.traverse(p=>list.push(p.name,...(p.userData.authoredParts||[])));return list;},count=(g,name)=>names(g).filter(n=>n===name).length;

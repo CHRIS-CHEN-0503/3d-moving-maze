@@ -7,12 +7,21 @@
     5:Object.freeze({metal:0xd2e7e1,trim:0xf0d298,wood:0x2c514b,dark:0x1c383e,gem:0x95eedb,cloth:0x2f615c}),
   });
   const ROBOT_LOOKS=Object.freeze({male:Object.freeze({metal:0x687c88,trim:0xc1a474,dark:0x263a45,face:0xb7c6c9,core:0x72dce9,name:'鐵衡'}),female:Object.freeze({metal:0xdad5bd,trim:0xbb9663,dark:0x4b554c,face:0xeee5c9,core:0x91dfa8,name:'鈴芯'})});
+  const ROBOT_CORE_COLORS=Object.freeze([0x48a8ff,0xf6f9ff,0xffd04d,0xa7eeee,0xd2b1f5]);
+  function robotLight(equipment){if(H.ROBOT?.coreLight)return H.ROBOT.coreLight(equipment);const tier=Math.max(1,...['core1','core2'].map(slot=>{const g=equipment?.[slot];return H.GEAR[g?.kind]?.baseKind==='robot_core'?H.GEAR[g.kind].tier:0;}));return {tier,color:ROBOT_CORE_COLORS[tier-1]};}
+  function robotHalo(T,group,points,color){
+    const size=32,data=new Uint8Array(size*size*4);for(let y=0;y<size;y++)for(let x=0;x<size;x++){const r=Math.hypot((x+.5)/size*2-1,(y+.5)/size*2-1),a=Math.max(0,1-r);const i=(y*size+x)*4;data[i]=data[i+1]=data[i+2]=255;data[i+3]=Math.round(a*a*210);}
+    const texture=new T.DataTexture(data,size,size,T.RGBAFormat);texture.needsUpdate=true;texture.magFilter=texture.minFilter=T.LinearFilter;texture.userData={owner:'robot-glow',originalArt:true,byteBudget:4096};
+    const material=new T.SpriteMaterial({map:texture,color,transparent:true,opacity:.46,blending:T.AdditiveBlending,depthWrite:false,depthTest:true});material.userData.robotGlow=true;
+    for(const [x,y,z,r]of points){const halo=new T.Sprite(material);halo.name='robot-core-soft-glow';halo.position.set(x,y,z);halo.scale.set(r,r,1);group.add(halo);}
+  }
+  function colorRobotEnergy(model,info){model.traverse(p=>{for(const m of Array.isArray(p.material)?p.material:[p.material])if(m?.userData.robotEnergy){m.color.setHex(info.color);m.emissive?.setHex(info.color);m.emissiveIntensity=.74;}else if(m?.userData.robotGlow)m.color.setHex(info.color);});model.userData.robotLightTier=info.tier;model.userData.robotLightColor=info.color;}
   // Every articulated group owns its materials, so the existing scene disposer
   // can retire a changed fist or shell without invalidating another joint.
   function robotParts(T,sex,tier=1){
     const look={...ROBOT_LOOKS[sex==='female'?'female':'male']},master=MASTERWORK[tier];if(tier===2)look.metal=sex==='female'?0xe5dcc5:0x8b9da5;if(tier===3){look.metal=sex==='female'?0xe6e5d4:0xa3bbc5;look.trim=0xe3c18a;}if(master){look.metal=master.metal;look.trim=master.trim;}
     const group=new T.Group(),materials=new Map();
-    const mesh=(geometry,color,x=0,y=0,z=0,name='robot-plated-surface')=>{if(!materials.has(color)){const material=new T.MeshPhongMaterial({color,specular:0x82949a,shininess:42});material.userData.surface='metal';materials.set(color,material);}const part=new T.Mesh(geometry,materials.get(color));part.position.set(x,y,z);part.name=name;group.add(part);return part;};
+    const mesh=(geometry,color,x=0,y=0,z=0,name='robot-plated-surface')=>{if(!materials.has(color)){const energy=color===look.core,material=new T.MeshPhongMaterial({color,emissive:energy?color:0,emissiveIntensity:energy?.74:0,specular:0x82949a,shininess:42});material.userData.surface=energy?'robot-energy':'metal';material.userData.robotEnergy=energy;materials.set(color,material);}const part=new T.Mesh(geometry,materials.get(color));part.position.set(x,y,z);part.name=name;group.add(part);return part;};
     const soft=(w,h,d,c,x=0,y=0,z=0,name)=>{const geometry=new T.SphereGeometry(1,12,8);geometry.scale(w/2,h/2,d/2);return mesh(geometry,c,x,y,z,name);};
     const bevel=(w,h,d,c,x=0,y=0,z=0,name)=>mesh(root.CharacterSculpt?root.CharacterSculpt.roundedBox(T,w,h,d):new T.SphereGeometry(.15,8,6),c,x,y,z,name);
     const ring=(r,t,c,x=0,y=0,z=0,name='robot-inlaid-ring')=>mesh(new T.TorusGeometry(r,t,4,16),c,x,y,z,name);
@@ -78,7 +87,7 @@
         mesh(new T.TubeGeometry(new T.CatmullRomCurve3(pts),8,.009+step*.001,3,false),tier>=3?look.core:look.trim,0,0,0,'robot-rear-energy-pipe');
         if(tier>=2)rearPlate([[side*w*.08,.91],[side*w*.30,.96],[side*w*.29,.995],[side*w*.09,.94]],look.trim,'robot-rear-lower-armor-seam',.018);
       }
-      if(tier>=3){const radius=.058+step*.004,cy=1.035,hex=Array.from({length:female?8:6},(_,i)=>{const a=i*Math.PI*2/(female?8:6);return [Math.sin(a)*radius,cy+Math.cos(a)*radius];});rearPlate(hex,look.trim,'robot-rear-core-cover',.038);const cap=mesh(new T.CylinderGeometry(radius*.6,radius*.6,.018,female?8:6),look.dark,0,cy,rearZ(0,cy,.044),'robot-rear-core-seal');cap.rotation.x=Math.PI/2;}
+      if(tier>=3){const radius=.058+step*.004,cy=1.035,hex=Array.from({length:female?8:6},(_,i)=>{const a=i*Math.PI*2/(female?8:6);return [Math.sin(a)*radius,cy+Math.cos(a)*radius];});rearPlate(hex,look.trim,'robot-rear-core-cover',.038);const cap=mesh(new T.CylinderGeometry(radius*.6,radius*.6,.018,female?8:6),look.core,0,cy,rearZ(0,cy,.044),'robot-rear-core-seal');cap.rotation.x=Math.PI/2;}
       if(tier>=4)for(const side of [-1,1]){const cy=1.035;rearPlate([[side*.012,cy-.035],[side*.032,cy-.009],[side*.012,cy+.037],[side*.006,cy+.004]],look.core,'robot-rear-core-engraving',.061);rearPlate([[side*w*.065,1.29],[side*w*.20,1.33],[side*w*.29,1.29],[side*w*.28,1.26],[side*w*.20,1.29],[side*w*.065,1.265]],look.trim,'robot-rear-shoulder-crest',.025);}
       if(tier===5)rearPlate([[-w*.16,.885],[-w*.08,.86],[0,.895],[w*.08,.86],[w*.16,.885],[0,.925]],look.dark,'robot-rear-abyss-chevron',.025);
     }
@@ -92,6 +101,7 @@
       if(tier>=4){const crest=leg.mesh(new T.OctahedronGeometry(.035+step*.006),look.core,0,-.30,z+.089+step*.012,'robot-energy-knee-inlay');crest.scale.z=.42;}
       const plate=leg.finish();plate.name='robot-articulated-leg-armor';plate.userData.robotJoint=key;plate.position.set(side*(female?.15:.18),.63,0);finished.add(plate);finished.userData.sourceParts+=plate.userData.sourceParts;finished.userData.renderParts+=plate.userData.renderParts;
     }
+    if(baseKind==='robot_shell'){const step=tier-1,depth=.49+step*.06,points=[[0,1.115,depth*.5+.068,.38+step*.012]];if(tier>=3)points.push([0,1.035,-depth*.5-.070,.24+step*.01]);robotHalo(T,finished,points,ROBOT_CORE_COLORS[0]);}
     return finished;
   }
   function robotBase(T,sex='male',identity='hero'){
@@ -102,7 +112,8 @@
     chassis.soft(female?.59:.72,.55,.4,c.dark,0,1.05,0,'robot-base-chassis');
     for(const y of [.77,.84,.91]){const r=chassis.ring(female?.2:.245,.025,c.trim,0,y);r.rotation.x=Math.PI/2;r.scale.y=.72;}
     chassis.soft(female?.48:.57,.23,.29,c.dark,0,.69,-.005,'robot-round-base-pelvis');
-    const body=chassis.finish();m.add(body);
+    const bareCore=new T.SphereGeometry(1,8,6);bareCore.scale(.083,.083,.036);chassis.mesh(bareCore,c.core,0,1.09,.224,'robot-innate-core');const bareBezel=chassis.mesh(new T.TorusGeometry(.093,.017,4,8),c.trim,0,1.09,.223,'robot-innate-core-bezel');bareBezel.scale.z=.65;
+    const body=chassis.finish();robotHalo(T,body,[[0,1.09,.272,.34]],ROBOT_CORE_COLORS[0]);m.add(body);
     const head=new T.Group();head.position.y=female?1.665:1.72;m.add(head);
     const scalp=robotParts(T,sex),headPlate=scalp.soft(female?.53:.56,female?.58:.54,.5,c.metal,0,0,-.015,'robot-seamless-cranium');
     scalp.soft(female?.438:.46,.41,.107,c.face,0,-.025,.205,'robot-rounded-faceplate');
@@ -122,7 +133,7 @@
     Object.assign(m.userData,{...limbs,body,head,headMesh:headPlate,frontAxis:'+Z',sculpted:true,heroJob:'robot',heroSex:sex,heroShape:female?'rounded-machine':'heavy-machine',heroVariant:'robot-'+sex,heroIdentityStyle:identity==='hero'?'protagonist':'traveller',adultDesign:true,heroPieces:[],baseClothing:[body],robotLook:look.name});
     const eyes=[-1,1].map(side=>{const geo=new T.SphereGeometry(1,10,6);geo.scale(female?.037:.033,female?.046:.036,.018);const eye=new T.Mesh(geo,new T.MeshBasicMaterial({color:c.core}));eye.position.set(side*.116,.03,.266);head.add(eye);return eye;});
     if(root.CharacterFace){const face=root.CharacterFace.attach(T,m,head,eyes,0,true,{job:'robot',sex});face.baseEyeY=female?.92:.76;face.browY=.103;face.width=female?1.06:.95;for(const part of [...face.brows,face.mouth,...face.corners])part.material.color.setHex(c.dark);for(const cheek of face.cheeks)cheek.material.opacity=0;for(const white of face.whites)white.material.color.setHex(female?0xeff4db:0xd3edf0);}
-    root.CharacterMotion?.prepare(m);return m;
+    colorRobotEnergy(m,robotLight({}));root.CharacterMotion?.prepare(m);return m;
   }
   function batchGear(T,g){
     const parts=g.children.filter(o=>o.isMesh),buckets=new Map(),kept=new Set();
@@ -133,15 +144,18 @@
     const retiredGeometry=new Set(),retiredMaterial=new Set();g.userData.authoredParts=parts.map(p=>p.name).filter(Boolean);g.userData.sourceParts=parts.length;
     for(const [surface,list]of buckets){if(list.length<2)continue;const position=[],normal=[],color=[],uv=[];
       for(const p of list){p.updateMatrix();const geo=p.geometry.index?p.geometry.toNonIndexed():p.geometry.clone();geo.applyMatrix4(p.matrix);const xyz=geo.attributes.position,norm=geo.attributes.normal,c=p.material.color;
-        for(let i=0;i<xyz.count;i++){position.push(xyz.getX(i),xyz.getY(i),xyz.getZ(i));normal.push(norm.getX(i),norm.getY(i),norm.getZ(i));uv.push(geo.attributes.uv?.getX(i)||0,geo.attributes.uv?.getY(i)||0);const shade=.96+.04*Math.max(-1,Math.min(1,norm.getY(i)));color.push(c.r*shade,c.g*shade,c.b*shade);}
+        for(let i=0;i<xyz.count;i++){position.push(xyz.getX(i),xyz.getY(i),xyz.getZ(i));normal.push(norm.getX(i),norm.getY(i),norm.getZ(i));uv.push(geo.attributes.uv?.getX(i)||0,geo.attributes.uv?.getY(i)||0);const energy=p.material.userData.robotEnergy,shade=.96+.04*Math.max(-1,Math.min(1,norm.getY(i)));color.push(energy?1:c.r*shade,energy?1:c.g*shade,energy?1:c.b*shade);}
         geo.dispose();g.remove(p);retiredGeometry.add(p.geometry);retiredMaterial.add(p.material);
       }
       const geo=new T.BufferGeometry();geo.setAttribute('position',new T.Float32BufferAttribute(position,3));geo.setAttribute('normal',new T.Float32BufferAttribute(normal,3));geo.setAttribute('color',new T.Float32BufferAttribute(color,3));geo.setAttribute('uv',new T.Float32BufferAttribute(uv,2));geo.computeBoundingSphere();
-      const material=list[0].material.clone();material.color.setHex(0xffffff);material.vertexColors=true;const m=new T.Mesh(geo,material);m.name='equipment-'+surface+'-batch';m.userData.staticBatch=true;g.add(m);
+      const material=list[0].material.clone();if(!material.userData.robotEnergy)material.color.setHex(0xffffff);material.vertexColors=true;const m=new T.Mesh(geo,material);m.name='equipment-'+surface+'-batch';m.userData.staticBatch=true;g.add(m);
     }
     const liveGeometry=new Set(g.children.map(p=>p.geometry)),liveMaterial=new Set(g.children.map(p=>p.material));for(const x of retiredGeometry)if(!liveGeometry.has(x))x.dispose();for(const x of retiredMaterial)if(!liveMaterial.has(x))x.dispose();g.userData.renderParts=g.children.length;return g;
   }
   function gear(T,kind,appearance={}){
+    if(H.GEAR[kind]?.baseKind==='robot_core'){
+      const tier=H.GEAR[kind].tier,p=robotParts(T,appearance.sex,tier);p.look.core=ROBOT_CORE_COLORS[tier-1];const frame=p.mesh(new T.CylinderGeometry(.13+tier*.005,.13+tier*.005,.10+tier*.004,6+tier*2),p.look.trim,0,0,0,'robot-core-casing');frame.rotation.x=Math.PI/2;const stone=p.mesh(new T.OctahedronGeometry(.088+tier*.006),p.look.core,0,0,.076,'robot-core-crystal');stone.scale.z=.68;p.ring(.076+tier*.006,.012,p.look.dark,0,0,.068,'robot-core-socket');for(const side of [-1,1])p.bevel(.048,.037,.035,p.look.dark,side*.13,0,.023,'robot-core-coupling');const g=p.finish();g.name='hero-gear-'+kind;Object.assign(g.userData,{tier,baseKind:'robot_core',wearVariant:appearance.sex||'male',adultDesign:true,detailEdition:1});return g;
+    }
     if((H.GEAR[kind]?.baseKind||kind)==='robot_shell'||(H.GEAR[kind]?.baseKind||kind)==='robot_fists')return robotGear(T,kind,appearance,H.GEAR[kind]);
     const g=new T.Group(),definition=H.GEAR[kind],tier=definition?.tier||1,female=appearance.sex==='female',job=appearance.job||definition?.jobs?.[0]||'swordsman',look=style(job,female?'female':'male'),master=MASTERWORK[tier],atlas=root.EquipmentSurfaces?.create(T,{tier,job,kind,sex:female?'female':'male'},root.document)||null;g.name='hero-gear-'+kind;Object.assign(g.userData,{tier,baseKind:definition?.baseKind||kind,wearVariant:female?'female':'male',adultDesign:true,surfaceAtlasSize:atlas?128:0,detailEdition:2});kind=g.userData.baseKind;const materials=new Map();
     // Higher grades retain the fitted adult silhouette. Their cloth/metal
@@ -338,7 +352,7 @@
     return '<svg class="hero-portrait" viewBox="0 0 96 112" role="img" aria-label="'+H.JOBS[job].name+' · 成年'+(female?'女性':'男性')+' · '+s.description+'"><rect x="2" y="2" width="92" height="108" rx="20" fill="#1b333d"/>'+hair+ears+'<path d="'+face+'" fill="'+hex(s.skin)+'"/><path d="M'+(female?'19':'12')+' 110V92q0-20 '+(female?'29':'36')+'-20t'+(female?'29':'36')+' 20v18" fill="'+hex(s.cloak)+'"/><path d="M27 32q17-28 43-4l-16 7-11-8-16 16Z" fill="'+hex(s.hair)+'"/><path d="M30 42h12m12 0h12" stroke="'+hex(s.hair)+'" stroke-width="'+(female?2:3)+'" stroke-linecap="round"/><ellipse cx="36" cy="49" rx="3" ry="4" fill="'+hex(s.eyes)+'"/><ellipse cx="60" cy="49" rx="3" ry="4" fill="'+hex(s.eyes)+'"/><path d="m48 49-3 8h5m-9 7q7 4 14 0" fill="none" stroke="'+(female?'#aa6672':'#936f60')+'" stroke-width="2" stroke-linecap="round"/>'+braids+(!female&&['chef','mage','smith'].includes(job)?'<path d="m34 65 14 4 14-4-5 11H39Z" fill="'+hex(s.hair)+'"/>':'')+'<path d="M'+(female?'32 83 48 98 64 83':'27 85h42m-33 0 12 16 12-16')+'" fill="none" stroke="'+hex(s.accent)+'" stroke-width="3"/></svg>';
   }
   function poseRobotLegArmor(model){if(model.userData.heroJob!=='robot')return;for(const shell of model.userData.heroPieces||[])if(shell.userData.baseKind==='robot_shell')for(const plate of shell.children){const joint=model.userData[plate.userData.robotJoint];if(joint){plate.position.copy(joint.position);plate.quaternion.copy(joint.quaternion);plate.scale.copy(joint.scale);}}}
-  function dress(T,model,equipment,dispose,{showHelmet=true}={}){equipment=Object.fromEntries(Object.entries(equipment).map(([slot,g])=>[slot,g?.durability===0?null:g]));const appearance={job:model.userData.heroJob,sex:model.userData.heroSex},signature=(appearance.job||'')+'|'+(appearance.sex||'male')+'|'+showHelmet+'|'+Object.values(equipment).map(g=>g?.kind||'-').join('|');if(model.userData.heroDress===signature)return;
+  function dress(T,model,equipment,dispose,{showHelmet=true}={}){const appearance={job:model.userData.heroJob,sex:model.userData.heroSex},info=appearance.job==='robot'?robotLight(equipment):null;equipment=Object.fromEntries(Object.entries(equipment).filter(([slot,g])=>!['core1','core2'].includes(slot)&&g?.slot!=='core').map(([slot,g])=>[slot,g?.durability===0?null:g]));const geometrySignature=(appearance.job||'')+'|'+(appearance.sex||'male')+'|'+showHelmet+'|'+Object.values(equipment).map(g=>g?.kind||'-').join('|'),signature=geometrySignature+(info?'|core:'+info.tier:'');if(model.userData.heroDress===signature)return;if(model.userData.heroDressGeometry===geometrySignature){if(info)colorRobotEnergy(model,info);model.userData.heroDress=signature;return;}
     for(const p of model.userData.heroPieces||[]){p.parent?.remove(p);dispose(p);}const pieces=[];
     for(const item of Object.values(equipment).filter(g=>g&&(g.slot!=='helmet'||showHelmet))){const piece=gear(T,item.kind,appearance),slot=item.slot;pieces.push(piece);
       const baseKind=H.GEAR[item.kind].baseKind;
@@ -349,8 +363,8 @@
     // Equipment owns the torso/waist silhouette; old uniform trim must never
     // protrude from a slimmer robe or female armor. Broken/removed armor restores it.
     for(const p of model.userData.baseClothing||[])p.visible=!equipment.armor;
-    Object.assign(model.userData,{heroDress:signature,heroPieces:pieces,heroWeapon:H.GEAR[equipment.weapon?.kind]?.baseKind,heroWeaponKind:equipment.weapon?.kind,hasWeapon:!!equipment.weapon,hasShield:!!equipment.shield});
-    if(appearance.job==='robot'){model.userData.heroWeapon='robot_fists';model.userData.hasShield=false;for(const side of ['armR','armL'])if(model.userData[side+'BareFist'])model.userData[side+'BareFist'].visible=!equipment.weapon;poseRobotLegArmor(model);}
+    Object.assign(model.userData,{heroDress:signature,heroDressGeometry:geometrySignature,heroPieces:pieces,heroWeapon:H.GEAR[equipment.weapon?.kind]?.baseKind,heroWeaponKind:equipment.weapon?.kind,hasWeapon:!!equipment.weapon,hasShield:!!equipment.shield});
+    if(appearance.job==='robot'){model.userData.heroWeapon='robot_fists';model.userData.hasShield=false;for(const side of ['armR','armL'])if(model.userData[side+'BareFist'])model.userData[side+'BareFist'].visible=!equipment.weapon;poseRobotLegArmor(model);colorRobotEnergy(model,info);}
   }
   function pose(model,remaining,interval,fp=false,dt=0){const right=model.userData.armR,left=model.userData.armL,kind=model.userData.heroWeapon;if(!right||!left)return;
     if(root.TowerCombatMotion){
@@ -377,5 +391,5 @@
       if(p.userData.baseKind===kind&&p.parent!==model){const phase=p.parent===left?swing*.8:swing;e.set(.25+1.35*phase,.16*phase,.12-.3*phase);q.setFromEuler(e);p.quaternion.copy(p.parent.quaternion).invert().multiply(q);}
     }
   }
-  root.TowerHeroVisuals={gear,STYLES,VARIANTS,ROBOT_LOOKS,style,base,portrait,dress,pose};
+  root.TowerHeroVisuals={gear,STYLES,VARIANTS,ROBOT_LOOKS,ROBOT_CORE_COLORS,syncRobotLight:colorRobotEnergy,style,base,portrait,dress,pose};
 })(globalThis);

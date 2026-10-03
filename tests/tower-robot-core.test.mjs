@@ -13,9 +13,9 @@ test('robot has six active/five passive skills, first-rank body +5 then +5 per r
   const r=owns(fresh(),'robot_body');for(let l=1;l<=10;l++){H.state(r).level=l;assert.equal(H.maxHp(r),60+(l-1)*3+5*(l>=10?6:Math.min(5,l)));}
 });
 test('five fixed part tiers are gated, normal pools exclude parts, ordinary gear cannot replace or detach them',()=>{
-  assert.equal(Object.keys(R.GEAR).length,10);for(const base of ['robot_fists','robot_shell'])for(let tier=1;tier<=5;tier++){const d=R.GEAR[R.kind(base,tier)],g=C.createGear(d.kind,99,123,'fixed');assert.equal(g.maxDurability,d.maxDurability);assert.deepEqual(C.validateGear(g),g);assert.equal(d.requiredLevel,[1,3,5,8,10][tier-1]);for(const key of ['defense','maxDurability','bonus']){const bad={...g,[key]:g[key]+1};assert.equal(C.validateGear(bad),null);}}
+  assert.equal(Object.keys(R.GEAR).filter(R.isPart).length,10);assert.equal(Object.keys(R.CORES).length,5);for(const base of ['robot_fists','robot_shell'])for(let tier=1;tier<=5;tier++){const d=R.GEAR[R.kind(base,tier)],g=C.createGear(d.kind,99,123,'fixed');assert.equal(g.maxDurability,d.maxDurability);assert.deepEqual(C.validateGear(g),g);assert.equal(d.requiredLevel,[1,3,5,8,10][tier-1]);for(const key of ['defense','maxDurability','bonus']){const bad={...g,[key]:g[key]+1};assert.equal(C.validateGear(bad),null);}}
   const r=fresh();assert.ok(!H.gearPool(-50).some(R.isPart));assert.equal(r.equipment.helmet,null);assert.equal(r.equipment.shield,null);assert.equal(H.canEquip(r,'hero',C.createGear('heavy_armor',99,r.seed,'wrong')),false);assert.equal(H.unequip(r,'hero','weapon').ok,false);assert.equal(H.equip(r,'hero',r.equipment.weapon.id).ok,false);
-  r.equipment.weapon.durability=0;r.equipment.armor.durability=0;assert.equal(H.stats(r).damage,3);assert.equal(H.stats(r).armor,4);assert.ok(C.validateSave(r));
+  r.equipment.weapon.durability=0;r.equipment.armor.durability=0;r.equipment.core1.durability=0;assert.equal(H.stats(r).damage,3);assert.equal(H.stats(r).armor,4);assert.ok(C.validateSave(r));
 });
 test('ordinary punching misses are free, every four real basic hits wear once, skills wear once per cast',()=>{
   let r=floor(owns(fresh(),'shoulder_quake'),1),w=r.equipment.weapon.durability;assert.equal(H.strike(r,'not-a-monster').ok,false);assert.equal(r.equipment.weapon.durability,w);

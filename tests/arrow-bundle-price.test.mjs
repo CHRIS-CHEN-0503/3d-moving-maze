@@ -7,7 +7,8 @@ test('arrow bundle prices are integer coins, ten arrows for one coin; other supp
   for(const [n,cost]of [[1,1],[4,1],[10,1],[11,2],[20,2],[99,10],[100,10],[3000,300]])assert.equal(C.supplyPrice('arrow',n),cost);
   for(const n of [0,-1,3001,1.5,NaN])assert.equal(C.supplyPrice('arrow',n),null);
   assert.equal(C.supplyPrice('coin'),null);assert.equal(C.supplyPrice('__proto__'),null);
-  for(const [id,item]of Object.entries(C.ITEMS).filter(([id])=>!['arrow','coin'].includes(id)))assert.equal(C.supplyPrice(id,3),item.buyPrice*3);
+  for(const [id,item]of Object.entries(C.ITEMS).filter(([id,item])=>!['arrow','coin'].includes(id)&&item.buyPrice>0))assert.equal(C.supplyPrice(id,3),item.buyPrice*3);
+  for(const id of ['power_starlight','power_sunheart'])assert.equal(C.supplyPrice(id,3),null,'higher-grade fuel is not sold');
 });
 test('merchant arrow bundle and nearly-full top-up use the same quote and persist without fractions',()=>{
   let r=fresh();r.coins=2;r.bag.arrow=86;const shop=E.merchantOffers(r.floor,r.seed,true).find(m=>m.id==='suHe');

@@ -22,6 +22,32 @@ try{
   await page.locator('#heroNameInput').fill('交易外觀驗證');await page.locator('[data-tower="hero-sex"][data-item="female"]').tap();await page.locator('[data-tower="profession"][data-item="'+job+'"]').tap();assert.equal(await page.locator('.hero-skill-list article').count(),5);await page.locator('[data-tower="hero-create-start"]').tap();await close();await page.waitForFunction(()=>TowerMode.active&&!TowerMode.paused&&G.running);
   const snapshot=()=>page.evaluate(()=>{const r=TowerCore.validateSave(JSON.parse(localStorage.getItem('maze3d_tower_v1')));return {valid:!!r,floor:r.floor,seed:r.seed,job:r.party.profession,sex:r.party.sex,skills:r.party.loadouts.actors.hero.skills,gear:Object.values(r.equipment).filter(Boolean).map(g=>({kind:g.kind,max:g.maxDurability}))};});
   const first=await snapshot();assert.ok(first.valid);assert.equal(first.floor,99);assert.equal(first.job,job);assert.equal(first.sex,'female');assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth),width);await page.screenshot({path:out+'/'+width+'-story.png'});
+  const rosterGlyph=page.locator('#heroTeamBar button[data-hero-switch="hero"] > svg');
+  assert.equal(await rosterGlyph.getAttribute('class'),'party-glyph',job+' uses compact profession styling');
+  const glyphBox=await rosterGlyph.boundingBox(),glyphSize=height<=500?20:26;
+  assert.equal(glyphBox.width,glyphSize,job+' icon width');assert.equal(glyphBox.height,glyphSize,job+' icon height');
+  if(job==='robot'){
+    report.robotCardLayouts=[];
+    for(const viewport of [{width:844,height:390},{width:568,height:320},{width:1440,height:900}]){
+      await page.setViewportSize(viewport);await page.waitForTimeout(250);
+      const layout=await page.locator('#heroTeamBar button[data-hero-switch="hero"]').evaluate(b=>{
+        const box=e=>{const r=e.getBoundingClientRect();return {x:r.x,y:r.y,width:r.width,height:r.height,right:r.right,bottom:r.bottom};};
+        return {card:box(b),glyph:box(b.querySelector('svg')),label:box(b.querySelector('span')),text:b.querySelector('span').textContent};
+      });
+      const size=viewport.height<=500?20:26;assert.equal(layout.glyph.width,size);assert.equal(layout.glyph.height,size);
+      assert.ok(layout.card.width>=44&&layout.card.height>=44,'keep the touch target');
+      assert.ok(layout.glyph.bottom<=layout.label.y+1,'icon does not overlap profession name');
+      assert.ok(layout.card.x>=0&&layout.card.y>=0&&layout.card.right<=viewport.width&&layout.card.bottom<=viewport.height,'card remains on screen');
+      assert.match(layout.text,/機器人/);report.robotCardLayouts.push({viewport,...layout});
+      await page.locator('#towerLeftHud').screenshot({path:out+'/'+viewport.width+'-robot-card.png'});
+    }
+    await page.setViewportSize({width,height});
+    const active=await page.evaluate(()=>JSON.parse(localStorage.getItem('maze3d_tower_v1')).party.loadouts.active);
+    await page.locator('#heroTeamBar button[data-hero-switch="hero"]').tap();await page.waitForTimeout(400);
+    assert.ok(await page.locator('#heroTactics').isVisible(),'compact card still opens strategies');
+    assert.equal(await page.evaluate(()=>JSON.parse(localStorage.getItem('maze3d_tower_v1')).party.loadouts.active),active);
+    await page.locator('#heroTactics header button').tap();
+  }
   await page.locator('#towerBagBtn').tap();assert.ok(await page.locator('#towerDialog').isVisible());await page.screenshot({path:out+'/'+width+'-equipment.png'});await close();
   await page.locator('#actionsToggle').tap();assert.equal(await page.locator('[data-audio-mix]').count(),2);await close();
   await home();await page.locator('#storyEntryBtn').tap();await page.locator('[data-tower="continue"]').tap();await close();await page.waitForFunction(()=>TowerMode.active&&!TowerMode.paused&&G.running);assert.deepEqual(await snapshot(),first,'reload preserves gear and progression');

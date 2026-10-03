@@ -22,7 +22,9 @@ function withGuard(strength) {
 
 test('six gear kinds have only three armor slots and one nonlethal weapon slot', () => {
   assert.deepEqual(Object.keys(C.GEAR).slice(0,6), ['helmet', 'armor', 'shield', 'bat', 'pan', 'staff']);
-  assert.equal(Object.keys(C.GEAR).length,96); // Six original pieces plus 18 modern kinds × five tiers.
+  assert.equal(Object.values(C.GEAR).filter(g=>!g.integrated).length,96); // Six original pieces plus 18 modern human kinds × five tiers.
+  assert.equal(Object.values(C.GEAR).filter(g=>g.integrated).length,10); // Fixed fists and shell × five tiers, not random equipment rolls.
+  assert.equal(Object.keys(C.GEAR).length,106);
   assert.deepEqual(Object.keys(fresh().equipment), ['helmet', 'armor', 'shield', 'weapon']);
   assert.deepEqual(['bat', 'pan', 'staff'].map(kind => C.GEAR[kind].stunSeconds), [15, 20, 10]);
   assert.deepEqual(['helmet', 'armor', 'shield'].map(kind => C.GEAR[kind].defense), [2, 4, 3]);
@@ -34,9 +36,10 @@ test('six gear kinds have only three armor slots and one nonlethal weapon slot',
 });
 
 test('normal equipment scales original 3..10 durability; enhanced rolls retain three tiers', () => {
+  const ordinaryKinds=Object.entries(C.GEAR).filter(([,g])=>!g.integrated).map(([kind])=>kind);assert.equal(ordinaryKinds.length,96);
   const ordinary = new Set(), deepBonus = new Set(), deepDurability = new Set();
   for (let seed = 1; seed <= 100; seed += 1) {
-    for (const kind of Object.keys(C.GEAR)) {
+    for (const kind of ordinaryKinds) {
       const plain = C.createGear(kind, 99, seed, 'supply');
       const mult=C.durabilityMultiplier(kind);ordinary.add(Math.round(plain.durability/mult));
       assert.deepEqual(C.createGear(kind, 99, seed, 'supply'), plain);

@@ -13,11 +13,19 @@ for(const asset of ['tower-cooperation-core','tower-cooperation-runtime','tower-
   assert.ok(html.includes(`src="story/${asset}.js?v=`),`缺少照明模組：${asset}`);
 }
 assert.ok(html.indexOf('src="story/tower-lighting-core.js')<html.indexOf('src="story/tower-party-core.js'),'照明規則必須先於隊伍規則載入');
+new vm.Script(await readFile(new URL('../story/tower-foraging.js',import.meta.url),'utf8'),{filename:'tower-foraging.js'});
+assert.ok(html.indexOf('src="story/tower-foraging.js')>=0&&html.indexOf('src="story/tower-foraging.js')<html.indexOf('src="story/tower-party-core.js'),'採集規則必須先於隊伍規則載入');
 assert.ok(html.indexOf('src="story/tower-lighting-runtime.js')<html.indexOf('src="story/tower-mode.js'),'照明畫面必須先於劇情引擎載入');
 assert.ok(html.indexOf('src="story/tower-underworld.js')<html.indexOf('src="story/tower-floor-lords.js'),'地下設定必須先於楼層主載入');
 assert.ok(html.indexOf('src="story/tower-ascension-catalog.js')<html.indexOf('src="story/tower-hero-growth.js'),'進階招式必須先於成長規則載入');
 assert.ok(html.indexOf('src="story/tower-gear-tiers.js')<html.indexOf('src="story/tower-heroes-core.js'),'裝備階級必須先於人物規則載入');
 assert.ok(html.indexOf('src="story/tower-heroes-core.js')<html.indexOf('src="story/tower-cooperation-core.js'),'連攜定義必須在技能規則之後載入');
+for(const name of ['tower-robot-core','tower-commission-cooking']){
+  new vm.Script(await readFile(new URL(`../story/${name}.js`,import.meta.url),'utf8'),{filename:name+'.js'});
+  assert.ok(html.includes(`src="story/${name}.js?v=`),`缺少劇情模組：${name}`);
+}
+assert.ok(html.indexOf('src="story/tower-robot-core.js')<html.indexOf('src="story/tower-heroes-core.js'),'機體規則必須先於職業資料載入');
+assert.ok(html.indexOf('src="story/tower-party-core.js')<html.indexOf('src="story/tower-commission-cooking.js')&&html.indexOf('src="story/tower-commission-cooking.js')<html.indexOf('src="story/tower-mode.js'),'委託料理必須在食譜之後、劇情引擎之前載入');
 assert.ok(html.indexOf('src="story/tower-cooperation-runtime.js')<html.indexOf('src="story/tower-mode.js'),'連攜控制必須先於劇情引擎載入');
 assert.ok(html.includes('story/tower-cooperation.css?v='),'連攜按鈕需要獨立且有限的版面');
 for(const asset of ['story-atlas-rules','story-atlas-items','story-atlas-cooperation','story-atlas']){

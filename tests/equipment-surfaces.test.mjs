@@ -16,7 +16,9 @@ function env(document=canvasDocument()){
 function resources(model){const maps=new Set(),materials=new Set(),geometries=new Set();model.traverse(o=>{if(!o.isMesh)return;geometries.add(o.geometry);materials.add(o.material);if(o.material.map)maps.add(o.material.map);});return {maps,materials,geometries};}
 test('one small original atlas covers metal, leather and fabric across all 180 gender/tier equipment variants',t=>{
   const e=env();let maxDraws=0,maxTriangles=0;
-  for(const kind of Object.keys(H.GEAR))for(const sex of ['male','female']){
+  // Integrated robots use flush native engraving, tested separately; these
+  // atlases remain unchanged for all ninety existing wearable equipment kinds.
+  for(const kind of Object.keys(H.GEAR).filter(kind=>!H.GEAR[kind].integrated))for(const sex of ['male','female']){
     const g=e.TowerHeroVisuals.gear(T,kind,{sex}),{maps}=resources(g);assert.equal(maps.size,1,kind+':'+sex);const map=[...maps][0];assert.equal(map.image.width,128);assert.equal(map.image.height,128);assert.equal(map.userData.equipmentOwned,true);assert.equal(map.userData.bytes,65536);assert.equal(map.userData.tier,H.GEAR[kind].tier);assert.equal(map.colorSpace,T.SRGBColorSpace);assert.equal(map.anisotropy,1);assert.ok(map.image.commands.length>200);let triangles=0;
     g.traverse(o=>{assert.ok(!o.isLight);if(!o.isMesh)return;triangles+=(o.geometry.index?.count||o.geometry.attributes.position.count)/3;assert.ok(!o.castShadow);const mat=o.material;if(!mat.map)return;assert.equal(mat.bumpMap,map);assert.ok(mat.bumpScale<=.006);const uv=o.geometry.attributes.uv,rect=A.REGIONS[mat.userData.surface];assert.ok(rect);assert.equal(uv.count,o.geometry.attributes.position.count);for(let i=0;i<uv.count;i++){assert.ok(Number.isFinite(uv.getX(i))&&Number.isFinite(uv.getY(i)));assert.ok(uv.getX(i)>=rect[0]-.000001&&uv.getX(i)<=rect[0]+rect[2]+.000001);assert.ok(uv.getY(i)>=rect[1]-.000001&&uv.getY(i)<=rect[1]+rect[3]+.000001);}});
     maxDraws=Math.max(maxDraws,g.children.length);maxTriangles=Math.max(maxTriangles,triangles);assert.ok(g.children.length<=8,kind+':'+sex);assert.ok(triangles<5000,kind+':'+sex);assert.equal(g.userData.detailEdition,2);e.disposeSceneObject(g);
@@ -25,7 +27,7 @@ test('one small original atlas covers metal, leather and fabric across all 180 g
 });
 test('all five grades have original finish detail and each job has a raised maker crest',()=>{
   const e=env(),signatures=[];for(let tier=1;tier<=5;tier++){const g=e.TowerHeroVisuals.gear(T,H.tierKind('heavy_armor',tier),{job:'smith',sex:'female'});signatures.push(JSON.stringify([...resources(g).maps][0].image.commands));assert.ok(g.userData.authoredParts.includes('profession-raised-heraldry')||g.userData.authoredParts.includes('female-leaf-crest'));}
-  assert.equal(new Set(signatures).size,5);const atlasSigns=[];for(const job of Object.keys(H.JOBS)){const g=e.TowerHeroVisuals.gear(T,'robe_t3',{job});atlasSigns.push(JSON.stringify([...resources(g).maps][0].image.commands));}assert.equal(new Set(atlasSigns).size,7);
+  assert.equal(new Set(signatures).size,5);const atlasSigns=[];for(const job of Object.keys(H.JOBS).filter(job=>job!=='robot')){const g=e.TowerHeroVisuals.gear(T,'robe_t3',{job});atlasSigns.push(JSON.stringify([...resources(g).maps][0].image.commands));}assert.equal(new Set(atlasSigns).size,7);
 });
 test('repeated dressing retains the current texture and disposes replaced atlases exactly once with the engine lifecycle',()=>{
   const e=env(),model=new T.Group();model.userData={heroJob:'scout',heroSex:'female',heroPieces:[],armR:new T.Group(),armL:new T.Group()};model.add(model.userData.armR,model.userData.armL);const equipment={helmet:null,armor:{kind:'light_armor',slot:'armor'},shield:null,weapon:{kind:'twin_daggers',slot:'weapon'}},seen=new Map(),textureDispose=T.Texture.prototype.dispose;

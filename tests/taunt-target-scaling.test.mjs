@@ -34,7 +34,7 @@ test('entering any puzzle rift drops tower targets and leaving restores only the
   run.expedition.active=null;assert.deepEqual(apply(run,monsters),['monster-11']);run.floor=89;assert.deepEqual(apply(run,monsters),['monster-0']);
 });
 test('repeated aura refreshes never reconstruct full monster specs, even when ticks replace the run object',()=>{
-  let {run}=fixture('dawn_breach');const monsters=crowd(run),sandbox={TowerCore:C,TowerPartyCore:{...P,monsterSpecs(){throw Error('full monster reconstruction is forbidden in aura refresh');}},TowerFloorLords:require('../story/tower-floor-lords.js'),TowerHeroGrowth:G,TowerAscensionCatalog:require('../story/tower-ascension-catalog.js'),TowerGearTiers:require('../story/tower-gear-tiers.js')};
+  let {run}=fixture('dawn_breach');const monsters=crowd(run),sandbox={TowerCore:C,TowerRobotCore:require('../story/tower-robot-core.js'),TowerPartyCore:{...P,monsterSpecs(){throw Error('full monster reconstruction is forbidden in aura refresh');}},TowerFloorLords:require('../story/tower-floor-lords.js'),TowerHeroGrowth:G,TowerAscensionCatalog:require('../story/tower-ascension-catalog.js'),TowerGearTiers:require('../story/tower-gear-tiers.js')};
   vm.createContext(sandbox);vm.runInContext(readFileSync(new URL('../story/tower-heroes-core.js',import.meta.url),'utf8'),sandbox);
   for(let frame=0;frame<120;frame++){run=structuredClone(run);const ids=sandbox.TowerHeroes.applyTaunt(run,'hero',{monsters,origin:{x:0,z:0},clear:()=>true,seconds:.35,retain:true});assert.equal(ids.length,1);}
   const source=readFileSync(new URL('../story/tower-heroes-core.js',import.meta.url),'utf8'),prune=source.slice(source.indexOf('function pruneTaunts'),source.indexOf('function setBuff'));

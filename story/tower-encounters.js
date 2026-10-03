@@ -132,6 +132,7 @@
   function merchantHandles(merchantId,gear){
     const rules=Object.hasOwn(MERCHANT_SERVICES,merchantId)?MERCHANT_SERVICES[merchantId]:null,kind=typeof gear==='string'?gear:gear?.kind,definition=core().GEAR[kind];
     if(!rules||!definition)return false;
+    if(definition.integrated)return merchantId==='tieLing';
     return definition.slot===rules.slot||definition.slot==='weapon'&&(rules.weaponKinds.includes(definition.baseKind||kind)||rules.legacyWeapons.includes(kind));
   }
   function serviceContext(run,merchantId){return run&&Object.hasOwn(MERCHANT_SERVICES,merchantId)&&merchant(run,merchantId)?{kind:'merchant',merchantId,floor:run.floor,seed:run.seed}:null;}

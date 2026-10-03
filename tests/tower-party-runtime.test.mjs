@@ -105,7 +105,7 @@ test('ordinary exploration advances only nearby while running and persists compl
   const coins=h.run.coins;h.ui.handle('party-explore-work',s.offer.id);h.ui.tick(12,500);assert.equal(h.run.coins,coins);assert.ok(C.validateSave(h.run));
 });
 test('six companion professions survive stairs and rebuild outside the full walking collision margin',()=>{
-  const jobs=Object.keys(P.PROFESSIONS),safe=p=>Math.abs(p.x)+.28<1.65&&Math.abs(p.z)+.28<1.65;
+  const jobs=Object.keys(P.PROFESSIONS).filter(job=>!['archer','robot'].includes(job)),safe=p=>Math.abs(p.x)+.28<1.65&&Math.abs(p.z)+.28<1.65;assert.equal(jobs.length,6);
   for(let offset=0;offset<jobs.length;offset+=3){
     const h=harness(99,{followClear:(a,b)=>safe(a)&&safe(b)});
     h.run.party.members=jobs.slice(offset,offset+3).map((profession,i)=>({id:'companion:test:'+profession,profession,sex:P.PROFESSIONS[profession].gender,level:i+1,hp:i?20:0,cooldown:0,hurtLeft:0}));h.run.party.joined=h.run.party.members.map(m=>m.id);

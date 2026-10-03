@@ -121,7 +121,7 @@
     starvein:{name:'星脈',description:'地下限定。法杖或法書每級增加 12% 法術傷害，並增加 5 個百分點的治療與輔助加成。',parts:6,coins:18,materialCost:{starore:2,crystalshard:1},modernOnly:true,underground:true,slots:['weapon'],types:['staff','book'],effects:{spellPct:.12,support:.05}},
     abyssward:{name:'鎮淵',description:'地下限定。每級在防禦減傷前抵銷 1 點怪物攻擊，全身最高 4 點；不抵銷陷阱或飢餓，仍至少承受 1 點原始攻擊。',parts:6,coins:18,materialCost:{abyssalloy:2,embercore:1},modernOnly:true,underground:true,slots:['helmet','armor','shield'],effects:{monsterFlat:1}},
   }).map(([id,t])=>[id,Object.freeze({...t,id,icon:'forge_'+id,maxLevel:2,materialCost:Object.freeze(t.materialCost),slots:Object.freeze(t.slots||['weapon','helmet','armor','shield']),...(t.types?{types:Object.freeze(t.types)}:{}),effects:Object.freeze(t.effects||{})})])));
-  function traitFits(trait,definition){const t=TRAITS[trait];return !!t&&!!definition&&t.slots.includes(definition.slot)&&(!t.types||t.types.includes(definition.type));}
+  function traitFits(trait,definition){const t=TRAITS[trait];return !!t&&!!definition&&!definition.integrated&&t.slots.includes(definition.slot)&&(!t.types||t.types.includes(definition.type));}
   function validateForge(value,slot,definition){if(value===undefined)return undefined;if(!value||!own(TRAITS,value.trait)||!integer(value.level,1,2)||!integer(value.reserve,0,value.trait==='durable'?value.level*2:0)||!TRAITS[value.trait].slots.includes(slot)||definition&&!traitFits(value.trait,definition))return null;return {trait:value.trait,level:value.level,reserve:value.reserve};}
   const traitPower=(gear,key)=>gear?.durability>0?(TRAITS[gear.forge?.trait]?.effects[key]||0)*(gear.forge?.level||0):0;
   const H=()=>typeof module==='object'&&module.exports?require('./tower-heroes-core.js'):globalThis.TowerHeroes;
@@ -161,13 +161,14 @@
   });}
   function dismantle(run,id,revision,service){return C().transaction(run,revision,n=>{
     if(!n.party)return {ok:false,message:'請先選擇冒險職業。'};const g=allGear(n).find(g=>g.id===id);if(!g)return {ok:false,message:'裝備已不在背包裡。'};
+    if(H().ROBOT?.isPart(g.kind))return {ok:false,message:'機殼與雙拳不能拆解，請使用機體強化。'};
     const access=serviceRule(n,g,service);if(!access.allowed)return {ok:false,message:access.reason};
     const value=salvageValue(g);if(n.party.journey.scrap+value>99)return {ok:false,message:'零件袋放不下，請先使用零件。'};
     n.party.journey.scrap+=value;n.gearBag=n.gearBag.filter(x=>x.id!==id);if(n.equipment[g.slot]?.id===id)n.equipment[g.slot]=null;if(n.party.loadouts)for(const id of H().ids(n)){const e=H().equipment(n,id);if(e[g.slot]?.id===g.id)e[g.slot]=null;}
     return {ok:true,message:`拆解${g.name}，獲得${value}份金屬零件。`};
   });}
   function forgeQuote(run,id,trait,service){
-    const t=own(TRAITS,trait)?TRAITS[trait]:null,g=run?.party?allGear(run).find(g=>g.id===id):null;if(!t||!g)return null;
+    const t=own(TRAITS,trait)?TRAITS[trait]:null,g=run?.party?allGear(run).find(g=>g.id===id):null;if(!t||!g||H().ROBOT?.isPart(g.kind))return null;
     const definition=C().GEAR[g.kind],level=(g.forge?.level||0)+1,discount=run.party.loadouts?H().teamPassive(run,'economy'):P().has(run,'smith')?50:0,parts=level*t.parts,rule=serviceRule(run,g,service),baseCoins=Math.ceil(level*t.coins*(1-discount/100)),coins=rule.merchant?Math.ceil(baseCoins*1.2):baseCoins;
     const materialCost=Object.fromEntries(Object.entries(t.materialCost).map(([key,count])=>[key,count*level]));
     const reason=!traitFits(trait,definition)?'這種特性不適用目前裝備。':t.modernOnly&&!run.party.loadouts?'此特性需要職業裝備系統。':t.underground&&!C().isUnderworld(run)?'地下探索開放後才能進行這種鍛造。':g.durability===0?'請先修復損壞裝備。':g.forge&&g.forge.trait!==trait?'每件裝備只能保留一種特性，不能改選。':level>2?'這件裝備的特性已達二級。':!rule.allowed?rule.reason:'';

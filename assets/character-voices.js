@@ -27,6 +27,13 @@
   });
   for(const [job,sexes]of Object.entries(specialties))for(const [gender,text]of Object.entries(sexes)){const id='character.'+job+'.'+gender+'.specialty';tracks[id]=Object.freeze({src:'./assets/voice/characters/'+job+'-'+gender+'-specialty.mp3',text,speaker:voices[job][gender],instruction:(gender==='male'?'成年男性，':'成年女性，')+'普通话自然清楚，正常语速，温暖自信，不要唱歌。',category:'character-bark'});}
   for(const gender of ['male','female']){const base=tracks['character.mage.'+gender+'.specialty'];tracks['character.mage.'+gender+'.specialty.hope']=Object.freeze({...base,src:'./assets/voice/characters/mage-'+gender+'-specialty-hope.mp3',text:'加油！有光的地方就有希望！'});}
+  // The new mechanical companion reuses existing, gender-matched recordings.
+  // Do not invent paths for clips that were never recorded or fall back to a
+  // different device's synthetic voice during battle.
+  for(const gender of ['male','female'])for(const event of events){
+    const source=tracks['character.smith.'+gender+'.'+event];
+    tracks['character.robot.'+gender+'.'+event]=Object.freeze({...source});
+  }
   function create(ctx){let clock=0,next=0;const played=new Map(),low=new Set();
     function say(event,id,{allowPaused=false}={}){const H=globalThis.TowerHeroes,run=ctx.run(),voice=ctx.voice||globalThis.GameVoice;if(!H?.enabled(run)||!H.ids(run).includes(id)||!voice||!allowPaused&&ctx.paused?.())return false;
       const key=id+':'+event,status=voice.status();if(!status.enabled||!status.supported||status.speaking||clock<next||clock<(played.get(key)||0))return false;

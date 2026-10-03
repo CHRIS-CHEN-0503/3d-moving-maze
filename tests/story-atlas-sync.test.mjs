@@ -22,7 +22,7 @@ function load(){
 
 test('reference page loads its real script order without starting timers, graphics, storage or network',()=>{
   const c=load();assert.equal(c.THREE,undefined);
-  assert.equal(c.StoryAtlasRules.build().jobs.length,7);
+  assert.equal(c.StoryAtlasRules.build().jobs.length,Object.keys(c.TowerHeroes.JOBS).length);assert.equal(c.StoryAtlasRules.build().jobs.length,8);
   assert.ok(c.StoryAtlasItems.records().length);
   assert.ok(c.StoryAtlasCooperation.records().length);
   assert.ok(sources.every(s=>!/^https?:/.test(s)));
@@ -61,7 +61,7 @@ test('atlas IDs and icons are complete and descriptions have no unresolved value
   const records=[...rules.entries,...items.map(r=>({...r,category:r.recipe?'cooking':'items'})),...cooperation];
   assert.equal(new Set(records.map(r=>r.category+':'+r.id)).size,records.length);
   for(const r of records){assert.ok(r.name);assert.ok(r.description);assert.doesNotMatch(JSON.stringify(r),/undefined|NaN/);}
-  assert.equal(records.length,313);
+  assert.equal(records.length,rules.entries.length+items.length+cooperation.length);assert.ok(records.some(record=>record.id==='robot'));assert.ok(records.some(record=>record.id==='robot_body'));
 });
 
 test('current game and read-only reference share the release version and accessible entry links',()=>{
@@ -69,7 +69,7 @@ test('current game and read-only reference share the release version and accessi
   assert.ok(index.includes("const GAME_VERSION='"+pkg.version+"'"));assert.ok(html.includes('v'+pkg.version+' 圖鑑'));
   assert.match(index,/href="docs\/職業裝備圖鑑.html"[^>]*rel="noopener"/);
   assert.match(readFileSync(resolve(base,'story/tower-mode.js'),'utf8'),/docs\/職業裝備圖鑑.html/);
-  for(const file of ['tower-cooperation-core.js','tower-cooperation-runtime.js','tower-forge-icons.js','tower-resource-icons.js','tower-materials.js']){
+  for(const file of ['tower-cooperation-core.js','tower-cooperation-runtime.js','tower-forge-icons.js','tower-resource-icons.js','tower-materials.js','tower-robot-core.js','tower-commission-cooking.js']){
     assert.ok(index.includes('story/'+file));assert.ok(html.includes('../story/'+file));
   }
 });

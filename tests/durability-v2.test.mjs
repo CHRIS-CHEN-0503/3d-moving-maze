@@ -4,7 +4,8 @@ import {createRequire} from 'node:module';
 const require=createRequire(import.meta.url),C=require('../story/story-core.js'),H=require('../story/tower-heroes-core.js'),P=require('../story/tower-party-core.js'),X=require('../story/tower-expedition-core.js');
 const fresh=(job='smith')=>H.enable(P.enable(C.newRun({seed:43}),job).run).run;
 test('all weapon and armor multipliers match category; legacy damaged items upgrade once without healing',()=>{
-  for(const [kind,def]of Object.entries(C.GEAR)){
+  const ordinary=Object.entries(C.GEAR).filter(([,def])=>!def.integrated);assert.equal(ordinary.length,96);
+  for(const [kind,def]of ordinary){
     const expected=def.slot==='weapon'||def.type==='heavy'||['helmet','armor','shield','round_shield','tower_shield'].includes(def.baseKind||kind)?20:40/3;
     assert.equal(C.durabilityMultiplier(kind),expected);
     const gear=C.createGear(kind,49,13,'migration'),price=C.gearPrice(gear),old={...gear,durability:2,maxDurability:Math.round(gear.maxDurability/expected)};delete old.durabilityVersion;

@@ -57,6 +57,12 @@
   branch('forest_echo','archer','passive','森影追獵',
     ['pursuit_volley','追獵三連矢','volley',true,360,30,'消耗3支箭，向前方最多三名敵人各射一箭，造成360%傷害，緩速35%、持續4秒。對已緩速敵人可接續森靈追擊。',{params:{slowSeconds:4,slowPower:.35},presentation:look('arrow','bow','bow',0x9ee6b4,0xe8fac9)}],
     ['forest_symphony','森影合奏',35,15,'森靈追擊的額外增傷提高35%；追獵三連矢的傷害提高35%、冷卻縮短15%。不增加射擊目標數，也不重複緩速。']);
+  branch('steel_meteor_fist','robot','active','巨拳突破',
+    ['explosive_fists','爆裂雙拳','robot_double',true,560,45,'雙拳連續轟擊同一名可見敵人，合計560%傷害；僅一次耐久消耗與擊退，不穿牆。',{preparation:1.3,params:{reach:3,maxTargets:1,knockback:1.2},presentation:look('twin_fist','metal','double_punch',0x8dddf6,0xffce83)}],
+    ['molten_drive','熔核動力',25,15,'鋼鐵隕拳、爆裂雙拳傷害提高25%、冷卻縮短15%；不增加目標數或控制時間。']);
+  branch('kinetic_core','robot','passive','蓄能守護',
+    ['mech_aid','機甲援護','mech_aid',false,35,55,'為自身提供35%最大生命護盾，並為附近指定隊友提供20%最大生命護盾；持續五分鐘，被打破提前消失，不疊加。',{params:{radius:4,shieldDuration:300,allyShield:20},presentation:look('shield','shield','core_aid',0x8adaeb,0xffdd99)}],
+    ['core_resonance','護核共振',30,20,'動能護核與機甲援護的護盾、反擊傷害提高30%，触發間隔與冷卻縮短20%；不增加儲能、目標數或持續時間。']);
   const SKILLS=Object.fromEntries(actives.map(s=>[s.id,s])),PASSIVES=Object.fromEntries(passives.map(s=>[s.id,s]));
   function forJob(job){return BY_JOB[job]?Object.values(BY_JOB[job]):[];}
   function earned(base,level){return (BRANCHES[base]?.steps||[]).filter(step=>Number.isFinite(level)&&level>=step.level).map(step=>SKILLS[step.id]||PASSIVES[step.id]);}

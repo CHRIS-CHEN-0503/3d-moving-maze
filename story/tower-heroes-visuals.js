@@ -6,6 +6,124 @@
     4:Object.freeze({metal:0xbfc5df,trim:0xe3dcec,wood:0x493953,dark:0x342b48,gem:0xc6a4f1,cloth:0x5c527f}),
     5:Object.freeze({metal:0xd2e7e1,trim:0xf0d298,wood:0x2c514b,dark:0x1c383e,gem:0x95eedb,cloth:0x2f615c}),
   });
+  const ROBOT_LOOKS=Object.freeze({male:Object.freeze({metal:0x687c88,trim:0xc1a474,dark:0x263a45,face:0xb7c6c9,core:0x72dce9,name:'鐵衡'}),female:Object.freeze({metal:0xdad5bd,trim:0xbb9663,dark:0x4b554c,face:0xeee5c9,core:0x91dfa8,name:'鈴芯'})});
+  // Every articulated group owns its materials, so the existing scene disposer
+  // can retire a changed fist or shell without invalidating another joint.
+  function robotParts(T,sex,tier=1){
+    const look={...ROBOT_LOOKS[sex==='female'?'female':'male']},master=MASTERWORK[tier];if(tier===2)look.metal=sex==='female'?0xe5dcc5:0x8b9da5;if(tier===3){look.metal=sex==='female'?0xe6e5d4:0xa3bbc5;look.trim=0xe3c18a;}if(master){look.metal=master.metal;look.trim=master.trim;}
+    const group=new T.Group(),materials=new Map();
+    const mesh=(geometry,color,x=0,y=0,z=0,name='robot-plated-surface')=>{if(!materials.has(color)){const material=new T.MeshPhongMaterial({color,specular:0x82949a,shininess:42});material.userData.surface='metal';materials.set(color,material);}const part=new T.Mesh(geometry,materials.get(color));part.position.set(x,y,z);part.name=name;group.add(part);return part;};
+    const soft=(w,h,d,c,x=0,y=0,z=0,name)=>{const geometry=new T.SphereGeometry(1,12,8);geometry.scale(w/2,h/2,d/2);return mesh(geometry,c,x,y,z,name);};
+    const bevel=(w,h,d,c,x=0,y=0,z=0,name)=>mesh(root.CharacterSculpt?root.CharacterSculpt.roundedBox(T,w,h,d):new T.SphereGeometry(.15,8,6),c,x,y,z,name);
+    const ring=(r,t,c,x=0,y=0,z=0,name='robot-inlaid-ring')=>mesh(new T.TorusGeometry(r,t,4,16),c,x,y,z,name);
+    const scroll=(points,x,y,z,r=.008)=>mesh(new T.TubeGeometry(new T.CatmullRomCurve3(points.map(p=>new T.Vector3(...p))),points.length*3,r,4,false),look.trim,x,y,z,'robot-flush-engraving');
+    return {group,look,mesh,soft,bevel,ring,scroll,finish:()=>batchGear(T,group)};
+  }
+  function robotGear(T,kind,appearance={},definition={}){
+    const sex=appearance.sex==='female'?'female':'male',female=sex==='female',tier=definition.tier||1,baseKind=definition.baseKind||kind,p=robotParts(T,sex,tier),{look,soft,bevel,ring,scroll,mesh}=p,g=p.group;
+    g.name='hero-gear-'+kind;Object.assign(g.userData,{tier,baseKind,wearVariant:sex,adultDesign:true,integratedRobotPart:true,detailEdition:3});
+    if(baseKind==='robot_fists'){
+      // Knuckle pads face +Z. No handle, shield or backwards striking face.
+      g.userData.contact={kind:'knuckle-face',center:[0,0,.16],normal:[0,0,1],axis:[0,0,1],grip:[0,0,0]};
+      const gradeSpan=1+(tier-1)*.09;
+      soft((female?.27:.32)*gradeSpan,.24,.28,look.dark,0,0,0,'robot-palm-chassis');
+      for(let i=0;i<3;i++){const x=(i-1)*(female?.077:.089)*gradeSpan;bevel(.08*gradeSpan,.145,.1,look.metal,x,.025,.125,'robot-forward-knuckle');soft(.076*gradeSpan,.052,.025,look.trim,x,.075,.18,'robot-knuckle-inlay');}
+      soft(.085*gradeSpan,.14,.125,look.metal,.135*gradeSpan,-.055,.055,'robot-opposed-thumb');
+      const cuff=ring((female?.145:.167)*gradeSpan,.023+tier*.001,look.trim,0,.105,-.065,'robot-forged-wrist');cuff.rotation.x=Math.PI/2;
+      scroll([[-.11,0,0],[0,.07,.01],[.11,0,0]],0,-.07,.155,.007);
+      if(tier>1)soft(.045,.045,.018,look.core,0,-.01,.191,'robot-tier-core');
+      if(tier>=3)for(const side of [-1,1]){const rail=bevel(.065,.17,.12,look.trim,side*.145*gradeSpan,.02,.02,'robot-layered-punch-rail');rail.rotation.z=-side*.18;}
+      if(tier>=4)scroll([[-.11,.02,0],[-.06,-.035,0],[0,.015,.01],[.06,-.035,0],[.11,.02,0]],0,-.10,.157,.009);
+      const rearSocket=mesh(new T.CylinderGeometry(.052+tier*.004,.052+tier*.004,.018,8),look.trim,0,.018,-.144,'robot-fist-rear-coupling');rearSocket.rotation.x=Math.PI/2;
+      if(tier>=3)for(const side of [-1,1]){const slit=mesh(new T.BoxGeometry(.018,.09,.012),look.dark,side*.076*gradeSpan,.013,-.141,'robot-fist-rear-vent');slit.rotation.z=side*.25;}
+      if(tier>=4){const pin=mesh(new T.CylinderGeometry(.022,.022,.022,8),look.core,0,.018,-.151,'robot-fist-rear-power-pin');pin.rotation.x=Math.PI/2;}
+    }else{
+      const step=tier-1,w=(female?.66:.8)+step*(female?.062:.075),h=(female?.61:.64)+step*.018,y=1.08,depth=.49+step*.06;
+      const body=soft(w,h,depth,look.metal,0,y,0,'robot-continuous-chest-shell');body.userData.robotShell=true;
+      for(const side of [-1,1]){
+        const shoulderX=side*((female?.365:.455)+step*.018),shoulderW=(female?.28:.35)+step*.062;
+        soft(shoulderW,.25+step*.055,.42+step*.052,look.metal,shoulderX,1.33+step*.018,-.015,'robot-overlapping-pauldron');
+        if(tier>=2){const plate=soft(shoulderW*.92,.11+step*.022,.38+step*.046,look.trim,shoulderX,1.39+step*.025,.055,'robot-layered-shoulder-rim');plate.rotation.z=-side*.17;}
+        scroll([[side*.02,.17,0],[side*.16,.16,-.015],[side*(w*.35),.08,-.04],[side*(w*.32),-.12,-.045],[side*.07,-.19,-.012]],0,y,depth*.47);
+        soft(.075+step*.013,.24,.085+step*.01,look.trim,side*(.26+step*.02),.78,.095,'robot-contoured-waist-fillet');
+        for(const a of [0,1])soft(.024,.024,.014,look.trim,side*(.22-a*.05),1.23-a*.24,depth*.44,'robot-forged-rivet');
+        if(tier>=4){const guard=bevel(shoulderW*.63,.18+step*.014,.15,look.dark,shoulderX,1.40+step*.031,.2+step*.015,'robot-fortress-shoulder-guard');guard.rotation.z=-side*.12;scroll([[side*.02,.06,0],[side*.08,.0,.02],[0,-.07,.025],[-side*.08,0,.02],[-side*.02,.06,0]],shoulderX,1.42+step*.023,.28+step*.012,.009);}
+      }
+      const coreZ=depth*.5+.015,bezel=ring((female?.111:.13)+step*.011,.024+step*.003,look.trim,0,1.115,coreZ,'robot-core-bezel');bezel.scale.z=.7;
+      soft((female?.15:.18)+step*.018,(female?.15:.18)+step*.018,.075+step*.008,look.core,0,1.115,coreZ+.017,'robot-energy-core');
+      if(tier>=2)for(const side of [-1,1])scroll([[side*.06,.04,0],[side*.15,.075,-.012],[side*(w*.36),.02,-.03]],0,1.25,depth*.47,.008);
+      // One rounded hip plate follows the pelvis, no square rear belt block.
+      soft((female?.5:.61)+step*.026,.23+step*.012,.34+step*.022,look.metal,0,.72,-.005,'robot-rounded-pelvis');
+      scroll([[-.15,0,0],[0,-.09,.025],[.15,0,0]],0,.765,.166);
+      if(tier>=3){for(const side of [-1,1])scroll([[side*.12,.07,0],[side*(w*.4),0,-.03],[side*(w*.32),-.12,-.04]],0,y,depth*.50,.008);}
+      if(tier>=4)for(const side of [-1,1]){const jewel=mesh(new T.OctahedronGeometry(.037+step*.005),look.core,side*.21,1.25,depth*.46,'robot-masterwork-inlay');jewel.scale.z=.45;}
+      if(tier===5){const keel=bevel(.15,.34,.12,look.dark,0,.94,depth*.46,'robot-abyss-heart-guard');keel.rotation.z=Math.PI/4;scroll([[-.06,.14,0],[0,.09,.025],[.06,.14,0],[0,-.09,.025],[-.06,.14,0]],0,.98,depth*.53,.011);}
+      // Flush, low-face rear engineering follows the ellipsoid instead of
+      // hanging a square backpack off the pelvis. It shares the shell batch.
+      const rearZ=(x,y,lift=0)=>-depth*.5*Math.sqrt(Math.max(.07,1-(x/(w*.5))**2-((y-1.08)/(h*.5))**2))-lift;
+      const rearPlate=(points,color,name,lift=.014)=>{
+        if(points.reduce((a,p,i)=>{const q=points[(i+1)%points.length];return a+p[0]*q[1]-q[0]*p[1];},0)<0)points=points.slice().reverse();
+        const cx=points.reduce((n,a)=>n+a[0],0)/points.length,cy=points.reduce((n,a)=>n+a[1],0)/points.length,positions=[],vertices=points.map(([x,y])=>[x,y,rearZ(x,y,.002)]),inset=points.map(([x,y])=>{x=cx+(x-cx)*.82;y=cy+(y-cy)*.82;return [x,y,rearZ(x,y,lift)];}),center=[cx,cy,rearZ(cx,cy,lift)];
+        const tri=(a,b,c)=>positions.push(...a,...b,...c);
+        for(let i=0;i<points.length;i++){const j=(i+1)%points.length;tri(center,inset[j],inset[i]);tri(inset[i],inset[j],vertices[j]);tri(inset[i],vertices[j],vertices[i]);}
+        const geo=new T.BufferGeometry();geo.setAttribute('position',new T.Float32BufferAttribute(positions,3));geo.computeVertexNormals();return mesh(geo,color,0,0,0,name);
+      };
+      const spineCount=3+Math.floor(step/2),spineW=(female?.085:.10)+step*.006;
+      for(let i=0;i<spineCount;i++){const sy=.96+i*(.27/(spineCount-1)),sw=spineW*(i===0?.78:1);rearPlate([[-sw*.5,sy-.038],[0,sy-.052],[sw*.5,sy-.038],[sw*.5,sy+.034],[0,sy+.044],[-sw*.5,sy+.034]],i%2?look.trim:look.dark,'robot-rear-spine-segment',.025);}
+      for(const side of [-1,1]){
+        const vx=side*w*.245,vw=w*(female?.146:.155),vy=1.12,vh=.23+step*.012;
+        rearPlate([[vx-vw*.5,vy-vh*.5],[vx+vw*.5,vy-vh*.5],[vx+vw*.5,vy+vh*.5],[vx-vw*.5,vy+vh*.5]],look.dark,'robot-rear-vent-recess',.007);
+        for(let i=0;i<3+Math.floor(step/2);i++){const sy=vy-vh*.36+i*vh*.72/(2+Math.floor(step/2)),slant=side*(female?.018:.011);rearPlate([[vx-vw*.43,sy-.007-slant],[vx+vw*.43,sy-.007+slant],[vx+vw*.43,sy+.007+slant],[vx-vw*.43,sy+.007-slant]],look.trim,'robot-rear-cooling-slat',.021);}
+        const pts=[[side*w*.08,1.31],[side*w*.255,1.28],[side*w*.35,1.10],[side*w*.22,.94]].map(([x,y])=>new T.Vector3(x,y,rearZ(x,y,.022)));
+        mesh(new T.TubeGeometry(new T.CatmullRomCurve3(pts),8,.009+step*.001,3,false),tier>=3?look.core:look.trim,0,0,0,'robot-rear-energy-pipe');
+        if(tier>=2)rearPlate([[side*w*.08,.91],[side*w*.30,.96],[side*w*.29,.995],[side*w*.09,.94]],look.trim,'robot-rear-lower-armor-seam',.018);
+      }
+      if(tier>=3){const radius=.058+step*.004,cy=1.035,hex=Array.from({length:female?8:6},(_,i)=>{const a=i*Math.PI*2/(female?8:6);return [Math.sin(a)*radius,cy+Math.cos(a)*radius];});rearPlate(hex,look.trim,'robot-rear-core-cover',.038);const cap=mesh(new T.CylinderGeometry(radius*.6,radius*.6,.018,female?8:6),look.dark,0,cy,rearZ(0,cy,.044),'robot-rear-core-seal');cap.rotation.x=Math.PI/2;}
+      if(tier>=4)for(const side of [-1,1]){const cy=1.035;rearPlate([[side*.012,cy-.035],[side*.032,cy-.009],[side*.012,cy+.037],[side*.006,cy+.004]],look.core,'robot-rear-core-engraving',.061);rearPlate([[side*w*.065,1.29],[side*w*.20,1.33],[side*w*.29,1.29],[side*w*.28,1.26],[side*w*.20,1.29],[side*w*.065,1.265]],look.trim,'robot-rear-shoulder-crest',.025);}
+      if(tier===5)rearPlate([[-w*.16,.885],[-w*.08,.86],[0,.895],[w*.08,.86],[w*.16,.885],[0,.925]],look.dark,'robot-rear-abyss-chevron',.025);
+    }
+    const finished=p.finish();
+    if(baseKind==='robot_shell')for(const [key,side]of [['legR',-1],['legL',1]]){
+      const leg=robotParts(T,sex,tier),step=tier-1,width=(female?.225:.275)+step*.035,z=.155+step*.013;
+      leg.soft(width,.165+step*.028,.10+step*.023,look.metal,0,-.30,z,'robot-tier-knee-plate');
+      leg.soft(width*.88,.23+step*.029,.075+step*.022,look.metal,0,-.45,z-.006,'robot-tier-shin-plate');
+      leg.scroll([[-width*.32,.065,0],[0,-.07,.021],[width*.32,.065,0]],0,-.30,z+.07+step*.012,.007+step*.001);
+      if(tier>=3)leg.scroll([[-width*.32,.07,0],[0,-.065,.018],[width*.32,.07,0]],0,-.45,z+.06+step*.01,.007);
+      if(tier>=4){const crest=leg.mesh(new T.OctahedronGeometry(.035+step*.006),look.core,0,-.30,z+.089+step*.012,'robot-energy-knee-inlay');crest.scale.z=.42;}
+      const plate=leg.finish();plate.name='robot-articulated-leg-armor';plate.userData.robotJoint=key;plate.position.set(side*(female?.15:.18),.63,0);finished.add(plate);finished.userData.sourceParts+=plate.userData.sourceParts;finished.userData.renderParts+=plate.userData.renderParts;
+    }
+    return finished;
+  }
+  function robotBase(T,sex='male',identity='hero'){
+    const female=sex==='female',look=ROBOT_LOOKS[female?'female':'male'],m=new T.Group();m.name='robot-'+look.name;
+    // A complete bare machine remains after a shell breaks. Armor upgrades
+    // replace only the fitted torso layer; arms/legs and facial rig stay alive.
+    const chassis=robotParts(T,sex),c=chassis.look;
+    chassis.soft(female?.59:.72,.55,.4,c.dark,0,1.05,0,'robot-base-chassis');
+    for(const y of [.77,.84,.91]){const r=chassis.ring(female?.2:.245,.025,c.trim,0,y);r.rotation.x=Math.PI/2;r.scale.y=.72;}
+    chassis.soft(female?.48:.57,.23,.29,c.dark,0,.69,-.005,'robot-round-base-pelvis');
+    const body=chassis.finish();m.add(body);
+    const head=new T.Group();head.position.y=female?1.665:1.72;m.add(head);
+    const scalp=robotParts(T,sex),headPlate=scalp.soft(female?.53:.56,female?.58:.54,.5,c.metal,0,0,-.015,'robot-seamless-cranium');
+    scalp.soft(female?.438:.46,.41,.107,c.face,0,-.025,.205,'robot-rounded-faceplate');
+    scalp.scroll([[-.18,.16,-.015],[0,.25,-.02],[.18,.16,-.015]],0,.035,.183,.012);
+    for(const side of [-1,1]){const ear=scalp.mesh(new T.CylinderGeometry(.13,.13,.065,12),c.trim,side*.273,0,-.025,'robot-ear-joint');ear.rotation.z=Math.PI/2;const inset=scalp.mesh(new T.CylinderGeometry(.08,.08,.071,12),c.dark,side*.273,0,-.025,'robot-ear-inset');inset.rotation.z=Math.PI/2;}
+    head.add(scalp.finish());
+    const neck=robotParts(T,sex);neck.mesh(new T.CylinderGeometry(.12,.12,.16,12),c.dark,0,1.405,-.012,'robot-neck-joint');m.add(neck.finish());
+    const limbs={};for(const [key,side]of [['armR',-1],['armL',1]]){
+      const joint=new T.Group();joint.position.set(side*(female?.405:.49),1.30,0);joint.name=key;const p=robotParts(T,sex);
+      p.soft(female?.19:.24,.22,.23,c.dark,0,-.055,0,'robot-shoulder-ball');p.soft(female?.2:.245,.33,.22,c.metal,0,-.22,0,'robot-rounded-upper-arm');p.soft(female?.22:.27,.3,.255,c.metal,0,-.42,.005,'robot-forearm-shell');
+      const r=p.ring(female?.12:.145,.022,c.trim,0,-.36,.01);r.rotation.x=Math.PI/2;p.scroll([[-.06,0,0],[0,-.11,.01],[.06,0,0]],0,-.40,.13,.007);joint.add(p.finish());m.add(joint);limbs[key]=joint;
+      const hand=robotParts(T,sex);hand.soft(female?.2:.235,.19,.23,c.dark,0,0,0,'robot-bare-fist');const fist=hand.finish();fist.position.set(0,-.53,.07);joint.add(fist);limbs[key+'BareFist']=fist;
+    }
+    for(const [key,side]of [['legR',-1],['legL',1]]){const joint=new T.Group();joint.name=key;joint.position.set(side*(female?.15:.18),.63,0);const p=robotParts(T,sex);
+      p.soft(female?.23:.29,.34,.27,c.metal,0,-.125,0,'robot-rounded-thigh');p.soft(.21,.18,.235,c.dark,0,-.31,.025,'robot-knee-joint');p.soft(female?.24:.3,.29,.27,c.metal,0,-.405,.005,'robot-continuous-shin');p.bevel(female?.29:.35,.18,.40,c.metal,0,-.55,.075,'robot-beveled-foot');p.scroll([[-.075,0,0],[0,-.08,.015],[.075,0,0]],0,-.40,.146,.008);joint.add(p.finish());m.add(joint);limbs[key]=joint;}
+    m.scale.set(female?.95:1.04,female?.95:1.03,1);
+    Object.assign(m.userData,{...limbs,body,head,headMesh:headPlate,frontAxis:'+Z',sculpted:true,heroJob:'robot',heroSex:sex,heroShape:female?'rounded-machine':'heavy-machine',heroVariant:'robot-'+sex,heroIdentityStyle:identity==='hero'?'protagonist':'traveller',adultDesign:true,heroPieces:[],baseClothing:[body],robotLook:look.name});
+    const eyes=[-1,1].map(side=>{const geo=new T.SphereGeometry(1,10,6);geo.scale(female?.037:.033,female?.046:.036,.018);const eye=new T.Mesh(geo,new T.MeshBasicMaterial({color:c.core}));eye.position.set(side*.116,.03,.266);head.add(eye);return eye;});
+    if(root.CharacterFace){const face=root.CharacterFace.attach(T,m,head,eyes,0,true,{job:'robot',sex});face.baseEyeY=female?.92:.76;face.browY=.103;face.width=female?1.06:.95;for(const part of [...face.brows,face.mouth,...face.corners])part.material.color.setHex(c.dark);for(const cheek of face.cheeks)cheek.material.opacity=0;for(const white of face.whites)white.material.color.setHex(female?0xeff4db:0xd3edf0);}
+    root.CharacterMotion?.prepare(m);return m;
+  }
   function batchGear(T,g){
     const parts=g.children.filter(o=>o.isMesh),buckets=new Map(),kept=new Set();
     // Keep the shaped body/cap and nocked arrow independently addressable.
@@ -24,6 +142,7 @@
     const liveGeometry=new Set(g.children.map(p=>p.geometry)),liveMaterial=new Set(g.children.map(p=>p.material));for(const x of retiredGeometry)if(!liveGeometry.has(x))x.dispose();for(const x of retiredMaterial)if(!liveMaterial.has(x))x.dispose();g.userData.renderParts=g.children.length;return g;
   }
   function gear(T,kind,appearance={}){
+    if((H.GEAR[kind]?.baseKind||kind)==='robot_shell'||(H.GEAR[kind]?.baseKind||kind)==='robot_fists')return robotGear(T,kind,appearance,H.GEAR[kind]);
     const g=new T.Group(),definition=H.GEAR[kind],tier=definition?.tier||1,female=appearance.sex==='female',job=appearance.job||definition?.jobs?.[0]||'swordsman',look=style(job,female?'female':'male'),master=MASTERWORK[tier],atlas=root.EquipmentSurfaces?.create(T,{tier,job,kind,sex:female?'female':'male'},root.document)||null;g.name='hero-gear-'+kind;Object.assign(g.userData,{tier,baseKind:definition?.baseKind||kind,wearVariant:female?'female':'male',adultDesign:true,surfaceAtlasSize:atlas?128:0,detailEdition:2});kind=g.userData.baseKind;const materials=new Map();
     // Higher grades retain the fitted adult silhouette. Their cloth/metal
     // pairing is readable in dim corridors, without glow lights or extra rigs.
@@ -134,6 +253,7 @@
   // All playable/recruitable job variants are adult adventurers. Appearance only:
   // no item duplication, gender equip locks, stat changes or save migration.
   const VARIANTS=Object.freeze({
+    robot:{male:{shirt:0x687c88,skin:0xb7c6c9,hair:0x687c88,eyes:0x72dce9,cloak:0x263a45,accent:0xc1a474,leather:0x263a45,width:1.04,height:1.03,face:1,shape:'heavy-machine',description:'鐵衡：鋼藍機殼、寬肩重拳、黃銅雕紋與藍色動力核'},female:{shirt:0xdad5bd,skin:0xeee5c9,hair:0xdad5bd,eyes:0x91dfa8,cloak:0x4b554c,accent:0xbb9663,leather:0x4b554c,width:.95,height:.95,face:1,shape:'rounded-machine',description:'鈴芯：象牙弧面機殼、圓潤臉孔、黃銅鑲邊與綠色動力核'}},
     swordsman:{male:{hair:0x4d352e,cloak:0x293f66,accent:0xb9d4e8,leather:0x6a4b3b,description:'俐落短髮、寬肩、短戰袍與盾徽'},female:{hair:0x953f34,shirt:0x7595b5,cloak:0x426993,accent:0xe2c585,leather:0x705241,description:'赤銅側辮、修身分片護甲與藍色長戰袍'}},
     mage:{male:{hair:0xbabecb,cloak:0x3f436b,accent:0xaacbda,leather:0x534662,description:'灰銀短髮、短鬚、立領長袍'},female:{hair:0x493457,shirt:0x9174b2,cloak:0x674677,accent:0xe4bd85,leather:0x76516e,description:'紫黑長波浪髮、收腰側開衩法袍'}},
     scout:{male:{hair:0x654132,cloak:0x244f47,accent:0x99c5b4,leather:0x785843,description:'斜瀏海、斜背束帶與短獵裝'},female:{hair:0xbc7845,shirt:0x76a18b,cloak:0x377561,accent:0xe4bc8b,leather:0x705b4f,description:'蜜銅側編髮、斜肩披巾與分片輕甲'}},
@@ -179,6 +299,7 @@
     placeBowArm(r,r.left,.42-.52*across,y,.10+(.28-draw)*forward,0,0,0);
   }
   function base(job,build,identity='hero',sex=root.TowerPartyCore?.PROFESSIONS[job]?.gender||'male'){
+    if(job==='robot')return robotBase(root.THREE,sex,identity);
     const s=style(job,sex),female=sex==='female',m=build({shirt:s.shirt,pants:0x354351,skin:s.skin,hair:s.hair,type:female?'girl':'boy',heroJob:job,heroSex:sex}),T=root.THREE;
     m.scale.set(s.width*(female?.9:1.03),s.height*(female?1.05:1),job==='chef'||job==='smith'?1.08:.96);
     Object.assign(m.userData,{heroIdentityStyle:identity==='hero'?'protagonist':'traveller',heroJob:job,heroSex:sex,heroShape:s.shape,heroVariant:job+'-'+sex,adultDesign:true,heroPieces:[]});
@@ -211,15 +332,17 @@
     return m;
   }
   function portrait(job,sex='male'){
+    if(job==='robot'){const l=ROBOT_LOOKS[sex==='female'?'female':'male'],hex=c=>'#'+c.toString(16).padStart(6,'0'),female=sex==='female';return '<svg class="hero-portrait" viewBox="0 0 96 112" role="img" aria-label="機器人 · '+l.name+'"><rect x="2" y="2" width="92" height="108" rx="20" fill="#1b333d"/><path d="M14 110V93q0-18 34-18t34 18v17" fill="'+hex(l.metal)+'" stroke="'+hex(l.trim)+'" stroke-width="3"/><circle cx="48" cy="94" r="10" fill="'+hex(l.dark)+'" stroke="'+hex(l.trim)+'" stroke-width="4"/><circle cx="48" cy="94" r="6" fill="'+hex(l.core)+'"/><path d="M23 44V31q0-23 25-23t25 23v22q-1 22-25 22T23 53Z" fill="'+hex(l.metal)+'" stroke="'+hex(l.trim)+'" stroke-width="3"/><path d="M29 36q19-10 38 0v20q0 13-19 15T29 56Z" fill="'+hex(l.face)+'"/><path d="M32 27 48 16l16 11M34 40h10m8 0h10" fill="none" stroke="'+hex(l.trim)+'" stroke-width="3"/><g fill="'+hex(l.dark)+'" stroke="'+hex(l.trim)+'" stroke-width="3"><ellipse cx="23" cy="44" rx="7" ry="11"/><ellipse cx="73" cy="44" rx="7" ry="11"/></g><g fill="'+hex(l.core)+'"><ellipse cx="38" cy="48" rx="'+(female?4.5:4)+'" ry="'+(female?6:4.5)+'"/><ellipse cx="58" cy="48" rx="'+(female?4.5:4)+'" ry="'+(female?6:4.5)+'"/></g><path d="M39 61q9 '+(female?6:3)+' 18 0" fill="none" stroke="'+hex(l.dark)+'" stroke-width="2" stroke-linecap="round"/></svg>';}
     const s=style(job,sex),female=sex==='female',hex=c=>'#'+c.toString(16).padStart(6,'0'),ears=job==='archer'?'<path d="m22 35-12-9 5 19 9 1m50-11 12-9-5 19-9 1" fill="'+hex(s.skin)+'"/>':'',long=['mage','healer','archer'].includes(job),hair=female?'<path d="M23 28q2-24 25-24t25 24v'+(long?55:40)+'l-12-8H32l-11 8Z" fill="'+hex(s.hair)+'"/>':'<path d="M23 30q1-25 25-25 27 3 25 25v13H23Z" fill="'+hex(s.hair)+'"/>',face=female?'M27 29q21-15 42 0v24q-2 15-21 23-19-8-21-23Z':'M24 29q24-17 48 0v27l-9 15-15 6-15-6-9-15Z';
     const braids=female&&job==='smith'?'<g data-hair="twin-braids" fill="none" stroke="'+hex(s.hair)+'" stroke-width="8" stroke-linecap="round"><path d="M24 51q-10 8-4 18t-1 17"/><path d="M72 51q10 8 4 18t1 17"/></g><path d="M14 84h12m44 0h12" stroke="'+hex(s.accent)+'" stroke-width="4"/>':female&&!long?'<path d="M72 50q11 7 3 21t-1 17" fill="none" stroke="'+hex(s.hair)+'" stroke-width="8" stroke-linecap="round"/>':'';
     return '<svg class="hero-portrait" viewBox="0 0 96 112" role="img" aria-label="'+H.JOBS[job].name+' · 成年'+(female?'女性':'男性')+' · '+s.description+'"><rect x="2" y="2" width="92" height="108" rx="20" fill="#1b333d"/>'+hair+ears+'<path d="'+face+'" fill="'+hex(s.skin)+'"/><path d="M'+(female?'19':'12')+' 110V92q0-20 '+(female?'29':'36')+'-20t'+(female?'29':'36')+' 20v18" fill="'+hex(s.cloak)+'"/><path d="M27 32q17-28 43-4l-16 7-11-8-16 16Z" fill="'+hex(s.hair)+'"/><path d="M30 42h12m12 0h12" stroke="'+hex(s.hair)+'" stroke-width="'+(female?2:3)+'" stroke-linecap="round"/><ellipse cx="36" cy="49" rx="3" ry="4" fill="'+hex(s.eyes)+'"/><ellipse cx="60" cy="49" rx="3" ry="4" fill="'+hex(s.eyes)+'"/><path d="m48 49-3 8h5m-9 7q7 4 14 0" fill="none" stroke="'+(female?'#aa6672':'#936f60')+'" stroke-width="2" stroke-linecap="round"/>'+braids+(!female&&['chef','mage','smith'].includes(job)?'<path d="m34 65 14 4 14-4-5 11H39Z" fill="'+hex(s.hair)+'"/>':'')+'<path d="M'+(female?'32 83 48 98 64 83':'27 85h42m-33 0 12 16 12-16')+'" fill="none" stroke="'+hex(s.accent)+'" stroke-width="3"/></svg>';
   }
+  function poseRobotLegArmor(model){if(model.userData.heroJob!=='robot')return;for(const shell of model.userData.heroPieces||[])if(shell.userData.baseKind==='robot_shell')for(const plate of shell.children){const joint=model.userData[plate.userData.robotJoint];if(joint){plate.position.copy(joint.position);plate.quaternion.copy(joint.quaternion);plate.scale.copy(joint.scale);}}}
   function dress(T,model,equipment,dispose,{showHelmet=true}={}){equipment=Object.fromEntries(Object.entries(equipment).map(([slot,g])=>[slot,g?.durability===0?null:g]));const appearance={job:model.userData.heroJob,sex:model.userData.heroSex},signature=(appearance.job||'')+'|'+(appearance.sex||'male')+'|'+showHelmet+'|'+Object.values(equipment).map(g=>g?.kind||'-').join('|');if(model.userData.heroDress===signature)return;
     for(const p of model.userData.heroPieces||[]){p.parent?.remove(p);dispose(p);}const pieces=[];
     for(const item of Object.values(equipment).filter(g=>g&&(g.slot!=='helmet'||showHelmet))){const piece=gear(T,item.kind,appearance),slot=item.slot;pieces.push(piece);
       const baseKind=H.GEAR[item.kind].baseKind;
-      if(slot==='weapon'){if(baseKind==='elven_bow'&&model.userData.bowArms){piece.position.set(0,0,0);model.userData.bowArms.right.hand.add(piece);}else{piece.position.set(0,-.36,.13);model.userData.armR.add(piece);}if(baseKind==='twin_daggers'){const left=gear(T,item.kind,appearance);left.position.set(0,-.36,.13);model.userData.armL.add(left);pieces.push(left);}else if(baseKind==='spellbook'){piece.position.set(0,1.04,.49);model.add(piece);}}
+      if(slot==='weapon'){if(baseKind==='elven_bow'&&model.userData.bowArms){piece.position.set(0,0,0);model.userData.bowArms.right.hand.add(piece);}else{piece.position.set(0,baseKind==='robot_fists'?-.53:-.36,baseKind==='robot_fists'?.07:.13);model.userData.armR.add(piece);}if(baseKind==='twin_daggers'||baseKind==='robot_fists'){const left=gear(T,item.kind,appearance);left.position.set(0,baseKind==='robot_fists'?-.53:-.36,baseKind==='robot_fists'?.07:.13);if(baseKind==='robot_fists')left.scale.x=-1;model.userData.armL.add(left);pieces.push(left);}else if(baseKind==='spellbook'){piece.position.set(0,1.04,.49);model.add(piece);}}
       else if(slot==='shield'){piece.position.set(.07,-.32,.08);piece.rotation.y=Math.PI/3;model.userData.armL.add(piece);}else model.add(piece);
     }
     for(const p of model.userData.head?.children||[])if(p.name==='hair-crown'||p.name==='hair-fringe')p.visible=!showHelmet||!equipment.helmet||H.GEAR[equipment.helmet.kind]?.baseKind==='rune_crown';
@@ -227,6 +350,7 @@
     // protrude from a slimmer robe or female armor. Broken/removed armor restores it.
     for(const p of model.userData.baseClothing||[])p.visible=!equipment.armor;
     Object.assign(model.userData,{heroDress:signature,heroPieces:pieces,heroWeapon:H.GEAR[equipment.weapon?.kind]?.baseKind,heroWeaponKind:equipment.weapon?.kind,hasWeapon:!!equipment.weapon,hasShield:!!equipment.shield});
+    if(appearance.job==='robot'){model.userData.heroWeapon='robot_fists';model.userData.hasShield=false;for(const side of ['armR','armL'])if(model.userData[side+'BareFist'])model.userData[side+'BareFist'].visible=!equipment.weapon;poseRobotLegArmor(model);}
   }
   function pose(model,remaining,interval,fp=false,dt=0){const right=model.userData.armR,left=model.userData.armL,kind=model.userData.heroWeapon;if(!right||!left)return;
     if(root.TowerCombatMotion){
@@ -237,9 +361,9 @@
       // every compass direction instead of pitching around the world's X axis.
       model.rotation.order='YXZ';model.rotation.x=p.lean;model.rotation.z=p.tilt;
       for(const part of model.userData.heroPieces||[]){part.visible=!fp||part.parent===right||part.parent===left||part.parent===bow?.right.hand||part.userData.baseKind==='spellbook';
-        if(part.userData.baseKind===kind){if(kind==='spellbook'){part.position.set(0,1.04+p.bookLift,.49+p.bookPush);part.rotation.set(p.bookTilt,0,0);}else if(kind==='elven_bow'&&bow){part.position.set(0,0,0);part.quaternion.identity();}else{const l=part.parent===left;offset.set(l?p.lpx:p.wpx,l?p.lpy:p.wpy,l?p.lpz:p.wpz).applyQuaternion(q.copy(part.parent.quaternion).invert());part.position.set(0,-.36,.13).add(offset);e.set(l?p.lwx:p.wx,l?p.lwy:p.wy,l?p.lwz:p.wz);q.setFromEuler(e);part.quaternion.copy(part.parent.quaternion).invert().multiply(q);}}
+        if(part.userData.baseKind===kind){if(kind==='spellbook'){part.position.set(0,1.04+p.bookLift,.49+p.bookPush);part.rotation.set(p.bookTilt,0,0);}else if(kind==='elven_bow'&&bow){part.position.set(0,0,0);part.quaternion.identity();}else{const l=part.parent===left;offset.set(l?p.lpx:p.wpx,l?p.lpy:p.wpy,l?p.lpz:p.wpz).applyQuaternion(q.copy(part.parent.quaternion).invert());part.position.set(0,kind==='robot_fists'?-.53:-.36,kind==='robot_fists'?.07:.13).add(offset);e.set(l?p.lwx:p.wx,l?p.lwy:p.wy,l?p.lwz:p.wz);q.setFromEuler(e);part.quaternion.copy(part.parent.quaternion).invert().multiply(q);}}
       }
-      if(model.userData.legL)model.userData.legL.rotation.x-=p.knee;if(model.userData.legR)model.userData.legR.rotation.x+=p.knee;return;
+      if(model.userData.legL)model.userData.legL.rotation.x-=p.knee;if(model.userData.legR)model.userData.legR.rotation.x+=p.knee;poseRobotLegArmor(model);return;
     }
     const t=remaining>0?Math.max(0,Math.min(1,1-remaining/interval)):1,swing=remaining>0?Math.sin(t*Math.PI):0;
     // Forward is +Z: negative shoulder rotation moves the hand towards +Z.
@@ -253,5 +377,5 @@
       if(p.userData.baseKind===kind&&p.parent!==model){const phase=p.parent===left?swing*.8:swing;e.set(.25+1.35*phase,.16*phase,.12-.3*phase);q.setFromEuler(e);p.quaternion.copy(p.parent.quaternion).invert().multiply(q);}
     }
   }
-  root.TowerHeroVisuals={gear,STYLES,VARIANTS,style,base,portrait,dress,pose};
+  root.TowerHeroVisuals={gear,STYLES,VARIANTS,ROBOT_LOOKS,style,base,portrait,dress,pose};
 })(globalThis);

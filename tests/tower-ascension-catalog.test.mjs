@@ -6,10 +6,10 @@ import vm from 'node:vm';
 const require=createRequire(import.meta.url),A=require('../story/tower-ascension-catalog.js'),G=require('../story/tower-hero-growth.js'),M=require('../story/tower-combat-motion.js'),Audio=require('../assets/combat-audio.js'),T=require('../lib/three.min.js');
 const fxContext=vm.createContext({});vm.runInContext(readFileSync(new URL('../story/tower-skill-effects.js',import.meta.url),'utf8'),fxContext);const V=fxContext.TowerSkillEffects;
 
-test('seven professions continue both actual level-ten ultimates with 28 unique, branch-bound skills',()=>{
+test('eight professions continue both actual level-ten ultimates with 32 unique, branch-bound skills',()=>{
   const bases=[...G.actives,...G.passives.filter(s=>s.unique)];
-  assert.equal(bases.length,14);assert.equal(Object.keys(A.BY_JOB).length,7);
-  assert.equal(A.actives.length,14);assert.equal(A.passives.length,14);
+  assert.equal(bases.length,16);assert.equal(Object.keys(A.BY_JOB).length,8);
+  assert.equal(A.actives.length,16);assert.equal(A.passives.length,16);
   const ids=new Set();
   for(const base of bases){
     const b=A.BRANCHES[base.id];assert.ok(b,base.id);assert.equal(b.job,base.job);
@@ -18,12 +18,12 @@ test('seven professions continue both actual level-ten ultimates with 28 unique,
     assert.deepEqual(b.steps.map(s=>s.level),[12,15]);
     for(const step of b.steps){const s=A.SKILLS[step.id]||A.PASSIVES[step.id];assert.ok(s);assert.equal(s.job,base.job);assert.equal(s.unique,true);assert.deepEqual(s.ascension,{base:base.id,level:step.level});assert.equal(s.power.length,6);assert.ok(s.power.every(v=>Number.isFinite(v)&&v>0));assert.equal(ids.has(s.id),false);ids.add(s.id);}
   }
-  assert.equal(ids.size,28);for(const job of Object.keys(A.BY_JOB))assert.equal(A.forJob(job).length,2);
+  assert.equal(ids.size,32);for(const job of Object.keys(A.BY_JOB))assert.equal(A.forJob(job).length,2);
 });
 
 test('catalog is independent of engine state, immutable, and threshold queries cannot grant the other branch',()=>{
   const browser=vm.createContext({});vm.runInContext(readFileSync(new URL('../story/tower-ascension-catalog.js',import.meta.url),'utf8'),browser);
-  const standalone=browser.TowerAscensionCatalog;assert.equal(Object.keys(standalone.SKILLS).length,14);
+  const standalone=browser.TowerAscensionCatalog;assert.equal(Object.keys(standalone.SKILLS).length,16);
   for(const b of Object.values(A.BRANCHES)){
     assert.deepEqual(A.earned(b.id,10),[]);assert.deepEqual(A.earned(b.id,11),[]);
     assert.deepEqual(A.earned(b.id,12).map(s=>s.id),[b.steps[0].id]);
@@ -37,8 +37,8 @@ test('catalog is independent of engine state, immutable, and threshold queries c
 });
 
 test('active skills use implemented effect families and control durations stay within saved-state bounds',()=>{
-  const supported=new Set(['decisive','stagger','starfall','shock','speed','mark','soup','barrier','revive','ward','fortify','repair','binding','volley']);
-  const limits={duration:[0,30],stunSeconds:[0,3],slowSeconds:[0,60],slowPower:[0,1],rootSeconds:[0,3],markSeconds:[0,60]};
+  const supported=new Set(['decisive','stagger','starfall','shock','speed','mark','soup','barrier','revive','ward','fortify','repair','binding','volley','robot_double','mech_aid']);
+  const limits={duration:[0,30],stunSeconds:[0,3],slowSeconds:[0,60],slowPower:[0,1],rootSeconds:[0,3],markSeconds:[0,60],reach:[0,8],maxTargets:[0,3],knockback:[0,1.5],radius:[0,4],shieldDuration:[0,300],allyShield:[0,20]};
   for(const s of A.actives){
     assert.ok(supported.has(s.effect),s.id);assert.equal(typeof s.attack,'boolean');assert.ok(s.cooldown>=20&&s.cooldown<=120);
     for(const [param,value] of Object.entries(s.params||{})){assert.ok(limits[param],param);assert.ok(Number.isFinite(value)&&value>limits[param][0]&&value<=limits[param][1],s.id+':'+param);}

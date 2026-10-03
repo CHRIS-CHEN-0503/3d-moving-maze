@@ -28,7 +28,7 @@ function recruitNext(run){
 function ordinary(run,id){const actor=H.actor(run,id);return Object.values({...H.SKILLS,...H.PASSIVES}).find(s=>s.job===H.job(run,id)&&!s.unique&&![...actor.skills,...actor.passives].includes(s.id)).id;}
 function removeRecruitBonus(run,id){const a=H.actor(run,id),key=a.learned;a.skills=a.skills.filter(k=>k!==key);a.passives=a.passives.filter(k=>k!==key);delete a.cooldowns[key];a.learned=null;G.record(run,id).choices=[];}
 
-test('every underground floor recruits level-five travellers across seeds and all fourteen appearances',t=>{
+test('every underground floor recruits level-five travellers across seeds and all sixteen appearances',t=>{
   const floors=new Set(),appearances=new Set(),rewardKinds=new Set(),jobRewards=new Map();let count=0;
   for(let seed=1;seed<=64;seed++){
     const entered=underground(seed);
@@ -37,7 +37,8 @@ test('every underground floor recruits level-five travellers across seeds and al
       assert.equal(offer.level,5,`offer at ${floor}, seed ${seed}`);
       const before=structuredClone(H.actor(run,'hero')),xp=H.experience(run,'hero'),base=H.preview(run,offer),result=P.recruit(run,offer.id,run.revision);assert.ok(result.ok,result.message);
       const member=result.run.party.members.find(m=>m.id===offer.id);
-      assert.equal(member.level,5);assert.equal(member.xp,G.XP[4]);assert.equal(member.hp,58);assert.equal(H.maxHp(result.run,member.id),58);
+      const bodyBonus=member.profession==='robot'&&H.actor(result.run,member.id).passives.includes('robot_body')?25:0;
+      assert.equal(member.level,5);assert.equal(member.xp,G.XP[4]);assert.equal(member.hp,58+bodyBonus);assert.equal(H.maxHp(result.run,member.id),58+bodyBonus);
       assert.equal(H.level(result.run,'hero'),1);assert.equal(H.experience(result.run,'hero'),xp);assert.deepEqual(H.actor(result.run,'hero'),before);
       const a=H.actor(result.run,member.id),all=[...a.skills,...a.passives],reward=H.SKILLS[a.learned]||H.PASSIVES[a.learned];
       assert.equal(all.length,6);assert.equal(new Set(all).size,6);assert.ok([...base.skills,...base.passives].every(k=>all.includes(k)));
@@ -85,7 +86,8 @@ test('surface recruitment keeps its original floor-based levels one through five
     const run=atFloor(fresh(seed),floor);run.coins=99999;const offer=P.recruitOffer(run);if(!offer)continue;
     const expected=Math.min(5,1+Math.floor((99-floor)/22));assert.equal(offer.level,expected);
     const result=P.recruit(run,offer.id,run.revision);assert.ok(result.ok,result.message);const member=result.run.party.members[0];
-    assert.equal(member.level,expected);assert.equal(member.xp,G.XP[expected-1]);assert.equal(member.hp,28+expected*6);assert.equal(H.actor(result.run,member.id).learned,null);assert.deepEqual(G.record(result.run,member.id).choices,[]);assert.equal(G.available(result.run,member.id),expected>=4?1:0);valid(result.run);levels.add(expected);count++;
+    const bodyBonus=member.profession==='robot'&&H.actor(result.run,member.id).passives.includes('robot_body')?5*expected:0;
+    assert.equal(member.level,expected);assert.equal(member.xp,G.XP[expected-1]);assert.equal(member.hp,28+expected*6+bodyBonus);assert.equal(H.actor(result.run,member.id).learned,null);assert.deepEqual(G.record(result.run,member.id).choices,[]);assert.equal(G.available(result.run,member.id),expected>=4?1:0);valid(result.run);levels.add(expected);count++;
   }
   assert.deepEqual([...levels].sort(),[1,2,3,4,5]);t.diagnostic(JSON.stringify({surfaceRecruitments:count}));
 });

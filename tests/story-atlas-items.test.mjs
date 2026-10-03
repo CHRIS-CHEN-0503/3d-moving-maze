@@ -9,7 +9,7 @@ const require=createRequire(import.meta.url),base=path.resolve(path.dirname(file
 const C=require('../story/story-core.js'),P=require('../story/tower-party-core.js'),H=require('../story/tower-heroes-core.js');
 const N=require('../story/tower-narrative.js'),L=require('../story/tower-lighting-core.js'),Loot=require('../story/tower-loot.js');
 const Atlas=require('../docs/story-atlas-items.js'),Icons=require('../story/tower-resource-icons.js');
-const Materials=require('../story/tower-materials.js');
+const Materials=require('../story/tower-materials.js'),Foraging=require('../story/tower-foraging.js');
 require('../story/tower-party-runtime.js');require('../story/tower-lighting-runtime.js');
 const entries=Atlas.records(),find=id=>entries.find(r=>r.id===id),fresh=()=>H.enable(P.enable(C.newRun({seed:71}),'mage').run).run;
 
@@ -45,7 +45,9 @@ test('item guide uses current actor combat values, not the retired feather and s
 });
 
 test('drop percentages are conditional and arrow bundles differ from shop quantities',()=>{
-  for(const e of entries.filter(e=>e.drop))assert.equal(e.drop.conditionalPercent,Loot.CHANCES[e.drop.rarity]);
+  for(const e of entries.filter(e=>e.drop))assert.equal(e.drop.conditionalPercent,Loot.chance({type:e.id.startsWith('ingredient:')?'ingredient':e.id.startsWith('material:')?'material':'item',key:e.key,rarity:e.drop.rarity}));
+  for(const key of Loot.COMMON_FOOD){assert.equal(find('ingredient:'+key).drop.conditionalPercent,25);assert.match(find('ingredient:'+key).acquisition,/候選後.*25%/);}
+  assert.deepEqual(Loot.CHANCES,{common:20,uncommon:12,rare:6,legendary:3});assert.equal(find('ingredient:meat').drop.conditionalPercent,20);assert.equal(find('item:ration').drop.conditionalPercent,20);
   assert.equal(find('item:arrow').drop.quantity,Loot.ARROW_DROP_QUANTITY);assert.equal(find('item:arrow').drop.quantity,50);assert.match(find('item:arrow').acquisition,/10 支/);assert.match(find('item:arrow').acquisition,/50 支/);
   assert.equal(find('item:arrow').stackLimit,null);assert.match(find('item:arrow').capacityRule,/所有射手/);assert.match(find('item:arrow').capacityRule,/300 支/);assert.match(find('item:arrow').effect,/每一名射手累加/);
   assert.match(Atlas.dropExplanation,/先.*抽一種/);assert.match(Atlas.dropExplanation,/不是每件/);
@@ -58,6 +60,7 @@ test('cooking cards preserve real costs and distinguish self, party healing and 
   for(const [id,recipe]of Object.entries(P.RECIPES)){const entry=find('meal:'+id);assert.deepEqual(entry.recipe.cost,recipe.cost);assert.equal(entry.recipe.hp,recipe.hp);assert.equal(entry.recipe.hunger,recipe.hunger);assert.equal(entry.requiredDepth,recipe.requiredDepth||0);assert.equal(entry.underground,!!recipe.requiredDepth);if(recipe.team)assert.match(entry.effect,new RegExp(recipe.team+' 點'));if(recipe.buff)assert.match(entry.effect,/3 層.*2 種/);}
   assert.match(find('meal:stew').description,/任何職業/);assert.match(find('meal:stew').notes.join(' '),/不是有廚師就必定雙倍/);
   const run=fresh(),snapshot=JSON.stringify(run);Atlas.records();assert.equal(JSON.stringify(run),snapshot);
+  const Commission=require('../story/tower-commission-cooking.js');for(const[id]of Object.entries(P.RECIPES)){const entry=find('meal:'+id);assert.deepEqual(entry.commission,{fee:Commission.fee(id),category:Commission.category(id),quantity:1});assert.match(entry.acquisition,new RegExp('費用 '+Commission.fee(id)+' 幣'));assert.match(entry.notes.join(' '),/固定一份.*按原配方扣料/);assert.ok(entry.sources.includes(Atlas.SOURCES.commission));}
 });
 
 test('grocery supplies and regional ingredients document the same prices, haste duration and availability',()=>{
@@ -76,8 +79,21 @@ test('torch, raw materials, daylight and tools are current obtainable resources 
   assert.match(find('light:cloth').effect,/木枝 1 份＋布條 1 份/);
   assert.match(find('tool:shovel').acquisition,new RegExp(H.PASSIVES.tool_supply.power.join('／')));
   assert.match(find('material:scrap').effect,/1\.5 倍/);
+  assert.match(find('material:scrap').effect,new RegExp('恢復最大耐久'+Math.round(P.CAMP_MAINTENANCE_RATIO*100)+'%'));assert.match(find('material:scrap').effect,/商人銅幣再加20%/);
   assert.match(find('quest:memory').effect,/回原探索者/);
   assert.match(Atlas.scope.notes.join(' '),/不會在開局或變形時自然散放/);
+});
+
+test('natural herb and ore records derive independent corner harvesting rules without replenishment',()=>{
+  assert.deepEqual(entries.filter(e=>e.foraging).map(e=>e.key).sort(),['herb',...Foraging.NATURAL_ORES].sort());
+  assert.match(Atlas.scope.notes.join(' '),/不是自然散放補給/);assert.match(Atlas.foragingExplanation,/株數與礦石堆數獨立/);assert.match(Atlas.foragingExplanation,/靠牆角落/);assert.match(Atlas.foragingExplanation,/同層變形與讀檔不補回已採集/);
+  for(const weights of Object.values(Foraging.PROFILES))assert.ok(Atlas.foragingExplanation.includes([1,2,3].map(n=>weights[n]+'%').join('／')));
+  for(const e of entries.filter(e=>e.foraging)){
+    assert.equal(e.foraging.quantity,1);assert.deepEqual(e.foraging.profiles,Foraging.PROFILES);assert.ok(e.sources.includes(Atlas.SOURCES.foraging));assert.match(e.acquisition,/靠牆角落/);assert.match(e.acquisition,/每株 1 份|每堆 1 份/);
+    const regions=Materials.ECOLOGIES.filter(region=>e.key==='herb'||Foraging.orePool({floor:region.high}).includes(e.key));
+    assert.deepEqual(e.foraging.regions,regions.map(region=>({id:region.id,name:region.name,profile:Foraging.REGIONS[region.id][e.foraging.kind]})));
+  }
+  assert.equal(find('ingredient:herb').drop.quantity,2);assert.equal(find('material:ironore').drop.quantity,2);assert.ok(find('material:starore').foraging.regions.every(region=>region.id.startsWith('underworld:')));assert.match(find('material:starore').acquisition,/僅地下出現/);
 });
 
 test('regional ingredient and forging records use real ecological sources, costs and rarity',()=>{
@@ -100,7 +116,7 @@ test('regional ingredient and forging records use real ecological sources, costs
 });
 
 test('browser module can create the same catalogue without timers, storage or network',()=>{
-  const host={TowerMaterials:Materials,TowerCore:C,TowerPartyCore:P,TowerHeroes:H,TowerLighting:L,TowerEncounters:require('../story/tower-encounters.js'),TowerNarrative:N,TowerLoot:Loot,TowerExpedition:require('../story/tower-expedition-core.js'),TowerFieldGuide:require('../story/tower-field-guide.js'),TowerHeroIcons:require('../story/tower-heroes-icons.js'),TowerResourceIcons:Icons,TowerPartyRuntime:globalThis.TowerPartyRuntime,TowerLightingRuntime:globalThis.TowerLightingRuntime};
+  const host={TowerRobotCore:require('../story/tower-robot-core.js'),TowerCommissionCooking:require('../story/tower-commission-cooking.js'),TowerMaterials:Materials,TowerForaging:Foraging,TowerCore:C,TowerPartyCore:P,TowerHeroes:H,TowerLighting:L,TowerEncounters:require('../story/tower-encounters.js'),TowerNarrative:N,TowerLoot:Loot,TowerExpedition:require('../story/tower-expedition-core.js'),TowerFieldGuide:require('../story/tower-field-guide.js'),TowerHeroIcons:require('../story/tower-heroes-icons.js'),TowerResourceIcons:Icons,TowerPartyRuntime:globalThis.TowerPartyRuntime,TowerLightingRuntime:globalThis.TowerLightingRuntime};
   host.globalThis=host;vm.runInNewContext(fs.readFileSync(path.join(base,'docs/story-atlas-items.js'),'utf8'),host);
   assert.deepEqual(JSON.parse(JSON.stringify(host.StoryAtlasItems.records())),JSON.parse(JSON.stringify(entries)));
   assert.equal(host.StoryAtlasItems.iconHtml(find('item:heal')),Atlas.iconHtml(find('item:heal')));

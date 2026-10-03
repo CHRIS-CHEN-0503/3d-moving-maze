@@ -38,9 +38,15 @@
     // wrist draws its rear string. Scalar reach tracks also blend back to rest.
     elven_bow:[[{rx:-1.45,lx:-1.4,wx:0,wz:0,bowRaise:1,bowDraw:.03},{rx:-1.4,lx:-1.5,wx:0,wz:0,bowRaise:1,bowDraw:.08,lean:-.03},{rx:-1.2,lx:-1.25,wx:.05,wz:0,bowRaise:.9,bowDraw:-.04}],
       [{rx:-1.5,lx:-1.45,wx:0,wz:0,bowRaise:1,bowDraw:.04},{rx:-1.45,lx:-1.55,wx:0,wz:0,bowRaise:1,bowDraw:.07,lean:.02},{rx:-1.25,lx:-1.3,wx:.05,wz:0,bowRaise:.85,bowDraw:-.04}]],
+    // Knuckles stay aimed +Z while the shoulder throws a straight right and
+    // a left body-hook. Both punches originate ahead of the chest, never a
+    // handle swing; the off hand covers the core during the striking phase.
+    robot_fists:[[{rx:-.72,lx:-.68,ry:-.18,rz:-.16,lz:.12,wx:0,lwx:0,wz:0,lwz:0,lean:-.045},{rx:-1.48,lx:-.64,ry:0,rz:0,lz:.2,wx:0,lwx:0,wz:0,lwz:0,wpz:.20,lean:.13},{rx:-.78,lx:-.73,wx:0,lwx:0,wz:0,lwz:0}],
+      [{rx:-.62,lx:-.85,rz:-.2,lz:.5,ly:.20,wx:0,lwx:0,wz:0,lwz:0,tilt:.055},{rx:-.7,lx:-1.38,rz:-.2,lz:-.13,ly:-.1,wx:0,lwx:0,wz:0,lwz:0,lpz:.18,lean:.105,tilt:-.045},{rx:-.69,lx:-.72,wx:0,lwx:0,wz:0,lwz:0}]],
     unarmed:[[{rx:-.55,rz:-.3},{rx:-1.55,rz:0,lean:.1},{rx:-.65}], [{lx:-.55,lz:.3},{lx:-1.55,lz:0,lean:.1},{lx:-.65}]]
   });
-  const FAMILIES=Object.freeze({arrow:'bow',binding:'bow',volley:'bow',great_arrow:'bow',cleave:'slash',circle:'spin',blind:'thrust',stun:'heavy',stagger:'heavy',splash:'cook',bolt:'cast',weak:'cast',slow:'thrust',mark:'thrust',shock:'cast',thorns:'cast',repel:'ward',starfall:'cast',star_ring:'cast',decisive:'heavy',guard:'ward',barrier:'ward',ward:'ward',fortify:'forge',fortress:'deploy',rally:'rally',speed:'cook',polish:'forge',stealth:'scout',smoke:'scout',stomach:'cook',meal:'cook',soup:'cook',feast:'cook',heal:'heal',revive:'heal',cleanse:'heal',sanctuary:'heal',reveal:'scout',escape:'scout',disarm:'deploy',daylight:'cast',repair:'forge',frost:'cast',taunt:'rally',barricade:'deploy'});
+  const FAMILIES=Object.freeze({arrow:'bow',binding:'bow',volley:'bow',great_arrow:'bow',cleave:'slash',circle:'spin',blind:'thrust',stun:'heavy',stagger:'heavy',splash:'cook',bolt:'cast',weak:'cast',slow:'thrust',mark:'thrust',shock:'cast',thorns:'cast',repel:'ward',starfall:'cast',star_ring:'cast',decisive:'heavy',guard:'ward',barrier:'ward',ward:'ward',fortify:'forge',fortress:'deploy',rally:'rally',speed:'cook',polish:'forge',stealth:'scout',smoke:'scout',stomach:'cook',meal:'cook',soup:'cook',feast:'cook',heal:'heal',revive:'heal',cleanse:'heal',sanctuary:'heal',reveal:'scout',escape:'scout',disarm:'deploy',daylight:'cast',repair:'forge',frost:'cast',taunt:'rally',barricade:'deploy',robot_fist:'punch',robot_charge:'charge_run',robot_quake:'ground_slam',robot_guard:'machine_guard',robot_speed:'maintenance',robot_restore:'maintenance',robot_meteor:'ground_slam',robot_double:'double_punch',mech_aid:'core_aid'});
+  const ROBOT_FAMILIES=Object.freeze({flying_fist:'punch',iron_charge:'charge_run',shoulder_quake:'ground_slam',folded_guard:'machine_guard',joint_oil:'maintenance',parts_restore:'maintenance',steel_meteor_fist:'ground_slam',explosive_fists:'double_punch',mech_aid:'core_aid'});
   const SKILL_TRACKS={
     cast:[{rx:-1.6,lx:-1.2,rz:.4,lz:-.6,wx:.1,bookLift:.12},{rx:-1.65,lx:-1.25,rz:-.25,lz:.25,wx:Math.PI/2,wz:0,bookLift:.2,bookPush:.18,lean:.05},{rx:-1.05,lx:-.8,wx:1.2}],
     heal:[{rx:-1,lx:-1,rz:.25,lz:-.25,bookLift:.1},{rx:-1.5,lx:-1.5,rz:-.4,lz:.4,wx:.65,bookLift:.2,bookTilt:-.1},{rx:-1.15,lx:-1.15,rz:-.15,lz:.15}],
@@ -54,10 +60,17 @@
     // Level sweep: blade +Y reaches forward while its +/-X cutting edges
     // lead the lateral motion. Never roll the flat face into the target.
     spin:[{rx:-1.2,lx:-1.1,ry:-.3,rz:.25,lz:-.65,wx:Math.PI/2,wy:0,wz:-1.15,tilt:-.04},{rx:-1.45,lx:-1.25,ry:.25,rz:.55,lz:-.85,wx:Math.PI/2,wy:0,wz:1.15,lean:.08,tilt:.04},{rx:-1.2,lx:-1.1,rz:.6,lz:-.9,wx:Math.PI/2,wy:0,wz:1.55}],
+    punch:[{rx:-.75,lx:-.6,ry:-.18,wx:0,lwx:0,wz:0,lwz:0,lean:-.06},{rx:-1.55,lx:-.7,wx:0,lwx:0,wz:0,lwz:0,wpz:.27,lean:.12},{rx:-1.0,lx:-.65,wx:0,lwx:0,wz:0,lwz:0}],
+    charge_run:[{rx:-.65,lx:-.65,rz:-.35,lz:.35,wx:0,lwx:0,wz:0,lwz:0,lean:-.08,knee:.22},{rx:-1.15,lx:-1.15,rz:-.1,lz:.1,wx:0,lwx:0,wz:0,lwz:0,lean:.24,knee:.17},{rx:-.8,lx:-.8,wx:0,lwx:0,wz:0,lwz:0,lean:.09}],
+    ground_slam:[{rx:-2.25,lx:-1.15,rz:-.1,lz:.25,wx:0,lwx:0,wz:0,lwz:0,lean:-.10,knee:.18},{rx:-.48,lx:-.48,wx:0,lwx:0,wz:0,lwz:0,wpy:-.27,lpy:-.10,lean:.25,knee:.32},{rx:-.78,lx:-.7,wx:0,lwx:0,wz:0,lwz:0,lean:.12,knee:.13}],
+    machine_guard:[{rx:-.9,lx:-.9,rz:.38,lz:-.38,wx:0,lwx:0,wz:0,lwz:0},{rx:-1.1,lx:-1.1,rz:.55,lz:-.55,wx:0,lwx:0,wz:0,lwz:0,wpy:.15,lpy:.15,lean:-.035,knee:.12},{rx:-1.05,lx:-1.05,rz:.5,lz:-.5,wx:0,lwx:0,wz:0,lwz:0}],
+    maintenance:[{rx:-.85,lx:-.5,rz:.25,lz:-.1,wx:0,lwx:0,wz:0,lwz:0},{rx:-1.15,lx:-.9,rz:.5,lz:-.3,wx:0,lwx:0,wz:0,lwz:0,lean:.04},{rx:-.8,lx:-.75,rz:.2,lz:-.15,wx:0,lwx:0,wz:0,lwz:0}],
+    double_punch:[{rx:-.9,lx:-.9,rz:-.28,lz:.28,wx:0,lwx:0,wz:0,lwz:0,lean:-.06},{rx:-1.47,lx:-.72,wx:0,lwx:0,wz:0,lwz:0,wpz:.18,lean:.12},{rx:-.72,lx:-1.47,wx:0,lwx:0,wz:0,lwz:0,lpz:.18,lean:.12}],
+    core_aid:[{rx:-.9,lx:-.9,rz:.3,lz:-.3,wx:0,lwx:0,wz:0,lwz:0},{rx:-1.3,lx:-1.3,rz:-.25,lz:.25,wx:0,lwx:0,wz:0,lwz:0,wpy:.09,lpy:.09,lean:-.02},{rx:-.85,lx:-.85,wx:0,lwx:0,wz:0,lwz:0}],
   };
   const motionFamilies=new Set(Object.values(FAMILIES));
-  const familyFor=skill=>motionFamilies.has(skill?.presentation?.motion)?skill.presentation.motion:FAMILIES[skill?.effect]||'';
-  function rest(kind,shield){const p={...REST};if(shield)p.lx=-.35;if(['greatsword','warhammer','arcane_staff'].includes(kind)){p.rx=-.35;p.lx=-.5;p.rz=.65;p.lz=-.9;}if(kind==='spellbook'){p.rx=p.lx=-1;p.rz=.5;p.lz=-.5;}if(kind==='elven_bow'){p.rx=-.7;p.lx=-.35;p.wx=0;}return p;}
+  const familyFor=skill=>ROBOT_FAMILIES[skill?.id]||(motionFamilies.has(skill?.presentation?.motion)?skill.presentation.motion:FAMILIES[skill?.effect]||'');
+  function rest(kind,shield){const p={...REST};if(shield)p.lx=-.35;if(['greatsword','warhammer','arcane_staff'].includes(kind)){p.rx=-.35;p.lx=-.5;p.rz=.65;p.lz=-.9;}if(kind==='spellbook'){p.rx=p.lx=-1;p.rz=.5;p.lz=-.5;}if(kind==='elven_bow'){p.rx=-.7;p.lx=-.35;p.wx=0;}if(kind==='robot_fists'){p.rx=p.lx=-.64;p.rz=-.14;p.lz=.14;p.wx=p.lwx=p.wz=p.lwz=0;}return p;}
   function sample(kind,action='attack',variant=0,progress=1,shield=false,family='',out={}){
     kind=kind.replace(/_t[2-5]$/,'');
     const base=rest(kind,shield),track=(WEAPONS[kind]||WEAPONS.unarmed)[variant%2];let poses=track;
@@ -71,5 +84,5 @@
   function begin(model,action,duration,skill){if(!model?.userData)return false;const s=state(model),kind=model.userData.heroWeapon||'unarmed';s.action=action;s.duration=Math.max(.1,Math.min(4,Number(duration)||.65));s.elapsed=0;s.family=familyFor(skill);s.skillId=skill?.id||'';if(action==='attack'){s.variant=s.counts[kind]||0;s.counts[kind]=(s.variant+1)%2;}else s.variant=0;return true;}
   function cancel(model){if(model?.userData.combatMotion){const s=state(model);s.action='';s.elapsed=s.duration;}}
   function update(model,dt=0){const s=state(model);s.elapsed=Math.min(s.duration,s.elapsed+Math.max(0,Math.min(.1,Number(dt)||0)));if(s.elapsed>=s.duration)s.action='';return sample(model.userData.heroWeapon||'unarmed',s.action||'attack',s.variant,s.action?s.elapsed/s.duration:1,model.userData.hasShield,s.family,s.pose);}
-  return Object.freeze({WEAPONS,FAMILIES,familyFor,sample,begin,cancel,update,state});
+  return Object.freeze({WEAPONS,FAMILIES,ROBOT_FAMILIES,familyFor,sample,begin,cancel,update,state});
 });

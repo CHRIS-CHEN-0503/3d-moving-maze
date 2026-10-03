@@ -142,7 +142,9 @@ test('skill preparation holds the same authored windup used by its release',()=>
 });
 
 test('first-person posing preserves held equipment, heading and location, then restores torso rest',()=>{
-  for(const kind of Object.keys(M.WEAPONS).filter(k=>k!=='unarmed')){
+  // Robot integrated fists use their own no-handle hierarchy and are covered
+  // by tower-robot-visuals, rather than this humanoid armor fixture.
+  for(const kind of Object.keys(M.WEAPONS).filter(k=>!['unarmed','robot_fists'].includes(k))){
     const f=figure(kind,'female',5),count=f.model.children.length;f.model.rotation.y=2.4;
     M.begin(f.model,'attack',.6);for(let i=0;i<35;i++){
       f.model.userData.legR.rotation.x=f.model.userData.legL.rotation.x=0;V.pose(f.model,0,.6,true,.02);f.model.updateMatrixWorld(true);

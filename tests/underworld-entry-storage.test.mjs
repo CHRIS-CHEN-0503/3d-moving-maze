@@ -49,12 +49,12 @@ test('a stale active save or changed surface source refuses the pending candidat
   }
 });
 
-test('old underground character selection excludes and rejects archer without replacing legacy gear',()=>{
+test('old underground character selection excludes and rejects archer and robot without replacing legacy gear',()=>{
   const h=harness(),old=C.startUnderworld(winner()).run,before=JSON.stringify({equipment:old.equipment,gearBag:old.gearBag});
-  h.call('chooseProfession',old,true);const html=h.dialogs.at(-1)[3];assert.equal((html.match(/data-tower="profession"/g)||[]).length,6);assert.doesNotMatch(html,/data-item="archer"/);
-  h.call('handleAction','profession','archer');assert.equal(h.context.pendingHero,null);assert.equal(h.events.enabled,0);assert.equal(h.events.revealed,0);assert.match(h.messages.at(-1),/避免替換既有裝備/);
+  h.call('chooseProfession',old,true);const html=h.dialogs.at(-1)[3];assert.equal((html.match(/data-tower="profession"/g)||[]).length,6);assert.doesNotMatch(html,/data-item="(?:archer|robot)"/);
+  for(const job of ['archer','robot']){h.call('handleAction','profession',job);assert.equal(h.context.pendingHero,null);assert.equal(h.events.enabled,0);assert.equal(h.events.revealed,0);assert.match(h.messages.at(-1),/避免替換既有裝備/);}
   h.call('handleAction','profession','mage');assert.equal(h.events.enabled,0);assert.equal(h.events.revealed,1);assert.equal(h.context.pendingHero.party.loadouts,undefined);assert.equal(JSON.stringify({equipment:h.context.pendingHero.equipment,gearBag:h.context.pendingHero.gearBag}),before);assert.ok(C.validateSave(h.context.pendingHero));
-  h.call('chooseProfession',C.newRun({seed:59}),false);assert.match(h.dialogs.at(-1)[3],/data-item="archer"/,'new stories still expose all seven professions');
+  h.call('chooseProfession',C.newRun({seed:59}),false);for(const job of ['archer','robot'])assert.match(h.dialogs.at(-1)[3],new RegExp('data-item="'+job+'"'),'new stories expose all eight professions');
 });
 
 test('descent saves no old-floor exploration checkpoint and a failed save restores the active floor',()=>{

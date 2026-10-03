@@ -15,19 +15,32 @@
   const encounters = () => moduleFor('tower-encounters', 'TowerEncounters');
   const narrative = () => moduleFor('tower-narrative', 'TowerNarrative');
   const loot = () => moduleFor('tower-loot', 'TowerLoot');
+  const foraging = () => moduleFor('tower-foraging', 'TowerForaging');
   const fieldGuide = () => moduleFor('tower-field-guide', 'TowerFieldGuide');
+  const commission = () => moduleFor('tower-commission-cooking', 'TowerCommissionCooking');
+  const robot = () => moduleFor('tower-robot-core', 'TowerRobotCore');
   const freeze = value => { if (value && typeof value === 'object') { Object.values(value).forEach(freeze); Object.freeze(value); } return value; };
   const icon = (provider, key, source, extra = {}) => ({provider, key, source, ...extra});
   const filename = 'story/';
-  const SOURCES = freeze({core: filename + 'story-core.js', party: filename + 'tower-party-core.js', heroes: filename + 'tower-heroes-core.js', growth: filename + 'tower-hero-growth.js', lighting: filename + 'tower-lighting-core.js', encounters: filename + 'tower-encounters.js', loot: filename + 'tower-loot.js', expedition: filename + 'tower-expedition-core.js', narrative: filename + 'tower-narrative.js', runtime: filename + 'tower-mode.js'});
+  const SOURCES = freeze({core: filename + 'story-core.js', party: filename + 'tower-party-core.js', heroes: filename + 'tower-heroes-core.js', growth: filename + 'tower-hero-growth.js', lighting: filename + 'tower-lighting-core.js', encounters: filename + 'tower-encounters.js', loot: filename + 'tower-loot.js', foraging: filename + 'tower-foraging.js', expedition: filename + 'tower-expedition-core.js', narrative: filename + 'tower-narrative.js', runtime: filename + 'tower-mode.js', commission:filename+'tower-commission-cooking.js',robot:filename+'tower-robot-core.js'});
   const rarity = {heal:'uncommon', ration:'common', shield:'rare', hourglass:'rare', bell:'rare', map:'rare', feather:'legendary', arrow:'common'};
   const rarityNames = {common:'普通', uncommon:'少見', rare:'稀有', legendary:'珍稀'};
-  const dropExplanation = '有生態素材的怪物先以一半機率選素材、一半選補給，再從該組候選物資中抽一種，依該物的稀有度判定；不是每件物品都獨立抽一次。沒有素材的怪物只抽補給。落地後需靠近拾取，未拾取物跨存檔與同層變形保留。';
+  const dropExplanation = '有生態素材的怪物先以一半機率選素材、一半選補給，再從該組候選物資中抽一種，依該物的稀有度判定；不是每件物品都獨立抽一次。四種常用食材（'+loot().COMMON_FOOD.map(key=>party().INGREDIENTS[key]).join('、')+'）被抽為候選後為普通 '+loot().chance({type:'ingredient',key:'herb',rarity:'common'})+'%；其他普通物資仍為 '+loot().CHANCES.common+'%。沒有素材的怪物只抽補給。落地後需靠近拾取，未拾取物跨存檔與同層變形保留。';
+  const profileNames={neutral:'中性',suitable:'適合',unsuitable:'不適合'};
+  const foragingExplanation='每層的藥草株數與礦石堆數獨立抽取，各自依環境分類：'+Object.entries(profileNames).map(([id,name])=>name+'環境的 1／2／3 處機率為 '+[1,2,3].map(n=>foraging().PROFILES[id][n]+'%').join('／')+'，其餘 '+foraging().PROFILES[id][0]+'% 為零處').join('；')+'。資源放在靠牆角落，每株或每堆採得 1 份；同層變形與讀檔不補回已採集資源，與討伐掉落分開計算。';
+  function naturalSource(kind,key){
+    const F=foraging(),regions=materials().ECOLOGIES.filter(e=>kind==='herb'||F.orePool({floor:e.high}).includes(key));
+    return {kind,quantity:1,profiles:F.PROFILES,regions:regions.map(e=>({id:e.id,name:e.name,profile:F.REGIONS[e.id][kind]}))};
+  }
+  const naturalRegions=source=>source.regions.map(e=>e.name+'（'+profileNames[e.profile]+'）').join('、');
   const scope = freeze({
     title:'目前職業版劇情模式：地上高塔與地下五十層',
     notes:[
-      '劇情模式不會在開局或變形時自然散放補給；來源為商人、料理、委託、討伐掉落及主線互動。',
+      '一般消耗補給不會在開局或變形時自然散放；來源為商人、料理、委託、討伐掉落及主線互動。靠牆角落的藥草與自然礦石是獨立採集資源，不是自然散放補給。',
+      foragingExplanation,
+      '自然礦堆依環境取得精鐵礦、共鳴晶片或星脈礦；星脈礦僅地下出現。藥草可作料理食材與藥草技能材料。',
       '雜貨商・蘇禾每層有 40% 機率出現，販售藥品、消耗道具、箭矢、火把、四種常用食材及一種隨機樓層特產。食材各限 1～5 份，同層變形／讀檔不補貨；地上可買其他地上樓層特產，地下可另抽到地下特產。三位裝備商只販售裝備並提供對應維護服務。',
+      '蘇禾可代煮已解鎖食譜，沒有廚師也能委託。自備原配方全部食材，另付代煮費；每次固定一份，不觸發廚師的雙份或保鮮被動。',
       dropExplanation,
       '主線印記與委託碎片是任務進度，不是可使用或販售的普通背包物品；固定機關、營地、陷阱與故事日誌紀念文字不算消耗道具。',
       '一般模式的短效加速藥水、穿牆斗篷、風箏、集合口哨、超市商品與雞蛋不屬於目前劇情物資來源，因此不混列；劇情模式另有持續五分鐘的加速藥水。',
@@ -74,30 +87,30 @@
   function ingredientRecords() {
     const P = party(), H = heroes(), L = loot(), M = materials();
     return Object.entries(P.INGREDIENTS).map(([key,name]) => {
-      const meta = M.INGREDIENT_META[key], sources = meta.sources, type = meta.rarity;
+      const meta = M.INGREDIENT_META[key], sources = meta.sources, type = meta.rarity,conditionalPercent=L.chance({type:'ingredient',key,rarity:type}),natural=key==='herb'?naturalSource('herb',key):null;
       const recipes = Object.values(P.RECIPES).filter(r => Object.hasOwn(r.cost,key)).map(r => r.name + ' ×' + r.cost[key]);
       const skills = Object.values(H.SKILLS).filter(s => Object.hasOwn(s.cost || {},key)).map(s => s.name + ' ×' + s.cost[key]);
       const signature=M.ECOLOGIES.filter(e=>M.signature(e.high)===key).map(e=>e.name),grocery=encounters().GROCERY,common=grocery.commonIngredients.includes(key),grocerySource=common?'雜貨商販售常用食材，每份 '+grocery.commonPrice+' 幣（香草也作藥草使用），本層每種限 1～5 份。':signature.length?'可能成為雜貨商的隨機樓層特產，每份 '+grocery.specialtyPrice+' 幣，本層限 1～5 份；可早於原產地樓層買到，地上不抽地下特產。':'';
       return {id:'ingredient:' + key,key,name,category:key === 'shell' ? '製作材料' : '料理食材',description:meta.description+' 整隊共用，持有上限 99 份；在營地料理或技能消耗時使用。',effect:[recipes.length ? '食譜用量：' + recipes.join('、') + '。' : '',skills.length ? '技能材料：' + skills.join('、') + '。' : ''].filter(Boolean).join(' ')||'可作料理或製作材料，實際用途依持有技能與食譜。',
-        acquisition:sources.join('；')+'。被抽為素材候選後，以'+rarityNames[type]+' '+L.CHANCES[type]+'%判定；每堆 '+(key==='shell'?1:2)+' 份。'+(key==='shell'?'完成章末迷宮機關另外給 3 份。':'')+(signature.length?'「棘殼食材箱」在'+signature.join('、')+'完成時另給此食材 2 份。':''),
-        notes:['開局食材：甜根莖 3、月傘菇 2、香草 2、硬殼 1；其他為 0。','已收集食材隨隊保留；自然掉落仍需遇到相應怪物，並非每層都有蟹肉。',grocerySource,'食材不會隨迷宮變形在地面重新生成；雜貨商的庫存與特產也不因變形或讀檔重抽。'].filter(Boolean),stackLimit:99,underground:sources.every(s=>s.includes('地下 B')),drop:{rarity:type,conditionalPercent:L.CHANCES[type],quantity:key==='shell'?1:2},
-        recipes,skills,icon:icon('party-food',key,filename + 'tower-party-runtime.js'),sources:[filename+'tower-materials.js',SOURCES.party,SOURCES.heroes,SOURCES.loot,SOURCES.expedition]};
+        acquisition:sources.join('；')+'。被抽為素材候選後，以'+rarityNames[type]+' '+conditionalPercent+'%判定；每堆 '+(key==='shell'?1:2)+' 份。'+(natural?'另可採集靠牆角落的藥草，每株 1 份。':'')+(key==='shell'?'完成章末迷宮機關另外給 3 份。':'')+(signature.length?'「棘殼食材箱」在'+signature.join('、')+'完成時另給此食材 2 份。':''),
+        notes:['開局食材：甜根莖 3、月傘菇 2、香草 2、硬殼 1；其他為 0。','已收集食材隨隊保留；討伐掉落仍需遇到相應怪物，並非每層都有蟹肉。',grocerySource,'食材不會隨迷宮變形在地面重新生成；雜貨商的庫存與特產也不因變形或讀檔重抽。',...(natural?[foragingExplanation,'藥草可生長環境：'+naturalRegions(natural)+'。']:[])].filter(Boolean),stackLimit:99,underground:sources.every(s=>s.includes('地下 B')),drop:{rarity:type,conditionalPercent,quantity:key==='shell'?1:2},...(natural?{foraging:natural}:{}),
+        recipes,skills,icon:icon('party-food',key,filename + 'tower-party-runtime.js'),sources:[filename+'tower-materials.js',SOURCES.party,SOURCES.heroes,SOURCES.loot,SOURCES.expedition,...(natural?[SOURCES.foraging]:[])]};
     });
   }
   function materialRecords(){
     const M=materials(),X=moduleFor('tower-expedition-core','TowerExpedition'),L=loot();
-    return Object.entries(M.MATERIALS).map(([key,name])=>{const meta=M.MATERIAL_META[key],uses=Object.values(X.TRAITS).filter(t=>t.materialCost?.[key]).map(t=>t.name+'：一級 '+t.materialCost[key]+'／升二級 '+(t.materialCost[key]*2)+' 份'),quantity=['ironore','toughfiber'].includes(key)?2:1;return {
+    return Object.entries(M.MATERIALS).map(([key,name])=>{const meta=M.MATERIAL_META[key],uses=[...Object.values(X.TRAITS).filter(t=>t.materialCost?.[key]).map(t=>t.name+'：一級 '+t.materialCost[key]+'／升二級 '+(t.materialCost[key]*2)+' 份'),...Object.entries(robot().COSTS).filter(([,cost])=>cost.materials[key]).map(([tier,cost])=>'機殼或拳臂進階第'+tier+'階：每件 '+cost.materials[key]+' 份')],quantity=['ironore','toughfiber'].includes(key)?2:1,natural=foraging().NATURAL_ORES.includes(key)?naturalSource('ore',key):null;return {
       id:'material:'+key,key,name,category:'鍛造材料',description:meta.description+' 整隊共用，持有上限 99 份；與食材、金屬零件分開存放。',effect:'鍛造需求：'+uses.join('；')+'。不當成料理食材或隨機宴席耗料。',
-      acquisition:meta.sources.join('；')+'。被抽為素材候選後，以'+rarityNames[meta.rarity]+' '+L.CHANCES[meta.rarity]+'%判定；每堆 '+quantity+' 份。',notes:['所有新鍛造素材初始為零；舊存檔不補送稀有材料。','換層保留已收集材料；普通修理仍只需原有零件和銅幣，不額外消耗新礦材。'],stackLimit:99,underground:['starore','abyssalloy'].includes(key),drop:{rarity:meta.rarity,conditionalPercent:L.CHANCES[meta.rarity],quantity},icon:icon('resource',key,filename+'tower-resource-icons.js'),sources:[filename+'tower-materials.js',SOURCES.loot,SOURCES.expedition]};});
+      acquisition:meta.sources.join('；')+'。被抽為素材候選後，以'+rarityNames[meta.rarity]+' '+L.CHANCES[meta.rarity]+'%判定；每堆 '+quantity+' 份。'+(natural?'另可採集靠牆角落的自然礦堆，每堆 1 份；出現環境：'+naturalRegions(natural)+'。'+(key==='starore'?'星脈礦僅地下出現。':''):''),notes:['所有新鍛造素材初始為零；舊存檔不補送稀有材料。','換層保留已收集材料；普通修理仍只需原有零件和銅幣，不額外消耗新礦材。',...(natural?[foragingExplanation]:[])],stackLimit:99,underground:['starore','abyssalloy'].includes(key),drop:{rarity:meta.rarity,conditionalPercent:L.CHANCES[meta.rarity],quantity},...(natural?{foraging:natural}:{}),icon:icon('resource',key,filename+'tower-resource-icons.js'),sources:[filename+'tower-materials.js',SOURCES.loot,SOURCES.expedition,SOURCES.robot,...(natural?[SOURCES.foraging]:[])]};});
   }
   function mealRecords() {
     const P = party();
     return Object.entries(P.RECIPES).map(([key,r]) => ({id:'meal:' + key,key,name:r.name,category:r.requiredDepth?'地下料理':'料理',
       description:(r.description?r.description+' ':'')+(P.BASIC_RECIPES.includes(key)?'基本料理：任何職業的隊伍皆可在安全營地烹飪。':'廚師料理：隊中有能行動的廚師才會顯示菜譜，且需在安全營地烹飪。'),
       effect:[r.hp ? '恢復目前操控者生命 ' + r.hp + ' 點。' : '不直接恢復目前操控者生命。','恢復全隊共用飽食度 ' + r.hunger + ' 點。',r.team ? '其他仍能行動的隊友各恢復生命 ' + r.team + ' 點，不復活倒地成員。' : '',r.buff ? P.BUFFS[r.buff] + '；維持 3 層，同時最多保留 2 種料理增益。重吃同種會刷新持續樓層。' : ''].filter(Boolean).join(' '),
-      acquisition:(r.requiredDepth?'地下 B'+r.requiredDepth+' 起解鎖；地上及尚未抵達的地下層不能烹飪或享用。':'地上與地下皆可烹飪。')+'材料：' + Object.entries(r.cost).map(([id,n]) => P.INGREDIENTS[id] + ' ×' + n).join(' ＋ ') + '。烹飪基礎產量 1 份。',
-      notes:['沒有廚師時只顯示六道基本菜譜；原先做好的高階成品仍能享用，不會隨廚師離隊消失。商人處不能烹飪。','一料雙份、食材保鮮、食療與分享等效果必須實際學會相應被動才生效；不是有廚師就必定雙倍。','生命與飽食恢復不超過上限；料理欄每種最多 99 份。'],
-      recipe:{...r,cost:{...r.cost}},requiredDepth:r.requiredDepth||0,underground:!!r.requiredDepth,stackLimit:99,icon:icon('party-dish',key,filename + 'tower-party-runtime.js'),sources:[SOURCES.party,SOURCES.heroes,SOURCES.growth]}));
+      acquisition:(r.requiredDepth?'地下 B'+r.requiredDepth+' 起解鎖；地上及尚未抵達的地下層不能烹飪或享用。':'地上與地下皆可烹飪。')+'材料：' + Object.entries(r.cost).map(([id,n]) => P.INGREDIENTS[id] + ' ×' + n).join(' ＋ ') + '。烹飪基礎產量 1 份。亦可在本層蘇禾處委託代煮，'+commission().LABELS[commission().category(key)]+'費用 '+commission().fee(key)+' 幣，仍需自備全部材料。',
+      notes:['沒有廚師時營地只顯示六道基本菜譜；原先做好的高階成品仍能享用，不會隨廚師離隊消失。蘇禾代煮不需廚師，但不能跳過地下食譜深度限制；其他裝備商不提供料理。','一料雙份、食材保鮮、食療與分享等效果必須實際學會相應被動才生效；不是有廚師就必定雙倍。委託代煮固定一份、按原配方扣料，不觸發雙份或保鮮。','生命與飽食恢復不超過上限；料理欄每種最多 99 份。'],
+      recipe:{...r,cost:{...r.cost}},commission:{fee:commission().fee(key),category:commission().category(key),quantity:1},requiredDepth:r.requiredDepth||0,underground:!!r.requiredDepth,stackLimit:99,icon:icon('party-dish',key,filename + 'tower-party-runtime.js'),sources:[SOURCES.party,SOURCES.heroes,SOURCES.growth,SOURCES.commission]}));
   }
   function toolRecords() {
     const L = light(), supply = heroes().PASSIVES.tool_supply.power;
@@ -107,7 +120,7 @@
       {id:'light:torch',name:'火把',category:'照明工具',description:'可切換點燃與熄滅，照亮附近通道。',effect:'一支可燃燒 ' + L.TORCH_SECONDS + ' 秒（五分鐘）；熄滅保留餘火。有日光術照明時暫停燃料消耗；暫停／閱讀／離線不扣時間。',acquisition:'開局 2 支。雜貨商以每支 ' + L.TORCH_PRICE + ' 幣販售，每層限 ' + L.SHOP_STOCK + ' 支，裝備商不再販售。沒有現成火把且燃料用盡時，直接消耗木枝、布條各 1 份點燃，不必先製作。',icon:torchIcon,stackLimit:99,sources:[SOURCES.lighting,filename + 'tower-lighting-runtime.js']},
       ...[['wood','木枝'],['cloth','布條']].map(([key,name]) => ({id:'light:' + key,key,name,category:'照明材料',description:'與另一份照明材料配合，直接點燃五分鐘火把。',effect:'沒有現成火把與餘火時，每次點燃消耗木枝 1 份＋布條 1 份。',acquisition:'開局各 2 份；討伐候選「火把材料」被抽中後，作普通 20%判定，掉一組木枝 1 份＋布條 1 份。',notes:['木枝與布條在迷宮中以同一束材料掉落；此處使用照明面板的物件小圖。'],stackLimit:99,icon:icon('resource',key,filename + 'tower-resource-icons.js'),sources:[SOURCES.lighting,SOURCES.loot,SOURCES.runtime]})),
       {id:'light:daylight',name:'日光術',category:'職業本領',description:'術士的照明本領，不是消耗品，也不占主動技能欄。',effect:'持續 ' + L.DAYLIGHT_SECONDS + ' 秒（十分鐘），同時冷卻 ' + L.DAYLIGHT_COOLDOWN + ' 秒。光照範圍依隊伍術士等級提升，12 起、最高 20；火把照明範圍為 10（遊戲世界距離）。',acquisition:'隊伍有仍能行動的術士即可點左上照明鍵或按 L 施放；照明鍵會由火把換成日光術。',icon:icon('lighting','daylight',filename + 'tower-lighting-runtime.js'),sources:[SOURCES.lighting,filename + 'tower-lighting-runtime.js']},
-      {id:'material:scrap',name:'金屬零件',category:'製作材料',description:'鍛匠工坊修理、強化與部分高階技能使用的共用材料，上限 99。',effect:'修理依損耗計價。'+forgeCosts+'。完全損壞的裝備需有能行動的鍛匠，或找負責這類裝備的商人。破損費為原修理費的 1.5 倍，商人銅幣再加20%，零件不加倍。營地基本保養每層僅一次、6幣、恢復最大耐久20%，不消耗零件，也不能重建破損裝備。',acquisition:'拆解裝備每件取得 1～6 份（依裝備加成與餘下耐久）；完成損壞機關箱探索點取得 4 份。',notes:['這不是背包中可直接使用的療傷道具。'],stackLimit:99,icon:icon('resource','scrap',filename + 'tower-resource-icons.js'),sources:[SOURCES.expedition,SOURCES.growth]},
+      {id:'material:scrap',name:'金屬零件',category:'製作材料',description:'鍛匠工坊修理、強化與部分高階技能使用的共用材料，上限 99。',effect:'修理依損耗計價。'+forgeCosts+'。完全損壞的裝備需有能行動的鍛匠，或找負責這類裝備的商人。破損費為原修理費的 1.5 倍，商人銅幣再加20%，零件不加倍。營地基本保養每層僅一次、6幣、恢復最大耐久'+Math.round(party().CAMP_MAINTENANCE_RATIO*100)+'%，不消耗零件，也不能重建破損裝備。',acquisition:'拆解裝備每件取得 1～6 份（依裝備加成與餘下耐久）；完成損壞機關箱探索點取得 4 份。',notes:['這不是背包中可直接使用的療傷道具。'],stackLimit:99,icon:icon('resource','scrap',filename + 'tower-resource-icons.js'),sources:[SOURCES.expedition,SOURCES.growth,SOURCES.party]},
       {id:'tool:shovel',name:'鐵鍬／破障工具',category:'探索工具',description:'敲掉面前一道可破壞的普通內牆。',effect:'成功破牆消耗 1 把；沒有可破牆時不消耗。不能破外圍牆，也不能跳過章末印記與機關條件。',acquisition:'學會鍛匠「工具補給」被動的存活角色可補充，至多保留 1 把；技能一至六級補充間隔為 ' + supply.join('／') + ' 秒。不是所有鍛匠都保證抽到這項被動。',icon:icon('pickup','⛏','assets/pickup-objects.js'),sources:[SOURCES.heroes,'index.html']}
     ];
   }
@@ -131,5 +144,5 @@
     // The original complete shovel sprite is rendered by the atlas host.
     return '';
   }
-  return Object.freeze({records,iconHtml,scope,dropExplanation,SOURCES});
+  return Object.freeze({records,iconHtml,scope,dropExplanation,foragingExplanation,SOURCES});
 });

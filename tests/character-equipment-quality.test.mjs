@@ -12,7 +12,7 @@ test('all gender and tier equipment batches have finite positions, color and nor
     m.traverse(o=>{assert.ok(!o.isLight);if(!o.isMesh)return;assert.equal(o.material.map,null);for(const key of ['position','normal','color'])if(o.geometry.attributes[key])assert.ok(Array.from(o.geometry.attributes[key].array).every(Number.isFinite));if(o.userData.staticBatch){assert.ok(o.material.vertexColors);assert.equal(o.geometry.attributes.position.count,o.geometry.attributes.color.count);}});
     const bounds=new T.Box3().setFromObject(m);assert.ok(bounds.max.y<2.4&&bounds.min.y>-.85,kind);
   }
-  assert.equal(variants,180);assert.ok(draws/source<.65,'static gear must save at least 35 percent of authored part draws');
+  assert.equal(variants,200);assert.ok(draws/source<.65,'static gear must save at least 35 percent of authored part draws');
 });
 test('weapon tiers gain functional silhouette geometry instead of only recoloring identical shapes',()=>{
   const V=visuals();for(const base of Object.keys(H.GEAR).filter(k=>H.GEAR[k].slot==='weapon'&&H.GEAR[k].tier===1)){

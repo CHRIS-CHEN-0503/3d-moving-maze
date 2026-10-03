@@ -92,7 +92,7 @@ function harness(initialSave, runtimeBridge = '',preferences = {}) {
   const storedRun=typeof initialSave==='string'?null:initialSave;
   if(storedRun?.party){
     context.TowerPartyCore=require('../story/tower-party-core.js');context.TowerExpedition=require('../story/tower-expedition-core.js');
-    context.TowerLighting=require('../story/tower-lighting-core.js');context.TowerFloorLords=require('../story/tower-floor-lords.js');context.TowerLoot=require('../story/tower-loot.js');context.TowerReinforcements=require('../story/tower-reinforcements.js');
+    context.TowerLighting=require('../story/tower-lighting-core.js');context.TowerFloorLords=require('../story/tower-floor-lords.js');context.TowerLoot=require('../story/tower-loot.js');context.TowerForaging=require('../story/tower-foraging.js');context.TowerReinforcements=require('../story/tower-reinforcements.js');
     context.TowerCreatureArt=require('../story/tower-creature-art.js');
     context.camera=new THREE.PerspectiveCamera();
     vm.runInContext(lightingRuntimeSource,context,{filename:'tower-lighting-runtime.js'});

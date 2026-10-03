@@ -1,11 +1,13 @@
 /* Original layered spells: filled silhouettes, GPU particles and soft light.
    Uses the existing loop, no dynamic lights, bloom, fullscreen flashes or lines. */
 (function(root){'use strict';
-  const PALETTES={swordsman:[0xffe5af,0xffa46c],mage:[0xc6b5ff,0x86e4ff],scout:[0xa3ffe0,0x54cda2],chef:[0xffd6a0,0xff9a64],healer:[0xd9ffe4,0x79edba],smith:[0xffdea9,0xffa465],archer:[0xffe6ac,0x99ddb2]};
+  const PALETTES={swordsman:[0xffe5af,0xffa46c],mage:[0xc6b5ff,0x86e4ff],scout:[0xa3ffe0,0x54cda2],chef:[0xffd6a0,0xff9a64],healer:[0xd9ffe4,0x79edba],smith:[0xffdea9,0xffa465],archer:[0xffe6ac,0x99ddb2],robot:[0xbff3ff,0xffbd73]};
   const FAMILIES={arrow:'arrow',binding:'arrow',volley:'arrow',great_arrow:'arrow',decisive:'slash',star_ring:'meteor',escape:'scan',feast:'steam',sanctuary:'heal',fortress:'shield',cleave:'slash',circle:'spin',blind:'slash',stun:'impact',stagger:'impact',splash:'splash',bolt:'cast',weak:'cast',slow:'slash',mark:'cast',shock:'storm',thorns:'thorns',repel:'wave',starfall:'meteor',guard:'shield',barrier:'shield',ward:'shield',fortify:'shield',rally:'aura',speed:'aura',polish:'forge',stealth:'smoke',smoke:'smoke',stomach:'steam',meal:'steam',soup:'heal',heal:'heal',revive:'heal',cleanse:'cleanse',reveal:'scan',disarm:'scan',daylight:'sun',repair:'forge',frost:'frost',taunt:'wave',barricade:'forge'};
   const THEMES={shock:[0xebfaff,0x459fff],thorns:[0xd5f697,0x6aab43],starfall:[0xfff1cc,0xff8242],star_ring:[0xfff1cc,0xea92ff],frost:[0xe1fbff,0x72cdff],splash:[0xffd090,0xfb714a],weak:[0xe4fff2,0x8be8bd],mark:[0xfff0be,0xfa9e62]};
+  const ROBOT_FAMILIES=Object.freeze({flying_fist:'rocket_fist',iron_charge:'ram',shoulder_quake:'quake',folded_guard:'shield',joint_oil:'lubricate',parts_restore:'rebuild',steel_meteor_fist:'quake',explosive_fists:'twin_fist',mech_aid:'shield'});
+  Object.assign(FAMILIES,{robot_fist:'rocket_fist',robot_charge:'ram',robot_quake:'quake',robot_guard:'shield',robot_speed:'lubricate',robot_restore:'rebuild',robot_meteor:'quake',robot_double:'twin_fist',mech_aid:'shield'});
   const visualFamilies=new Set(Object.values(FAMILIES));
-  const familyFor=skill=>visualFamilies.has(skill?.presentation?.family)?skill.presentation.family:FAMILIES[skill?.effect];
+  const familyFor=skill=>ROBOT_FAMILIES[skill?.id]||(visualFamilies.has(skill?.presentation?.family)?skill.presentation.family:FAMILIES[skill?.effect]);
   const colorsFor=skill=>Array.isArray(skill?.presentation?.colors)&&skill.presentation.colors.length===2&&skill.presentation.colors.every(n=>Number.isInteger(n)&&n>=0&&n<=0xffffff)?skill.presentation.colors:THEMES[skill?.effect]||PALETTES[skill?.job]||PALETTES.swordsman;
   const PARTICLE_VERTEX=[
     'attribute vec3 velocity; attribute float seed; attribute float pointSize;',
@@ -42,9 +44,9 @@
     let shieldMaterial=null;
     function dispose(f){if(!f)return;f.group.parent?.remove(f.group);const geometries=new Set();f.group.traverse(o=>{if((o.isMesh||o.isPoints)&&o.geometry)geometries.add(o.geometry);});geometries.forEach(g=>g.dispose());f.mats.forEach(m=>m.dispose());}
     function emit(skill,at,angle=0,options={}){
-      if(destroyed||!at||!skill||!FAMILIES[skill.effect]||ctx.visible&&!ctx.visible(at))return null;
+      if(destroyed||!at||!skill||!familyFor(skill)||ctx.visible&&!ctx.visible(at))return null;
       if(effects.length>=limit)dispose(effects.shift());
-      const baseFamily=familyFor(skill),family=options.impact?(['storm','thorns'].includes(baseFamily)?baseFamily:'hit'):options.stage==='charge'?'charge':options.stage==='land'?(baseFamily==='meteor'?'meteor':'burst'):baseFamily;
+      const baseFamily=familyFor(skill),family=options.impact?(skill.job==='robot'?'mechanical_hit':['storm','thorns'].includes(baseFamily)?baseFamily:'hit'):options.stage==='charge'?'charge':options.stage==='land'?(skill.job==='robot'?'quake':baseFamily==='meteor'?'meteor':'burst'):baseFamily;
       const colors=colorsFor(skill),group=new T.Group();group.name='skill-vfx-'+skill.id;group.position.set(at.x,.04,at.z);group.rotation.y=angle;
       const total=family==='thorns'&&options.impact?3:family==='storm'?.92:family==='hit'?.42:family==='charge'||family==='meteor'?Math.min(4,Math.max(.1,Number(options.duration)||.85)):reduced?.65:['heal','shield','sun'].includes(family)?1.6:1.15;
       const parts=[],mats=[],count=reduced?2:4,power=skill.unique?1.18:1;
@@ -59,7 +61,34 @@
         group.add(cloud);parts.push({m:cloud,mode:'particles'});return cloud;
       }
       const ground=new T.Mesh(new T.PlaneGeometry(3.6,3.6),material(colors[1],.24,glow));ground.rotation.x=-Math.PI/2;ground.position.y=.008;group.add(ground);
-      if(family==='storm'){
+      if(['rocket_fist','twin_fist'].includes(family)){
+        // A filled, forward-facing fist silhouette, not a generic magic orb.
+        const n=family==='twin_fist'&&!reduced?2:1;
+        for(let i=0;i<n;i++){
+          const s=new T.Shape();s.moveTo(-.26,-.18);s.lineTo(.17,-.18);s.quadraticCurveTo(.32,-.12,.32,.045);s.quadraticCurveTo(.29,.12,.19,.13);s.lineTo(.19,.25);s.quadraticCurveTo(.13,.37,.05,.29);s.lineTo(.045,.235);s.quadraticCurveTo(-.025,.36,-.1,.28);s.lineTo(-.105,.215);s.quadraticCurveTo(-.18,.32,-.27,.23);s.lineTo(-.27,-.1);s.closePath();
+          const geometry=new T.ExtrudeGeometry(s,{depth:.22,bevelEnabled:true,bevelThickness:.025,bevelSize:.02,bevelSegments:1,steps:1}),normals=geometry.attributes.normal,tints=[];
+          // Raised gold bevels and shaded steel thickness retain a real fist
+          // silhouette even in bright rooms; existing scene lights do the work.
+          for(let v=0;v<normals.count;v++){const facing=Math.abs(normals.getZ(v)),color=new T.Color(facing>.95?colors[0]:facing>.15?colors[1]:0x456373);tints.push(color.r,color.g,color.b);}
+          geometry.setAttribute('color',new T.Float32BufferAttribute(tints,3));
+          const fist=solid(geometry,i?.37:-.37,1.12,.28+i*.17,0,'flight',.96),old=fist.material;
+          mats.splice(mats.indexOf(old),1);old.dispose();fist.material=new T.MeshPhongMaterial({color:0xffffff,vertexColors:true,emissive:0x0f2630,emissiveIntensity:.4,specular:0xe2f1fa,shininess:70,transparent:true,opacity:.96,depthWrite:false,blending:T.NormalBlending,toneMapped:false});fist.material.userData.baseOpacity=.96;mats.push(fist.material);
+          fist.name='robot-propelled-fist';fist.scale.setScalar(skill.unique?1.45:1);fist.rotation.y=i?-.18:.18;
+          const exhaust=soft(i?.37:-.37,1.10,.12+i*.17,.78,1,'flight');exhaust.material.opacity=.45;exhaust.material.userData.baseOpacity=.45;exhaust.scale.z=1;
+        }
+      }else if(family==='ram'){
+        soft(0,.82,.7,2.05,0,'breathe');
+        for(let i=0;i<(reduced?1:3);i++){const s=new T.Shape();s.moveTo(-.66,0);s.quadraticCurveTo(0,.4,.66,0);s.lineTo(.56,-.11);s.quadraticCurveTo(0,.17,-.56,-.11);s.closePath();const plate=solid(new T.ShapeGeometry(s),0,.6+i*.24,.44+i*.21,i%2,'flight',.65);plate.name='robot-charge-pressure-front';}
+      }else if(['quake','mechanical_hit'].includes(family)){
+        const impact=soft(0,family==='quake'?.2:1.03,0,skill.unique?3.0:2.2,0,'breathe');impact.name='robot-impact-core';
+        // Debris and filled pressure fans use the same bounded particle program.
+        for(let i=0;i<(reduced?2:4);i++){const a=i*Math.PI*2/4,shard=solid(new T.DodecahedronGeometry(family==='quake'?.17:.11,0),Math.sin(a)*.33,family==='quake'?.24:1.03,Math.cos(a)*.33,i%2,'contact',.9);shard.name='robot-armor-impact-shard';shard.scale.y=family==='quake'?.7:1.6;}
+      }else if(['rebuild','lubricate'].includes(family)){
+        soft(0,.85,0,1.55,0,'breathe');
+        if(family==='rebuild'){const s=new T.Shape();for(let i=0;i<32;i++){const a=i*Math.PI*2/32,r=i%4<2?.36:.29,x=Math.sin(a)*r,y=Math.cos(a)*r;if(i)s.lineTo(x,y);else s.moveTo(x,y);}s.closePath();const cog=solid(new T.ShapeGeometry(s),0,1.20,.28,1,'orbit',.8);cog.name='robot-repair-cog';}
+        else {const s=new T.Shape();s.moveTo(0,.43);s.bezierCurveTo(-.13,.16,-.34,-.08,-.18,-.25);s.quadraticCurveTo(0,-.4,.18,-.25);s.bezierCurveTo(.34,-.08,.13,.16,0,.43);s.closePath();const oil=solid(new T.ShapeGeometry(s),0,1.24,.3,1,'rise',.85);oil.name='robot-lubricant-drop';}
+        for(let i=0;i<(reduced?1:3);i++){const a=i*Math.PI*2/3;soft(Math.sin(a)*.47,.36+i*.24,Math.cos(a)*.47,.38,0,'orbit');}
+      }else if(family==='storm'){
         soft(0,1.05,0,2.2,1,'breathe');
         for(let i=0;i<(reduced?2:3);i++){const s=new T.Shape();s.moveTo(0,0);s.lineTo(.48,.75);s.lineTo(.13,.7);s.lineTo(.68,1.48);s.lineTo(.3,1.4);s.lineTo(.75,2.4);s.lineTo(.07,1.5);s.lineTo(.35,1.55);s.lineTo(-.14,.65);s.lineTo(.16,.68);s.closePath();const bolt=solid(new T.ShapeGeometry(s),Math.sin(i*2.1)*.66,.15,Math.cos(i*2.1)*.66,i%2,'electric',.95);bolt.rotation.y=i*2.1;bolt.rotation.z=(i-1)*.6;}
         for(let i=0;i<(reduced?1:2);i++)soft(i?-.8:.8,1.1,0,.7,0,'contact');
@@ -101,7 +130,7 @@
         soft(0,['sun','heal','cleanse'].includes(family)?1.65:.6,0,family==='sun'?2.2:1.6,0,'breathe');
         for(let i=0;i<count;i++){const a=i*Math.PI*2/count;soft(Math.sin(a)*.78,.15+i*.25,Math.cos(a)*.78,.6,i%2,['scan','wave'].includes(family)?'spark':'orbit',['heal','aura','cleanse'].includes(family));}
       }
-      particles(family==='charge'?2:['shield','heal','aura','cleanse','thorns','sun'].includes(family)?1:['steam','smoke'].includes(family)?3:0,['heal','aura','thorns','arrow'].includes(family));
+      particles(family==='charge'?2:['shield','heal','aura','cleanse','thorns','sun','rebuild','lubricate'].includes(family)?1:['steam','smoke'].includes(family)?3:0,['heal','aura','thorns','arrow'].includes(family));
       group.scale.setScalar(power);ctx.world().add(group);
       const f={group,total,left:total,parts,mats,family,at:{x:at.x,z:at.z},skill:skill.id};effects.push(f);return f;
     }
@@ -129,5 +158,5 @@
     function destroy(){if(destroyed)return;reset();for(const map of [glow,petal,mist])map.dispose();particleMaterial.dispose();shieldMaterial?.dispose();destroyed=true;}
     return {emit,tick,reset,cancel,destroy,stats:()=>({groups:effects.length,max:limit,meshes:effects.reduce((n,f)=>n+f.group.children.length,0),particles:effects.reduce((n,f)=>n+f.parts.filter(p=>p.mode==='particles').reduce((s,p)=>s+p.m.geometry.attributes.position.count,0),0),textureBytes:destroyed?0:49152})};
   }
-  root.TowerSkillEffects={create,FAMILIES,THEMES,familyFor,colorsFor};
+  root.TowerSkillEffects={create,FAMILIES,THEMES,ROBOT_FAMILIES,familyFor,colorsFor};
 })(globalThis);

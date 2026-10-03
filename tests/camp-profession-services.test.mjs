@@ -21,10 +21,10 @@ test('chef may be leader or follower, but prepared advanced meals remain edible 
   for(const hero of [true,false]){let run=fresh(hero?'chef':'swordsman');const id=hero?'hero':companion(run,'chef');run=ok(P.cook(run,'feast'));const count=run.party.meals.feast;assert.ok(count>=1);if(hero){const follower=companion(run,'swordsman');run=ok(H.switchActor(run,follower));H.setHp(run,'hero',0);}else run=ok(P.dismiss(run,id));assert.equal(P.recipeAvailable(run,'feast'),false);assert.ok(P.recipeUnlocked(run,'feast'));run=ok(P.eat(run,'feast'));assert.equal(run.party.meals.feast,count-1);}
 });
 
-test('camp maintenance restores 20 percent of maximum once per floor, excludes broken and stored gear',()=>{
+test('camp maintenance restores 10 percent of maximum once per floor, excludes broken and stored gear',()=>{
   let run=fresh();const id=companion(run,'mage');[run]=stored(run,'heavy_helm');const worn=H.allGear(run).filter(g=>!run.gearBag.includes(g));for(const gear of worn)gear.durability=1;H.equipment(run,id).weapon.durability=0;const bag=run.gearBag[0];bag.durability=1;
-  const before=structuredClone(run),quote=P.campMaintenanceQuote(run);assert.equal(quote.cost,6);assert.equal(quote.ratio,.2);assert.equal(quote.used,false);run=ok(P.camp(run,'repair',run.revision));assert.equal(run.coins,before.coins-6);
-  for(const gear of H.allGear(run)){const old=H.allGear(before).find(g=>g.id===gear.id),eligible=old.durability>0&&!before.gearBag.some(g=>g.id===old.id);assert.equal(gear.durability,eligible?Math.min(old.maxDurability,1+Math.ceil(old.maxDurability*.2)):old.durability);}
+  const before=structuredClone(run),quote=P.campMaintenanceQuote(run);assert.equal(quote.cost,6);assert.equal(P.CAMP_MAINTENANCE_RATIO,.1);assert.equal(quote.ratio,.1);assert.equal(quote.used,false);const result=P.camp(run,'repair',run.revision);assert.match(result.message,/最大耐久的10%/);run=ok(result);assert.equal(run.coins,before.coins-6);
+  for(const gear of H.allGear(run)){const old=H.allGear(before).find(g=>g.id===gear.id),eligible=old.durability>0&&!before.gearBag.some(g=>g.id===old.id);assert.equal(gear.durability,eligible?Math.min(old.maxDurability,1+Math.ceil(old.maxDurability*.1)):old.durability);}
   assert.equal(P.campMaintenanceQuote(run).used,true);unchanged(run,()=>P.camp(run,'repair'));
 });
 
@@ -49,10 +49,11 @@ test('camp full repair, forge and dismantle all require an actionable smith, reg
   const smith=companion(run,'smith');assert.ok(X.repairQuote(run,id).allowed);assert.ok(X.forgeQuote(run,id,'durable').allowed);assert.ok(X.repair(run,id).ok);assert.ok(X.forge(run,id,'durable').ok);assert.ok(X.dismantle(run,id).ok);run=ok(H.switchActor(run,smith));assert.ok(X.repairQuote(run,id).allowed);run=ok(C.tickEffects(run,2));run=ok(H.switchActor(run,'hero'));H.setHp(run,smith,0);for(const action of [()=>X.repair(run,id),()=>X.forge(run,id,'durable'),()=>X.dismantle(run,id)])unchanged(run,action);
 });
 
-test('all 90 modern equipment definitions and legacy items have exactly one specialist matching sales',()=>{
-  for(const kind of Object.keys(H.GEAR)){const merchants=Object.keys(E.MERCHANTS).filter(id=>E.merchantHandles(id,kind));assert.equal(merchants.length,1,kind);const owner=E.MERCHANT_SERVICES[merchants[0]],gear=H.GEAR[kind];assert.ok(gear.slot===owner.slot||owner.weaponKinds.includes(gear.baseKind));}
+test('all 90 human equipment definitions, ten fixed robot parts and legacy items have exactly one specialist',()=>{
+  assert.equal(Object.values(H.GEAR).filter(g=>!g.integrated).length,90);assert.equal(Object.values(H.GEAR).filter(g=>g.integrated).length,10);
+  for(const kind of Object.keys(H.GEAR)){const merchants=Object.keys(E.MERCHANTS).filter(id=>E.merchantHandles(id,kind));assert.equal(merchants.length,1,kind);const owner=E.MERCHANT_SERVICES[merchants[0]],gear=H.GEAR[kind];if(gear.integrated){assert.deepEqual(merchants,['tieLing']);assert.deepEqual(gear.jobs,['robot']);}else assert.ok(gear.slot===owner.slot||owner.weaponKinds.includes(gear.baseKind));}
   for(const kind of ['helmet','armor','shield','bat','pan','staff'])assert.equal(Object.keys(E.MERCHANTS).filter(id=>E.merchantHandles(id,kind)).length,1);
-  for(const floor of [99,50,1,-1,-21,-50])for(let seed=1;seed<15;seed++)for(const shop of E.merchantOffers(floor,seed,true))for(const gear of shop.gear)assert.equal(E.merchantHandles(shop.id,gear.kind),true);
+  for(const floor of [99,50,1,-1,-21,-50])for(let seed=1;seed<15;seed++)for(const shop of E.merchantOffers(floor,seed,true))for(const gear of shop.gear){assert.equal(E.merchantHandles(shop.id,gear.kind),true);assert.equal(H.GEAR[gear.kind].integrated,undefined,'fixed parts are serviced but never sold as loose equipment');}
   assert.equal(E.merchantHandles('__proto__','longsword'),false);assert.equal(E.merchantHandles('tieLing','unknown'),false);
 });
 

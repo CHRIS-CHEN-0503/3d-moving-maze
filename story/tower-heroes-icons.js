@@ -145,9 +145,37 @@
     pursuit_volley:p('M5 19h51m-11-8 11 8-11 8M10 36h49m-11-8 11 8-11 8M3 53h49m-11-8 11 8-11 8M6 12l7 7-7 7m9 3 7 7-7 7m-8 3 7 7-7 7'),
     forest_symphony:g(leaf,'translate(-1 7) scale(.75)')+p('M36 18q16 13 0 27m8-35q23 21 0 42m8-49q24 28 0 56M4 55h14m-9-8v12'),
   });
+  // Integrated machinery and action silhouettes; no downloaded pictograms.
+  const fist=p('M13 39V22q0-6 7-6h5v-5h8v3h8v3h8v7h5v17l-9 13H23ZM20 16v16m13-18v17m8-14v15M13 39l12-9 10 3v11M21 53h22v6H21');
+  const core=circle(32,32,13)+circle(32,32,7)+p('M28 12h8v6m12 10h6v8h-6M28 46v6h8v-6M10 28h6v8h-6');
+  const robotShell=p('M23 9h18l12 9 6 18-10 4-5-9v23H20V31l-5 9-10-4 6-18ZM20 54l12 6 12-6M13 19l8 7m30-7-8 7')+g(core,'translate(13 13) scale(.6)');
+  Object.assign(drawings,{
+    robot:p('M20 5h24l7 9v17l-8 7H21l-8-7V14ZM7 15h7v13H7m43-13h7v13h-7M21 20h6m10 0h6M24 29h16M10 60V45l12-7h20l12 7v15')+g(core,'translate(14 29) scale(.55)'),
+    robot_fists:fist,
+    robot_shell:robotShell,
+    flying_fist:g(fist,'translate(19 -1) scale(.76)')+p('M2 23h21M1 34h16M3 45h22M43 55l14-6'),
+    iron_charge:g(fist,'translate(16 1) scale(.75)')+p('M3 12h20M2 23h17M1 35h13M3 47h22M44 6l15 23-4 15-13 13'),
+    shoulder_quake:g(fist,'translate(18 -4) rotate(30 25 25) scale(.62)')+p('M6 48h16l-5 10h11l5-15 8 12h17M6 30l10 8m-10 4h10m42-12-10 8m10 4H48'),
+    folded_guard:p('M8 45V23l10-7 14 13 14-13 10 7v22L42 56H22ZM18 16l4-9h20l4 9M16 30l14 10m18-10L34 40M23 43l9 7 9-7'),
+    joint_oil:p('M31 5q-6 14-14 25C3 51 44 60 49 39 52 28 37 18 31 5ZM19 39q0 11 10 12M46 6h12m-6-5v12M48 18h10'),
+    parts_restore:g(core,'translate(-8 -4) scale(.83)')+p('M37 32h22v27H37Zm6 0v-7h10v7M41 45h14m-7-7v15'),
+    steel_meteor_fist:g(fist,'translate(22 14) rotate(-35 25 25) scale(.68)')+p('M7 4l17 21M20 1l15 19M3 20l18 19M5 53l12-7 8 14 10-13 12 10 12-7'),
+    explosive_fists:g(fist,'translate(-2 1) scale(.65)')+g(fist,'translate(28 1) scale(.65)')+p('m31 41-6 8 7 11 6-11-7-8M5 49h12m30 0h12'),
+    mech_aid:g(core,'translate(0 -6) scale(.8)')+p('M5 42l13-7 14 11 14-11 13 7-10 17H15M17 42l15 9 15-9'),
+    robot_body:robotShell+p('M7 5h11m-6-5v11M48 47h12m-6-6v12'),
+    fist_drive:g(fist,'translate(10 4) scale(.8)')+p('M4 6h12v12H4m-1 8h9M48 7l6 11-8 6M48 47l12 8'),
+    stable_feet:p('M10 9h17v25l-3 7H8V20ZM37 9h17v11l2 21H40l-3-7ZM8 41h16v12H4v-7Zm32 0h16l4 5v7H40M3 60h58'),
+    shock_absorber:p('M23 5h18v11H23ZM25 16v8l14 6-14 6 14 6-14 6v8h14V48M25 24l14 6-14 6 14 6-14 6M20 56h24v7H20M5 26l9 6-9 6m54-12-9 6 9 6'),
+    power_calibration:g(core,'translate(0 6) scale(.9)')+p('M3 4h17m-8-3v17M39 8l7 7 13-12M22 58h15'),
+    kinetic_core:core+p('M1 5l17 13m45-13L46 18M3 56l15-12m43 12L46 44'),
+    molten_drive:g(core,'translate(3 14) scale(.88)')+p('M19 25Q3 7 26 2q-5 14 6 15Q47 1 50 23q-8 1-11 6M5 51h13m27 0h14'),
+    core_resonance:g(core,'translate(-1 -1) scale(.75)')+g(core,'translate(22 22) scale(.65)')+p('M40 6q20 4 20 20M6 40q4 20 20 20M49 8l-9-2 5 9M8 49l-2-9 9 5'),
+  });
+  // The portrait consumes the same whole machine illustration as the job icon.
+  drawings.job_robot=drawings.robot;
   // Each tier keeps its recognizable whole object and adds its own inlaid trim.
   const tierInlay={2:p('m45 42 5-5 5 5-5 5Z'),3:p('m43 38 7-7 7 7-7 7Zm-3 13 4-4 4 4-4 4m11 0 4-4 4 4-4 4'),4:p('m43 44 7-12 7 12-7 12Zm7-12v24M38 43q-5 10 8 17m16-17q5 10-8 17'),5:circle(50,46,7)+p('M50 32v5m0 18v5M36 46h5m18 0h4M39 35l5 5m12 12 5 5M39 57l5-5m12-12 5-5')};
-  for(const kind of ['longsword','greatsword','arcane_staff','spellbook','smith_hammer','warhammer','cooking_pan','twin_daggers','elven_bow','heavy_helm','heavy_armor','light_hood','light_armor','rune_crown','robe','buckler','round_shield','tower_shield'])for(const tier of [2,3,4,5])drawings[kind+'_t'+tier]=drawings[kind]+tierInlay[tier];
+  for(const kind of ['longsword','greatsword','arcane_staff','spellbook','smith_hammer','warhammer','cooking_pan','twin_daggers','elven_bow','heavy_helm','heavy_armor','light_hood','light_armor','rune_crown','robe','buckler','round_shield','tower_shield','robot_fists','robot_shell'])for(const tier of [2,3,4,5])drawings[kind+'_t'+tier]=drawings[kind]+tierInlay[tier];
   function svg(id){if(!drawings[id])return '';return '<svg class="hero-icon" viewBox="0 0 64 64" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><g fill="#284957" fill-opacity=".75" stroke="#f6db9e" stroke-width="2.8" stroke-linecap="round" stroke-linejoin="round">'+drawings[id]+'</g></svg>';}
   return Object.freeze({svg,ids:Object.freeze(Object.keys(drawings))});
 });

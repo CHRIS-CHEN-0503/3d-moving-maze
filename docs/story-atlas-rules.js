@@ -11,9 +11,10 @@
   const E=()=>moduleFor('tower-encounters','TowerEncounters'),X=()=>moduleFor('tower-expedition-core','TowerExpedition');
   const FI=()=>moduleFor('tower-forge-icons','TowerForgeIcons');
   const TR=()=>moduleFor('tower-recruitment','TowerRecruitment');
+  const Robot=()=>moduleFor('tower-robot-core','TowerRobotCore');
   const row=(label,value)=>({label,value:String(value)}),fmt=n=>Number(n.toFixed(2)).toString(),series=(a,unit)=>a.map(fmt).join('／')+unit;
   const valid=(object,key)=>typeof key==='string'&&Object.hasOwn(object,key);
-  const armorNames={heavy:'重裝',light:'輕裝',robe:'法袍',shield:'盾牌'},slotNames={helmet:'頭部',armor:'身體',shield:'副手盾牌',weapon:'武器'};
+  const armorNames={heavy:'重裝',light:'輕裝',robe:'法袍',shield:'盾牌',robot:'一體式機殼'},slotNames={helmet:'頭部',armor:'身體',shield:'副手盾牌',weapon:'武器'};
   const targetEffects=['heal','revive','barrier','ward','repair','fortify','polish','cleanse'];
   function skillAccess(s){
     if(s.ascension)return '僅地下篇主角 '+s.ascension.level+' 級，自動沿「'+(H().SKILLS[s.ascension.base]||H().PASSIVES[s.ascension.base]).name+'」路線獲得；同伴不會取得。';
@@ -25,10 +26,17 @@
     if(s.modifiers)return {label:'分支效果增幅',unit:'%'};
     if(s.id==='double_portion'||s.id==='ingredient_care'||s.id==='care')return {label:'觸發機率',unit:'%'};
     if(s.id==='artisan_soul')return {label:'裝備耐久護層',unit:'%'};
+    if(s.id==='robot_body')return {label:'最大生命增加',unit:'點'};
     if(s.id==='many_flavors'||s.id==='life_covenant'||s.id==='unyielding')return {label:'最大生命護盾',unit:'%'};
     return current;
   }
   function skillTarget(s){
+    if(s.job==='robot'){
+      const p=s.params||{};
+      if(s.attack)return (p.radius?'自身周圍 '+p.radius:'前方 '+(p.reach||6))+' 個世界距離單位內，最多 '+(p.maxTargets||1)+' 隻可見怪物；牆壁會阻擋，不能推動樓層主。';
+      if(s.effect==='mech_aid')return '施放者與一名四個世界距離單位內可見隊友；先點技能，再點左側職業卡選人。';
+      return '施放者自身。';
+    }
     if(targetEffects.includes(s.effect))return '先點技能，再點左側隊友；需在六個世界距離單位內，且牆壁不阻擋視線。';
     if(s.attack){
       if(s.job==='archer')return (s.effect==='volley'?'前方最多三隻怪物':'前方最近一隻怪物')+'；射程沿用已裝備弓，不穿牆。';
@@ -48,6 +56,11 @@
   }
   function timing(s){
     const p=s.params||{},a=Array.from({length:6},(_,i)=>i+1);
+    if(s.job==='robot'){
+      if(s.effect==='mech_aid')return '吸收型護盾最多五分鐘；受傷耗盡會提早消失，不與同類護盾相加。';
+      if(p.knockback)return '命中擊退 '+p.knockback+' 個世界距離單位；不可穿牆，不推動樓層主。';
+      if(p.duration)return '持續 '+p.duration+' 秒。';
+    }
     if(s.effect==='barrier')return '護盾最多五分鐘；先被傷害耗盡就立即失效，不等於無敵。';
     if(s.effect==='fortress')return '護盾五分鐘；挑釁及四次耐久保護十五秒，三者不是同一時限。';
     if(s.effect==='sanctuary')return '領域十秒，合計恢復最大生命40%；施放時扶起一人至30%生命。';
@@ -79,6 +92,7 @@
       if(s.effect==='fortress')materials.push('金屬零件 ×2');
       if(s.effect==='feast')materials.push('三種不同食材各一份');
       if(s.ammo)materials.push('箭矢 ×'+s.ammo);
+      if(s.scrapCost)materials.push('金屬零件 ×'+s.scrapCost);
       details.push(row('冷卻',s.effect==='cleanse'?'一至六級：'+series(s.power,' 秒'):s.cooldown+' 秒'),row('準備時間',prep?prep+' 秒':s.effect==='disarm'?'依下方作業秒數；本身無額外蓄力':'立即施放'),row('消耗',materials.join('、')||'不耗食材或箭矢'),row('作用對象',skillTarget(s)),row('持續／附帶效果',timing(s)));
       if(['taunt','fortress'].includes(s.effect))details.push(row('挑釁數量上限','技能一至六級：'+series(Array.from({length:6},(_,i)=>h.tauntTargetLimit(i+1)),' 隻')+'；每名施放者分開計算，主角與同伴遵循同一規則。'));
       if(s.attack)notes.push(['mage','healer','archer'].includes(s.job)?'施放攻擊技能就扣一次武器耐久，空放或撞牆不退；同次命中不再重扣。':'近戰攻擊技能確認命中才扣一次武器耐久；同次多目標不重扣。');
@@ -91,7 +105,7 @@
     return {id,name:s.name,category:'skills',job:s.job,jobs:[s.job],description,iconHtml:I().svg(id),tags:[h.JOBS[s.job].name,active?'主動':'被動',s.ascension?'地下主角進階':s.unique?'十級覺醒':'普通技能'],details,notes,levels,skillType:active?'active':'passive',unique:!!s.unique,ascension:s.ascension?{...s.ascension}:null};
   }
   function gear(kind){
-    const h=H(),c=C();if(!valid(h.GEAR,kind))return null;const d=h.GEAR[kind],guide=F().gear(kind),mult=c.durabilityMultiplier(kind),normal=[3,10].map(n=>c.durabilityForRoll(kind,n));
+    const h=H(),c=C();if(!valid(h.GEAR,kind))return null;const d=h.GEAR[kind];if(d.integrated)return robotGear(d);const guide=F().gear(kind),mult=c.durabilityMultiplier(kind),normal=[3,10].map(n=>c.durabilityForRoll(kind,n));
     const sourceFloors=[99,69,39,-1,-21].filter(f=>h.gearPool(f).includes(kind));
     const floor=d.tier<=3?[99,69,39][d.tier-1]:d.tier===4?-1:-21;
     const merchants=E().merchantOffers(floor,17,true),merchant=merchants.find(m=>m.equipmentKinds.includes(kind))?.name||({longsword:'鐵嶺',greatsword:'鐵嶺',smith_hammer:'鐵嶺',warhammer:'鐵嶺',heavy_helm:'鐵嶺',light_hood:'鐵嶺',rune_crown:'鐵嶺',heavy_armor:'錦禾',light_armor:'錦禾',robe:'錦禾',cooking_pan:'錦禾',twin_daggers:'錦禾'}[d.baseKind]||'嵐舟');
@@ -102,14 +116,24 @@
     else details.push(row('基礎防禦',d.defense),row('防禦換算','穿戴總防禦 ÷（總防禦 +20）換成減傷，裝備防禦本身最高45%；並非直接扣除相同點數傷害。'),row('持握限制',d.slot==='shield'?'只可配單手武器；雙手武器會卸下盾牌':'獨立防具欄位'),row('造型',d.slot==='helmet'||d.slot==='armor'?'依人物顯示男裝／女裝，能力相同；頭部可隱藏外觀，不影響能力。':'盾牌外觀與強度跟隨階級。'));
     if(d.type==='robe')details.push(row('法袍額外效益','每件未損壞的法冠／法袍：法術增傷4%、治療加成5%。'));
     details.push(row('普通初始耐久',normal.join('～')),row('強化初始耐久',enhancedBands.map(([label,max])=>label+' '+[10,max].map(n=>c.durabilityForRoll(kind,n)).join('～')).join('；')),row('強化加成',enhancedBands.map(([label,max,bonus])=>label+' +1'+(bonus>1?'～'+bonus:'')).join('；')+'。武器每 +1 加物理／法術基礎威力2；防具每 +1 加防禦1。'),row('一般商店價格',c.gearPrice(minimum)+'～'+c.gearPrice(maximum)+' 枚銅幣（按隨機耐久；強化品另計）'),row('行商',merchant+'固定經營此裝備類型，是否遇見及庫存依樓層決定'),row('進入獎勵池',d.tier===1?'自99層起':d.tier===2?'69層以下及地下':d.tier===3?'39層以下及地下':d.tier===4?'地下B1起':'地下B21起'),row('耐久消耗',guide.wear));
-    const notes=[guide.handling,'裝備可來自行商、寶箱、委託、'+(d.tier<=3?'副本及':'')+'樓層主掉落；依當前樓層獎勵池抽取。樓層主裝備掉落率50%，不是每一件各50%。','耐久20%橘色提醒、10%紅色；歸零能力停止，但保留物件。營地基本保養每層限一次，6幣恢復全隊穿戴中未損壞裝備最大耐久的20%；變形或讀檔不重置。完整修復、重建與強化需能行動的鍛匠，或找對應商人；商人銅幣費加20%、材料不加價，可一鍵修理全隊及背包中其專長裝備；確認總費用與零件後一併修復，資源不足不局部扣款。破損重建費先乘1.5倍。','工坊可選一種特性，最高兩級：'+Object.values(X().TRAITS).map(t=>t.name+'（'+t.description+'）').join('、')];
+    const notes=[guide.handling,'裝備可來自行商、寶箱、委託、'+(d.tier<=3?'副本及':'')+'樓層主掉落；依當前樓層獎勵池抽取。樓層主裝備掉落率50%，不是每一件各50%。','耐久20%橘色提醒、10%紅色；歸零能力停止，但保留物件。營地基本保養每層限一次，6幣恢復全隊穿戴中未損壞裝備最大耐久的'+Math.round(P().CAMP_MAINTENANCE_RATIO*100)+'%；變形或讀檔不重置。完整修復、重建與強化需能行動的鍛匠，或找對應商人；商人銅幣費加20%、材料不加價，可一鍵修理全隊及背包中其專長裝備；確認總費用與零件後一併修復，資源不足不局部扣款。破損重建費先乘1.5倍。','工坊可選一種特性，最高兩級：'+Object.values(X().TRAITS).map(t=>t.name+'（'+t.description+'）').join('、')];
     if(d.tier>3)notes.push('第四、第五階僅地下篇可取得與穿用；不提高原有耐久倍率。');
     return {id:kind,name:d.name,category:d.slot==='weapon'?'weapons':'armor',jobs:[...d.jobs],description:guide.role+'。'+guide.handling,iconHtml:I().svg(kind),tags:['第'+d.tier+'階',d.requiredLevel+'級',...d.jobs.map(j=>h.JOBS[j].name)],details,notes,tier:d.tier,requiredLevel:d.requiredLevel,baseKind:d.baseKind,rawStats:{damage:d.damage,magicDamage:d.magicDamage,defense:d.defense,support:d.support,interval:d.interval,reach:d.reach,hands:d.hands,normalDurability:normal,durabilityMultiplier:mult},sourceFloors};
   }
   function profession(id){
-    const h=H();if(!valid(h.JOBS,id))return null;const j=h.JOBS[id],guide=F().profession(id),skills=Object.values(h.SKILLS).filter(s=>s.job===id),passives=Object.values(h.PASSIVES).filter(s=>s.job===id),weapons=h.BASE_GEAR.filter(g=>g.slot==='weapon'&&g.jobs.includes(id));
+    const h=H();if(!valid(h.JOBS,id))return null;const j=h.JOBS[id],guide=F().profession(id),skills=Object.values(h.SKILLS).filter(s=>s.job===id),passives=Object.values(h.PASSIVES).filter(s=>s.job===id),weapons=Object.values(h.GEAR).filter(g=>g.tier===1&&g.slot==='weapon'&&g.jobs.includes(id));
     const terms=sex=>Object.entries(TR().TERMS[id+':'+sex].costs).flatMap(([type,value])=>typeof value==='number'?[TR().label(type,type)+' ×'+value]:Object.entries(value).map(([key,n])=>TR().label(type,key)+' ×'+n)).join('、');
-    return {id,name:j.name,category:'jobs',job:id,jobs:[id],description:guide.innate,iconHtml:R().portrait(id),tags:[armorNames[j.armor],...weapons.map(w=>w.name)],details:[row('造型','男女各一種；外觀不同，職業能力相同。'),row('旅人姓名',P().NAMES[id].male+'／'+P().NAMES[id].female),row('男旅人首次同行',terms('male')),row('女旅人首次同行',terms('female')),row('防具',armorNames[j.armor]),row('專有武器',weapons.map(w=>w.name+'（'+(w.hands===2?'雙手':'單手，可配盾')+'）').join('、')),row('初始武器',h.GEAR[j.starter].name),row('初始技能','隨機三個主動、兩個被動；至少有攻擊招式。療癒師必有治療或援起。'),row('普通技能池',skills.filter(s=>!s.unique).length+' 主動／'+passives.filter(s=>!s.unique).length+' 被動'),row('全部技能',skills.length+' 主動／'+passives.length+' 被動（含覺醒與地下主角進階）'),row('職業本領',guide.innate)],notes:[guide.note,'新人物的技能在出發前才揭曉；圖鑑列出的是可獲得清單，不代表一人全部擁有。','地下新招募固定五級，額外隨機獲得四級追加技能；原有隊員不重設。','離隊保留等級、經驗、技能與已選成長；裝備退回背包，重招不重送裝備或箭矢。本層不能重招，後續樓層隨機重逢；每次離隊後重新邀請，基礎需求多50%並逐項向上取整，單項物資最多99。地下重逢至少五級，不降低原有較高等級。'],skillIds:[...skills,...passives].map(s=>s.id),weaponIds:weapons.map(w=>w.kind)};
+    return {id,name:j.name,category:'jobs',job:id,jobs:[id],description:guide.innate,iconHtml:R().portrait(id),tags:[armorNames[j.armor],...weapons.map(w=>w.name)],details:[row('造型','男女各一種；外觀不同，職業能力相同。'),row('旅人姓名',P().NAMES[id].male+'／'+P().NAMES[id].female),row('男旅人首次同行',terms('male')),row('女旅人首次同行',terms('female')),row('防具',armorNames[j.armor]),row('專有武器',weapons.map(w=>w.name+'（'+(w.integrated?'一體式拳臂，不可配盾':w.hands===2?'雙手':'單手，可配盾')+'）').join('、')),row('初始武器',h.GEAR[j.starter].name),row('初始技能','隨機三個主動、兩個被動；至少有攻擊與輔助招式。療癒師必有治療或援起。'),row('普通技能池',skills.filter(s=>!s.unique).length+' 主動／'+passives.filter(s=>!s.unique).length+' 被動'),row('全部技能',skills.length+' 主動／'+passives.length+' 被動（含覺醒與地下主角進階）'),row('職業本領',guide.innate)],notes:[guide.note,'新人物的技能在出發前才揭曉；圖鑑列出的是可獲得清單，不代表一人全部擁有。','地下新招募固定五級，額外隨機獲得四級追加技能；原有隊員不重設。',id==='robot'?'機器人離隊保留等級、經驗、技能、成長及原機件；不把機殼或拳臂放入共用背包。重招沿用原機件，不重送。':'離隊保留等級、經驗、技能與已選成長；裝備退回背包，重招不重送裝備或箭矢。','本層不能重招，後續樓層隨機重逢；每次離隊後重新邀請，基礎需求多50%並逐項向上取整，單項物資最多99。地下重逢至少五級，不降低原有較高等級。'],skillIds:[...skills,...passives].map(s=>s.id),weaponIds:weapons.map(w=>w.kind)};
+  }
+  function robotGear(d){
+    const weapon=d.slot==='weapon',guide=F().gear(d.kind),details=[row('階級／需求','第 '+d.tier+' 階，人物 '+d.requiredLevel+' 級可用'),row('適用職業','機器人'),row('部位／類型',weapon?'一體式雙拳':'一體式機殼'),row(weapon?'物理基礎威力':'基礎防禦',weapon?d.damage:d.defense),row('普通初始耐久',d.maxDurability+'～'+d.maxDurability),row('耐久消耗',guide.wear),row('行商','鐵嶺可維護及進階；不出售或收購一體式機件'),row('取得方式',d.tier===1?'機器人初始配備，不出現在普通裝備掉落池。':'由上一階原機件進階，不更換人物或重抽。'),row('持握限制','不能卸下、移交、出售、拆解或裝入共用背包；不能穿一般防具或配盾。')];
+    if(weapon)details.push(row('攻擊間隔',d.interval+' 秒／次'),row('攻擊距離',d.reach+' 個世界距離單位'),row('普通攻擊','左右拳輪替，近身命中；揮空不消耗耐久。'),row('背面造型','拳臂後側有關節接頭。'+(d.tier>=3?'另有散熱槽。':'')+(d.tier>=4?'增加能量針。':'')+'外觀依拳臂本身階級，與機殼獨立。'));
+    else details.push(row('怪物原始傷害抵銷',d.monsterFlat+' 點；不抵銷陷阱或飢餓，與鎮淵抵銷共用上限。'),row('防禦換算','與普通裝備相同：防禦換算減傷最多45%，所有減傷合計最多65%。'),row('背面造型','貼合曲面的'+(d.tier>=5?'五':d.tier>=3?'四':'三')+'節金屬背脊裝甲，左右各'+(d.tier>=5?'五':d.tier>=3?'四':'三')+'片斜向散熱格柵與兩條弧形管線。'+(d.tier>=2?'下背甲增加接縫。':'')+(d.tier>=3?'中央核心護蓋：男型六角、女型八角。':'')+(d.tier>=4?'加入核心能量雕紋與肩背紋章。':'')+(d.tier>=5?'增加鎮淵箭形下背鑲片。':'')+'外觀依本件機殼階級。'));
+    return {id:d.kind,name:d.name,category:weapon?'weapons':'armor',jobs:['robot'],description:guide.role+'。'+guide.handling,iconHtml:I().svg(d.kind),tags:['第'+d.tier+'階',d.requiredLevel+'級','一體式機件'],details,notes:[guide.handling,'營地基本保養每層限一次，6幣恢復未破損機件最大耐久的'+Math.round(P().CAMP_MAINTENANCE_RATIO*100)+'%；完整修復需鍛匠或鐵嶺。','進階消耗銅幣、金屬零件與指定礦材，保留原耐久比例，不免費補滿；破損先修復。',...(d.tier>3?['第四、第五階僅地下篇可取得與穿用。']:[])],tier:d.tier,requiredLevel:d.requiredLevel,baseKind:d.baseKind,integrated:true,rawStats:{damage:d.damage,magicDamage:d.magicDamage,defense:d.defense,support:d.support,interval:d.interval,reach:d.reach,hands:d.hands,normalDurability:[d.maxDurability,d.maxDurability],durabilityMultiplier:C().durabilityMultiplier(d.kind)},sourceFloors:[]};
+  }
+  function robotUpgrade(tier){
+    const robot=Robot(),cost=robot.COSTS[tier],labels=moduleFor('tower-materials','TowerMaterials').MATERIALS,parts=['robot_shell','robot_fists'].map(base=>H().GEAR[robot.kind(base,tier)]),text=price=>price+' 銅幣／'+cost.scrap+' 金屬零件／'+Object.entries(cost.materials).map(([id,n])=>labels[id]+' ×'+n).join('／');
+    return {id:'robot-upgrade-t'+tier,name:'機件進階・第'+tier+'階',category:'forging',jobs:['robot'],description:'將原機殼或拳臂進階；防護與攻擊成長，但保留耐久比例，不免費修復。',iconHtml:I().svg(parts[0].kind),tags:['機器人專用','人物'+robot.GATES[tier-1]+'級',tier>3?'地下限定':'地上／地下'],details:[row('開放條件','人物 '+robot.GATES[tier-1]+' 級；'+(tier>3?'僅地下篇；':'')+'安全營地有能行動的鍛匠，或本層鐵嶺。'),row('上一階',parts.map(part=>H().GEAR[robot.kind(part.baseKind,tier-1)].name).join('／')),row('完成機件',parts.map(part=>part.name).join('／')),row('每件隊內費用',text(cost.coins)),row('每件商人費用',text(Math.ceil(cost.coins*1.2))),row('防護／威力',parts[0].defense+' 防禦／'+parts[1].damage+' 拳力'),row('耐久',parts[0].maxDurability+' 機殼／'+parts[1].maxDurability+' 拳臂')],notes:['兩個部位分開進階並各付一次費用，材料不加價；資源不足不扣款。','機件破損時必須先修復，再進阶。'.replace('阶','階'),'只有五階，不可无限強化。'.replace('无限','無限')],underground:tier>3,robotUpgrade:true};
   }
   function forging(id){
     const x=X();if(!valid(x.TRAITS,id))return null;const trait=x.TRAITS[id],affected=Object.values(H().GEAR).filter(g=>x.traitFits(id,g));
@@ -118,8 +142,8 @@
     return {id,name:trait.name,category:'forging',jobs:[...new Set(affected.flatMap(g=>g.jobs))],description:trait.description,iconHtml:FI().svg(trait.icon),tags:[trait.underground?'地下限定':'地上／地下','最高二級'],details:[row('開放條件',(trait.underground?'正式進入地下篇後；':'')+'需鍛匠同行並在安全營地，或找負責這種裝備的專門商人。'),row('適用部位',trait.slots.map(s=>slotNames[s]).join('、')),row('可用武器／防具類型',H().BASE_GEAR.filter(g=>x.traitFits(id,g)).map(g=>g.name).join('、')),row('一級消耗',trait.parts+' 金屬零件／'+trait.coins+' 銅幣'+materialText(1)),row('升二級消耗',trait.parts*2+' 金屬零件／'+trait.coins*2+' 銅幣'+materialText(2)),row('折扣','存活隊員的「節省工料」降低銅幣費用，零件與素材不打折；顯示上述為未折扣的隊內鍛匠費用；商人按同條件銅幣費再加20%，向上取整，材料不加價。'),...(id==='starvein'?[row('治療與輔助加成','一／二級額外增加5／10個百分點。')]:[]),...(id==='light'?[row('防具作用','每件每級移速增加3%，全身最多6%。')]:[])],levels:[1,2].map(level=>({level,label,value:Number((value*level).toFixed(2)),unit})),notes:['每件裝備只能選一種特性，選定後不能替換；最多強化兩次。','需先修復已損壞裝備。確認才扣款，裝備或資源已改變時會重新驗證，不照過期報價扣款。',id==='durable'?'耐用護層被消耗後不會因修理而恢復。':'裝備損壞後，本特性停止提供能力；修復裝備後恢復。'],underground:!!trait.underground};
   }
   function build(){
-    const h=H(),jobs=Object.keys(h.JOBS).map(profession),skills=[...Object.keys(h.SKILLS),...Object.keys(h.PASSIVES)].map(skill),allGear=Object.keys(h.GEAR).map(gear),forgingEntries=Object.keys(X().TRAITS).map(forging);
-    return {jobs,skills,weapons:allGear.filter(g=>g.category==='weapons'),armor:allGear.filter(g=>g.category==='armor'),gear:allGear,forging:forgingEntries,entries:[...jobs,...skills,...allGear,...forgingEntries],progression:{xp:[...G().XP],skillLevels:'人物一至五級對應技能一至五級；人物六至九級技能維持五級，十級起技能六級。',surface:'地上主角上限十級、同伴五級；主角一／二／三級分別可帶一／二／三名同伴。',underworld:'通關後地下篇主角十五級、同伴十級，最多四名同伴；地下新隊友五級加入並隨機帶四級追加技能。',branches:Object.values(A().BRANCHES).map(b=>({...b,steps:b.steps.map(s=>({...s}))}))},notes:['所有圖示直接沿用遊戲的職業、技能、裝備與鍛造圖示。','技能表為六級基礎數值；技能倍率不是固定傷害。裝備、人物成長、被動、目標減傷會影響最後結果。','此頁只列目前七職業系統的90件裝備；舊存檔中的球棒、平底鍋、木杖與無職業通用防具屬已退役系統，不能當作目前職業武器規則。']};
+    const h=H(),jobs=Object.keys(h.JOBS).map(profession),skills=[...Object.keys(h.SKILLS),...Object.keys(h.PASSIVES)].map(skill),allGear=Object.keys(h.GEAR).map(gear),forgingEntries=[...Object.keys(X().TRAITS).map(forging),...[2,3,4,5].map(robotUpgrade)];
+    return {jobs,skills,weapons:allGear.filter(g=>g.category==='weapons'),armor:allGear.filter(g=>g.category==='armor'),gear:allGear,forging:forgingEntries,entries:[...jobs,...skills,...allGear,...forgingEntries],progression:{xp:[...G().XP],skillLevels:'人物一至五級對應技能一至五級；人物六至九級技能維持五級，十級起技能六級。',surface:'地上主角上限十級、同伴五級；主角一／二／三級分別可帶一／二／三名同伴。',underworld:'通關後地下篇主角十五級、同伴十級，最多四名同伴；地下新隊友五級加入並隨機帶四級追加技能。',branches:Object.values(A().BRANCHES).map(b=>({...b,steps:b.steps.map(s=>({...s}))}))},notes:['所有圖示直接沿用遊戲的職業、技能、裝備與鍛造圖示。','技能表為六級基礎數值；技能倍率不是固定傷害。裝備、人物成長、被動、目標減傷會影響最後結果。','此頁列目前 '+jobs.length+' 職業的 '+allGear.length+' 件武器、防具與一體式機件；舊存檔中的球棒、平底鍋、木杖與無職業通用防具屬已退役系統，不能當作目前職業武器規則。']};
   }
-  return Object.freeze({build,skill,gear,profession,forging,scale});
+  return Object.freeze({build,skill,gear,profession,forging,robotUpgrade,scale});
 });

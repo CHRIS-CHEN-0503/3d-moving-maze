@@ -2,9 +2,9 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {C,P,H,G,Co,fixture,add} from './tower-cooperation-fixtures.mjs';
 
-test('eight read-only cooperative definitions cover all jobs and reuse real owned skill icons',()=>{
+test('eight read-only cooperative definitions preserve the seven original jobs and reuse real owned skill icons',()=>{
   assert.equal(Co.DEFINITIONS.length,8);assert.equal(Co.DEFINITIONS.filter(d=>d.underground&&d.participants.length===3).length,2);
-  assert.deepEqual([...new Set(Co.DEFINITIONS.flatMap(d=>d.participants.map(p=>p.job)))].sort(),Object.keys(H.JOBS).sort());
+  assert.deepEqual([...new Set(Co.DEFINITIONS.flatMap(d=>d.participants.map(p=>p.job)))].sort(),Object.keys(H.JOBS).filter(job=>job!=='robot').sort());
   for(const d of Co.DEFINITIONS){assert.ok(Object.isFrozen(d));assert.ok(Object.isFrozen(d.participants));assert.equal(d.iconKeys.length,d.participants.length);assert.ok(d.preparation>=.8&&d.cooldown<=55);for(const p of d.participants)assert.equal(H.SKILLS[p.skill].job,p.job);}
 });
 for(const d of Co.DEFINITIONS)test(d.name+' has atomic real skill costs, shared cooldowns and valid persistence',()=>{

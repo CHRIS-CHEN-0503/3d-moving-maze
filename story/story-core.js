@@ -168,6 +168,8 @@
   }
 
   function durabilityMultiplier(kind) {
+    const robot=heroRules()?.ROBOT;
+    if(robot?.isPart(kind))return robot.repairMultiplier(kind);
     const item=GEAR[kind];
     return (item?.slot==='weapon'||item?.type==='heavy'||['helmet','armor','shield','round_shield','tower_shield'].includes(item?.baseKind||kind)?15:10)*4/3;
   }
@@ -178,6 +180,7 @@
   function createGear(kind, floor, seed, sourceId, enhanced = false) {
     floorConfig(floor);
     if (!Object.hasOwn(GEAR, kind) || !validNumber(seed, 1, 0xffffffff, true) || typeof sourceId !== 'string' || !sourceId || sourceId.length > 96 || typeof enhanced !== 'boolean') throw new RangeError('無效的裝備來源。');
+    if(heroRules()?.ROBOT?.isPart(kind))return heroRules().ROBOT.createGear(kind,floor,seed,sourceId);
     let hash = (seed ^ Math.imul(floor, 0x9e3779b9)) >>> 0;
     for (const char of `${sourceId}:${kind}`) hash = Math.imul(hash ^ char.charCodeAt(0), 16777619) >>> 0;
     const tier = floor >= 70 ? 1 : floor >= 40 ? 2 : 3;
@@ -190,6 +193,7 @@
 
   function validateGear(value) {
     if (!value || typeof value !== 'object' || !Object.hasOwn(GEAR, value.kind) || typeof value.id !== 'string' || !value.id || value.id.length > 160) return null;
+    if(heroRules()?.ROBOT?.isPart(value.kind))return heroRules().ROBOT.validateGear(value);
     const item = GEAR[value.kind];
     const legacy=value.durabilityVersion===undefined,priorMultiplier=durabilityMultiplier(value.kind)/2;
     if(!legacy&&![2,3,4,DURABILITY_VERSION].includes(value.durabilityVersion))return null;
@@ -257,7 +261,9 @@
     if (typeof run === 'string') { try { run = JSON.parse(run); } catch (_) { return null; } }
     if (!run || typeof run !== 'object' || Array.isArray(run) || ![1, STATE_VERSION].includes(run.stateVersion) || run.mode !== 'tower') return null;
     const legacyHealth = run.stateVersion === 1;
-    if (!isFloor(run.floor) || !validNumber(run.hp, 0, legacyHealth ? 100 : run.party?.loadouts?(isUnderworld(run)?102:87):MAX_HP) || !validNumber(run.hunger, 0, 100) || !validNumber(run.coins, 0, MAX_COINS, true)) return null;
+    // Broad first-pass bound includes robot_body; the validated actor's exact
+    // maximum is checked below, so ordinary professions cannot gain extra HP.
+    if (!isFloor(run.floor) || !validNumber(run.hp, 0, legacyHealth ? 100 : run.party?.loadouts?(isUnderworld(run)?132:117):MAX_HP) || !validNumber(run.hunger, 0, 100) || !validNumber(run.coins, 0, MAX_COINS, true)) return null;
     let underworld;
     if (run.floor < 0) {
       const u = run.underworld, departed = u?.departed, P = partyRules();
@@ -353,7 +359,7 @@
     const chronicle = narrativeRules().validateChronicle(run.chronicle, run.floor);
     const expedition = dungeonRules().validateExpedition(run.expedition, run.floor, run.seed);
     if (!chronicle || !expedition) return null;
-    const party = run.party === undefined ? undefined : partyRules()?.validate(run.party, run.floor, defeatedMonsters,hiredWarriors);
+    const party = run.party === undefined ? undefined : partyRules()?.validate(run.party, run.floor, defeatedMonsters,hiredWarriors,run.seed);
     if (run.party !== undefined && !party) return null;
     if(party?.loadouts&&!heroRules().validEquipment({party,equipment,gearBag,floor:run.floor,underworld}))return null;
     if(party?.loadouts&&run.hp>heroRules().maxHp({party}))return null;
@@ -411,6 +417,8 @@
 
   function discardGear(run, gearId, expectedRevision) {
     return transaction(run, expectedRevision, next => {
+      const integrated=heroRules()?.allGear(next).find(g=>g.id===gearId);
+      if(heroRules()?.ROBOT?.isPart(integrated?.kind))return {ok:false,message:'機殼與雙拳是機體的一部分，不能捨棄。'};
       const index = next.gearBag.findIndex(gear => gear.id === gearId);
       let removed;
       if (index >= 0) [removed] = next.gearBag.splice(index, 1);
@@ -675,7 +683,7 @@
       // A completed tower's old overflow is not underground training. The
       // separate surface snapshot still retains the original saved XP.
       if(H.level(next,'hero')===10){const growth=typeof module==='object'&&module.exports?require('./tower-hero-growth.js'):globalThis.TowerHeroGrowth;H.state(next).xp=Math.min(H.state(next).xp,growth.XP[9]);}
-      if (companion) { P.archiveMember(next, companion); returned.push(...Object.values(H.equipment(next, companion.id)).filter(Boolean)); next.gearBag.push(...returned); H.removeMember(next, companion.id); }
+      if (companion) { P.archiveMember(next, companion); if(companion.profession!=='robot')returned.push(...Object.values(H.equipment(next, companion.id)).filter(Boolean)); next.gearBag.push(...returned); H.removeMember(next, companion.id); }
     }
     if (companion && !next.party?.loadouts) P.archiveMember(next, companion);
     if (companion) next.party.members = next.party.members.filter(m => m.id !== companion.id);

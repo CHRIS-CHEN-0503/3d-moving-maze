@@ -7,7 +7,7 @@ const require=createRequire(import.meta.url),C=require('../story/story-core.js')
 const fresh=(job='swordsman',seed=43,sex='male')=>H.enable(P.enable(C.newRun({seed}),job,sex).run).run;
 const floor=(r,f)=>{r.floor=f;r.floorsCleared=99-f;r.chronicle=N.newChronicle(f);P.advance(r);return r;};
 test('18 gear types retain three surface tiers, requirements 1/3/5 and category-correct durability',()=>{
-  assert.equal(Object.keys(H.GEAR).length,90);
+  assert.equal(Object.values(H.GEAR).filter(g=>!g.integrated).length,90);assert.equal(Object.values(H.GEAR).filter(g=>g.integrated).length,10);
   for(const base of H.BASE_GEAR){let strength=0;for(const tier of [1,2,3]){const d=H.GEAR[H.tierKind(base.kind,tier)];assert.equal(d.requiredLevel,[0,1,3,5][tier]);assert.equal(d.baseKind,base.kind);const power=d.damage+d.magicDamage+d.defense;assert.ok(power>strength);strength=power;assert.equal(C.durabilityMultiplier(d.kind),base.slot==='weapon'||base.type==='heavy'||['round_shield','tower_shield'].includes(base.kind)?20:40/3);const item=C.createGear(d.kind,49,43,'tiers');assert.ok(C.validateGear(item));}}
   assert.deepEqual(H.gearPool(99).map(k=>H.GEAR[k].tier),Array(18).fill(1));assert.equal(H.gearPool(60).length,36);assert.equal(H.gearPool(20).length,54);
 });
@@ -24,7 +24,7 @@ test('every companion can choose exactly one new ordinary active or passive at l
 });
 test('male/female appearances never change abilities or reroll skills; legacy identities remain fixed',()=>{
   for(const job of Object.keys(H.JOBS)){const male=fresh(job,43,'male'),female=fresh(job,43,'female');assert.deepEqual(H.stats(male),H.stats(female));assert.deepEqual(H.actor(male).skills,H.actor(female).skills);assert.equal(H.sex(C.validateSave(female)),'female');const old=structuredClone(male);delete old.party.sex;assert.equal(H.sex(C.validateSave(old)),P.PROFESSIONS[job].gender);}
-  const c=vm.createContext({TowerHeroes:H,TowerPartyCore:P});vm.runInContext(readFileSync(new URL('../story/tower-heroes-visuals.js',import.meta.url),'utf8'),c);const portraits=new Set();for(const job of Object.keys(H.JOBS))for(const sex of ['male','female'])portraits.add(c.TowerHeroVisuals.portrait(job,sex));assert.equal(portraits.size,14);
+  const c=vm.createContext({TowerHeroes:H,TowerPartyCore:P});vm.runInContext(readFileSync(new URL('../story/tower-heroes-visuals.js',import.meta.url),'utf8'),c);const portraits=new Set();for(const job of Object.keys(H.JOBS))for(const sex of ['male','female'])portraits.add(c.TowerHeroVisuals.portrait(job,sex));assert.equal(portraits.size,16);
 });
 test('staff/book physical damage is low; higher tiers strengthen spell damage and support',()=>{
   for(const job of ['mage','healer']){let r=fresh(job);H.gainXp(r,G.XP[4]);const base=H.stats(r);assert.ok(base.damage<5);assert.ok(base.spellDamage>base.damage);const kind=H.tierKind(H.JOBS[job].starter,3),gear=C.createGear(kind,49,r.seed,'magic');r=C.grantGear(r,gear).run;r=H.equip(r,'hero',gear.id).run;assert.ok(H.stats(r).spellDamage>base.spellDamage);assert.ok(H.stats(r).support>base.support);}

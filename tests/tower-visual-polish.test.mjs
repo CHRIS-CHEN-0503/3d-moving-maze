@@ -16,7 +16,7 @@ function finiteGeometry(model){model.traverse(o=>{for(const name of ['position',
 function release(model){const geometries=new Set(),materials=new Set();model.traverse(o=>{if(o.isMesh||o.isPoints)geometries.add(o.geometry);if(o.material)for(const m of Array.isArray(o.material)?o.material:[o.material])materials.add(m);});geometries.forEach(g=>g.dispose());materials.forEach(m=>m.dispose());}
 
 test('all fourteen hairstyles have a continuous crown/drape seam with identical normals and finite surfaces',()=>{
-  for(const job of Object.keys(H.JOBS))for(const sex of ['male','female']){
+  for(const job of Object.keys(H.JOBS).filter(job=>job!=='robot'))for(const sex of ['male','female']){
     const hair=S.hair(T,{job,sex}),a=hair.crown,b=hair.drape,ai=new Set(a.index.array),bi=new Set(b.index.array),shared=[...ai].filter(i=>bi.has(i));
     assert.equal(shared.length,28,job+':'+sex);assert.ok(a.userData.continuousHair&&b.userData.continuousHair);
     for(const i of shared)for(const key of ['position','normal'])for(let axis=0;axis<3;axis++)assert.equal(a.attributes[key].array[i*3+axis],b.attributes[key].array[i*3+axis]);
@@ -27,7 +27,7 @@ test('all fourteen hairstyles have a continuous crown/drape seam with identical 
 
 test('every job/sex/tier hides all old waist trim under live armor and restores it after removal or breakage',()=>{
   const e=environment();let variants=0;
-  for(const job of Object.keys(H.JOBS))for(const sex of ['male','female'])for(const tier of [1,2,3]){
+  for(const job of Object.keys(H.JOBS).filter(job=>job!=='robot'))for(const sex of ['male','female'])for(const tier of [1,2,3]){
     const family=H.JOBS[job].armor,armor=family==='heavy'?'heavy_armor':family==='robe'?'robe':'light_armor',helmet=family==='heavy'?'heavy_helm':family==='robe'?'rune_crown':'light_hood';
     const model=e.TowerHeroVisuals.base(job,e.buildCharacter,'hero',sex),belt=model.userData.baseClothing.find(p=>p.name==='base-belt');
     assert.equal(belt.geometry.type,'TorusGeometry');belt.updateMatrixWorld(true);const beltBox=new T.Box3().setFromObject(belt);assert.ok(beltBox.max.z-beltBox.min.z<.48);
@@ -51,7 +51,7 @@ test('four merchants, five explorers and five guards keep unique props while rem
   assert.ok(V.buildMerchant('jinHe',deps).getObjectByName('sewing-pouch'));assert.equal(V.buildExplorer('eve',deps).getObjectByName('traveler-braid').geometry.type,'TubeGeometry');assert.ok(V.buildExplorer('mira',deps).getObjectByName('round-double-bun'));assert.ok(V.buildExplorer('sena',deps).getObjectByName('comet-hairpin-star'));
 });
 
-test('all seven professions and all 49 active skills have batched particles, bounded draws, and safe shader source',()=>{
+test('every profession and active skill has batched particles, bounded draws, and safe shader source',()=>{
   const e=environment(),jobs=new Set();for(const reducedMotion of [false,true]){
     const world=new T.Group(),fx=e.TowerSkillEffects.create(T,{world:()=>world,reducedMotion}),expected=reducedMotion?12:48;
     for(const skill of Object.values(H.SKILLS))for(const options of [{},{impact:true},{stage:'charge',duration:1.9},{stage:'land'}]){
@@ -63,7 +63,7 @@ test('all seven professions and all 49 active skills have batched particles, bou
       fx.tick(.035);
     }
     fx.destroy();assert.equal(world.children.length,0);assert.equal(fx.stats().textureBytes,0);
-  }assert.equal(jobs.size,7);
+  }assert.equal(jobs.size,Object.keys(H.JOBS).length);
 });
 
 test('spell visibility, frozen time, eviction, reset and destruction dispose owned particles without harming shared sprites',()=>{

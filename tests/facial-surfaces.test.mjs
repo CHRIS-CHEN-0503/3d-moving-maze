@@ -23,7 +23,7 @@ function dispose(model){const r=resources(model);r.geometries.forEach(x=>x.dispo
 
 test('fourteen profession faces own a single original 128-square complexion map, never mapped onto hands or body',()=>withCanvas(doc=>{
   const e=environment(),textures=new Set();
-  for(const job of Object.keys(H.JOBS))for(const sex of ['male','female']){
+  for(const job of Object.keys(H.JOBS).filter(job=>job!=='robot'))for(const sex of ['male','female']){
     const model=e.TowerHeroVisuals.base(job,e.buildCharacter,'hero',sex),face=model.userData.face,head=model.userData.headMesh;
     assert.ok(head.material.map?.isCanvasTexture,job+':'+sex);assert.equal(head.material.map,face.skinTexture);textures.add(head.material.map);
     assert.equal(head.material.type,'MeshPhongMaterial');assert.deepEqual(head.material.map.userData,{originalArt:true,owner:'character',byteBudget:65536,kind:'complexion'});
@@ -77,7 +77,7 @@ test('refined connected head sculpture has UVs, finite normals and a bounded det
 });
 
 test('calm faces smile softly below visible brows; nose remains one continuous sculpt rather than detached pellets',()=>{
-  const e=environment();for(const job of Object.keys(H.JOBS))for(const sex of ['male','female']){
+  const e=environment();for(const job of Object.keys(H.JOBS).filter(job=>job!=='robot'))for(const sex of ['male','female']){
     const model=e.TowerHeroVisuals.base(job,e.buildCharacter,'hero',sex),face=model.userData.face;F.update(model,.6,'calm');
     const p=face.mouth.geometry.attributes.position,edgeY=(p.getY(0)+p.getY(1))/2,centerY=(p.getY(10)+p.getY(11))/2;assert.ok(edgeY>centerY,'mouth corners must turn upward in the calm pose');
     for(let i=0;i<2;i++){assert.ok(face.brows[i].position.y>face.eyes[i].position.y+.028);assert.ok(face.brows[i].position.y<.08,'brows must remain below the front fringe');}
@@ -87,7 +87,7 @@ test('calm faces smile softly below visible brows; nose remains one continuous s
 });
 
 test('every adult profession has a short sculpted neck that overlaps both chin and upper torso without extending beyond the silhouette',()=>{
-  const e=environment();for(const job of Object.keys(H.JOBS))for(const sex of ['male','female']){
+  const e=environment();for(const job of Object.keys(H.JOBS).filter(job=>job!=='robot'))for(const sex of ['male','female']){
     const model=e.TowerHeroVisuals.base(job,e.buildCharacter,'hero',sex),neck=model.getObjectByName('anatomical-neck');assert.ok(neck,job+':'+sex);assert.equal(neck.geometry.type,'LatheGeometry');model.updateMatrixWorld(true);
     const n=new T.Box3().setFromObject(neck),head=new T.Box3().setFromObject(model.userData.headMesh),body=new T.Box3().setFromObject(model.userData.body);assert.ok(n.max.y>head.min.y);assert.ok(n.min.y<body.max.y);assert.ok(n.max.x<head.max.x&&n.min.x>head.min.x);
     dispose(model);

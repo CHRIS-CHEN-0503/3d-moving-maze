@@ -22,6 +22,8 @@
     'smith:female':{costs:{materials:{ironore:1},ingredients:{root:1}},story:'鐵薇對精鐵礦比銅幣有興趣，再帶一份根莖就能精神飽滿地出發。'},
     'archer:male':{costs:{bag:{arrow:10},ingredients:{root:1}},story:'風梢希望補足箭袋與口糧，願意用精靈的目光守住遠處。'},
     'archer:female':{costs:{coins:3,meals:{salad:1}},story:'嵐羽想要清爽的香草沙拉與少許旅費，同行時會照看後方。'},
+    'robot:male':{costs:{coins:6,scrap:2},story:'鐵衡想補足維護費和零件，願意用厚實機殼守住隊伍前方。'},
+    'robot:female':{costs:{materials:{ironore:1},scrap:1},story:'鈴芯需要一份精鐵礦與一個可用零件；修好關節後，她願意和你一起探索。'},
   });
   const identity=(job,sex)=>job+':'+sex;
   const archive=run=>run?.party?.travellers||[];
@@ -51,7 +53,7 @@
     let reason='';if(run.party.members.length>=P().recruitLimit(run))reason='隊伍名額已滿，請先與一位同伴道別。';
     else if(run.party.members.some(m=>m.profession===offer.profession))reason='隊伍已有相同職業的同伴。';
     else if(list.some(c=>c.missing))reason='還缺少：'+list.filter(c=>c.missing).map(c=>c.label+' '+c.missing).join('、')+'。';
-    const story=offer.returning?P().person(offer.profession,offer.sex)+'還記得上次的旅程，願意再次同行；這回希望準備更充足的補給。原有等級與技能保留，裝備請從背包重新分配。':terms.story;
+    const story=offer.returning?P().person(offer.profession,offer.sex)+'還記得上次的旅程，願意再次同行；這回希望準備更充足的補給。原有等級與技能保留，'+(offer.profession==='robot'?'機殼與拳臂保留原有階級與耐久。':'裝備請從背包重新分配。'):terms.story;
     return {offer,costs,list,affordable:!reason,reason,story,returning:!!offer.returning,recruitCount:offer.recruitCount};
   }
   function pay(run,q){for(const c of q.list){if(c.type==='coins')run.coins-=c.count;else if(c.type==='scrap')run.party.journey.scrap-=c.count;else if(c.type==='materials')run.party.journey.materials[c.id]-=c.count;else if(c.type==='bag')run.bag[c.id]-=c.count;else run.party[c.type][c.id]-=c.count;}}
@@ -66,7 +68,7 @@
   }
   function validate(value,party,floor){
     if(value===undefined)return [];
-    if(!Array.isArray(value)||value.length>14||new Set(value.map(t=>t?.identity)).size!==value.length||new Set(value.map(t=>t?.id)).size!==value.length)return null;
+    if(!Array.isArray(value)||value.length>16||new Set(value.map(t=>t?.identity)).size!==value.length||new Set(value.map(t=>t?.id)).size!==value.length)return null;
     const result=[];for(const t of value){
       if(!t||typeof t!=='object'||Array.isArray(t)||t.identity!==identity(t.profession,t.sex)||!Object.hasOwn(TERMS,t.identity)||typeof t.id!=='string'||!t.id||t.id==='hero'||t.id.length>80||!party.joined.includes(t.id)||!C().isFloor(t.departedFloor)||t.departedFloor<floor||!Number.isInteger(t.departures)||t.departures<1||t.departures>149||!Number.isInteger(t.level)||t.level<1||t.level>(t.departedFloor<0&&party.loadouts?10:5)||!Number.isInteger(t.xp)||t.xp<G().XP[t.level-1]||t.xp>G().XP[9])return null;
       const current=party.members.find(m=>m.id===t.id),same=party.members.find(m=>identity(m.profession,m.sex)===t.identity);

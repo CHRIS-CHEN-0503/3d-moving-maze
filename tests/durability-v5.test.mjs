@@ -5,18 +5,19 @@ import {readFileSync} from 'node:fs';
 import vm from 'node:vm';
 import {provisionTravellers} from './recruit-fixtures.mjs';
 const require=createRequire(import.meta.url),C=require('../story/story-core.js'),H=require('../story/tower-heroes-core.js'),P=require('../story/tower-party-core.js'),X=require('../story/tower-expedition-core.js'),N=require('../story/tower-narrative.js'),E=require('../story/tower-encounters.js');
+const ordinaryKinds=Object.entries(C.GEAR).filter(([,def])=>!def.integrated).map(([kind])=>kind);
 function fresh(floor=99,seed=43){const r=C.newRun({seed});r.floor=floor;r.floorsCleared=99-floor;r.chronicle=N.newChronicle(floor);return H.enable(P.enable(r,'smith').run).run;}
 function v4(g,left){return {...g,durabilityVersion:4,maxDurability:g.maxDurability/2,durability:left??g.durability/2};}
 function groundGear(run){const g=C.createGear('heavy_armor',run.floor,run.seed,'lord-drop',true),source='monster-11';run.defeatedMonsters.push(source);run.party.loot={version:1,rolled:[source],entries:[{id:run.floor+':'+source+':gear',source,type:'gear',key:g.kind,rarity:'rare',quantity:1,cx:0,cy:0,gear:g}]};return g;}
 function allIncludingGround(run){return [...H.allGear(run),...(run.party.loot?.entries||[]).filter(e=>e.type==='gear').map(e=>e.gear)];}
 test('all 96 weapon/armor kinds generate exact double v4 values including rounded light rolls, five grades and enhanced drops',()=>{
-  const lightRolls=new Set();for(const kind of Object.keys(C.GEAR))for(const floor of [99,49,1,-1,-21])for(const enhanced of [false,true])for(let seed=1;seed<=32;seed++){
+  assert.equal(ordinaryKinds.length,96);const lightRolls=new Set();for(const kind of ordinaryKinds)for(const floor of [99,49,1,-1,-21])for(const enhanced of [false,true])for(let seed=1;seed<=32;seed++){
     const g=C.createGear(kind,floor,seed,'v5-source',enhanced),before=v4(g);assert.equal(g.durabilityVersion,5);assert.ok(C.validateGear(before),kind);assert.equal(g.maxDurability,before.maxDurability*2);assert.equal(g.durability,before.durability*2);assert.deepEqual(C.validateGear(g),g);assert.equal(C.gearPrice(g),C.gearPrice(before));if(kind==='robe'&&!enhanced)lightRolls.add(g.maxDurability);
   }
   assert.deepEqual([...lightRolls].sort((a,b)=>a-b),[40,54,66,80,94,106,120,134]);
 });
 test('worn, broken, forged and partly repaired v4 gear doubles precisely once while warning percentages and stats remain unchanged',()=>{
-  for(const kind of Object.keys(C.GEAR))for(const enhanced of [false,true]){
+  assert.equal(ordinaryKinds.length,96);for(const kind of ordinaryKinds)for(const enhanced of [false,true]){
     const now=C.createGear(kind,1,43,'v5-migrate',enhanced),source=v4(now);
     for(const left of [0,1,Math.floor(source.maxDurability*.1),Math.floor(source.maxDurability*.2),Math.floor(source.maxDurability*.55),source.maxDurability]){
       const old={...source,durability:left},before=JSON.stringify(old),g=C.validateGear(old);assert.ok(g,kind);assert.equal(JSON.stringify(old),before);assert.equal(g.maxDurability,old.maxDurability*2);assert.equal(g.durability,left*2);assert.equal(g.defense,old.defense);assert.equal(g.bonus,old.bonus);assert.equal(g.durability/g.maxDurability,old.durability/old.maxDurability);let reloaded=g;for(let i=0;i<5;i++)reloaded=C.validateGear(JSON.parse(JSON.stringify(reloaded)));assert.deepEqual(reloaded,g);

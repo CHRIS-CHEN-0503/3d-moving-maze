@@ -7,6 +7,10 @@
   const M=()=>typeof module==='object'&&module.exports?require('./tower-materials.js'):globalThis.TowerMaterials;
   const num=(v,a,b)=>Number.isInteger(v)&&v>=a&&v<=b;
   const CHANCES=Object.freeze({common:20,uncommon:12,rare:6,legendary:3}),MAX_GROUND=96,ARROW_DROP_QUANTITY=50;
+  const COMMON_FOOD=Object.freeze(['root','mushroom','herb','nectar']),COMMON_FOOD_BONUS=5;
+  // Only the selected common food candidate gets the extra percentage points.
+  // Keep ecology, candidate weighting and all equipment/supply rolls intact.
+  function chance(entry){return (CHANCES[entry?.rarity]||0)+(entry?.type==='ingredient'&&COMMON_FOOD.includes(entry.key)?COMMON_FOOD_BONUS:0);}
   function hash(seed,text){let h=seed>>>0;for(const c of String(text))h=Math.imul(h^c.charCodeAt(0),16777619)>>>0;
     // Mix all bits before modulo: power-of-two candidate pools otherwise make
     // FNV's low bits correlate the choice with its supposedly independent roll.
@@ -25,7 +29,7 @@
     const state=run.party.loot||(run.party.loot=fresh());if(state.rolled.includes(spec.id))return [];
     state.rolled.push(spec.id);const maxCell=C().floorConfig(run.floor,run.seed).size-1,prefix=run.floor+':'+spec.id,cx=num(cell?.x,0,maxCell)?cell.x:0,cy=num(cell?.y,0,maxCell)?cell.y:0,entries=[];
     const choices=pool(run,spec),pick=choices[hash(run.seed,prefix+':kind')%choices.length];
-    if(hash(run.seed,prefix+':item')%100<CHANCES[pick.rarity])entries.push({...pick,id:prefix+':item',source:spec.id,cx,cy});
+    if(hash(run.seed,prefix+':item')%100<chance(pick))entries.push({...pick,id:prefix+':item',source:spec.id,cx,cy});
     if(spec.lord&&hash(run.seed,prefix+':gear')%100<50){const kinds=run.party.loadouts?H().gearPool(run.floor):['helmet','armor','shield','bat','pan','staff'],kind=kinds[hash(run.seed,prefix+':gear-kind')%kinds.length];entries.push({type:'gear',key:kind,rarity:'rare',quantity:1,id:prefix+':gear',source:spec.id,cx,cy,gear:C().createGear(kind,run.floor,run.seed,'lord-drop',true)});}
     // Preserve every existing ground drop. Stop adding piles when the finite
     // floor storage is full; never let long-running reinforcement farming
@@ -56,5 +60,5 @@
     else{const stock=e.type==='ingredient'?n.party.ingredients:e.type==='material'?n.party.journey.materials:n.bag,limit=e.type==='item'?C().itemLimit(e.key,n):99,storedLimit=e.type==='item'?C().itemStorageLimit(e.key):99;if(!stock||!num(stock[e.key],0,storedLimit))return {ok:false,message:'材料資料尚未就緒，掉落物留在原地。'};if(stock[e.key]+e.quantity>limit)return {ok:false,message:e.key==='arrow'?'箭袋空間不足，整束箭矢留在原地。':'這種物品已滿，掉落物留在原地。'};stock[e.key]+=e.quantity;}
     state.entries=state.entries.filter(x=>x.id!==id);compact(n);return {ok:true,message:'獲得 '+label(e),effect:{pickup:e}};
   });}
-  return Object.freeze({CHANCES,MAX_GROUND,ARROW_DROP_QUANTITY,fresh,pool,recordKill,compact,validate,claim,label,hash});
+  return Object.freeze({CHANCES,COMMON_FOOD,COMMON_FOOD_BONUS,chance,MAX_GROUND,ARROW_DROP_QUANTITY,fresh,pool,recordKill,compact,validate,claim,label,hash});
 });

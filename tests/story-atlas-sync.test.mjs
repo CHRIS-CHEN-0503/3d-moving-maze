@@ -73,3 +73,16 @@ test('current game and read-only reference share the release version and accessi
     assert.ok(index.includes('story/'+file));assert.ok(html.includes('../story/'+file));
   }
 });
+
+test('reading overview and resource cards share the current natural appearance and absence rules',()=>{
+  const c=load(),overview=html.match(/<section><h3>靠牆採集資源<\/h3>([\s\S]*?)<\/section>/)?.[1];
+  assert.ok(overview);
+  for(const [profile,label]of [['neutral','一般（中性）'],['suitable','適合'],['unsuitable','不適合']]){
+    const chance=c.TowerForaging.APPEARANCE[profile],absent=100-chance;
+    assert.ok(overview.includes(label+'環境'+chance+'%出現、'+absent+'%不出現'));
+    for(const weights of [c.TowerForaging.PROFILES,c.TowerForaging.POWER_PROFILES])assert.equal(weights[profile][0],absent);
+  }
+  assert.match(overview,/香草（藥草）、自然礦石與動力石各自獨立抽取/);
+  assert.match(overview,/舊樓層的生成與已採紀錄保留，新樓層才套用新機率/);
+  assert.doesNotMatch(overview,/30%／25%／15%|40%／35%／25%|20%／15%／5%/);
+});

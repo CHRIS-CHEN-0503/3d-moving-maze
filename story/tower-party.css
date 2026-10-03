@@ -75,6 +75,7 @@
 #towerLightBtn svg,.tower-light-card svg {width:24px;height:24px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
 #towerLightBtn[data-light="torch"] {color:#ffce80;background:#4c3d2c}
 #towerLightBtn[data-light="daylight"] {color:#fff3bf;background:#39525c}
+#towerLightBtn[data-light="core"] {background:#263d50}
 #towerLightBtn:focus-visible {outline:2px solid #ffe2a2;outline-offset:2px}
 #towerLightStatus {font-size:12px;color:#e3c995;padding-top:4px}
 .tower-light-card svg {width:42px;height:42px;color:#f0cb87}

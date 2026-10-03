@@ -20,7 +20,9 @@ function fresh(floor=99,seed=31){
   assert.ok(C.validateSave(run));return run;
 }
 function withResources(floor=99,predicate=amount=>amount.herb>0&&amount.ore>0){
-  for(let seed=1;seed<=512;seed++)if(predicate(F.counts({floor,seed})))return fresh(floor,seed);
+  // The reduced appearance rate makes two simultaneous three-unit deposits
+  // uncommon. Keep full-density placement coverage with a finite seed search.
+  for(let seed=1;seed<=12000;seed++)if(predicate(F.counts({floor,seed})))return fresh(floor,seed);
   throw new Error('No finite seeded foraging fixture found');
 }
 function grid(size=9,solid=false){
@@ -30,7 +32,13 @@ function grid(size=9,solid=false){
 test('all 149 valid floors have explicit profiles and deterministic independent resource draws',()=>{
   assert.equal(Object.keys(F.REGIONS).length,15);
   assert.deepEqual(Object.keys(F.REGIONS).sort(),M.ECOLOGIES.map(region=>region.id).sort());
-  assert.deepEqual(F.PROFILES,{suitable:{0:0,1:40,2:35,3:25},neutral:{0:30,1:30,2:25,3:15},unsuitable:{0:60,1:20,2:15,3:5}});
+  assert.deepEqual(F.LEGACY_PROFILES,{suitable:{0:0,1:40,2:35,3:25},neutral:{0:30,1:30,2:25,3:15},unsuitable:{0:60,1:20,2:15,3:5}});
+  assert.equal(F.BASE_APPEARANCE,30);assert.equal(F.ENVIRONMENT_BONUS,20);
+  assert.deepEqual(F.APPEARANCE,{suitable:50,neutral:30,unsuitable:10});
+  for(const [name,weights]of Object.entries(F.PROFILES)){
+    assert.equal(weights[0],100-F.APPEARANCE[name]);assert.ok(Math.abs(Object.values(weights).reduce((sum,chance)=>sum+chance,0)-100)<1e-10);
+    for(const quantity of [1,2,3])assert.ok(Math.abs(weights[quantity]/F.APPEARANCE[name]-F.LEGACY_PROFILES[name][quantity]/(100-F.LEGACY_PROFILES[name][0]))<1e-10);
+  }
   const floors=[...Array.from({length:99},(_,index)=>index+1),...Array.from({length:50},(_,index)=>-index-1)];
   for(const floor of floors)for(const seed of [1,31,9987,0xffffffff]){
     const run={floor,seed,party:{foraging:F.fresh({floor,seed})}},before=structuredClone(run),amount=F.counts(run);
@@ -106,7 +114,8 @@ test('surface and underground harvest records survive the real save validator on
 test('forged, duplicate, future-floor and foreign-seed harvest receipts are rejected',()=>{
   const run=withResources(),first=F.specs(run)[0];
   const changes=[
-    state=>state.version=2,state=>state.floor=98,state=>state.seed++,state=>state.claimed=null,
+    state=>state.version=4,state=>state.floor=98,state=>state.seed++,state=>state.claimed=null,
+    state=>state.harvestRule=3,state=>delete state.counts,state=>state.counts.herb=4,state=>state.counts.ore=-1,
     state=>state.claimed=['foraging:99:herb:999'],state=>state.claimed=['foraging:98:herb:0'],
     state=>state.claimed=['foraging:99:ore:999'],state=>state.claimed=[first.id,first.id],
     state=>state.claimed=[{}],state=>state.claimed=Array(7).fill(first.id),

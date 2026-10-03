@@ -3,20 +3,20 @@ import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
 import {createRequire} from 'node:module';
 import vm from 'node:vm';
-const require=createRequire(import.meta.url),T=require('../lib/three.min.js'),C=require('../story/story-core.js'),P=require('../story/tower-party-core.js'),L=require('../story/tower-lighting-core.js'),E=require('../story/tower-encounters.js');
+const require=createRequire(import.meta.url),T=require('../lib/three.min.js'),C=require('../story/story-core.js'),P=require('../story/tower-party-core.js'),H=require('../story/tower-heroes-core.js'),L=require('../story/tower-lighting-core.js'),E=require('../story/tower-encounters.js');
 const source=readFileSync(new URL('../story/tower-lighting-runtime.js',import.meta.url),'utf8');
-function harness(){
-  let run=P.enable(C.newRun({seed:1}),'mage').run,wall=false,failed=false,disposals=0,active=true,at=1;
+function harness(job='mage',modern=false){
+  let run=P.enable(C.newRun({seed:1}),job).run,wall=false,failed=false,disposals=0,active=true,at=1;if(modern)run=H.enable(run).run;
   const world=new T.Group(),player=new T.Group(),camera=new T.PerspectiveCamera(),fog=new T.Fog(0x263d38,4,20),events=[];
   const G={px:0,pz:0,mazeW:7,mazeH:7,running:true,shifting:false,view:'tp'},merchant={...E.merchantOffers(run.floor,run.seed).find(m=>m.id==='suHe'),x:8,z:0,cx:2,cy:0};
-  const context=vm.createContext({TowerLighting:L,document:{getElementById:()=>null}});vm.runInContext(source,context);
+  const button={dataset:{},style:{},setAttribute(k,v){this[k]=v;}},line={},context=vm.createContext({TowerLighting:L,TowerHeroes:H,document:{getElementById:id=>id==='towerLightBtn'?button:id==='towerLightStatus'?line:null}});vm.runInContext(source,context);
   const ui=context.TowerLightingRuntime.create({THREE:T,G,run:()=>run,active:()=>active,world:()=>world,player:()=>player,camera:()=>camera,
     traders:()=>[merchant],inDungeon:()=>!!run.expedition.active,environment:()=>({id:'echo',rig:{fog}}),clear:()=>!wall,
     cell:(cx,cy)=>({cx,cy,x:cx*4,z:cy*4}),chooseCell:()=>({cx:at,cy:1,x:at++*4,z:4}),marker:()=>new T.Group(),bind(){},action:(label,key,id,disabled)=>'<button data-tower="'+key+'" data-item="'+id+'"'+(disabled?' disabled':'')+'>'+label+'</button>',dialog(){events.push('dialog');},
-    transact:result=>{if(!result.ok||failed)return false;run=result.run;return true;},toast:msg=>events.push(msg),audio:{sfxUse(){},sfxPickup(){}},close(){events.push('close');},trade(){events.push('trade');},dispose(){disposals++;},
+    transact:result=>{if(!result.ok||failed)return false;run=result.run;return true;},toast:msg=>events.push(msg),audio:{sfxUse(){},sfxPickup(){}},close(){events.push('close');},trade(){events.push('trade');},dispose(){disposals++;},robotPanel(){events.push('robot-panel');},
   });
   const build=()=>{at=1;ui.build(()=>.5,new Set());};build();
-  return {ui,G,world,player,camera,fog,merchant,events,build,get run(){return run;},set run(v){run=v;},set wall(v){wall=v;},set failed(v){failed=v;},set active(v){active=v;},get disposals(){return disposals;}};
+  return {ui,G,world,player,camera,fog,merchant,events,button,line,build,get run(){return run;},set run(v){run=v;},set wall(v){wall=v;},set failed(v){failed=v;},set active(v){active=v;},get disposals(){return disposals;}};
 }
 test('original light models have bounded geometry, no textures or independent animation loops',()=>{
   const h=harness();let meshes=0,triangles=0,lights=0;
@@ -74,4 +74,21 @@ test('torch merchant uses a compact closed summary and keeps finite stock and pu
   h.run.coins=0;assert.match(h.ui.merchantCard(id),/data-item="suHe" disabled/);
   h.run.coins=100;h.run.party.light.bought[id]=L.SHOP_STOCK;assert.match(h.ui.merchantCard(id),/<small>持有 2 · 剩 0<\/small>/);assert.match(h.ui.merchantCard(id),/data-item="suHe" disabled/);
   h.run.party.light.bought[id]=0;h.run.party.light.torches=99;assert.match(h.ui.merchantCard(id),/data-item="suHe" disabled/);
+});
+test('world range follows single core < torch < dual core < daylight with no extra lights or leader-specific override',()=>{
+  const h=harness('robot',true);h.G.px=200;h.ui.updateVisual(0,true);assert.equal(h.ui.radius(),8);assert.equal(h.world.getObjectByName('tower-light-slot-0').color.getHex(),0x48a8ff);
+  const m={id:'world-mage',profession:'mage',sex:'female',level:1,hp:34,cooldown:0,hurtLeft:0};h.run.party.members.push(m);h.run.party.joined.push(m.id);H.addMember(h.run,m);h.run=L.torch(h.run).run;h.ui.updateVisual(0,true);assert.equal(h.ui.radius(),10);assert.equal(h.world.getObjectByName('traveller-torch').visible,true);
+  h.run.equipment.core2=C.createGear('robot_core',99,h.run.seed,'world-dual');h.ui.updateVisual(0,true);assert.equal(h.ui.radius(),12);assert.equal(h.world.getObjectByName('traveller-torch').visible,false);
+  h.run=H.switchActor(h.run,m.id).run;h.ui.updateVisual(0,true);assert.equal(h.ui.radius(),12);assert.equal(h.world.getObjectByName('tower-light-slot-0').color.getHex(),0x48a8ff);
+  h.run=L.daylight(h.run).run;h.ui.updateVisual(0,true);assert.equal(h.ui.radius(),15);assert.equal(h.world.getObjectByName('daylight-orb').visible,true);assert.equal(h.world.getObjectByName('tower-light-slot-0').color.getHex(),0xfff2d1);
+  H.state(h.run).switchLeft=0;h.run=H.switchActor(h.run,'hero').run;assert.equal(H.state(h.run).active,'hero');h.ui.updateVisual(0,true);assert.equal(h.ui.radius(),15);assert.equal(h.world.getObjectByName('tower-light-slot-0').color.getHex(),0xfff2d1);assert.equal(h.world.getObjectByName('tower-light-slot-0').intensity,4.2);
+  let lights=0;h.world.traverse(p=>{if(p.isPointLight)lights++;});assert.equal(lights,3);H.setHp(h.run,'hero',0);L.tick(h.run,601);h.ui.updateVisual(0,true);assert.equal(h.ui.radius(),10);
+});
+test('robot lighting quick button casts its living mage companion instead of opening the core panel',()=>{
+  const h=harness('robot',true),m={id:'quick-mage',profession:'mage',sex:'male',level:1,hp:34,cooldown:0,hurtLeft:0};h.G.px=200;h.run.party.members.push(m);h.run.party.joined.push(m.id);H.addMember(h.run,m);h.ui.hud();assert.equal(h.button.dataset.icon,'daylight');assert.equal(h.button['aria-label'],'施放日光術');assert.equal(h.button.style.color,'');
+  assert.equal(h.ui.quickUse(),true);assert.equal(h.run.party.light.daylight,600);assert.equal(h.ui.radius(),15);assert.ok(!h.events.includes('robot-panel'));assert.match(h.line.textContent,/日光術 10:00/);assert.equal(h.ui.quickUse(),false);assert.equal(h.run.party.light.daylight,600);
+});
+test('a robot without a mage can directly light a useful torch; dead companions cannot replace the quick action',()=>{
+  const h=harness('robot',true),m={id:'quick-dead-mage',profession:'mage',sex:'male',level:1,hp:34,cooldown:0,hurtLeft:0};h.G.px=200;h.run.party.members.push(m);h.run.party.joined.push(m.id);H.addMember(h.run,m);H.setHp(h.run,m.id,0);h.ui.hud();assert.equal(h.button.dataset.icon,'core');assert.equal(h.button['aria-label'],'使用火把');assert.equal(h.ui.quickUse(),true);assert.equal(h.run.party.light.fuel,300);assert.equal(h.run.party.light.lit,true);assert.equal(h.ui.radius(),10);assert.ok(!h.events.includes('robot-panel'));
+  const fuel=h.run.party.light.fuel;L.tick(h.run,3);assert.equal(h.run.party.light.fuel,fuel-3);assert.equal(h.ui.quickUse(),true);assert.equal(h.run.party.light.lit,false);assert.equal(h.ui.radius(),8);
 });

@@ -351,6 +351,7 @@
       if(run.party?.journey?.materials&&previous?.party&&previous.party.journey?.materials===undefined&&C.validateSave(previous)&&!localStorage.getItem(SAVE+'_before_regional_crafting'))localStorage.setItem(SAVE+'_before_regional_crafting',raw);
       if(run.party?.travellers&&previous?.party&&previous.party.travellers===undefined&&C.validateSave(previous)&&!localStorage.getItem(SAVE+'_before_traveller_reunion'))localStorage.setItem(SAVE+'_before_traveller_reunion',raw);
       if(run.party?.foraging&&previous?.party&&previous.party.foraging===undefined&&C.validateSave(previous)&&!localStorage.getItem(SAVE+'_before_foraging_v1'))localStorage.setItem(SAVE+'_before_foraging_v1',raw);
+      if(run.party?.foraging?.version===3&&[1,2].includes(previous?.party?.foraging?.version)&&C.validateSave(previous)&&!localStorage.getItem(SAVE+'_before_foraging_v3'))localStorage.setItem(SAVE+'_before_foraging_v3',raw);
       if(previous&&typeof Heroes!=='undefined'&&Heroes?.ROBOT?.needsMigration(previous)&&C.validateSave(previous)&&!localStorage.getItem(SAVE+'_before_robot_power_v1'))localStorage.setItem(SAVE+'_before_robot_power_v1',raw);
       if(run.party?.loadouts?.growth&&previous?.party?.loadouts&&!previous.party.loadouts.growth&&C.validateSave(previous)&&!localStorage.getItem(SAVE+'_before_hero_growth'))localStorage.setItem(SAVE+'_before_hero_growth',raw);
       if(run.party?.loadouts?.growth?.version===2&&previous?.party?.loadouts&&previous.party.loadouts.growth?.version!==2&&C.validateSave(previous)&&!localStorage.getItem(SAVE+'_before_underground_growth_v2'))localStorage.setItem(SAVE+'_before_underground_growth_v2',raw);
@@ -1528,7 +1529,11 @@
   }
   function useItem(id) {
     syncEngine();const before={...run.effects};
-    if(!transact(C.useItem(run,id)))return;
+    // Bag use pauses simulation, including the combat-item cooldown. Refuel
+    // through the atomic core API so deliberate repeated bag taps can finish.
+    // Live quick slots and automatic items still use their normal cooldowns.
+    const bagFuel=paused&&modern()&&Heroes.ROBOT.fuelItemIds.includes(id);
+    if(!transact(bagFuel?Heroes.ROBOT.useFuel(run,id):C.useItem(run,id)))return;
     AudioEng.sfxAction?.(window.CombatAudio?.itemKind(id)||'device');
     const mul=run.party?1:CH().itemDurMul||1;for(const key of Object.keys(run.effects))if(key!=='haste'&&run.effects[key]>before[key])run.effects[key]*=mul;
     if(!run.party&&id==='ration'&&CH().foodMul)G.satiety=run.hunger=Math.min(100,run.hunger+45*(CH().foodMul-1));

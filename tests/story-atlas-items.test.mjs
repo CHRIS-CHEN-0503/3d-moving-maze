@@ -85,10 +85,21 @@ test('torch, raw materials, daylight and tools are current obtainable resources 
   assert.match(Atlas.scope.notes.join(' '),/不會在開局或變形時自然散放/);
 });
 
+test('portable lighting guide matches the live radius ordering, shared party priority and torch fuel rules',()=>{
+  const core=find('light:robot-core'),torch=find('light:torch'),daylight=find('light:daylight');
+  assert.ok(Robot.CORE_LIGHT_RADII[1]<L.TORCH_RADIUS&&L.TORCH_RADIUS<Robot.CORE_LIGHT_RADII[2]&&Robot.CORE_LIGHT_RADII[2]<L.DAYLIGHT_RADIUS);
+  assert.ok(core.effect.includes('無核／單核／雙核範圍 '+Robot.CORE_LIGHT_RADII.join('／')));assert.ok(core.effect.includes('火把 '+L.TORCH_RADIUS+'、日光術 '+L.DAYLIGHT_RADIUS));
+  assert.ok(daylight.effect.includes('光照範圍為 '+L.DAYLIGHT_RADIUS));assert.ok(daylight.effect.includes('火把為 '+L.TORCH_RADIUS));assert.match(core.effect,/全隊採最強來源.*日光術優先.*切換領隊不改光源/);
+  assert.match(daylight.effect,/日光術優先於核心.*切換領隊不改變光照/);assert.match(daylight.acquisition,/隊伍有仍能行動的術士.*按 L/);assert.match(torch.effect,/日光術或雙核心.*暫停燃料消耗.*單核心期間火把正常燃燒/);
+});
+
 test('natural herb and ore records derive independent corner harvesting rules without replenishment',()=>{
   assert.deepEqual(entries.filter(e=>e.foraging&&e.foraging.kind!=='power').map(e=>e.key).sort(),['herb',...Foraging.NATURAL_ORES].sort());
-  assert.match(Atlas.scope.notes.join(' '),/不是自然散放補給/);assert.match(Atlas.foragingExplanation,/株數與礦石堆數獨立/);assert.match(Atlas.foragingExplanation,/靠牆角落/);assert.match(Atlas.foragingExplanation,/同層變形與讀檔不補回已採集/);
-  for(const weights of Object.values(Foraging.PROFILES))assert.ok(Atlas.foragingExplanation.includes([1,2,3].map(n=>weights[n]+'%').join('／')));
+  assert.match(Atlas.scope.notes.join(' '),/不是自然散放補給/);assert.match(Atlas.foragingExplanation,/株數與自然礦石堆數獨立/);assert.match(Atlas.foragingExplanation,/靠牆角落/);assert.match(Atlas.foragingExplanation,/同層變形與讀檔不補回已採集/);
+  for(const weights of Object.values(Foraging.PROFILES)){
+    assert.ok(Atlas.foragingExplanation.includes([1,2,3].map(n=>Number(weights[n].toFixed(2))+'%').join('／')));
+    assert.ok(Atlas.foragingExplanation.includes((100-weights[0])+'% 出現、'+weights[0]+'% 不出現'));
+  }
   for(const e of entries.filter(e=>e.foraging&&e.foraging.kind!=='power')){
     assert.equal(e.foraging.quantity,1);assert.deepEqual(e.foraging.profiles,Foraging.PROFILES);assert.ok(e.sources.includes(Atlas.SOURCES.foraging));assert.match(e.acquisition,/靠牆角落/);assert.match(e.acquisition,/每株 1 份|每堆 1 份/);
     const regions=Materials.ECOLOGIES.filter(region=>e.key==='herb'||Foraging.orePool({floor:region.high}).includes(e.key));
@@ -102,16 +113,24 @@ test('robot fuel stones derive real recovery, rarity, exclusive merchant rules a
   for(const [key,def]of Object.entries(Robot.FUEL_ITEMS)){
     const e=find('item:'+key);assert.equal(e.name,def.name);assert.equal(e.fuel,def.fuel);assert.match(e.effect,new RegExp(def.fuel+'% 能源'));assert.match(e.effect,new RegExp(Robot.FUEL_SECONDS+' 秒'));assert.match(e.effect,/不能攻擊或施放技能.*內建光源與核心自修仍保留/);
     assert.equal(e.buyPrice,def.buyPrice);assert.equal(e.sellPrice,def.sellPrice);assert.equal(e.drop.rarity,def.dropRarity);assert.equal(e.drop.conditionalPercent,Loot.CHANCES[def.dropRarity]);assert.equal(e.drop.quantity,1);
-    assert.equal(e.foraging.tier,Foraging.POWER_STONES.indexOf(key)+1);assert.equal(e.foraging.cluster,true);assert.deepEqual(e.foraging.quantity,[1,3]);assert.deepEqual(e.foraging.profiles,Foraging.PROFILES);
+    assert.equal(e.foraging.tier,Foraging.POWER_STONES.indexOf(key)+1);assert.equal(e.foraging.cluster,true);assert.deepEqual(e.foraging.quantity,[1,3]);assert.deepEqual(e.foraging.profiles,Foraging.POWER_PROFILES);
     assert.match(e.acquisition,/靠牆角落.*1～3 顆.*一次整簇採取.*初始持有零/);assert.match(e.acquisition,/有能行動的機器人.*候選/);assert.ok(e.sources.includes(Atlas.SOURCES.robot));assert.ok(e.sources.includes(Atlas.SOURCES.foraging));
     assert.equal(Atlas.iconHtml(e),HeroIcons.svg(key));assert.equal(HeroIcons.svg(key),HeroIcons.svg('item_'+key));
     if(def.fuel===25)assert.match(e.acquisition,/雜貨商・蘇禾.*購買 6 幣/);else{assert.doesNotMatch(e.acquisition,/雜貨商・蘇禾/);assert.match(e.acquisition,/商人不販售/);assert.equal(e.buyPrice,null);assert.equal(e.sellPrice,null);}
   }
-  for(const weights of Object.values(Foraging.PROFILES))assert.ok(Atlas.powerForagingExplanation.includes([1,2,3].map(n=>weights[n]+'%').join('／')));
+  for(const [profile,weights]of Object.entries(Foraging.POWER_PROFILES)){
+    assert.ok(Atlas.powerForagingExplanation.includes([1,2,3].map(n=>Number(weights[n].toFixed(2))+'%').join('／')));
+    assert.ok(Atlas.powerForagingExplanation.includes(weights[0]+'% 不出現'));assert.equal(weights[0],100-Foraging.POWER_APPEARANCE[profile]);
+    assert.ok(Math.abs(Object.values(weights).reduce((sum,n)=>sum+n,0)-100)<1e-9);
+  }
   assert.match(Atlas.powerForagingExplanation,/每層至多一處礦簇/);assert.match(Atlas.powerForagingExplanation,/一次採取整簇/);assert.match(Atlas.powerForagingExplanation,/同層變形與讀檔不補回/);
-  const light=find('light:robot-core');assert.equal(Atlas.iconHtml(light),HeroIcons.svg('robot_core'));assert.match(light.effect,/一至三階.*四五階/);assert.match(light.effect,/能源耗盡仍保留照明/);assert.match(light.notes.join(' '),/眼睛.*身份色/);
+  const light=find('light:robot-core');assert.equal(Atlas.iconHtml(light),HeroIcons.svg('robot_core'));assert.match(light.effect,/單核心小於火把.*雙核心大於火把且小於日光術/);assert.doesNotMatch(light.effect,/一至三階.*四五階/);assert.match(light.effect,/能源耗盡仍保留照明/);assert.match(light.notes.join(' '),/眼睛.*身份色/);
   assert.match(find('item:heal').effect,/機器人不能/);assert.match(find('item:feather').effect,/機器人不適用/);for(const r of entries.filter(e=>e.recipe))assert.match(r.notes.join(' '),/一般治療不會修復機器人/);
   for(const [tier,cost]of Object.entries(Robot.CORE_COSTS))for(const key of Object.keys(cost.materials))assert.match(find('material:'+key).effect,new RegExp(Robot.CORES[Robot.kind('robot_core',Number(tier))].name+'製作'));
+});
+
+test('power-stone guide separates paused inventory refills from live and automatic item cooldowns',()=>{
+  for(const key of Robot.fuelItemIds){const text=find('item:'+key).notes.join(' ');assert.match(text,/暫停背包可連續補充.*滿能源不消耗.*戰鬥快捷欄間隔一秒.*自動使用間隔五秒/);assert.match(text,/同層變形與讀檔不補回/);assert.match(text,/舊旅程已生成的礦簇保留原狀.*新樓層才套用新出現率/);}
 });
 
 test('regional ingredient and forging records use real ecological sources, costs and rarity',()=>{

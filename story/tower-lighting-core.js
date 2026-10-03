@@ -3,7 +3,7 @@
   'use strict';
   const C=()=>typeof module==='object'&&module.exports?require('./story-core.js'):globalThis.TowerCore;
   const E=()=>typeof module==='object'&&module.exports?require('./tower-encounters.js'):globalThis.TowerEncounters;
-  const TORCH_SECONDS=300,DAYLIGHT_SECONDS=600,DAYLIGHT_COOLDOWN=600,TORCH_PRICE=4,SHOP_STOCK=3;
+  const TORCH_SECONDS=300,DAYLIGHT_SECONDS=600,DAYLIGHT_COOLDOWN=600,TORCH_PRICE=4,SHOP_STOCK=3,TORCH_RADIUS=10,DAYLIGHT_RADIUS=15;
   const SHOPS=['tieLing','jinHe','lanZhou','suHe'];
   const PROFILES=Object.freeze(Object.fromEntries(Object.entries({
     summoning:{name:'雲間石燈',style:'rune',color:0x9be5f5,sky:0x090f1b,ambient:.035,hemi:.075,sun:.045,radius:3.2},
@@ -41,6 +41,15 @@
   }
   const heroes=()=>typeof module==='object'&&module.exports?require('./tower-heroes-core.js'):globalThis.TowerHeroes;
   function robotLight(run,id){const h=heroes();if(!h?.enabled(run))return null;id=id||h.state(run).active;return h.job(run,id)==='robot'&&h.hp(run,id)>0?h.ROBOT?.lightInfo(run,id)||null:null;}
+  function partyRobotLight(run){const h=heroes();if(!h?.enabled(run))return null;return h.ids(run).map(id=>{const power=robotLight(run,id);return power?{...power,actorId:id}:null;}).filter(Boolean).sort((a,b)=>b.radius-a.radius||b.tier-a.tier)[0]||null;}
+  // Portable lighting is shared by the travelling party. Changing the leader
+  // must not downgrade an already lit torch, a companion core, or daylight.
+  function portableInfo(run){
+    const l=run?.party?.light,power=partyRobotLight(run);
+    if(l?.daylight>0)return {mode:'daylight',radius:DAYLIGHT_RADIUS,color:0xfff2d1};
+    if(l?.lit&&l.fuel>0&&(!power||power.radius<TORCH_RADIUS))return {mode:'torch',radius:TORCH_RADIUS,color:0xffc07a};
+    return power||{mode:'none',radius:0,color:0xffc07a};
+  }
   const canCast=run=>run.party?.loadouts?heroes().ids(run).some(id=>heroes().hp(run,id)>0&&heroes().job(run,id)==='mage'):!!run.party&&(run.party.profession==='mage'||run.party.members.some(m=>m.profession==='mage'&&m.hp>0));
   const tx=(run,revision,fn)=>C().transaction(run,revision,n=>n.party?fn(n,n.party.light):{ok:false,message:'請先選擇冒險職業。'});
   function craft(run,revision){return tx(run,revision,(n,l)=>{
@@ -74,11 +83,11 @@
   });}
   function tick(next,dt){
     const l=next.party?.light;if(!l||!Number.isFinite(dt)||dt<0)return;
-    const burn=robotLight(next)?0:Math.max(0,dt-l.daylight);
+    const burn=(partyRobotLight(next)?.radius||0)>TORCH_RADIUS?0:Math.max(0,dt-l.daylight);
     l.daylight=Math.max(0,l.daylight-dt);l.cooldown=Math.max(0,l.cooldown-dt);
     if(l.lit){l.fuel=Math.max(0,l.fuel-burn);if(!l.fuel)l.lit=false;}
   }
   function advance(next){const l=next.party?.light;if(l){l.gathered=[];l.bought=Object.fromEntries(SHOPS.map(k=>[k,0]));}}
-  const portable=run=>robotLight(run)?.mode||(run?.party?.light?.daylight>0?'daylight':run?.party?.light?.lit?'torch':'none');
-  return Object.freeze({TORCH_SECONDS,DAYLIGHT_SECONDS,DAYLIGHT_COOLDOWN,TORCH_PRICE,SHOP_STOCK,PROFILES,UNDERWORLD_PROFILES,profile,supplyCount,newState,validate,canCast,robotLight,craft,torch,daylight,buy,gather,tick,advance,portable});
+  const portable=run=>portableInfo(run).mode;
+  return Object.freeze({TORCH_SECONDS,DAYLIGHT_SECONDS,DAYLIGHT_COOLDOWN,TORCH_PRICE,SHOP_STOCK,TORCH_RADIUS,DAYLIGHT_RADIUS,PROFILES,UNDERWORLD_PROFILES,profile,supplyCount,newState,validate,canCast,robotLight,partyRobotLight,portableInfo,craft,torch,daylight,buy,gather,tick,advance,portable});
 });

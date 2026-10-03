@@ -65,7 +65,7 @@
     tower_shield:{role:'單手搭配',handling:'和單手武器一起使用，提供較多防禦。'},
     robot_fists:{role:'機器人拳擊',handling:'一體式雙拳，左右拳輪替；不能配盾、卸下或移交，揮空不消耗耐久。'},
     robot_shell:{role:'機器人防護',handling:'一體式機殼，不能穿一般防具或卸下；以礦材與零件進階，保留原耐久比例。背脊裝甲、斜向散熱格柵與弧形管線隨機殼階級加細；三階增加中央核心護蓋，四階加入能量雕紋與肩背紋章，五階增加鎮淵箭形下背鑲片。'},
-    robot_core:{role:'機體自修與照明',handling:'兩個可替換核心槽，各自按階級提供自修與防禦；內建永久光源跟隨最高核心階級，不消耗能源或核心耐久。'},
+    robot_core:{role:'機體自修與照明',handling:'兩個可替換核心槽，各自按階級提供自修與防禦；單核心光源小於火把、雙核心大於火把且小於日光術。最高核心階級只決定光色；全隊採最強光源，不消耗能源或核心耐久。'},
   });
   function gear(value,run,actorId){
     const h=H(),kind=typeof value==='string'?value:value?.kind;if(!own(h?.GEAR,kind))return null;const def=h.GEAR[kind];
@@ -94,7 +94,7 @@
     healer:{innate:'法書發射遠程光彈。遇到受污染的泉眼，可用職業本領快速淨化。',examples:['herbalism','rescue']},
     smith:{innate:'能穿重裝，使用短鎚配盾或重錘。隊中有能行動的鍛匠，營地才可完整修理、重建破損（耐久歸零）與鍛造強化；否則需找專門商人，銅幣另加20%。',examples:['economy','care']},
     archer:{innate:'精靈長弓進行遠程攻擊，使用輕裝與全隊共用箭袋；發射會消耗箭矢。',examples:['steady_aim','nimble_shot']},
-    robot:{innate:'重防禦拳鬥者，移動速度為一般人物九成。自帶一體式機殼與拳臂，不能穿一般防具、配盾或更換普通武器；以銅幣、零件與礦材進階。兩個動力核心自修生命並提供永久照明，光源按最高核心階級提升。動力能源滿額十分鐘，耗盡慢行且不能攻擊或施放技能，不損失生命，仍保留光源；以動力石補充。一般料理、療癒藥與療癒魔法不能修復機體。',examples:['robot_body','fist_drive']},
+    robot:{innate:'重防禦拳鬥者，移動速度為一般人物九成。自帶一體式機殼與拳臂，不能穿一般防具、配盾或更換普通武器；以銅幣、零件與礦材進階。兩個動力核心自修生命並提供永久照明：單核心小於火把，雙核心大於火把、小於日光術；最高核心階級決定光色。全隊採最強來源，日光術優先，不因切換領隊改變。動力能源滿額十分鐘，耗盡慢行且不能攻擊或施放技能，不損失生命，仍保留光源；以動力石補充。一般料理、療癒藥與療癒魔法不能修復機體。',examples:['robot_body','fist_drive']},
   });
   function profession(job,run,actorId){
     const h=H();if(!own(PROFESSIONS,job)||!h)return null;const spec=PROFESSIONS[job];

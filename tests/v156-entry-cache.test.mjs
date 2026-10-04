@@ -4,21 +4,24 @@ import {readFileSync,statSync} from 'node:fs';
 import {createRequire} from 'node:module';
 
 const root=new URL('../',import.meta.url),origin='https://maze-entry-cache.test';
-const release='1.57.2',gameEntry='index.html',atlasEntry='docs/職業裝備圖鑑.html';
+const release='1.57.4',knightHealingVersion='1.57.2',gameEntry='index.html',atlasEntry='docs/職業裝備圖鑑.html';
 const game=readFileSync(new URL(gameEntry,root),'utf8');
 const atlas=readFileSync(new URL(atlasEntry,root),'utf8');
 const packageInfo=JSON.parse(readFileSync(new URL('package.json',root),'utf8'));
-// Check only files changed by this release. Unchanged art and game rules keep
-// their own cache tags; this test must not pin their older version numbers.
+// The entrypoint advances independently from asset caches. Only the character
+// changed profession displays/models/motion and their shared rules advance in
+// 1.57.4; this round advances only the theater/direction/effects/audio to 1.57.5.
 const changedGameAssets=[
   {asset:'assets/game-voice.js',kind:'script'},
   {asset:'story/tower-floor-lords.js',kind:'script'},
   {asset:'story/tower-stairs.js',kind:'script'},
   {asset:'story/tower-cinematic-actors.js',kind:'script'},
   {asset:'story/tower-cinematic-look.js',kind:'script'},
-  {asset:'story/tower-story-theater.js',kind:'script'},
+  {asset:'story/tower-story-direction.js',kind:'script',version:'1.57.5'},
+  {asset:'story/tower-story-theater.js',kind:'script',version:'1.57.5'},
+  {asset:'assets/combat-audio.js',kind:'script',version:'1.57.5'},
   {asset:'story/tower-cinematics.js',kind:'script'},
-  {asset:'story/tower-mode.js',kind:'script',version:'1.57.1'},
+  {asset:'story/tower-mode.js',kind:'script',version:release},
   {asset:'story/tower-team-tactics.js',kind:'script',version:'1.57.1'},
   {asset:'story/tower-cooperation-runtime.js',kind:'script',version:'1.57.1'},
   {asset:'story/tower-cinematics.css',kind:'link'},
@@ -27,24 +30,27 @@ const changedGameAssets=[
   {asset:'assets/classic-tactics-core.js',kind:'script'},
   {asset:'assets/classic-tactics.js',kind:'script'},
   {asset:'assets/mode-variants.js',kind:'script'},
-  {asset:'story/tower-hero-growth.js',kind:'script',version:release},
-  {asset:'story/tower-growth-runtime.js',kind:'script',version:release},
+  {asset:'story/tower-hero-growth.js',kind:'script',version:knightHealingVersion},
+  {asset:'story/tower-growth-runtime.js',kind:'script',version:knightHealingVersion},
   {asset:'story/tower-heroes-runtime.js',kind:'script',version:'1.57.1'},
   {asset:'story/tower-party-runtime.js',kind:'script',version:'1.57.1'},
-  {asset:'assets/character-sculpt.js',kind:'script',version:release},
+  {asset:'assets/character-sculpt.js',kind:'script',version:knightHealingVersion},
   {asset:'story/tower-heroes-visuals.js',kind:'script',version:release},
   {asset:'story/tower-combat-motion.js',kind:'script',version:release},
   {asset:'story/tower-heroes-core.js',kind:'script',version:release},
-  {asset:'story/tower-ascension-catalog.js',kind:'script',version:release},
+  {asset:'story/tower-ascension-catalog.js',kind:'script',version:knightHealingVersion},
   {asset:'story/tower-cooperation-core.js',kind:'script',version:release},
+  {asset:'story/tower-expedition-core.js',kind:'script',version:release},
+  {asset:'story/tower-party-core.js',kind:'script',version:release},
+  {asset:'story/tower-field-guide.js',kind:'script',version:release},
   {asset:'story/tower-adventure-events.js',kind:'script'},
-  {asset:'story/tower-skill-effects.js',kind:'script'},
+  {asset:'story/tower-skill-effects.js',kind:'script',version:'1.57.5'},
   {asset:'story/tower-combat-readability.js',kind:'script'},
   {asset:'story/tower-story-insights.js',kind:'script'},
   {asset:'story/tower-environment-life.js',kind:'script'},
   {asset:'story/tower-party.css',kind:'link'},
 ];
-const changedAtlasAssets=[{asset:'docs/story-atlas-items.js',kind:'script'},{asset:'story/tower-hero-growth.js',kind:'script',version:release},{asset:'story/tower-adventure-events.js',kind:'script'},{asset:'story/tower-party-runtime.js',kind:'script',version:'1.57.1'},{asset:'story/tower-cooperation-runtime.js',kind:'script',version:'1.57.1'},{asset:'story/tower-heroes-core.js',kind:'script',version:release},{asset:'story/tower-ascension-catalog.js',kind:'script',version:release},{asset:'story/tower-cooperation-core.js',kind:'script',version:release},{asset:'docs/story-atlas-rules.js',kind:'script',version:release}];
+const changedAtlasAssets=[{asset:'docs/story-atlas-items.js',kind:'script'},{asset:'story/tower-hero-growth.js',kind:'script',version:knightHealingVersion},{asset:'story/tower-adventure-events.js',kind:'script'},{asset:'story/tower-party-runtime.js',kind:'script',version:'1.57.1'},{asset:'story/tower-cooperation-runtime.js',kind:'script',version:'1.57.1'},{asset:'story/tower-heroes-core.js',kind:'script',version:release},{asset:'story/tower-ascension-catalog.js',kind:'script',version:knightHealingVersion},{asset:'story/tower-cooperation-core.js',kind:'script',version:release},{asset:'story/tower-expedition-core.js',kind:'script',version:release},{asset:'story/tower-party-core.js',kind:'script',version:release},{asset:'story/tower-field-guide.js',kind:'script',version:release},{asset:'docs/story-atlas-rules.js',kind:'script',version:release}];
 
 function references(html,entry){
   return [...html.replace(/<!--[\s\S]*?-->/g,'').matchAll(/<(script|link)\b[^>]*>/gi)].flatMap(([tag,name])=>{
@@ -73,8 +79,8 @@ function assertReleaseReferences(html,entry,expected){
 function assertGameVersion(html,manifest){
   const declarations=[...html.matchAll(/\bconst\s+GAME_VERSION\s*=\s*(["'])([^"']+)\1/g)];
   assert.equal(declarations.length,1,'one real game version declaration');
-  assert.equal(declarations[0][2],release,'GAME_VERSION');
-  assert.equal(manifest.version,release,'package.json version');
+  assert.equal(declarations[0][2],'1.57.5','GAME_VERSION');
+  assert.equal(manifest.version,'1.57.5','package.json version');
 }
 
 function assertCinematicOrder(html){
@@ -83,6 +89,7 @@ function assertCinematicOrder(html){
   const director=index('tower-cinematics'),runtime=index('tower-mode');
   for(const provider of ['tower-cinematic-actors','tower-cinematic-look','tower-story-theater'])assert.ok(index(provider)<director,provider+' must load before the director');
   assert.ok(index('tower-cinematic-look')<index('tower-story-theater'),'cinematic surface provider must load before the stage');
+  assert.ok(index('tower-story-direction')<index('tower-story-theater'),'narrative direction must load before the stage');
   assert.ok(director<runtime,'cinematic director must load before story runtime');
 }
 
@@ -93,12 +100,12 @@ function sectionText(html,title){
   return section[1].replace(/<[^>]*>/g,' ').replace(/\s+/g,' ').trim();
 }
 
-test('actual v1.57.2 game and package versions are synchronized',()=>{
+test('actual v1.57.5 game and package versions are synchronized',()=>{
   assertGameVersion(game,packageInfo);
-  assert.match(atlas,/劇情模式\s*·\s*v1\.57\.2 圖鑑/);
+  assert.match(atlas,/劇情模式\s*·\s*v1\.57\.5 圖鑑/);
 });
 
-test('v1.57.2 knight and healing caches update while unchanged assets retain their tags',()=>{
+test('v1.57.5 cinematic and spell assets update while unchanged profession assets retain their tags',()=>{
   assertReleaseReferences(game,gameEntry,changedGameAssets);
   assertReleaseReferences(atlas,atlasEntry,changedAtlasAssets);
   for(const {asset}of [...changedGameAssets,...changedAtlasAssets])assert.ok(statSync(new URL(asset,root)).isFile(),asset+' must exist');
@@ -122,10 +129,11 @@ test('shared parser resolves quoted relative assets without counting comments, i
 
 test('every changed game and atlas asset rejects stale, malformed, unversioned and removed references',()=>{
   for(const [html,entry,expected]of [[game,gameEntry,changedGameAssets],[atlas,atlasEntry,changedAtlasAssets]]){
+    assertReleaseReferences(html,entry,expected);
     for(const {asset}of expected){
       const ref=references(html,entry).find(ref=>ref.asset===asset);
       assert.ok(ref,asset+' must be found before mutation');
-      for(const value of ['1.56.0','1.57.0-old','broken','',...(ref.version===release?['1.57.0','1.57.1']:[])]){
+      for(const value of ['1.56.0','1.57.0-old','broken','',...['1.57.0','1.57.1','1.57.2','1.57.3','1.57.4'].filter(version=>version!==ref.version)]){
         const source=ref.source.replace(/([?&])v=[^&#]*/,'$1v='+value);
         assert.notEqual(source,ref.source,asset+' mutation must take effect');
         assert.throws(()=>assertReleaseReferences(html.replace(ref.source,source),entry,expected),undefined,entry+': '+asset+' rejects '+JSON.stringify(value));
@@ -140,11 +148,13 @@ test('every changed game and atlas asset rejects stale, malformed, unversioned a
 });
 
 test('invalid source and manifest versions fail independently instead of matching each other',()=>{
-  const oldGame=game.replace(/(\bconst\s+GAME_VERSION\s*=\s*["'])1\.57\.2/,'$11.55.0');
-  assert.notEqual(oldGame,game,'version mutation must take effect');
-  assert.throws(()=>assertGameVersion(oldGame,packageInfo));
-  assert.throws(()=>assertGameVersion(game,{...packageInfo,version:'1.55.0'}));
-  assert.throws(()=>assertGameVersion(oldGame,{...packageInfo,version:'1.55.0'}));
+  for(const stale of ['1.55.0','1.57.3','1.57.4']){
+    const oldGame=game.replace(/(\bconst\s+GAME_VERSION\s*=\s*["'])1\.57\.5/,(_,prefix)=>prefix+stale);
+    assert.notEqual(oldGame,game,'version mutation must take effect');
+    assert.throws(()=>assertGameVersion(oldGame,packageInfo));
+    assert.throws(()=>assertGameVersion(game,{...packageInfo,version:stale}));
+    assert.throws(()=>assertGameVersion(oldGame,{...packageInfo,version:stale}));
+  }
 });
 
 test('wrong script order and unordered async loading are caught on the real entry',()=>{
@@ -152,6 +162,7 @@ test('wrong script order and unordered async loading are caught on the real entr
   const swap=(a,b)=>game.replace(a.tag,'<!-- v156-swap-slot -->').replace(b.tag,a.tag).replace('<!-- v156-swap-slot -->',b.tag);
   for(const provider of ['tower-cinematic-actors','tower-cinematic-look','tower-story-theater'])assert.throws(()=>assertCinematicOrder(swap(get(provider),get('tower-cinematics'))));
   assert.throws(()=>assertCinematicOrder(swap(get('tower-cinematic-look'),get('tower-story-theater'))));
+  assert.throws(()=>assertCinematicOrder(swap(get('tower-story-direction'),get('tower-story-theater'))));
   assert.throws(()=>assertCinematicOrder(swap(get('tower-cinematics'),get('tower-mode'))));
   const actor=get('tower-cinematic-actors');
   assert.throws(()=>assertCinematicOrder(game.replace(actor.tag,actor.tag.replace('<script ','<script async '))));

@@ -72,6 +72,8 @@
     if(index===2)return Object.freeze([medium('fragment-discovery',0,4,h,protagonist,1,true),close('traveller-recognition',4,4,npc?n:h,traveller,-1),side('summoning-returns',8,3.5),wide('summit-after-echo',11.5,3.5)]);
     return Object.freeze([side('travellers-meet',0,4),medium('traveller-warning',4,3.5,npc?n:h,traveller,-1),side('map-offer-and-receive',7.5,6,true),close('traveller-shares-direction',13.5,4,npc?n:h,traveller,-1)]);
   }
+  // One region has one visual identity, regardless of whether the entry is its
+  // opening, a later chapter, a resumed objective or a journal replay.
   // The film stage deliberately has its own art direction. All surfaces are
   // authored here, with tiny deterministic textures and no downloaded media.
   // Static scenery is baked by surface and depth layer before the first frame;
@@ -158,10 +160,28 @@
       ridge(-20,4.3,0xaccbb0,.8);ridge(-17.8,3.5,0x82ad84,2.1);ridge(-14.6,2.7,0x588b61,4.5);
     }else{box(20,8,.5,palette[0],0,3.75,-10,{surface:'stone',parent:layers.far});for(const side of [-1,1])box(.65,6.5,14,palette[1],side*7.5,3,-5,{surface:'stone',parent:layers.far});}
     if(id==='cloud'){
+      set.userData.storyArtDirection='cloud-summit';
+      set.userData.storyLandmarks=Object.freeze(['carved-altar','inlaid-processional-path','fluted-pillars','wind-banners','blue-sky','green-mountain-ridges']);
+      // The same engraved promenade, altar steps and roof parapet now surround
+      // every cloud-region scene. Detail sits beside/behind the actors, keeping
+      // the mobile close-up sightlines clear and the old summit choreography intact.
+      for(let n=0;n<7;n++){
+        const z=-1-n*1.1;for(const side of [-1,1])box(.045,.012,.88,palette[2],side*1.23,-.02,z,{surface:'ornament'});
+        const diamond=box(.22,.013,.22,palette[2],0,-.022,z,{surface:'ornament'});diamond.rotation.y=Math.PI/4;
+      }
+      for(let step=0;step<3;step++)rod(1.9+step*.17,.055,step===2?0x657c8d:palette[1],0,-.08+step*.055,-.35,{surface:'stone'});
       for(const side of [-1,1]){for(let n=0;n<3;n++){box(.5,1.05,.55,palette[1],side*(2.7+n*.92),.44,-4.15,{surface:'stone'});box(.7,.15,.75,palette[2],side*(2.7+n*.92),1,-4.15,{surface:'ornament'});}box(4.9,.28,.45,palette[1],side*3.7,.2,-4.15,{surface:'stone'});rod(.3,3.8,palette[1],side*3.9,1.75,-3.65,{surface:'stone'});rod(.46,.23,palette[2],side*3.9,3.7,-3.65,{surface:'ornament'});cone(.7,.7,palette[2],side*3.9,4.16,-3.65,{surface:'ornament'});box(.3,4.5,.4,palette[1],side*5.5,2,-9,{surface:'stone',parent:layers.far});cone(.62,1.8,palette[2],side*5.5,5.07,-9,{parent:layers.far});}
+      for(const side of [-1,1]){
+        for(const y of [.13,.34,3.42])rod(y===.13?.49:.38,y===.13?.15:.11,palette[2],side*3.9,y,-3.65,{surface:'ornament'});
+        for(let flute=0;flute<8;flute++){const angle=flute*Math.PI/4;rod(.018,2.88,0xc1cdd1,side*3.9+Math.cos(angle)*.305,1.88,-3.65+Math.sin(angle)*.305,{surface:'stone'});}
+        for(let n=0;n<4;n++){const z=-4.2-n*1.2;box(.27,.9,.27,palette[1],side*5.25,.36,z,{surface:'stone'});box(.37,.1,.37,palette[2],side*5.25,.85,z,{surface:'ornament'});}
+        box(.32,.16,5,palette[2],side*5.25,.99,-6,{surface:'ornament'});
+        const bannerStaff=rod(.035,.98,palette[2],side*3.5,3.49,-3.57,{surface:'ornament'});bannerStaff.rotation.z=Math.PI/2;
+        orb(.13,.13,.13,palette[2],side*3.9,4.64,-3.65,{surface:'ornament'});
+      }
       const altar=rod(1.78,.24,palette[1],0,.065,-.35,{surface:'stone'});altar.name='story-summoning-altar';for(let n=0;n<2;n++){const summon=ring(n?.92:1.4,n?.027:.043,n?palette[3]:palette[2],0,.205+n*.004,-.35,{glow:true});summon.rotation.x=Math.PI/2;animate(summon,'turn',n?-.07:.05);}
       for(let n=0;n<12;n++){const glyph=box(.07,.022,.2,palette[2],Math.cos(n*Math.PI/6)*1.18,.203,-.35+Math.sin(n*Math.PI/6)*1.18,{glow:true});glyph.rotation.y=-n*Math.PI/6;}
-      for(const side of [-1,1]){const cloth=new T.PlaneGeometry(.8,2.1,5,7);const pos=cloth.attributes.position;for(let i=0;i<pos.count;i++)pos.setZ(i,Math.sin(pos.getY(i)*3.2)*.045);cloth.computeVertexNormals();const banner=mesh(cloth,0x384c72,side*3.5,2.5,-3.57,{surface:'ornament',double:true});banner.name='story-summit-banner';animate(banner,'leaf',.39,.019);}
+      for(const side of [-1,1]){const cloth=new T.PlaneGeometry(.8,2.1,5,7),banner=mesh(cloth,0x384c72,side*3.5,2.5,-3.57,{surface:'ornament',double:true});banner.name='story-summit-banner';animate(banner,'cloth',.85,.075);}
       cloud(-6,2,-10,1.25);cloud(4.5,3.1,-13,1.6);cloud(0,4.8,-18,2.2);orb(.65,.65,.14,0xf8ddb0,-6.2,7,-17,{glow:true,parent:layers.far});particles(palette[3],20);
     }
     for(const layer of Object.values(layers))bake(layer);
@@ -231,8 +251,8 @@
     for(const mat of originals)if(!used.has(mat))retired.add(mat);
     model.userData.storyIdentityPalette='lian-teal-silver';
   }
-  // The first approval preview upgrades the tower summit only. Other regions
-  // retain the released prototype's exact props, lighting and framing.
+  // Non-cloud regions keep their own released stage designs. In particular,
+  // later cloud floors must never fall back to this featureless prototype.
   function legacyScenery(T,id,palette,scene,owned,motion){
     const set=new T.Group();set.name='story-theater-environment';scene.add(set);
     const mats=new Map(),material=(color,glow=false,opacity=1)=>{const key=color+':'+glow+':'+opacity;if(!mats.has(key)){const mat=glow?new T.MeshBasicMaterial({color,transparent:opacity<1,opacity}):new T.MeshLambertMaterial({color,transparent:opacity<1,opacity});mats.set(key,mat);owned.add(mat);}return mats.get(key);};
@@ -271,7 +291,7 @@
   function create({THREE:T,hero,heroJob='swordsman',heroSex='male',heroName='旅人',buildActor,buildStoryActor,dispose,environment,floor=99,reduced=false}={}){
     if(!T?.Scene||!T?.Mesh)return null;
     const id=environmentId(environment,floor),palette=PALETTES[id],scene=new T.Scene(),owned=new Set(),motion=[];
-    const premium=id==='cloud'&&Number(floor)===99;scene.name='story-theater';scene.userData.storyTheater=true;scene.userData.environment=id;scene.userData.cinematicPreview=premium;scene.background=new T.Color(palette[0]);scene.fog=new T.Fog(premium?0xb6d8e7:palette[0],premium?16:10,premium?45:22);
+    const premium=id==='cloud';scene.name='story-theater';scene.userData.storyTheater=true;scene.userData.environment=id;scene.userData.cinematicPreview=premium;scene.userData.storyArtDirection=premium?'cloud-summit':id+'-stage';scene.background=new T.Color(premium?0xb6d8e7:palette[0]);scene.fog=new T.Fog(premium?0xb6d8e7:palette[0],premium?16:10,premium?45:22);
     const ambient=new T.AmbientLight(0xf0e4d3,premium?.46:.65),keyLight=new T.HemisphereLight(palette[3],palette[0],premium?.7:.85);scene.add(ambient,keyLight);
     const cinemaLight=premium?new T.DirectionalLight(0xffedda,.82):null;if(cinemaLight){cinemaLight.position.set(-3.8,7,5.5);cinemaLight.castShadow=false;scene.add(cinemaLight);}
     const set=(premium?scenery:legacyScenery)(T,id,palette,scene,owned,motion);
@@ -335,7 +355,12 @@
       // The director owns the speaking/featured actor's joints. Only the other
       // character breathes here; no second controller fights the same rig.
       if(heroModel&&target!==heroModel&&!scriptedHero){if(heroBody)heroBody.scale.y=heroRest.bodyY*(1+Math.sin(t*1.6)*.004);if(heroHead){heroHead.rotation.x=heroRest.hx+Math.sin(t*.7)*.018;heroHead.rotation.y=heroRest.hy+Math.sin(t*.53)*.018;}}
-      for(const track of motion){const p=track.part,wave=Math.sin(t*track.speed);if(track.kind==='turn'||track.kind==='gear')p.rotation.z=track.rz+t*track.speed;else if(track.kind==='cloud')p.position.x=track.x+wave*track.range;else if(track.kind==='water')p.scale.y=1+wave*track.range;else if(track.kind==='leaf')p.rotation.z=track.rz+wave*track.range;else if(track.kind==='ember')p.scale.y=.12*(1+wave*.15);else p.position.y=track.y+wave*track.range;}
+      for(const track of motion){const p=track.part,wave=Math.sin(t*track.speed);if(track.kind==='turn'||track.kind==='gear')p.rotation.z=track.rz+t*track.speed;else if(track.kind==='cloth'){
+        // Two tiny retained vertex grids: the stitched upper edge stays fixed,
+        // while analytic normals follow the cloth without per-frame objects.
+        const pos=p.geometry.attributes.position,normal=p.geometry.attributes.normal;
+        for(let i=0;i<pos.count;i++){const x=pos.getX(i),y=pos.getY(i),weight=(1.05-y)/2.1,phase=t*track.speed+x*4-y*2.8+p.position.x,sine=Math.sin(phase),cosine=Math.cos(phase),dx=track.range*weight*weight*cosine*4,dy=track.range*(-2*weight/2.1*sine-weight*weight*cosine*2.8),length=Math.hypot(dx,dy,1);pos.setZ(i,track.range*weight*weight*sine);normal.setXYZ(i,-dx/length,-dy/length,1/length);}pos.needsUpdate=true;normal.needsUpdate=true;
+      }else if(track.kind==='cloud')p.position.x=track.x+wave*track.range;else if(track.kind==='water')p.scale.y=1+wave*track.range;else if(track.kind==='leaf')p.rotation.z=track.rz+wave*track.range;else if(track.kind==='ember')p.scale.y=.12*(1+wave*.15);else p.position.y=track.y+wave*track.range;}
       return true;
     }
     function page(spec={}){
@@ -352,18 +377,24 @@
       target=name&&npc?.visible?npc:heroModel||anchor;
       const index=Math.max(0,Number(spec.page)||0),focus=new T.Vector3(target===anchor?0:target.position.x*.4,1.35,-.1),goal=new T.Vector3((index%3-1)*.52,2.08,5.6);let shot={focus,goal};
       if(premium){const opening=index===0&&!name;focus.set(name?.25:0,opening?1.25:1.4,opening?-.45:-.2);goal.set(opening?.4:(index%3-1)*.42,opening?2.45:2.15,opening?6:5.7);shot={focus,goal,focusTo:new T.Vector3(name?.3:0,opening?1.4:1.42,-.25),goalTo:new T.Vector3(opening?.15:name?-.1:.1,opening?2.2:2.05,opening?5.5:5.2),fov:opening?56:name?48:52,duration:15,edition:'preview',kind:opening?'summit-reveal':name?'two-person-dialogue':'summit-discovery',cuts:summitCuts(T,index,heroModel,npc?.visible?npc:null,name)};}
-      let actorTracks;
-      if(premium&&spec.entry?.id==='scene:99'&&index<3&&text===spec.entry.paragraphs?.[index]){
+      let actorTracks,directedPerformance;
+      const exactArrival=premium&&Number(floor)===99&&spec.entry?.id==='scene:99'&&index<3&&text===spec.entry.paragraphs?.[index];
+      if(exactArrival){
         const authored=SUMMIT_ACTING[index],tracks=[];
         if(heroModel)tracks.push(Object.freeze({actor:heroModel,identity:'hero',performance:'thoughtful',personality:id,speechAnimation:false,beats:authored.hero}));
         if(authored.eve&&npc?.visible&&name==='伊芙')tracks.push(Object.freeze({actor:npc,identity:'伊芙',performance:index===1?'guide':'reflective',personality:id,speechAnimation:false,beats:authored.eve}));
         actorTracks=Object.freeze(tracks);scriptedHero=!!heroModel;configureProps(index);
         const props=index===1?[{kind:'map',identity:'伊芙',at:11/SUMMIT_NARRATION_RATE,duration:4/SUMMIT_NARRATION_RATE},{kind:'map',identity:'hero',at:15/SUMMIT_NARRATION_RATE,duration:(authored.sourceDuration-15)/SUMMIT_NARRATION_RATE}]:index===2?[{kind:'copper',identity:'hero',at:0,duration:authored.sourceDuration/SUMMIT_NARRATION_RATE}]:[];
         scene.userData.storyActionPlan=Object.freeze({pageIndex:index,narrationRate:SUMMIT_NARRATION_RATE,sourceDuration:authored.sourceDuration,duration:authored.sourceDuration/SUMMIT_NARRATION_RATE,tracks:Object.freeze(tracks.map(track=>Object.freeze({identity:track.identity,beats:track.beats}))),props:Object.freeze(props.map(prop=>Object.freeze(prop)))});
+      }else if(premium){
+        // Later objectives need their own acting, not the opening's wake-up,
+        // map hand-off or copper reveal. The planner only sees this paragraph.
+        const direction=globalThis.TowerStoryDirection?.plan?.({THREE:T,hero:heroModel,npc:npc?.visible?npc:null,text,environment:id,page:index,name:name&&npc?.visible?name:''});
+        if(direction){shot=direction.shot;actorTracks=direction.actorTracks;directedPerformance=direction.performance;scriptedHero=!!actorTracks?.some(track=>track.actor===heroModel);scene.userData.storyActionPlan=direction.actionPlan;}
       }
       // The supplied paragraph is an entire narration track with embedded
       // quotations. Never incorrectly lip-sync that whole track to an NPC.
-      return {target,actor:target===anchor?null:target,actorTracks,performance:performance(text,premium),personality:id,speechAnimation:false,shot,scene,frame,text,title:spec.title??spec.entry?.title??'',entry:spec.entry,page:index};
+      return {target,actor:target===anchor?null:target,actorTracks,performance:directedPerformance||performance(text,premium),personality:id,speechAnimation:false,shot,scene,frame,text,title:spec.title??spec.entry?.title??'',entry:spec.entry,page:index};
     }
     function release(){
       if(!active)return false;active=false;resetPageProps();releaseNpc();heroLook?.restore?.();heroLook=null;lookSession?.dispose?.();lookSession=null;for(const resource of owned)resource.dispose();owned.clear();motion.length=0;

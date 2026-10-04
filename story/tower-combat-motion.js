@@ -2,14 +2,14 @@
 (function(root,factory){const api=factory();if(typeof module==='object'&&module.exports)module.exports=api;root.TowerCombatMotion=api;})(globalThis,function(){
   'use strict';
   const clamp=x=>Math.max(0,Math.min(1,Number(x)||0));
-  const REST=Object.freeze({rx:-.25,ry:0,rz:-.08,lx:0,ly:0,lz:.05,wx:.25,wy:0,wz:.12,lwx:.25,lwy:0,lwz:-.12,wpx:0,wpy:0,wpz:0,lpx:0,lpy:0,lpz:0,lean:0,tilt:0,bookLift:0,bookTilt:0,bookPush:0,knee:0,bowRaise:0,bowDraw:0});
+  const REST=Object.freeze({rx:-.25,ry:0,rz:-.08,lx:0,ly:0,lz:.05,wx:.25,wy:0,wz:.12,lwx:.25,lwy:0,lwz:-.12,wpx:0,wpy:0,wpz:0,lpx:0,lpy:0,lpz:0,lean:0,tilt:0,bookLift:0,bookTilt:0,bookPush:0,bookOpen:0,knee:0,bowRaise:0,bowDraw:0});
   // Author a swing plane, then turn blades around their handle so the sharp
   // +/-X edge follows that arc. Hammers use the same arc with their +Z face.
   // Converted once at module load; sampling remains scalar joint interpolation.
   function swing(p,angle,roll=0,twist=0){const ca=Math.cos(angle),sa=Math.sin(angle),cr=Math.cos(roll),sr=Math.sin(roll),ct=Math.cos(twist),st=Math.sin(twist),m13=cr*st+sr*sa*ct;return {...p,wx:Math.abs(m13)<.9999999?Math.atan2(cr*sa*ct-sr*st,ca*ct):Math.atan2(sa,cr*ca),wy:Math.asin(Math.max(-1,Math.min(1,m13))),wz:Math.abs(m13)<.9999999?Math.atan2(sr*ca,cr*ct-sr*sa*st):0};}
-  // Local +Y handle twist after each knife's original Rx*Rz pose. Its +Y
-  // tip/axis stays in exactly the same place, but +/-X edges replace the flat
-  // face. The left follow-up adds .2 twist for its cross-body shoulder travel.
+  // Reverse knives have a local -Y blade, below the little-finger end of the
+  // grip. Turn around the handle axis so an edge, not the broad flat, leads
+  // each back-to-front downward cut; the left follow-up adds a small twist.
   function knifeCut(p){const out={...p};for(const wrist of ['w','lw']){const angle=p[wrist+'x'],roll=p[wrist+'z'],twist=Math.PI/2+(wrist==='lw'?.2:0),ca=Math.cos(angle),sa=Math.sin(angle),cr=Math.cos(roll),sr=Math.sin(roll),ct=Math.cos(twist),st=Math.sin(twist);out[wrist+'x']=Math.atan2(sa*ct-ca*sr*st,sa*sr*st+ca*ct);out[wrist+'y']=Math.asin(cr*st);out[wrist+'z']=Math.atan2(sr,cr*ct);}return out;}
   const WEAPONS=Object.freeze({
     // Blade is +Y, character faces +Z. First: high diagonal cut; second: level forward thrust.
@@ -25,11 +25,11 @@
     // (turned around the handle) and the rising slap.
     cooking_pan:[[{rx:-1.5,rz:-.2,wx:.12,wy:Math.PI,wz:.05},{rx:-.8,rz:.1,wx:1.85,wy:Math.PI,wz:-.05,lean:.12},{rx:-.55,wx:1.4,wy:Math.PI,wz:-.1}],
       [{rx:-.6,rz:-.2,wx:2.65,wz:0},{rx:-1.4,rz:.1,wx:1.8,wz:0,lean:.05},{rx:-1.1,wx:1.95,wz:0}]],
-    // +Z is forward, the right shoulder is -X. Alternate a right-then-left
-    // combination with a simultaneous inward X cut. Wrist Z signs deliberately
-    // oppose the shoulders: the real blade tips cross in front, not behind us.
-    twin_daggers:[[knifeCut({rx:-.7,lx:-.5,rz:-.25,lz:.2,wx:.5,lwx:.35,wz:-.12,lwz:.12,tilt:-.04}),knifeCut({rx:-1.6,lx:-.45,rz:.18,lz:.12,wx:1.57,lwx:.2,wz:-.12,lwz:.16,lean:.06,tilt:.045}),knifeCut({rx:-.45,lx:-1.6,rz:-.12,lz:-.18,wx:.2,lwx:1.57,wz:-.16,lwz:.12,lean:.06,tilt:-.045})],
-      [{rx:-.9,lx:-.9,rz:-.85,lz:.85,wx:.7,lwx:.7,wz:.65,lwz:-.65,lean:-.025},{rx:-1.35,lx:-1.35,rz:.9,lz:-.9,wx:1.3,lwx:1.3,wz:-.8,lwz:.8,lean:.09},{rx:-1.15,lx:-1.15,rz:1,lz:-1,wx:1.15,lwx:1.15,wz:-1.05,lwz:1.05,lean:.075}]],
+    // Reverse grips idle with both tips behind us (-Z), then slash down and
+    // forward in distinct right/left beats. The second combination opens the
+    // elbows and drives both blades inward across the front of the torso.
+    twin_daggers:[[knifeCut({rx:-.65,lx:-.5,rz:-.25,lz:.2,wx:1.10,lwx:1.25,wz:-.12,lwz:.12,tilt:-.035}),knifeCut({rx:-1.6,lx:-.5,rz:.14,lz:.12,wx:-1.18,lwx:1.25,wz:-.12,lwz:.12,lean:.055,tilt:.04}),knifeCut({rx:-.5,lx:-1.6,rz:-.12,lz:-.14,wx:1.05,lwx:-1.18,wz:-.12,lwz:.12,lean:.055,tilt:-.04})],
+      [{rx:-.9,lx:-.9,rz:-.85,lz:.85,wx:-1.3,lwx:-1.3,wy:0,lwy:0,wz:-.8,lwz:.8,lean:-.025},{rx:-1.35,lx:-1.35,rz:.9,lz:-.9,wx:-1.3,lwx:-1.3,wy:0,lwy:0,wz:.8,lwz:-.8,lean:.075},{rx:-1.15,lx:-1.15,rz:1,lz:-1,wx:-1.3,lwx:-1.3,wy:0,lwy:0,wz:1.05,lwz:-1.05,lean:.06}]],
     arcane_staff:[[{rx:-1.7,lx:-1.25,rz:.45,lz:-.75,wx:.15,wpy:.12},{rx:-1.3,lx:-1,rz:.55,lz:-.85,wx:1.57,wpz:.16,lean:.05},{rx:-1,lx:-.75,rz:.55,lz:-.75,wx:1.25}],
       [{rx:-1.1,lx:-.65,rz:.55,lz:-.55,wx:.05,wpy:.2},{rx:-1.4,lx:-1.2,rz:.5,lz:-.85,wx:1.57,wpz:.26},{rx:-1.05,lx:-.75,rz:.55,lz:-.75,wx:1.2}]],
     spellbook:[[{rx:-1,lx:-1,rz:.5,lz:-.5,bookLift:.13,bookTilt:-.2},{rx:-1.65,lx:-1.1,rz:-.25,lz:-.5,bookLift:.18,bookTilt:.12,bookPush:.18},{rx:-1.15,lx:-1,rz:.15,lz:-.5,bookLift:.07}],
@@ -72,18 +72,23 @@
   // not just ordinary strikes. Keep the weapon over the body centerline and
   // reuse the authored two-hand diagonal sweep for the circular skill.
   const TWO_HAND_SKILLS=Object.freeze({spin:WEAPONS.greatsword[1],ward:SKILL_TRACKS.ward.map(p=>({...p,rz:.65})),rally:SKILL_TRACKS.rally.map(p=>({...p,rz:.65}))});
+  // Cosmetic-only dagger gestures retain the reverse hold. Throwing briefly
+  // turns the right point forward at release, then regains its reverse guard.
+  const DAGGER_GESTURES=Object.freeze(Object.fromEntries(Object.entries(SKILL_TRACKS).map(([family,track])=>[family,track.map(p=>({...p,wx:Math.PI/2,wy:Math.PI/2,wz:0,lwx:Math.PI/2,lwy:Math.PI/2,lwz:0}))])));
+  const DAGGER_SKILLS=Object.freeze({thrust:WEAPONS.twin_daggers[0],slash:WEAPONS.twin_daggers[1],spin:WEAPONS.twin_daggers[1],heavy:WEAPONS.twin_daggers[1],knife_throw:[knifeCut({rx:-.9,lx:-.55,ry:-.15,rz:-.35,lz:.12,wx:1.1,lwx:Math.PI/2,wz:-.12,lwz:0,lean:-.035}),knifeCut({rx:-1.65,lx:-.55,rz:.1,lz:.12,wx:-Math.PI/2,lwx:Math.PI/2,wz:0,lwz:0,lean:.025}),knifeCut({rx:-.85,lx:-.55,rz:-.2,lz:.12,wx:1.1,lwx:Math.PI/2,wz:-.12,lwz:0})]});
   const motionFamilies=new Set(Object.values(FAMILIES));
-  const familyFor=skill=>ROBOT_FAMILIES[skill?.id]||(motionFamilies.has(skill?.presentation?.motion)?skill.presentation.motion:FAMILIES[skill?.effect]||'');
-  function rest(kind,shield){const p={...REST};if(shield)p.lx=-.35;if(['greatsword','warhammer','arcane_staff'].includes(kind)){p.rx=-.35;p.lx=-.5;p.rz=.65;p.lz=-.9;}if(['longsword','greatsword'].includes(kind)){p.wy=Math.PI/2;p.wz=0;}if(kind==='spellbook'){p.rx=p.lx=-1;p.rz=.5;p.lz=-.5;}if(kind==='elven_bow'){p.rx=-.7;p.lx=-.35;p.wx=0;}if(kind==='robot_fists'){p.rx=p.lx=-.64;p.rz=-.14;p.lz=.14;p.wx=p.lwx=p.wz=p.lwz=0;}return p;}
+  const familyFor=skill=>skill?.id==='throw_blade'?'knife_throw':ROBOT_FAMILIES[skill?.id]||(motionFamilies.has(skill?.presentation?.motion)?skill.presentation.motion:FAMILIES[skill?.effect]||'');
+  function rest(kind,shield){const p={...REST};if(shield)p.lx=-.35;if(['greatsword','warhammer','arcane_staff'].includes(kind)){p.rx=-.35;p.lx=-.5;p.rz=.65;p.lz=-.9;}if(['longsword','greatsword'].includes(kind)){p.wy=Math.PI/2;p.wz=0;}if(kind==='spellbook'){p.rx=-.28;p.rz=-.08;p.lx=0;p.lz=.05;}if(kind==='elven_bow'){p.rx=-.7;p.lx=-.35;p.wx=0;}if(kind==='robot_fists'){p.rx=p.lx=-.64;p.rz=-.14;p.lz=.14;p.wx=p.lwx=p.wz=p.lwz=0;}if(kind==='twin_daggers'){p.wx=p.lwx=p.wy=p.lwy=Math.PI/2;p.wz=p.lwz=0;}return p;}
   function sample(kind,action='attack',variant=0,progress=1,shield=false,family='',out={}){
     kind=kind.replace(/_t[2-5]$/,'');
     const base=rest(kind,shield),track=(WEAPONS[kind]||WEAPONS.unarmed)[variant%2];let poses=track;
     if(action==='skill'||action==='charge'){poses=family==='bow'?WEAPONS.elven_bow[variant%2]:family==='slash'?(kind==='greatsword'?WEAPONS.greatsword[0]:WEAPONS.longsword[0]):family==='heavy'?track:family==='thrust'&&['longsword','greatsword'].includes(kind)?WEAPONS.longsword[1]:family==='thrust'&&kind==='twin_daggers'?WEAPONS.twin_daggers[0]:SKILL_TRACKS[family]||SKILL_TRACKS.cast;}
     if((action==='skill'||action==='charge')&&kind==='greatsword'&&TWO_HAND_SKILLS[family])poses=TWO_HAND_SKILLS[family];
+    if((action==='skill'||action==='charge')&&kind==='twin_daggers')poses=DAGGER_SKILLS[family]||DAGGER_GESTURES[family]||DAGGER_GESTURES.scout;
     const t=clamp(progress);if(action!=='charge'&&t===1){Object.assign(out,base);return out;}
-    if(action==='charge'){const prep=poses[0],amount=Math.min(1,t*5);for(const k in base)out[k]=base[k]+((prep[k]??base[k])-base[k])*amount;return out;}
+    if(action==='charge'){const prep=poses[0],amount=Math.min(1,t*5);for(const k in base)out[k]=base[k]+((prep[k]??base[k])-base[k])*amount;if(kind==='spellbook')out.bookOpen=amount;return out;}
     const times=[0,.22,.48,.7,1],frames=[base,poses[0],poses[1],poses[2],base];let i=0;while(i<3&&t>times[i+1])i++;const u=clamp((t-times[i])/(times[i+1]-times[i])),smooth=u*u*(3-2*u);
-    for(const k in base){const a=frames[i][k]??base[k],b=frames[i+1][k]??base[k];out[k]=a+(b-a)*smooth;}return out;
+    for(const k in base){const a=frames[i][k]??base[k],b=frames[i+1][k]??base[k];out[k]=a+(b-a)*smooth;}if(kind==='spellbook')out.bookOpen=Math.min(1,t/.22,(1-t)/.18);return out;
   }
   function state(model){return model.userData.combatMotion||(model.userData.combatMotion={counts:{},action:'',elapsed:0,duration:1,variant:0,family:'',pose:{}});}
   function begin(model,action,duration,skill){if(!model?.userData)return false;const s=state(model),kind=model.userData.heroWeapon||'unarmed';s.action=action;s.duration=Math.max(.1,Math.min(4,Number(duration)||.65));s.elapsed=0;s.family=familyFor(skill);s.skillId=skill?.id||'';if(action==='attack'){s.variant=s.counts[kind]||0;s.counts[kind]=(s.variant+1)%2;}else s.variant=0;return true;}

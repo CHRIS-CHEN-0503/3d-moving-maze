@@ -19,7 +19,7 @@ function figure(sex,tier=1){
   assert.ok(weapons.every(Boolean));
   // Exact authored blade endpoint, transformed through the actual dress/pose
   // hierarchy, rather than comparing abstract pose arrays.
-  const tip=new T.Vector3(0,.14+.4*(1+(tier-1)*.045)+.11,0);
+  const tip=new T.Vector3(...weapons[0].userData.contact.tip);
   return {model,arms,weapons,tip};
 }
 function pose(f,variant,time){

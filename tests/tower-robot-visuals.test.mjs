@@ -2,15 +2,109 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {createRequire} from 'node:module';
 import {readFileSync} from 'node:fs';
+import {createHash} from 'node:crypto';
 import vm from 'node:vm';
-const require=createRequire(import.meta.url),T=require('../lib/three.min.js'),H=require('../story/tower-heroes-core.js'),R=require('../story/tower-robot-core.js'),M=require('../story/tower-combat-motion.js'),I=require('../story/tower-heroes-icons.js'),F=require('../assets/character-face.js');
+const require=createRequire(import.meta.url),T=require('../lib/three.min.js'),H=require('../story/tower-heroes-core.js'),R=require('../story/tower-robot-core.js'),M=require('../story/tower-combat-motion.js'),I=require('../story/tower-heroes-icons.js'),F=require('../assets/character-face.js'),CM=require('../assets/character-motion.js');
+const visualSource=readFileSync(new URL('../story/tower-heroes-visuals.js',import.meta.url),'utf8');
+function collisionRanges(source){
+ // Test-only provenance: preserve the original component triangle ranges
+ // inside each real static batch. No triangles, normals or draws change.
+ return source.replace('const position=[],normal=[],color=[],uv=[];','const position=[],normal=[],color=[],uv=[],collisionParts=[];').replace('const xyz=geo.attributes.position,norm=geo.attributes.normal,c=p.material.color;','const xyz=geo.attributes.position,norm=geo.attributes.normal,c=p.material.color;collisionParts.push({start:position.length/3,count:xyz.count,name:p.name,closed:p.geometry.type!==\'BufferGeometry\'});').replace('m.userData.staticBatch=true;g.add(m);','m.userData.staticBatch=true;m.userData.testCollisionParts=collisionParts;g.add(m);');
+}
 const env=vm.createContext({THREE:T,TowerHeroes:H,CharacterSculpt:require('../assets/character-sculpt.js'),CharacterFace:F,CharacterMotion:require('../assets/character-motion.js'),TowerCombatMotion:M});
-for(const file of ['tower-heroes-visuals.js','tower-skill-effects.js'])vm.runInContext(readFileSync(new URL('../story/'+file,import.meta.url),'utf8'),env);
+for(const file of ['tower-heroes-visuals.js','tower-skill-effects.js'])vm.runInContext(file==='tower-heroes-visuals.js'?collisionRanges(visualSource):readFileSync(new URL('../story/'+file,import.meta.url),'utf8'),env);
 const V=env.TowerHeroVisuals;
 function release(model){const gs=new Set(),ms=new Set(),ts=new Set();model.traverse(o=>{if(o.geometry&&(o.isMesh||o.isPoints))gs.add(o.geometry);if(o.material){ms.add(o.material);for(const v of Object.values(o.material))if(v?.isTexture)ts.add(v);}});gs.forEach(g=>g.dispose());ms.forEach(m=>m.dispose());ts.forEach(t=>t.dispose());}
 const equipment=t=>Object.fromEntries(['armor','weapon'].map(slot=>{const kind=R.kind(slot==='armor'?'robot_shell':'robot_fists',t);return [slot,{kind,slot,durability:100}];}));
 function figure(sex,tier=1){const m=V.base('robot',()=>{throw Error('human builder must not run');},'hero',sex);V.dress(T,m,equipment(tier),release);return m;}
 function metrics(m){let meshes=0,triangles=0;m.traverse(o=>{assert.equal(!!o.isLight,false);if(o.isMesh){meshes++;triangles+=(o.geometry.index?.count??o.geometry.attributes.position.count)/3;}for(const key of ['position','normal'])if(o.geometry?.attributes[key])assert.ok(Array.from(o.geometry.attributes[key].array).every(Number.isFinite));});return {meshes,triangles};}
+function oldNeckVisuals(){
+ // Restore the pre-trim mounts and remove both construction-time corrections,
+ // retaining the production sculpture, batching, face rig and other gear.
+ const source=visualSource.replace(/\s*\/\/ ROBOT_NECK_CLEARANCE_BEGIN[\s\S]*?\/\/ ROBOT_NECK_CLEARANCE_END/,'').replace(/\s*\/\/ ROBOT_NECK_FOOT_BEGIN[\s\S]*?\/\/ ROBOT_NECK_FOOT_END/,'').replace(/head\.position\.y=female\?[\d.]+:[\d.]+;m\.add\(head\);/,'head.position.y=female?1.665:1.72;m.add(head);').replace(/new T\.CylinderGeometry\(\.12,\.12,[\d.]+,12\)/,'new T.CylinderGeometry(.12,.12,.16,12)').replace(/c\.dark,0,[\d.]+,-\.012,'robot-neck-joint'/,"c.dark,0,1.405,-.012,'robot-neck-joint'");
+ assert.notEqual(source,visualSource,'the robot neck is actually shortened');
+ const context=vm.createContext({THREE:T,TowerHeroes:H,CharacterSculpt:require('../assets/character-sculpt.js'),CharacterFace:F,CharacterMotion:CM,TowerCombatMotion:M});vm.runInContext(collisionRanges(source),context);return context.TowerHeroVisuals;
+}
+const previousV=oldNeckVisuals();
+function previousFigure(sex,tier){const m=previousV.base('robot',()=>{throw Error('human builder must not run');},'hero',sex);previousV.dress(T,m,equipment(tier),release);return m;}
+function geometryDigest(g){
+ const hash=createHash('sha256');hash.update(g.type);for(const [key,a]of Object.entries(g.attributes).sort(([a],[b])=>a.localeCompare(b))){hash.update(key+':'+a.itemSize);hash.update(Buffer.from(a.array.buffer,a.array.byteOffset,a.array.byteLength));}if(g.index)hash.update(Buffer.from(g.index.array.buffer,g.index.array.byteOffset,g.index.array.byteLength));return hash.digest('hex');
+}
+function sculptureSnapshot(group){const snapshot=[];group.traverse(o=>snapshot.push({name:o.name,position:o===group?null:o.position.toArray(),rotation:o.quaternion.toArray(),scale:o.scale.toArray(),visible:o.visible,geometry:o.geometry?geometryDigest(o.geometry):null,material:o.material?{color:o.material.color?.getHex(),emissive:o.material.emissive?.getHex(),intensity:o.material.emissiveIntensity,opacity:o.material.opacity,map:o.material.map?.image?{width:o.material.map.image.width,height:o.material.map.image.height,data:Array.from(o.material.map.image.data||[])}:null}:null}));return snapshot;}
+function resourceReferences(m){const refs=[];m.traverse(o=>refs.push([o,o.geometry,o.material,o.material?.map]));return refs;}
+function penetratingHeadVertices(m,pitch){
+ m.userData.head.rotation.x=pitch;m.updateMatrixWorld(true);
+ const shell=m.userData.heroPieces.find(p=>p.userData.baseKind==='robot_shell'),meshes=[],heads=[];
+ // Glow sprites are intentionally excluded: they are not physical armor,
+ // and Sprite.raycast requires a camera unrelated to this surface test.
+ shell.traverse(o=>{if(o.isMesh)meshes.push(o);});m.userData.head.traverse(o=>{if(o.isMesh)heads.push(o);});
+ const armorBounds=new T.Box3(),components=[];
+ for(const mesh of meshes){
+  const source=mesh.geometry,ranges=mesh.userData.testCollisionParts||[{start:0,count:source.index?.count||source.attributes.position.count,name:mesh.name,closed:true}];
+  for(const range of ranges){if(!range.closed)continue;const geometry=new T.BufferGeometry();geometry.setAttribute('position',source.attributes.position);if(source.index)geometry.setIndex(source.index);geometry.setDrawRange(range.start,range.count);const bounds=new T.Box3(),point=new T.Vector3();for(let i=range.start;i<range.start+range.count;i++)bounds.expandByPoint(point.fromBufferAttribute(source.attributes.position,source.index?source.index.getX(i):i));geometry.boundingBox=bounds;geometry.boundingSphere=bounds.getBoundingSphere(new T.Sphere());const physical=new T.Mesh(geometry,mesh.material);physical.matrixAutoUpdate=false;physical.matrixWorld.copy(mesh.matrixWorld);const worldBounds=bounds.clone().applyMatrix4(mesh.matrixWorld).expandByScalar(1e-6);components.push({mesh:physical,bounds:worldBounds,name:range.name});armorBounds.union(worldBounds);}
+ }
+ const sides=meshes.map(o=>[o.material,o.material.side]);for(const [material]of sides)material.side=T.DoubleSide;
+ const rays=[new T.Vector3(1,.073,.041).normalize(),new T.Vector3(-1,-.053,-.037).normalize()],ray=new T.Raycaster(),point=new T.Vector3(),found=new Set();
+ try{for(let j=0;j<heads.length;j++){const o=heads[j],a=o.geometry.attributes.position,visited=new Set();for(let i=0;i<a.count;i++){
+  const key=j+':'+[a.getX(i),a.getY(i),a.getZ(i)].join(',');if(visited.has(key))continue;visited.add(key);point.fromBufferAttribute(a,i).applyMatrix4(o.matrixWorld);if(!armorBounds.containsPoint(point))continue;
+  // Parity is checked per closed authored component, not across a batch of
+  // separate shoulder volumes or open rear ornamental faces. Both directions
+  // must agree; coincident triangle-edge hits count as one surface crossing.
+  const inside=components.some(component=>component.bounds.containsPoint(point)&&rays.every(direction=>{ray.set(point,direction);const hits=ray.intersectObject(component.mesh,false);let crossings=0,last=-Infinity;for(const hit of hits)if(hit.distance>1e-5&&hit.distance-last>1e-5){crossings++;last=hit.distance;}return crossings%2===1;}));
+  if(inside)found.add(key);
+ }}return found;}finally{for(const [material,side]of sides)material.side=side;for(const component of components)component.mesh.geometry.dispose();}
+}
+test('short robot neck connects the unchanged head to the chassis in both sexes and all shell grades',()=>{
+ for(const sex of ['male','female'])for(let tier=1;tier<=5;tier++){
+  const before=previousFigure(sex,tier),m=figure(sex,tier),neck=m.getObjectByName('robot-neck-joint'),oldNeck=before.getObjectByName('robot-neck-joint');
+  assert.ok(neck&&oldNeck);neck.geometry.computeBoundingBox();oldNeck.geometry.computeBoundingBox();assert.ok(neck.geometry.boundingBox.getSize(new T.Vector3()).y<oldNeck.geometry.boundingBox.getSize(new T.Vector3()).y*.94,'the real joint remains shorter even with its embedded foot');assert.ok(Math.abs(neck.geometry.boundingBox.getSize(new T.Vector3()).y-.1475)<1e-6);assert.ok(m.userData.head.position.y<before.userData.head.position.y,'the head descends with the shortened joint');assert.equal(neck.position.y,1.37);
+  m.updateMatrixWorld(true);const jointBounds=new T.Box3().setFromObject(neck),headBounds=new T.Box3().setFromObject(m.userData.headMesh),base=m.userData.body.getObjectByName('robot-base-chassis'),baseBounds=new T.Box3().setFromObject(base);
+  assert.ok(jointBounds.min.y<=baseBounds.max.y+1e-6,'neck overlaps the bare chassis, including after armor breaks');assert.ok(jointBounds.max.y>=headBounds.min.y-1e-6,'neck overlaps the head instead of floating below the chin');
+  assert.deepEqual(sculptureSnapshot(m.userData.head),sculptureSnapshot(before.userData.head),'all head triangles and expression mounts are preserved');assert.deepEqual(metrics(m),metrics(before));
+  for(const key of ['body','armR','armL','legR','legL']){assert.deepEqual(m.userData[key].position.toArray(),before.userData[key].position.toArray(),key+' stays at its existing mount');assert.deepEqual(sculptureSnapshot(m.userData[key]),sculptureSnapshot(before.userData[key]),key+' sculpture and equipped parts stay unchanged');}
+  assert.deepEqual(Array.from(m.userData.heroPieces.filter(p=>p.userData.baseKind==='robot_fists'),sculptureSnapshot),Array.from(before.userData.heroPieces.filter(p=>p.userData.baseKind==='robot_fists'),sculptureSnapshot),'fist equipment is not changed to hide the neck fit');assert.deepEqual(m.scale.toArray(),before.scale.toArray());release(m);release(before);
+ }
+});
+test('neck saddles change only the inner upper shell surface, keeping tier width/depth, topology, articulation and light hardware',()=>{
+ for(const sex of ['male','female'])for(let tier=1;tier<=5;tier++){
+  const old=previousV.gear(T,R.kind('robot_shell',tier),{sex}),now=V.gear(T,R.kind('robot_shell',tier),{sex}),before=[],after=[];old.updateMatrixWorld(true);now.updateMatrixWorld(true);old.traverse(o=>before.push(o));now.traverse(o=>after.push(o));assert.equal(after.length,before.length);assert.equal(now.userData.robotNeckClearance,true);let changed=0;
+  const a=new T.Vector3(),b=new T.Vector3();
+  for(let j=0;j<after.length;j++){
+   const previous=before[j],current=after[j];assert.equal(current.name,previous.name);assert.deepEqual(current.position.toArray(),previous.position.toArray());assert.deepEqual(current.quaternion.toArray(),previous.quaternion.toArray());assert.deepEqual(current.scale.toArray(),previous.scale.toArray());
+   if(current.isSprite){assert.deepEqual(sculptureSnapshot(current),sculptureSnapshot(previous),'glow color, radius, texture and socket positions do not change');continue;}if(!current.geometry)continue;
+   const p=previous.geometry.attributes.position,q=current.geometry.attributes.position;assert.equal(q.count,p.count);assert.equal(current.geometry.index?.count,previous.geometry.index?.count);if(current.geometry.index)assert.deepEqual(Array.from(current.geometry.index.array),Array.from(previous.geometry.index.array),'neck clearance retains every original face');
+   for(let i=0;i<p.count;i++){a.fromBufferAttribute(p,i).applyMatrix4(previous.matrixWorld);b.fromBufferAttribute(q,i).applyMatrix4(current.matrixWorld);assert.ok(Math.abs(a.x-b.x)<1e-6&&Math.abs(a.z-b.z)<1e-6,'the shell is not made narrower or thinner');assert.ok(b.y<=a.y+1e-6,'only the top-facing neck/shoulder corner descends');if(a.y-b.y>1e-6){changed++;assert.ok(Math.abs(a.x)<.355+1e-6&&a.y>1.27,'no legs, lower chest or outboard shoulder are reshaped');}}
+  }
+  assert.ok(changed>10,'the head has a real sculpted opening, not a hidden/intersecting armor surface');const aBox=new T.Box3().setFromObject(old),bBox=new T.Box3().setFromObject(now);for(const key of ['min','max'])for(const axis of ['x','z'])assert.ok(Math.abs(aBox[key][axis]-bBox[key][axis])<1e-6,'original tier width and depth are preserved');assert.ok(Math.abs(aBox.min.y-bBox.min.y)<1e-6,'the feet and shin armor stay at their existing level');assert.ok(bBox.max.y<=aBox.max.y+1e-6&&aBox.max.y-bBox.max.y<.03,'only the original inner shoulder crest peak may descend slightly');assert.deepEqual(metrics(now),metrics(old));release(now);release(old);
+ }
+});
+test('short-neck robots retain every facial expression and reuse all resources while walking and attacking',()=>{
+ for(const sex of ['male','female'])for(let tier=1;tier<=5;tier++){
+  const before=previousFigure(sex,tier),m=figure(sex,tier);before.userData.face.phase=m.userData.face.phase=0;before.userData.motion.phase=m.userData.motion.phase=0;
+  for(const model of [before,m]){CM.update(model,1/30,0,false);V.pose(model,0,1,false,0);F.update(model,0);}
+  const references=resourceReferences(m),count=metrics(m),headY=m.userData.head.position.y,neckY=m.getObjectByName('robot-neck-joint').position.y,expressions=new Set();
+  for(let frame=1;frame<=160;frame++){
+   const time=frame/30,mood=F.moods[Math.floor((frame-1)/20)%F.moods.length],moving=frame%24<12;
+   if(frame%24===0)for(const model of [before,m])M.begin(model,'attack',1);
+   for(const model of [before,m]){model.userData.mood=mood;CM.update(model,1/30,time,moving);V.pose(model,1/30,1,moving,time);F.update(model,time,mood);}
+   const face=model=>[...model.userData.face.eyes,...model.userData.face.brows,model.userData.face.mouth].map(o=>({position:o.position.toArray(),rotation:o.quaternion.toArray(),scale:o.scale.toArray()}));assert.deepEqual(face(m),face(before),'the same expression still produces the same face pose');expressions.add(JSON.stringify(face(m)));
+   assert.equal(m.userData.head.position.y,headY);assert.equal(m.getObjectByName('robot-neck-joint').position.y,neckY);
+  }
+  assert.ok(expressions.size>30,'the shortened robot still blinks, emotes and speaks');assert.deepEqual(resourceReferences(m),references,'walking, expressions and fist motion allocate no frame meshes, geometry, materials or textures');assert.deepEqual(metrics(m),count);release(m);release(before);
+ }
+});
+test('component triangle probes detect a known head/armor overlap and reject an empty neck gap',()=>{
+ const m=previousFigure('female',5);
+ try{m.userData.head.position.y=1.54;assert.ok(penetratingHeadVertices(m,0).size>4,'the probe must detect genuine cranium/ear penetration, not always report an empty set');m.userData.head.position.y=3;assert.equal(penetratingHeadVertices(m,0).size,0,'a separated head cannot be inside the disjoint shoulder volumes');const batches=[];for(const piece of m.userData.heroPieces)piece.traverse(o=>{if(o.userData.testCollisionParts){batches.push(o);assert.equal(o.userData.testCollisionParts.reduce((n,p)=>n+p.count,0),o.geometry.attributes.position.count,'test provenance partitions every unchanged production batch triangle exactly once');}});assert.ok(batches.some(o=>o.userData.staticBatch&&o.userData.testCollisionParts.filter(p=>p.closed&&p.name==='robot-overlapping-pauldron').length===2),'the provenance instrumentation must actually partition both separate closed shoulders in the same real static batch, not silently fall back to whole-batch parity');}finally{release(m);}
+});
+test('short-neck robot head and ears introduce no additional real-triangle penetration into any shell tier',t=>{
+ let original=0,current=0;
+ for(const sex of ['male','female'])for(let tier=1;tier<=5;tier++){
+  const before=previousFigure(sex,tier),m=figure(sex,tier);
+  try{for(const pitch of [0,-.035,.045,.12]){const old=penetratingHeadVertices(before,pitch),now=penetratingHeadVertices(m,pitch),added=[...now].filter(key=>!old.has(key));original+=old.size;current+=now.size;assert.equal(added.length,0,`${sex} tier ${tier}, pitch ${pitch}: neck trim adds ${added.length} head/ear surface penetrations beyond the pre-trim armor fit; local samples=${added.slice(0,3).join(';')}`);}}finally{release(m);release(before);}
+ }
+ t.diagnostic(`40 sex/tier/pose cases, original penetrations=${original}, short-neck penetrations=${current}, additional=0; test-only closed component triangle partitions, no sprite raycasts`);
+});
 test('male/female integrated robots have different proportions and faces, smooth pelvis and no human hair or weapons',()=>{
  for(const sex of ['male','female'])for(let tier=1;tier<=5;tier++){
   const m=figure(sex,tier),size=metrics(m),names=[];m.traverse(o=>names.push(...(o.userData.authoredParts||[]),o.name));

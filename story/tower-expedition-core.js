@@ -81,7 +81,7 @@
   const SITES=Object.freeze({
     swordsman:{name:'卡住的石門',verb:'撐起石門',description:'石門卡住了一條捷徑。劍士能直接撐起；也可以一起慢慢清除碎石。',reward:'開通附近一道內牆，獲得短暫護盾。'},
     mage:{name:'失控的定牆符文',verb:'穩定符文',description:'古代符文正影響牆壁。術士能解讀；也可以慢慢比對碑文。',reward:'暫停迷宮變形二十秒。'},
-    scout:{name:'被掩蓋的暗門',verb:'找出暗扣',description:'牆邊有不自然的接縫。斥候能直接找到暗扣；也可以仔細敲查石壁。',reward:'開通附近一道內牆，顯示十八秒出口路線。'},
+    scout:{name:'被掩蓋的暗門',verb:'找出暗扣',description:'牆邊有不自然的接縫。遊俠能直接找到暗扣；也可以仔細敲查石壁。',reward:'開通附近一道內牆，顯示十八秒出口路線。'},
     chef:{name:'棘殼食材箱',verb:'處理食材',description:'當地食材藏在帶刺硬殼裡。廚師能快速處理；也可以慢慢去除外殼。',reward:'取得兩份當地特色食材。'},
     healer:{name:'受污染的泉眼',verb:'淨化泉水',description:'泉水混著灰色雜質。療癒師能淨化；也可以反覆過濾。',reward:'恢復主角十二點生命、同伴十點生命。'},
     smith:{name:'損壞的機關箱',verb:'修復機關',description:'齒輪箱裡的卡榫斷了。鍛匠能修復；也可以慢慢拆開重組。',reward:'取得四份金屬零件，穿戴裝備恢復兩點耐久。'},

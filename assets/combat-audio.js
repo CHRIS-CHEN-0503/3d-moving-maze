@@ -2,45 +2,56 @@
 (function(root,factory){const api=factory();if(typeof module==='object'&&module.exports)module.exports=api;root.CombatAudio=api;})(globalThis,function(){
   'use strict';
   const RATE=22050;
-  const ACTIONS=Object.freeze({slash:.3,bow:.25,metal:.24,magic:.48,frost:.45,heal:.55,shield:.4,scan:.4,smoke:.32,cook:.45,forge:.42,device:.38,drink:.32,charge:.65,burst:.48,thunder:.8,thorns:.65,meteor:.75,equip:.2,'hit-metal':.25,'hit-magic':.32});
-  const SKILL_SOUNDS=Object.freeze({arrow:'bow',binding:'bow',volley:'bow',great_arrow:'bow',cleave:'slash',circle:'slash',blind:'slash',stun:'metal',stagger:'metal',splash:'cook',bolt:'magic',weak:'magic',slow:'slash',mark:'metal',shock:'thunder',thorns:'thorns',repel:'burst',starfall:'meteor',star_ring:'meteor',decisive:'slash',guard:'shield',barrier:'shield',ward:'shield',fortify:'forge',fortress:'shield',rally:'shield',speed:'scan',polish:'forge',stealth:'smoke',smoke:'smoke',stomach:'cook',meal:'cook',soup:'heal',feast:'cook',heal:'heal',revive:'heal',cleanse:'heal',sanctuary:'heal',reveal:'scan',escape:'scan',disarm:'device',daylight:'heal',repair:'forge',frost:'frost',taunt:'metal',barricade:'device',robot_fist:'metal',robot_charge:'metal',robot_quake:'metal',robot_guard:'shield',robot_speed:'forge',robot_restore:'forge',robot_meteor:'metal',robot_double:'metal',mech_aid:'shield'});
-  const skillKind=skill=>Object.hasOwn(ACTIONS,skill?.presentation?.sound)?skill.presentation.sound:SKILL_SOUNDS[skill?.effect]||'magic';
+  const ACTIONS=Object.freeze({slash:.3,bow:.25,metal:.24,magic:.48,frost:.45,heal:.55,shield:.4,scan:.4,smoke:.32,cook:.45,forge:.42,device:.38,drink:.32,charge:.65,burst:.48,thunder:.8,thorns:.65,meteor:.75,equip:.2,'hit-metal':.25,'hit-magic':.32,robot:.6,'robot-impact':.5,'robot-drive':.7});
+  const ALIASES=Object.freeze({barrier:'shield',mechanism:'device'});
+  const SKILL_SOUNDS=Object.freeze({arrow:'bow',binding:'bow',volley:'bow',great_arrow:'bow',cleave:'slash',circle:'slash',blind:'slash',stun:'metal',stagger:'metal',splash:'cook',bolt:'magic',weak:'magic',slow:'slash',mark:'metal',shock:'thunder',thorns:'thorns',repel:'burst',starfall:'meteor',star_ring:'meteor',decisive:'slash',guard:'shield',barrier:'shield',ward:'shield',fortify:'forge',fortress:'shield',rally:'shield',speed:'scan',polish:'forge',stealth:'smoke',smoke:'smoke',stomach:'cook',meal:'cook',soup:'heal',feast:'cook',heal:'heal',revive:'heal',cleanse:'heal',sanctuary:'heal',reveal:'scan',escape:'scan',disarm:'device',daylight:'heal',repair:'forge',frost:'frost',taunt:'metal',barricade:'device',robot_fist:'robot',robot_charge:'robot-drive',robot_quake:'robot-impact',robot_guard:'shield',robot_speed:'robot-drive',robot_restore:'forge',robot_meteor:'robot-impact',robot_double:'robot',mech_aid:'shield'});
+  // Older robot metadata shares generic hammer/forge sounds. Upgrade only
+  // those legacy choices; an intentionally authored elemental sound wins.
+  const skillKind=skill=>skill?.job==='robot'&&['metal','forge'].includes(skill?.presentation?.sound)&&SKILL_SOUNDS[skill.effect]?SKILL_SOUNDS[skill.effect]:Object.hasOwn(ACTIONS,skill?.presentation?.sound)?skill.presentation.sound:SKILL_SOUNDS[skill?.effect]||'magic';
   const hitKind=weapon=>['staff','book'].includes(weapon?.type)?'hit-magic':['blade','daggers','hammer','pan','fists'].includes(weapon?.type)?'hit-metal':'hit';
-  const itemKind=id=>({heal:'drink',haste:'drink',ration:'cook',shield:'shield',hourglass:'scan',bell:'metal',map:'scan'}[id]||'device');
+  const itemKind=id=>({heal:'drink',haste:'drink',ration:'cook',shield:'shield',hourglass:'scan',bell:'metal',map:'scan',power_glimmer:'magic',power_starlight:'magic',power_sunheart:'magic'}[id]||'device');
   const chargeSeconds=value=>Number.isFinite(value)&&value>0?Math.min(4,Math.max(.1,Math.round(value*10)/10)):.65;
   function renderAction(kind,seconds){
-    const duration=kind==='charge'?chargeSeconds(seconds):ACTIONS[kind],data=new Float32Array(Math.round(RATE*duration));let seed=9143,low=0,peak=0;
+    const duration=kind==='charge'?chargeSeconds(seconds):ACTIONS[kind],data=new Float32Array(Math.round(RATE*duration));let seed=9143,low=0,rumble=0,peak=0;
     for(let i=0;i<data.length;i++){
       const t=i/RATE,p=i/(data.length-1),tau=Math.PI*2;
       seed=(Math.imul(seed,1664525)+1013904223)>>>0;
-      const n=seed/2147483648-1;low+=.08*(n-low);
-      const air=n-low,attack=Math.min(1,t/.008),tail=Math.pow(1-p,2),tone=f=>Math.sin(tau*f*t);
+      const n=seed/2147483648-1;low+=.08*(n-low);rumble+=.019*(n-rumble);
+      const air=n-low,attack=Math.min(1,t/.004),tail=Math.pow(1-p,1.35),tone=f=>Math.sin(tau*f*t);
+      const pulse=(at,decay)=>t<at?0:Math.min(1,(t-at)/.004)*Math.exp(-(t-at)*decay),swell=Math.pow(Math.sin(Math.PI*p),1.3);
       let sample=0;
-      if(kind==='slash')sample=air*.35*Math.sin(Math.PI*p)+low*.9*Math.sin(Math.PI*p);
-      if(kind==='bow')sample=(tone(210)*.28+tone(420)*.13)*Math.exp(-t*25)+air*.25*Math.sin(Math.PI*p);
-      if(kind==='metal'||kind==='hit-metal')sample=(tone(420)*.36+tone(713)*.2+tone(1171)*.1+air*.23*Math.exp(-t*55))*Math.exp(-t*(kind==='metal'?9:14));
-      if(kind==='magic'||kind==='hit-magic')sample=(Math.sin(tau*(260*t+600*t*t))*.28+tone(780)*.16+low*.9)*Math.sin(Math.PI*Math.min(1,p*1.8));
-      if(kind==='frost')sample=(tone(1174)*.2+tone(1568)*.14+air*.28)*Math.exp(-t*6);
-      if(kind==='heal')sample=(tone(523)*.22+tone(659)*.18+tone(784)*.16)*Math.sin(Math.PI*p);
-      if(kind==='shield')sample=(tone(220)*.25+tone(440)*.14+tone(660)*.12+low*.5)*Math.sin(Math.PI*p);
-      if(kind==='scan')sample=Math.sin(tau*(500*t+900*t*t))*.36*(.65+.35*Math.cos(tau*10*t));
-      if(kind==='smoke')sample=(low*2+air*.12)*Math.sin(Math.PI*p);
-      if(kind==='cook')sample=(air*.23+tone(730)*.15*Math.pow(Math.max(0,Math.cos(tau*9*t)),8))*Math.sin(Math.PI*p);
-      if(kind==='forge')sample=(tone(560)*.28+tone(931)*.17+air*.2)*Math.exp(-(t%.17)*24);
-      if(kind==='device'||kind==='equip')sample=(tone(180)*.3+tone(640)*.16+air*.25)*Math.exp(-(t%.11)*40);
-      if(kind==='drink')sample=(Math.sin(tau*(360*t+40*Math.sin(t*18)*t))*.28+low*.8)*Math.sin(Math.PI*p);
-      if(kind==='charge')sample=(Math.sin(tau*(120*t+240*t*t*.65/duration))*.35+tone(360)*.14+low*.6)*p;
-      if(kind==='burst')sample=(low*2+Math.sin(tau*(100*t-70*t*t))*.4+air*.16*Math.exp(-t*25))*Math.exp(-t*5);
-      if(kind==='thunder')sample=air*.6*Math.exp(-t*28)+low*2.4*Math.exp(-t*3.5)+tone(66)*.3*Math.exp(-t*5)+air*.16*Math.pow(Math.max(0,Math.cos(tau*19*t)),8)*Math.exp(-t*6);
-      if(kind==='thorns')sample=(air*.33*Math.pow(Math.max(0,Math.cos(tau*13*t)),12)+low*.9+Math.sin(tau*(320*t-190*t*t))*.28)*Math.sin(Math.PI*p);
-      if(kind==='meteor')sample=(air*.25*Math.exp(-t*9)+low*2*Math.exp(-t*4)+Math.sin(tau*(150*t-95*t*t))*.44)*Math.sin(Math.PI*Math.min(1,p*2));
+      if(kind==='slash')sample=(air*.24+low*1.55)*swell+tone(930)*.045*pulse(.1,24);
+      if(kind==='bow')sample=(tone(196)*.34+tone(392)*.14+tone(781)*.045)*pulse(0,25)+air*.18*pulse(.018,17)+(low-rumble)*.3*swell;
+      if(kind==='metal'||kind==='hit-metal'){const decay=kind==='metal'?8:14;sample=(tone(392)*.27+tone(643)*.16+tone(1093)*.055)*pulse(0,decay)+tone(106)*.24*pulse(0,26)+air*.18*pulse(0,65);}
+      if(kind==='magic'||kind==='hit-magic'){const impact=kind==='hit-magic';sample=Math.sin(tau*(240*t+(impact?240:570)*t*t))*.23*swell+tone(720)*.12*pulse(.03,7)+tone(1080)*.04*pulse(.085,9)+low*.5*swell+(impact?rumble*2.6*pulse(0,16):0);}
+      if(kind==='frost')sample=(tone(1318)*.16+tone(1760)*.07+tone(2217)*.025)*pulse(.025,7)+air*.16*(pulse(0,42)+.6*pulse(.11,45)+.35*pulse(.2,40))+low*.45*swell;
+      if(kind==='heal')sample=tone(523.25)*.25*pulse(.01,3.4)+tone(659.25)*.17*pulse(.075,3.8)+tone(784)*.13*pulse(.15,4.3)+tone(1046.5)*.035*pulse(.23,6);
+      if(kind==='shield')sample=(tone(220)*.22+tone(329.6)*.1+tone(440)*.14)*swell+tone(90)*.13*pulse(0,20)+air*.035*pulse(.025,30);
+      if(kind==='scan')sample=(Math.sin(tau*(480*t+540*t*t))*.22+tone(960)*.045)*swell*(.78+.22*Math.cos(tau*7*t));
+      if(kind==='smoke')sample=(low*1.6+air*.11+rumble*.7)*swell;
+      if(kind==='cook')sample=air*.12*swell+tone(510)*.12*pulse(.03,20)+Math.sin(tau*(320*t+65*t*t))*.12*pulse(.11,25)+low*.85*swell;
+      if(kind==='forge'){const hammer=pulse(0,18)+.68*pulse(.18,22);sample=(tone(440)*.22+tone(711)*.13+tone(1127)*.035)*hammer+tone(92)*.22*(pulse(0,28)+.6*pulse(.18,30))+air*.11*(pulse(0,65)+.55*pulse(.18,60));}
+      if(kind==='device'||kind==='equip'){const second=kind==='equip'?.065:.14;sample=(tone(173)*.26+tone(638)*.08+air*.12)*(pulse(0,36)+.65*pulse(second,40))+tone(286)*.075*pulse(second+.024,17);}
+      if(kind==='drink')sample=(Math.sin(tau*(290*t+60*Math.sin(t*15)*t))*.18+low*.75)*(pulse(.025,12)+.65*pulse(.135,14))+air*.06*pulse(0,45);
+      if(kind==='charge')sample=(Math.sin(tau*(110*t+185*t*t/duration))*.29+tone(330)*.09+low*.42)*Math.pow(p,.65)*(1+.08*Math.sin(tau*6*t));
+      if(kind==='burst')sample=(rumble*2.8+low*.85+Math.sin(tau*(110*t-85*t*t))*.27)*pulse(0,5)+air*.11*pulse(0,38);
+      if(kind==='thunder')sample=air*.24*(pulse(0,42)+.6*pulse(.095,44)+.3*pulse(.17,48))+rumble*5.6*(pulse(.035,2.6)+.25*pulse(.24,5))+tone(62)*.2*pulse(.035,4)+low*.55*pulse(.12,4);
+      if(kind==='thorns')sample=air*.18*(pulse(.035,34)+.75*pulse(.15,40)+.6*pulse(.29,32))+low*1.45*swell+Math.sin(tau*(240*t-110*t*t))*.15*swell;
+      if(kind==='meteor')sample=(low*.8+air*.15)*Math.pow(Math.sin(Math.PI*Math.min(1,p*2.8)),2)+(rumble*4+tone(72)*.27)*pulse(.19,4)+air*.15*pulse(.19,30);
+      if(kind==='robot')sample=(tone(132)*.18+tone(264)*.07)*pulse(0,15)+Math.sin(tau*(95*t+180*t*t))*.12*pulse(.03,8)+(tone(78)*.28+low*1.5+air*.12)*pulse(.15,13);
+      if(kind==='robot-impact')sample=(tone(70)*.3+tone(141)*.11+rumble*4+air*.15)*pulse(0,10)+(tone(387)*.095+tone(637)*.06)*pulse(.025,8);
+      if(kind==='robot-drive')sample=Math.sin(tau*(82*t+145*t*t))*.19*swell+tone(164)*.1*swell+low*.85*swell+air*.09*(pulse(.05,20)+.5*pulse(.3,20));
       data[i]=sample*attack*tail;peak=Math.max(peak,Math.abs(data[i]));
     }
-    // Consistent short, readable foley. The shared effects bus controls volume.
-    if(peak>0)for(let i=0;i<data.length;i++)data[i]*=.72/peak;
+    // One quiet early reflection gives body without another Web Audio voice,
+    // convolution node or a tail that hides the next action/narration syllable.
+    const delay=Math.round(RATE*(kind==='thunder'?.071:.037));
+    peak=0;for(let i=data.length-1;i>=0;i--){if(i>=delay)data[i]+=data[i-delay]*.1*(1-i/data.length);peak=Math.max(peak,Math.abs(data[i]));}
+    if(peak>0)for(let i=0;i<data.length;i++)data[i]*=.64/peak;
     data[0]=data[data.length-1]=0;return data;
   }
   function render(kind,seconds){
+    kind=Object.hasOwn(ALIASES,kind)?ALIASES[kind]:kind;
     if(Object.hasOwn(ACTIONS,kind))return renderAction(kind,seconds);
     const duration=kind==='defeat'?.55:kind==='block'?.28:kind==='hurt'?.3:kind==='swing'?.24:.2,data=new Float32Array(Math.round(RATE*duration));
     let seed=7381,low=0,mid=0;
@@ -58,11 +69,12 @@
     }
     data[0]=data[data.length-1]=0;return data;
   }
-  function create(context,output){
-    const buffers={},active=new Set(),last=new Map();
-    function release(source){source.onended=null;source.disconnect();active.delete(source);}
+  function create(context,output,{voice=()=>globalThis.GameVoice?.status?.()}={}){
+    const buffers={},active=new Set(),last=new Map(),levels=new Map();
+    function release(source){source.onended=null;source.disconnect();levels.get(source)?.disconnect();levels.delete(source);active.delete(source);}
     function stopSource(source){try{source.stop();}catch(_){}release(source);}
     function play(kind,seconds){
+      kind=Object.hasOwn(ALIASES,kind)?ALIASES[kind]:kind;
       if(!['swing','hit','hurt','block','defeat'].includes(kind)&&!Object.hasOwn(ACTIONS,kind))return;
       const now=context.currentTime;
       // Area attacks share a single hit sound rather than one per victim.
@@ -71,11 +83,18 @@
       const key=kind==='charge'?kind+':'+chargeSeconds(seconds):kind;
       if(!buffers[key]){const data=render(kind,seconds),b=context.createBuffer(1,data.length,RATE);b.getChannelData(0).set(data);buffers[key]=b;}
       if(active.size>=4)stopSource(active.values().next().value);
-      const source=context.createBufferSource();source.buffer=buffers[key];source.connect(output);active.add(source);
+      const source=context.createBufferSource();source.buffer=buffers[key];
+      // Four simultaneous normal voices stay below unity even before the
+      // existing effects/master controls. Narration keeps first priority.
+      if(typeof context.createGain==='function'){
+        const gain=context.createGain();let speaking=false;try{const status=voice?.();speaking=!!(status?.speaking||status?.loadingVoice||status?.loadingAudio);}catch{/* Audio remains available if speech status is unavailable. */}
+        gain.gain.value=(kind==='charge'?.22:.32)*(speaking?.36:1);source.connect(gain);gain.connect(output);levels.set(source,gain);
+      }else source.connect(output);
+      active.add(source);
       source.onended=()=>release(source);source.start();return ()=>{if(active.has(source))stopSource(source);};
     }
     function stop(){for(const source of [...active])stopSource(source);last.clear();}
     return {play,stop};
   }
-  return Object.freeze({RATE,ACTIONS,SKILL_SOUNDS,skillKind,hitKind,itemKind,render,create});
+  return Object.freeze({RATE,ACTIONS,ALIASES,SKILL_SOUNDS,skillKind,hitKind,itemKind,render,create});
 });

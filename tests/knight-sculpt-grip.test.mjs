@@ -7,12 +7,19 @@ import vm from 'node:vm';
 
 const require=createRequire(import.meta.url),T=require('../lib/three.min.js'),S=require('../assets/character-sculpt.js'),F=require('../assets/character-face.js'),H=require('../story/tower-heroes-core.js'),M=require('../story/tower-combat-motion.js');
 const html=readFileSync(new URL('../index.html',import.meta.url),'utf8'),start=html.indexOf('function buildCharacter('),source=html.slice(start,html.indexOf('\n}',start)+2);
-function environment(){const e=vm.createContext({THREE:T,CharacterSculpt:S,CharacterFace:F,TowerHeroes:H,TowerCombatMotion:M});e.window=e;vm.runInContext(source,e);vm.runInContext(readFileSync(new URL('../story/tower-heroes-visuals.js',import.meta.url),'utf8'),e);return e;}
+const visualSource=readFileSync(new URL('../story/tower-heroes-visuals.js',import.meta.url),'utf8');
+function environment(visuals=visualSource){const e=vm.createContext({THREE:T,CharacterSculpt:S,CharacterFace:F,TowerHeroes:H,TowerCombatMotion:M});e.window=e;vm.runInContext(source,e);vm.runInContext(visuals,e);return e;}
 const env=environment(),V=env.TowerHeroVisuals;
+// Keep the original fixed knight-scope golden data: the later, explicitly
+// requested dwarf legs/beard are independently checked against current source
+// in smith-dwarf-sculpt.test.mjs, not silently approved by a new golden hash.
+const knightScopeSource=visualSource.replace("    if(job==='smith')smithDwarfBody(T,m);",'').replace("if(job==='smith')smithLongBeard(T,beard);",'');
+assert.notEqual(knightScopeSource,visualSource);const knightScopeEnv=environment(knightScopeSource),knightScopeV=knightScopeEnv.TowerHeroVisuals;
 const item=(kind,slot)=>({kind,slot,durability:100,maxDurability:100});
 function figure(kind='longsword',tier=1,sex='male'){const model=V.base('swordsman',env.buildCharacter,'hero',sex);V.dress(T,model,{weapon:item(H.tierKind(kind,tier),'weapon'),armor:item(H.tierKind('heavy_armor',tier),'armor'),helmet:item(H.tierKind('heavy_helm',tier),'helmet'),shield:kind==='longsword'?item(H.tierKind('round_shield',tier),'shield'):null},()=>{});return {model,weapon:model.userData.heroPieces.find(p=>p.userData.baseKind===kind)};}
 function frame(f,variant=0,time=1){M.begin(f.model,'attack',1);Object.assign(M.state(f.model),{variant,elapsed:time});f.model.userData.legL.rotation.x=f.model.userData.legR.rotation.x=0;V.pose(f.model,0,1,false,0);f.model.updateMatrixWorld(true);return {grip:f.weapon.localToWorld(new T.Vector3(...f.weapon.userData.contact.grip)),hand:f.model.userData.knightRightHand?.getWorldPosition(new T.Vector3())||f.model.userData.armR.localToWorld(new T.Vector3(0,-.36,.13)),edge:new T.Vector3(...f.weapon.userData.contact.normal).applyNormalMatrix(new T.Matrix3().getNormalMatrix(f.weapon.matrixWorld)),flat:new T.Vector3(0,0,1).applyNormalMatrix(new T.Matrix3().getNormalMatrix(f.weapon.matrixWorld))};}
 function budget(model){let triangles=0,meshes=0;model.traverse(p=>{if(p.isMesh&&p.visible){for(let parent=p.parent;parent;parent=parent.parent)if(!parent.visible)return;triangles+=(p.geometry.index?.count||p.geometry.attributes.position.count)/3;meshes++;}assert.ok(!p.isLight);});return {triangles,meshes};}
+function visibleIndexedBounds(model){model.updateMatrixWorld(true);const box=new T.Box3(),v=new T.Vector3();model.traverse(p=>{if(!p.isMesh||!p.geometry?.attributes.position)return;for(let ancestor=p;ancestor;ancestor=ancestor.parent)if(!ancestor.visible)return;const position=p.geometry.attributes.position,used=p.geometry.index?new Set(p.geometry.index.array):Array.from({length:position.count},(_,i)=>i);for(const i of used)box.expandByPoint(v.fromBufferAttribute(position,i).applyMatrix4(p.matrixWorld));});return box;}
 function surfaceProbe(geometry){const skin=new T.Mesh(geometry,new T.MeshBasicMaterial({side:T.DoubleSide})),ray=new T.Raycaster();skin.updateMatrixWorld(true);return {at(x,y){ray.set(new T.Vector3(x,y,1),new T.Vector3(0,0,-1));const hit=ray.intersectObject(skin,false)[0];assert.ok(hit,`face surface exists at ${x}, ${y}`);return hit.point.z;},dispose(){skin.material.dispose();}};}
 function frontSectionWidth(geometry,y){const p=geometry.attributes.position,index=geometry.index.array,xs=[];for(let i=0;i<index.length;i+=3)for(let j=0;j<3;j++){const a=index[i+j],b=index[i+(j+1)%3],ay=p.getY(a),by=p.getY(b);if((ay-y)*(by-y)>0||ay===by)continue;const t=(y-ay)/(by-ay),z=p.getZ(a)+(p.getZ(b)-p.getZ(a))*t;if(z>=-.001)xs.push(p.getX(a)+(p.getX(b)-p.getX(a))*t);}assert.ok(xs.length>2,'horizontal triangle section intersects the face');return Math.max(...xs)-Math.min(...xs);}
 
@@ -66,7 +73,7 @@ test('slender face keeps both eyes and mouth unobstructed by every heavy-helmet 
 });
 
 test('male-knight face correction leaves female swordsman and every other organic profession head unchanged',()=>{
-  const snapshots=[];for(const job of Object.keys(H.JOBS).filter(j=>j!=='robot'))for(const sex of ['male','female']){if(job==='swordsman'&&sex==='male')continue;const m=V.base(job,env.buildCharacter,'hero',sex),head=m.userData.headMesh;snapshots.push({job,sex,head:Array.from(head.geometry.attributes.position.array),normal:Array.from(head.geometry.attributes.normal.array),scale:m.userData.head.scale.toArray(),position:m.userData.head.position.toArray(),ears:m.userData.head.children.filter(p=>p.name==='human-ear').map(p=>({at:p.position.toArray(),scale:p.scale.toArray(),visible:p.visible}))});assert.notEqual(head.geometry.userData.knightFace,true);}
+  const snapshots=[];for(const job of Object.keys(H.JOBS).filter(j=>j!=='robot'))for(const sex of ['male','female']){if(job==='swordsman'&&sex==='male')continue;const m=knightScopeV.base(job,knightScopeEnv.buildCharacter,'hero',sex),head=m.userData.headMesh;snapshots.push({job,sex,head:Array.from(head.geometry.attributes.position.array),normal:Array.from(head.geometry.attributes.normal.array),scale:m.userData.head.scale.toArray(),position:m.userData.head.position.toArray(),ears:m.userData.head.children.filter(p=>p.name==='human-ear').map(p=>({at:p.position.toArray(),scale:p.scale.toArray(),visible:p.visible}))});assert.notEqual(head.geometry.userData.knightFace,true);}
   assert.equal(snapshots.length,13);assert.equal(createHash('sha256').update(JSON.stringify(snapshots)).digest('hex'),'75038bc22c2ce8b418506906b27eb41a90b6264c0e62c33d07a30e897e9061eb','non-target head surfaces, normals, mounts and ear silhouettes retain the pre-correction geometry');
 });
 
@@ -116,11 +123,40 @@ test('removing male-knight side locks leaves every other profession and female s
 test('male knight is tall and balanced without changing female or other professions',()=>{
   const male=V.base('swordsman',env.buildCharacter,'hero','male'),female=V.base('swordsman',env.buildCharacter,'hero','female');male.updateMatrixWorld(true);female.updateMatrixWorld(true);
   const a=new T.Box3().setFromObject(male),b=new T.Box3().setFromObject(female),head=new T.Box3().setFromObject(male.userData.headMesh),height=a.max.y-a.min.y;
-  assert.ok(height>2.15&&height<2.5);assert.ok(height>b.max.y-b.min.y+.12);assert.ok(head.max.x-head.min.x<.55);assert.ok((head.max.y-head.min.y)/height<.29);assert.ok((head.max.x-head.min.x)/(head.max.y-head.min.y)<.8,'the longer chin stays balanced with a narrow face, not a larger round head');
+  assert.ok(height>2.15&&height<2.5);assert.ok(height>b.max.y-b.min.y);assert.ok(head.max.x-head.min.x<.55);assert.ok(Math.abs(head.max.y-head.min.y-.6562029741525648)<1e-6,'shortening legs does not shrink or stretch the already approved head sculpture');assert.ok((head.max.x-head.min.x)/(head.max.y-head.min.y)<.8,'the longer chin stays balanced with a narrow face, not a larger round head');
   assert.equal(male.userData.body.geometry.userData.knightSculpt,true);assert.deepEqual(Array.from(male.userData.heroGrip),[0,-.46,.10]);assert.equal(female.userData.knightSculpt,undefined);
   assert.deepEqual(female.scale.toArray(),[1.07*.9,1.08*1.05,.96]);assert.equal(female.userData.head.position.y,1.62);assert.equal(female.userData.armR.position.y,1.12);assert.equal(female.userData.legR.position.y,.62);
-  for(const job of Object.keys(H.JOBS).filter(j=>!['robot','swordsman'].includes(j)))for(const sex of ['male','female']){const m=V.base(job,env.buildCharacter,'hero',sex);assert.equal(m.userData.knightSculpt,undefined);assert.equal(m.userData.heroGrip,undefined);assert.equal(m.userData.armR.position.y,1.12);assert.equal(m.userData.legR.position.y,.62);assert.equal(m.userData.body.geometry.parameters.segments,12);}
+  for(const job of Object.keys(H.JOBS).filter(j=>!['robot','swordsman'].includes(j)))for(const sex of ['male','female']){const m=V.base(job,env.buildCharacter,'hero',sex);assert.equal(m.userData.knightSculpt,undefined);assert.equal(m.userData.heroGrip,undefined);const trim=job==='smith'?.11:0;assert.equal(m.userData.armR.position.y,1.12-trim);assert.equal(m.userData.legR.position.y,.62-trim);assert.equal(m.userData.body.geometry.parameters.segments,12);}
   const before=budget(male);assert.ok(before.triangles<7000&&before.meshes<65);
+});
+
+test('male hero and recruit shorten only the legs by 0.10, lower every upper-body mount together and retain original foot contact',()=>{
+  const oldVisibleHeight=2.3261715265130998,oldVisibleFloor=.0153399999999999,footGround=.08555;
+  for(const identity of ['hero','traveller']){
+    const m=V.base('swordsman',env.buildCharacter,identity,'male');assert.deepEqual(m.scale.toArray(),[1.0197,1.18,.96]);
+    for(const key of ['legR','legL']){
+      const leg=m.userData[key];leg.geometry.computeBoundingBox();assert.ok(Math.abs(leg.geometry.boundingBox.getSize(new T.Vector3()).y-.58)<1e-6);assert.ok(Math.abs(leg.geometry.boundingBox.max.y-.035)<1e-6);assert.equal(leg.position.y,.65);
+      const boot=leg.children.find(p=>p.geometry?.type==='ExtrudeGeometry'),sole=leg.children.find(p=>p.geometry?.type==='BoxGeometry');assert.ok(Math.abs(boot.position.y+.485)<1e-10);assert.ok(Math.abs(sole.position.y+.56)<1e-10);m.updateMatrixWorld(true);assert.ok(Math.abs(new T.Box3().setFromObject(sole).min.y-footGround)<1e-6,'shorter legs keep the same sole contact instead of raising the feet');
+    }
+    for(const [part,y]of [[m.userData.body,.975],[m.userData.head,1.58],[m.userData.armR,1.15],[m.userData.armL,1.15],[m.getObjectByName('anatomical-neck'),1.38],[m.getObjectByName('base-belt'),.725],[m.getObjectByName('base-collar'),1.255]])assert.ok(Math.abs(part.position.y-y)<1e-10,'body, neck, arms, head and uniform trim all descend by the same leg trim');
+    const bounds=visibleIndexedBounds(m);assert.ok(Math.abs(bounds.getSize(new T.Vector3()).y-(oldVisibleHeight-.118))<1e-6,'visible-indexed height falls only by the authored leg trim times the unchanged scale');assert.ok(Math.abs(bounds.min.y-oldVisibleFloor)<1e-6);
+    for(let tier=1;tier<=5;tier++){V.dress(T,m,{armor:item(H.tierKind('heavy_armor',tier),'armor'),helmet:item(H.tierKind('heavy_helm',tier),'helmet')},()=>{});for(const [kind,y]of [['heavy_armor',.025],['heavy_helm',.09]])assert.ok(Math.abs(m.userData.heroPieces.find(p=>p.userData.baseKind===kind).position.y-y)<1e-10,'all tier equipment follows the same upper-body trim');}
+    assert.equal(m.userData.heroIdentityStyle,identity==='hero'?'protagonist':'traveller');
+  }
+});
+
+test('the shorter male knight is no longer a full anatomical head taller than healers, without rescaling either healer',()=>{
+  const knight=V.base('swordsman',env.buildCharacter,'hero','male'),height=visibleIndexedBounds(knight).getSize(new T.Vector3()).y;
+  for(const [sex,oldHeight]of [['male',1.890720008428097],['female',2.038174958318532]]){
+    const healer=V.base('healer',env.buildCharacter,'hero',sex),healerHeight=visibleIndexedBounds(healer).getSize(new T.Vector3()).y;assert.ok(Math.abs(healerHeight-oldHeight)<1e-6,'the comparison must not make healers taller to disguise knight proportions');
+    const headHeight=new T.Box3().setFromObject(healer.userData.headMesh).getSize(new T.Vector3()).y;assert.ok((height-healerHeight)/headHeight<(sex==='male'?.65:.4));assert.ok(height>healerHeight);
+  }
+  assert.ok(Math.abs(height-2.2081715265130998)<1e-6);
+});
+
+test('leg proportion adjustment leaves female swordsman and all other organic profession model geometry and mounts unchanged',()=>{
+  const snapshots=[];for(const job of Object.keys(H.JOBS).filter(j=>j!=='robot'))for(const sex of ['male','female']){if(job==='swordsman'&&sex==='male')continue;const m=knightScopeV.base(job,knightScopeEnv.buildCharacter,'hero',sex),parts=[];m.traverse(p=>{const g=p.geometry;parts.push({name:p.name,position:p.position.toArray(),quaternion:p.quaternion.toArray(),scale:p.scale.toArray(),visible:p.visible,geometry:g?{position:Array.from(g.attributes.position.array),normal:Array.from(g.attributes.normal.array),index:g.index?Array.from(g.index.array):null}:null});});snapshots.push({job,sex,parts});}
+  assert.equal(snapshots.length,13);assert.equal(createHash('sha256').update(JSON.stringify(snapshots)).digest('hex'),'358d5bdb256f3351874a30ad0b055f210f87465cb338ac4b3a88cbb7bb00adc6');
 });
 
 test('knight sculpture and side-part hair retain the existing mesh segment budget and continuous seams',()=>{

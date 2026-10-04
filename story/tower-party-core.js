@@ -16,10 +16,10 @@
   const PROFESSIONS=Object.freeze({
     swordsman:{name:'劍士',person:'蒼衡',gender:'male',color:0x5594c1,skill:'守護架勢',description:'近戰傷害較高。技能：六秒內減傷一半；劍士隊友會替你攔下近身怪物。',cooldown:20},
     mage:{name:'術士',person:'露彌',gender:'female',color:0xb196e8,skill:'震盪結界',description:'技能：擊退附近怪物，使牠們短暫暈眩。另可在照明工具中施放十分鐘的日光術；術士隊友也能協助照明。',cooldown:22},
-    scout:{name:'斥候',person:'巧栗',gender:'female',color:0x68bead,skill:'探路之眼',description:'探路與避險專家。技能：顯示出口路線十八秒，獲得六秒陷阱保護。隊中有斥候時，陷阱傷害減少四分之一。',cooldown:25},
+    scout:{name:'遊俠',person:'巧栗',gender:'female',color:0x68bead,skill:'探路之眼',description:'探路與避險專家。技能：顯示出口路線十八秒，獲得六秒陷阱保護。隊中有遊俠時，陷阱傷害減少四分之一。',cooldown:25},
     chef:{name:'廚師',person:'禾谷',gender:'male',color:0xe6ac65,skill:'隨手料理',description:'烹飪一次可做兩份。技能：用一份根莖恢復飽食度，照顧整支隊伍。',cooldown:25},
     healer:{name:'療癒師',person:'澄音',gender:'female',color:0x88c69f,skill:'草藥療癒',description:'技能：消耗一份香草恢復生命。隊友在你受重傷時也會使用香草救援。',cooldown:25},
-    smith:{name:'鍛匠',person:'砧岳',gender:'male',color:0xbf936e,skill:'應急修補',description:'裝備修復專家。技能：用一份硬殼修復穿戴的裝備。隊中有鍛匠時，營地修理與鍛造費減半。',cooldown:25},
+    smith:{name:'鍛匠',person:'砧岳',gender:'male',color:0xbf936e,skill:'應急修補',description:'矮人族裝備修復專家。技能：用一份硬殼修復穿戴的裝備。隊中有鍛匠時，營地修理與鍛造費減半。',cooldown:25},
     archer:{name:'射手',person:'嵐羽',gender:'female',color:0xc8bc79,skill:'鷹眼巡望',description:'精靈弓手，擅長遠程射擊、牽制怪物與帶領隊伍穿行迷宮。弓是雙手武器，不能配盾。',cooldown:25},
     robot:{name:'機器人',person:'鐵衡',gender:'male',color:0x9dc5d7,skill:'摺甲防禦',description:'重防禦拳鬥者，以飛拳與衝撞替隊伍開路；不穿一般裝備，可用礦石和零件進階自身機殼、拳臂。',cooldown:28},
   });

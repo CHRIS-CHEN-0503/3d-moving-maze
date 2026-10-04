@@ -18,6 +18,10 @@ const modules=[
  ['TowerCinematicActors','story/tower-cinematic-actors.js','create'],
  ['TowerCinematicLook','story/tower-cinematic-look.js','create'],
  ['TowerStoryTheater','story/tower-story-theater.js','create'],
+ ['TowerStoryDirection','story/tower-story-direction.js','plan'],
+ ['TowerSkillEffects','story/tower-skill-effects.js','create'],
+ ['CombatAudio','assets/combat-audio.js','create'],
+ ['TowerHeroVisuals','story/tower-heroes-visuals.js','base'],
  ['TowerStoryInsights','story/tower-story-insights.js','journal'],
  ['TowerEnvironmentLife','story/tower-environment-life.js','create']
 ];
@@ -125,7 +129,7 @@ try{
   assert.deepEqual(await page.evaluate(()=>__releaseSockets),[],'whole game path never attempts a real room connection');
   await page.goto(new URL('docs/'+encodeURIComponent('職業裝備圖鑑.html'),base).href,{waitUntil:'networkidle'});await page.waitForSelector('html[data-atlas-ready="true"]');assert.match(await page.locator('body').innerText(),new RegExp(version.replaceAll('.','\\.')));assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1));
   const reading=page.locator('#readingRules');if(!await reading.evaluate(node=>node.open))await reading.locator(':scope > summary').tap();for(const title of ['把線索連起來','隊友戰術與演出']){const heading=page.getByRole('heading',{name:title,exact:true});await heading.scrollIntoViewIfNeeded();assert.ok(await heading.isVisible());assert.ok((await heading.locator('..').textContent()).length>180);}assert.match(await reading.textContent(),/事件紀錄未保存選項時會明示/);assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1));await page.getByRole('heading',{name:'把線索連起來',exact:true}).scrollIntoViewIfNeeded();await page.screenshot({path:out+'/'+width+'-atlas.png'});report.atlases.push({width,height,ready:true,version,newStoryAndTacticsRules:true,eventChoiceWording:true,noHorizontalOverflow:true});
-  assert.deepEqual(await page.evaluate(()=>__releaseSockets),[],'atlas never attempts a room connection');await Promise.all(loadedChecks);assert.deepEqual(new Set(currentLoads.map(row=>row.path)),moduleFiles,'all six required modules actually loaded in this browser context');await context.close();
+  assert.deepEqual(await page.evaluate(()=>__releaseSockets),[],'atlas never attempts a room connection');await Promise.all(loadedChecks);assert.deepEqual(new Set(currentLoads.map(row=>row.path)),moduleFiles,'all required presentation modules actually loaded in this browser context');await context.close();
  }
  assert.deepEqual(report.loadedFailures,[]);assert.deepEqual(report.blocked,[]);assert.deepEqual(report.errors,[]);report.pass=true;
 }catch(e){report.failure=e.stack;throw e;}finally{

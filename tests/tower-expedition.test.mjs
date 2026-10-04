@@ -76,7 +76,7 @@ test('dismantling handles equipped and stored gear once, including stale confirm
   const g=C.createGear('helmet',99,1,'spare');r=C.grantGear(r,g).run;assert.ok(r);r=X.dismantle(r,g.id).run;assert.equal(r.gearBag.length,0);
 });
 test('names and browser loading order use the expansion without changing classic modes',()=>{
-  assert.equal(P.PROFESSIONS.scout.name,'斥候');assert.equal(P.PROFESSIONS.smith.name,'鍛匠');assert.equal(C.newRun().party,undefined);
+  assert.equal(P.PROFESSIONS.scout.name,'遊俠');assert.equal(P.PROFESSIONS.smith.name,'鍛匠');assert.equal(C.newRun().party,undefined);
   const html=readFileSync(new URL('../index.html',import.meta.url),'utf8');assert.ok(html.indexOf('src="story/tower-expedition-core.js')<html.indexOf('src="story/tower-party-core.js'));
 });
 test('unambiguous older paid-guard conversion is repaired without granting a new companion',()=>{

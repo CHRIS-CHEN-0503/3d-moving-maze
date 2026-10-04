@@ -16,7 +16,7 @@ function figure(baseKind,sex,tier){
   V.dress(T,model,equipment,()=>{});model.position.set(4,0,-7);
   const weapon=model.userData.heroPieces.find(p=>p.userData.baseKind===baseKind),contact=weapon.userData.contact;
   assert.ok(contact,kind+' has an authored physical contact/emission point');
-  assert.equal(weapon.parent,baseKind==='spellbook'?model:baseKind==='elven_bow'?model.userData.bowArms.right.hand:model.userData.armR);
+  assert.equal(weapon.parent,baseKind==='elven_bow'?model.userData.bowArms.right.hand:model.userData.armR);
   return {model,weapon,contact,kind};
 }
 function frame(f,variant,time,family=''){
@@ -104,12 +104,13 @@ for(const sex of ['male','female'])for(let tier=1;tier<=5;tier++){
     }
     f.model.rotation.y=0;f.weapon=right;f.contact=right.userData.contact;const r=frame(f,0,.48);f.weapon=left;f.contact=left.userData.contact;const l=frame(f,0,.48),lFinish=frame(f,0,.70);
     assert.ok(r.tip.z>l.tip.z+.3,'right blade leads the first cut');assert.ok(lFinish.tip.z>l.tip.z+.3,'left blade follows for the second cut');
-    for(const [weapon,original]of [[right,[[.5,-.12],[1.57,-.12],[.2,-.16]]],[left,[[.35,.12],[.2,.16],[1.57,.12]]]]){
+    for(const weapon of [right,left]){
       f.weapon=weapon;f.contact=weapon.userData.contact;
-      for(const [index,time]of [.22,.48,.70].entries()){
-        const p=frame(f,0,time),offset=new T.Vector3(...f.contact.tip).applyEuler(new T.Euler(original[index][0],0,original[index][1])),expected=f.model.localToWorld(f.model.worldToLocal(p.grip.clone()).add(offset));
-        assert.ok(p.tip.distanceTo(expected)<1e-6,'handle twist preserves the original authored tip position');
-      }
+      const idle=frame(f,0,1),windup=frame(f,0,.22),release=frame(f,0,weapon===right?.48:.70);
+      assert.ok(idle.axis.z<-.95,'reverse blade points behind the actor at rest');
+      assert.ok(windup.tip.z<windup.grip.z,'windup retains a rearward reverse grip');
+      assert.ok(release.tip.z>release.grip.z,'reverse cut drives its real tip forward');
+      assert.ok(release.tip.y<release.grip.y,'downward cut finishes below the held handle');
     }
     f.weapon=right;f.contact=right.userData.contact;const rightCross=frame(f,1,.48);f.weapon=left;f.contact=left.userData.contact;const leftCross=frame(f,1,.48);assert.ok(rightCross.tip.x>leftCross.tip.x+.3,'second combination retains its inward crossed tips');
   });
@@ -150,7 +151,7 @@ test('first-person posing preserves held equipment, heading and location, then r
       f.model.userData.legR.rotation.x=f.model.userData.legL.rotation.x=0;V.pose(f.model,0,.6,true,.02);f.model.updateMatrixWorld(true);
       assert.equal(f.model.rotation.y,2.4);assert.deepEqual(f.model.position.toArray(),[4,0,-7]);assert.equal(f.model.children.length,count);
       f.model.traverse(p=>assert.ok(p.matrixWorld.elements.every(Number.isFinite)));
-      assert.equal(f.weapon.visible,true);assert.equal(f.weapon.parent,kind==='spellbook'?f.model:kind==='elven_bow'?f.model.userData.bowArms.right.hand:f.model.userData.armR);
+      assert.equal(f.weapon.visible,true);assert.equal(f.weapon.parent,kind==='elven_bow'?f.model.userData.bowArms.right.hand:f.model.userData.armR);
     }
     assert.equal(M.state(f.model).action,'');assert.equal(f.model.rotation.x,0);assert.equal(f.model.rotation.z,0);
   }

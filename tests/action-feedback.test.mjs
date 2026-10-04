@@ -74,7 +74,7 @@ test('every successful active skill emits action audio and geometry; failed repe
     const f=fixture(s);assert.equal(f.runtime.cast(s.id,f.target),true,s.id);
     assert.ok(f.sounds.includes(H.preparationSeconds(s.id)?'charge':A.skillKind(s)),s.id);
     assert.equal(f.motion().action,H.preparationSeconds(s.id)||s.effect==='disarm'?'charge':'skill',s.id);
-    assert.equal(f.motion().family,s.presentation?.motion||require('../story/tower-combat-motion.js').FAMILIES[s.effect],s.id);
+    assert.equal(f.motion().family,s.id==='throw_blade'?'knife_throw':s.presentation?.motion||require('../story/tower-combat-motion.js').FAMILIES[s.effect],s.id);
     assert.ok(f.runtime.effectStats().groups>0,s.id);assert.ok(C.validateSave(f.run()),s.id);
     const before=f.sounds.length;f.runtime.cast(s.id,f.target);assert.equal(f.sounds.length,before,s.id+' failed cast');
     f.runtime.reset();assert.equal(f.runtime.effectStats().groups,0);
@@ -98,6 +98,7 @@ test('every approved ordinary or awakened preparation is 0.3 seconds shorter, de
     f.pause(true);f.runtime.tick(5);assert.equal(f.runtime.preparing().left,seconds);f.pause(false);
     f.runtime.tick(seconds-.01);assert.equal(H.actor(f.run()).cooldowns[id],0,id);assert.equal(f.hits(),0);
     f.runtime.tick(.02);assert.equal(f.runtime.preparing(),null);assert.ok(H.actor(f.run()).cooldowns[id]>0,id);assert.ok(C.validateSave(f.run()),id);
+    assert.ok(f.sounds.includes(A.skillKind(H.SKILLS[id])),id+' release audio, not only the preparation swell');
     if(['worldtree_arrow','steel_meteor_fist','iron_charge'].includes(id)){assert.equal(f.hits(),0);f.runtime.tick(.2);}
     if(H.SKILLS[id].attack)assert.equal(f.hits(),1,id);
     if(id==='daylight')assert.equal(f.run().party.light.daylight,600);
@@ -123,7 +124,7 @@ test('disarm work is 0.3 seconds shorter at every tier and remains interruptible
 test('all underground preparations also shorten exactly 0.3 and canonical skill metadata matches execution',()=>{
   const catalog=require('../story/tower-ascension-catalog.js');assert.equal(H.PREPARATION_REDUCTION,.3);
   for(const s of Object.values(H.SKILLS)){assert.equal(s.preparation,H.preparationSeconds(s.id),s.id);assert.ok(s.preparation>=0,s.id);if(s.preparation)assert.ok(s.description.endsWith('準備 '+s.preparation+' 秒後生效。'),s.id);}
-  for(const s of catalog.actives){const seconds=Math.max(0,Math.round(((s.preparation||0)-.3)*10)/10);assert.equal(H.preparationSeconds(s.id),seconds,s.id);if(!seconds)continue;const f=fixture(H.SKILLS[s.id]),before=JSON.stringify(f.run());assert.equal(f.runtime.cast(s.id,f.target),true,s.id);assert.equal(f.runtime.preparing().total,seconds);assert.equal(JSON.stringify(f.run()),before);f.runtime.tick(seconds-.01);assert.equal(H.actor(f.run()).cooldowns[s.id],0);f.runtime.tick(.02);assert.equal(f.runtime.preparing(),null);assert.ok(H.actor(f.run()).cooldowns[s.id]>0);assert.ok(C.validateSave(f.run()));f.runtime.reset();}
+  for(const s of catalog.actives){const seconds=Math.max(0,Math.round(((s.preparation||0)-.3)*10)/10);assert.equal(H.preparationSeconds(s.id),seconds,s.id);if(!seconds)continue;const f=fixture(H.SKILLS[s.id]),before=JSON.stringify(f.run());assert.equal(f.runtime.cast(s.id,f.target),true,s.id);assert.equal(f.runtime.preparing().total,seconds);assert.equal(JSON.stringify(f.run()),before);f.runtime.tick(seconds-.01);assert.equal(H.actor(f.run()).cooldowns[s.id],0);f.runtime.tick(.02);assert.equal(f.runtime.preparing(),null);assert.ok(H.actor(f.run()).cooldowns[s.id]>0);assert.ok(f.sounds.includes(A.skillKind(H.SKILLS[s.id])),s.id+' release audio, not only the preparation swell');assert.ok(C.validateSave(f.run()));f.runtime.reset();}
   for(const id of ['arcane_bolt','flying_fist','parts_restore','mech_aid','not-a-skill'])assert.equal(H.preparationSeconds(id),0);
 });
 test('successful guard, healing and completed disarm play the acting gender specialty, not generic overlapping narration',()=>{

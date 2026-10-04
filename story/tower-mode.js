@@ -1544,6 +1544,7 @@
       // Keep the authored matrix intact: nonuniform body proportions plus
       // wrist rotation contain shear that quaternion decomposition would lose.
       matrix.premultiply(inverse);piece.matrix.copy(matrix);piece.matrixWorldNeedsUpdate=true;piece.visible=source.visible;
+      if(baseKind==='spellbook')HeroVisual.bookPose?.(piece,source.userData.bookOpen||0);
     }
     for(;i<heroFp.children.length;i++)heroFp.children[i].visible=false;
   }

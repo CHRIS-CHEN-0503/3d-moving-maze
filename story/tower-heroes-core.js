@@ -21,10 +21,10 @@
   const JOBS=Object.freeze({
     swordsman:{name:'劍士',armor:'heavy',starter:'longsword',color:'#89bce1',charIdx:2},
     mage:{name:'術士',armor:'robe',starter:'arcane_staff',color:'#c5a7f7',charIdx:3},
-    scout:{name:'斥候',armor:'light',starter:'twin_daggers',color:'#8fdec4',charIdx:1},
+    scout:{name:'遊俠',armor:'light',starter:'twin_daggers',color:'#8fdec4',charIdx:1},
     chef:{name:'廚師',armor:'light',starter:'cooking_pan',color:'#ffd09b',charIdx:0},
     healer:{name:'療癒師',armor:'robe',starter:'spellbook',color:'#b6e5b8',charIdx:1},
-    smith:{name:'鍛匠',armor:'heavy',starter:'smith_hammer',color:'#d7ab83',charIdx:4},
+    smith:{name:'鍛匠',description:'矮人族鍛匠；男女均為矮人族，外觀不同，職業能力相同。',armor:'heavy',starter:'smith_hammer',color:'#d7ab83',charIdx:4},
     archer:{name:'射手',armor:'light',starter:'elven_bow',color:'#e4d796',charIdx:1},
     robot:{name:'機器人',armor:'robot',starter:'robot_fists',color:'#a7dce8',charIdx:4},
   });

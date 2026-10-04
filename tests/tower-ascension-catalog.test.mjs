@@ -76,7 +76,7 @@ test('continuation visuals keep class-specific palettes and bounded geometry in 
 
 test('new actions have corresponding finite, audible, short synth effects and intentional motion tracks',()=>{
   for(const s of A.actives){
-    assert.equal(Audio.skillKind(s),s.presentation.sound);const data=Audio.render(Audio.skillKind(s));
+    assert.equal(Audio.skillKind(s),s.id==='explosive_fists'?'robot':s.presentation.sound);const data=Audio.render(Audio.skillKind(s));
     assert.ok(data.length>0&&data.length<=Audio.RATE);assert.ok(data.every(v=>Number.isFinite(v)&&Math.abs(v)<1));assert.ok(data.some(v=>Math.abs(v)>.1));assert.equal(data[0],0);assert.equal(data.at(-1),0);
     const model={userData:{heroWeapon:s.job==='archer'?'elven_bow_t5':s.job==='healer'?'spellbook_t5':'longsword_t5'}};
     M.begin(model,'skill',.8,s);assert.equal(M.state(model).family,s.presentation.motion);

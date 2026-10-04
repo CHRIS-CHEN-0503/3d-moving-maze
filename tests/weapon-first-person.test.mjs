@@ -41,9 +41,15 @@ for(const kind of kinds)test(`standalone first-person ${kind} retains real conta
         const expected=sources[i].matrixWorld.clone();expected.elements[13]+=.32;
         sameMatrix(pieces[i].matrixWorld,expected,kind+' '+sex+' '+tier+' '+variant+' '+heading+' '+time);
         assert.equal(pieces[i].visible,true);
+        if(kind==='spellbook'){assert.equal(pieces[i].userData.bookOpen,sources[i].userData.bookOpen);for(const name of ['book-left-leaf','book-right-leaf']){const actual=pieces[i].getObjectByName(name),source=sources[i].getObjectByName(name),expectedLeaf=source.matrixWorld.clone();expectedLeaf.elements[13]+=.32;sameMatrix(actual.matrixWorld,expectedLeaf,'FP actual articulated '+name);}}
       }
     }
   }
+});
+test('first-person healer book closes after cancel and reuses the independent cover resources',()=>{
+  const {env,V,model,scene}=fixture('spellbook','female',5);env.syncFP();const fp=env.readFP(),book=fp.children[0],refs=[];book.traverse(p=>refs.push([p,p.geometry,p.material]));
+  for(let n=0;n<100;n++){M.begin(model,'skill',1,{presentation:{motion:'heal'}});M.state(model).elapsed=.48;V.pose(model,0,1,true,0);env.syncFP();scene.updateMatrixWorld(true);assert.equal(book.userData.bookOpen,1);M.cancel(model);V.pose(model,0,1,true,0);env.syncFP();assert.equal(book.userData.bookOpen,0);assert.equal(env.readFP(),fp);}
+  const after=[];book.traverse(p=>after.push([p,p.geometry,p.material]));assert.deepEqual(after,refs);assert.equal(book.parent,fp);
 });
 test('FP shares charge / skill poses, hides on exit, reuses matrices and recreates only when appearance changes',()=>{
   const {env,V,model,scene,disposals}=fixture('elven_bow','female',5);

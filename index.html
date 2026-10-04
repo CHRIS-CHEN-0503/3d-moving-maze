@@ -1011,7 +1011,7 @@ button:focus-visible,input:focus-visible{outline:3px solid #fff;outline-offset:3
    3D移動迷宮 — 給小朋友的變形迷宮冒險
    ===================================================== */
 const $=id=>document.getElementById(id);
-const GAME_VERSION='1.57.0';
+const GAME_VERSION='1.57.1';
 
 /* ---------- 設定（後台可調） ---------- */
 const DEFAULT_CFG={teamSize:2,shiftMin:3,itemCount:6,foodCount:4,hungerMin:3,stunSec:3,pingSec:3,smellCells:3,mazeSize:13,magicMap:0,duelMin:5,unpaidRate:100,musicOn:1,speechOn:1,speechVoice:'',apiUrl:'',roomMax:3,rounds:3,goodsCount:16,shopCollect:1,shopMin:2.5,cartFull:400,views:{fp:1,tp:1,top:1},broker:'wss://broker.emqx.io:8084/mqtt'};
@@ -2651,6 +2651,8 @@ function updatePlayer(dt,t){
     ix=(keys.KeyD||keys.ArrowRight?1:0)-(keys.KeyA||keys.ArrowLeft?1:0);
     iy=(keys.KeyS||keys.ArrowDown?1:0)-(keys.KeyW||keys.ArrowUp?1:0);
   }
+  // 準備／引導招式只暫停這一幀的移動，不清除搖桿或按鍵；完成後沿用仍按住的方向。
+  if(window.TowerMode?.movementLocked?.()){ix=0;iy=0;}
   if(isShop()&&window.ShopChaos){const input=ShopChaos.input(ix,iy,MP.id);ix=input.x;iy=input.y;}
   const mag=Math.min(1,Math.hypot(ix,iy));
   if(mag>0.12){
@@ -2888,18 +2890,19 @@ function updateCamera(dt){
 /* 遊戲中的動作鈕：手機上一邊拖搖桿一邊按時，瀏覽器不一定會送出 click，
    所以直接綁 touchstart，並用時間戳避免同一下被 click 再觸發一次。 */
 function bindActionBtn(el,fn){
-  let lastTouch=0;
+  let lastTouch=-Infinity;
   el.addEventListener('touchstart',e=>{
     e.preventDefault(); e.stopPropagation();
     lastTouch=performance.now();
-    el.classList.add('pressing'); setTimeout(()=>el.classList.remove('pressing'),120);
+    const button=e.target?.closest?.('button'),pressed=button&&el.contains(button)?button:el;
+    pressed.classList.add('pressing'); setTimeout(()=>pressed.classList.remove('pressing'),120);
     try{navigator.vibrate&&navigator.vibrate(12);}catch(err){}
-    fn();
+    fn(e);
   },{passive:false});
   el.addEventListener('touchend',e=>{e.preventDefault();},{passive:false});
-  el.addEventListener('click',()=>{
+  el.addEventListener('click',e=>{
     if(performance.now()-lastTouch<700)return;   // 剛剛已經由觸控觸發過了
-    fn();
+    fn(e);
   });
 }
 function setupTouch(){
@@ -5242,12 +5245,12 @@ window.addEventListener('pagehide',()=>{AudioEng.shiftSound?.stop();AudioEng.com
 <script src="story/tower-heroes-visuals.js?v=1.54.0"></script>
 <script src="story/tower-skill-effects.js?v=1.57.0"></script>
 <script src="story/tower-growth-runtime.js?v=1.57.0"></script>
-<script src="story/tower-team-tactics.js?v=1.42.6"></script>
+<script src="story/tower-team-tactics.js?v=1.57.1"></script>
 <script src="story/tower-combat-intent.js?v=1.43.3"></script>
 <script src="story/tower-equipment-compare.js?v=1.44.0"></script>
-<script src="story/tower-heroes-runtime.js?v=1.57.0"></script>
+<script src="story/tower-heroes-runtime.js?v=1.57.1"></script>
 <script src="story/tower-cooperation-core.js?v=1.55.0"></script>
-<script src="story/tower-cooperation-runtime.js?v=1.55.0"></script>
+<script src="story/tower-cooperation-runtime.js?v=1.57.1"></script>
 <script src="story/story-core.js?v=1.55.0"></script>
 <script src="story/tower-narrative.js?v=1.45.0"></script>
 <script src="story/tower-side-stories.js?v=1.45.0"></script>
@@ -5270,7 +5273,7 @@ window.addEventListener('pagehide',()=>{AudioEng.shiftSound?.stop();AudioEng.com
 <script src="story/tower-resource-icons.js?v=1.48.0"></script>
 <script src="story/tower-forge-icons.js?v=1.47.0"></script>
 <script src="story/tower-compact-help.js?v=1.54.0"></script>
-<script src="story/tower-party-runtime.js?v=1.57.0"></script>
+<script src="story/tower-party-runtime.js?v=1.57.1"></script>
 <script src="story/tower-lighting-runtime.js?v=1.54.2"></script>
 <script src="story/tower-encounter-alert.js?v=1.42.5"></script>
 <script src="story/tower-combat-readability.js?v=1.57.0"></script>
@@ -5285,7 +5288,7 @@ window.addEventListener('pagehide',()=>{AudioEng.shiftSound?.stop();AudioEng.com
 <script src="story/tower-adventure-events.js?v=1.57.0"></script>
 <script src="story/tower-story-insights.js?v=1.57.0"></script>
 <script src="story/tower-environment-life.js?v=1.57.0"></script>
-<script src="story/tower-mode.js?v=1.57.0"></script>
+<script src="story/tower-mode.js?v=1.57.1"></script>
 <script src="assets/room-lifecycle.js?v=1.55.0"></script>
 <script src="assets/shop-collection-core.js?v=1.55.0"></script>
 <script src="assets/shop-collection.js?v=1.55.0"></script>

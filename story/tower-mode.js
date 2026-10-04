@@ -182,8 +182,8 @@
       foreground:()=>{const list=[playerGroup,heroFp];world?.traverse(o=>{if(o.isSprite||o.userData.partyTag&&o.userData.head)list.push(o);});return list;},
       hold:()=>{dialog('重要時刻','演出中','','','',{silent:true});el('towerOverlay').hidden=true;if(heroFp)heroFp.visible=false;},release:()=>{closeDialog();if(active&&modern())updateHeroFirstPerson();}});
     el('storyEntryBtn').onclick = () => open(true);
-    bindActionBtn(el('towerBagBtn'), inventory);
-    bindActionBtn(el('towerTalkBtn'), trade);
+    bindActionBtn(el('towerBagBtn'), ()=>inventory());
+    bindActionBtn(el('towerTalkBtn'), ()=>trade());
     bindActionBtn(el('towerJournalBtn'), journal);
     bindActionBtn(el('towerQuestBtn'), ()=>questDialog(false,true));
     bindActionBtn(el('towerAttackBtn'), attack);
@@ -1872,8 +1872,9 @@
   function voiceProfile(){if(!active||!run?.party)return null;const job=modern()?Heroes.job(run):run.party.profession,gender=P.sex(run,modern()?Heroes.state(run).active:'hero');return {identity:'tower-'+(modern()?Heroes.state(run).active:'hero')+'-'+job+'-'+gender,gender,age:'adult'};}
   function toolUsed(){if(active&&modern()){Heroes.toolSpent(run);run.engine.shovels=G.shovels;}}
   function robotEnergy(){if(!active||!modern()||Heroes.job(run)!=='robot')return null;return {value:Heroes.actor(run).robot.fuel};}
+  function movementLocked(){return !!(active&&modern()&&partyUI?.movementLocked?.());}
   function movementScale(){if(!active||paused||G.shifting)return 1;const traits=run.party?window.TowerExpedition.traits(run):{speed:1,grip:0};return (modern()?Heroes.speed(run):C.hasteMultiplier(run))*Math.min(1,hazardSlow+(traits.grip>0?.15:0))*(run.party?.slowLeft>0?(traits.grip>0?.8:.6):1)*(modern()?1:traits.speed);}
-  window.TowerMode = { get cinematicActive(){return !!cinema?.active;},cinematicFrame:dt=>cinema?.frame(dt),prepareMaze,openBattleSettings, sightRoot:()=>active?world:null, voiceProfile, toolUsed, robotEnergy, get active(){return active;}, get paused(){return paused;}, get partyActive(){return active&&!!run?.party;}, temporaryMapRadius:()=>modern()?(Heroes.buff(run,'path_eye')?.power||0):0, lightRadius:()=>active?lightingUI?.radius():null, useProfessionSkill:()=>partyUI?.skill(), movementScale, open, beginNew, tick, floorSeed, atmosphereStyle, scheduleShift, updateShift, exitUnlocked, reachExit, defeat, requestQuit, canCollectOriginal, collectedOriginal, itemConfig, reservedCells, preserveFloorPickups, soundChanged, mapMarkers };
+  window.TowerMode = { get cinematicActive(){return !!cinema?.active;},cinematicFrame:dt=>cinema?.frame(dt),prepareMaze,openBattleSettings, sightRoot:()=>active?world:null, voiceProfile, toolUsed, robotEnergy, get active(){return active;}, get paused(){return paused;}, get partyActive(){return active&&!!run?.party;}, temporaryMapRadius:()=>modern()?(Heroes.buff(run,'path_eye')?.power||0):0, lightRadius:()=>active?lightingUI?.radius():null, useProfessionSkill:()=>partyUI?.skill(), movementLocked, movementScale, open, beginNew, tick, floorSeed, atmosphereStyle, scheduleShift, updateShift, exitUnlocked, reachExit, defeat, requestQuit, canCollectOriginal, collectedOriginal, itemConfig, reservedCells, preserveFloorPickups, soundChanged, mapMarkers };
   window.TowerMode.cinematicRender=draw=>cinema?cinema.render(draw):draw();
   install();
 })();

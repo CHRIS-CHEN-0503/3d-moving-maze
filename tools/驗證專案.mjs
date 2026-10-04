@@ -8,7 +8,7 @@ for(const asset of ['camera-comfort','render-quality','character-sculpt','charac
   assert.ok(html.includes(`src="./assets/${asset}.js?v=`),`缺少視野模組：${asset}`);
 }
 
-for(const asset of ['tower-cooperation-core','tower-cooperation-runtime','tower-resource-icons','tower-forge-icons','tower-ascension-catalog','tower-gear-tiers','tower-underworld','tower-creature-art','tower-field-guide','tower-combat-readability','tower-equipment-compare','tower-floor-lords','tower-loot','tower-reinforcements','tower-stairs','tower-monster-sense','tower-combat-intent','tower-team-tactics','tower-encounter-alert','tower-combat-motion','tower-menu-voice','tower-hero-growth','tower-growth-runtime','tower-lighting-core','tower-lighting-runtime','tower-heroes-core','tower-heroes-icons','tower-heroes-visuals','tower-heroes-runtime']){
+for(const asset of ['tower-story-insights','tower-environment-life','tower-cooperation-core','tower-cooperation-runtime','tower-resource-icons','tower-forge-icons','tower-ascension-catalog','tower-gear-tiers','tower-underworld','tower-creature-art','tower-field-guide','tower-combat-readability','tower-equipment-compare','tower-floor-lords','tower-loot','tower-reinforcements','tower-stairs','tower-cinematics','tower-cinematic-actors','tower-cinematic-look','tower-story-theater','tower-monster-sense','tower-combat-intent','tower-team-tactics','tower-encounter-alert','tower-combat-motion','tower-menu-voice','tower-hero-growth','tower-growth-runtime','tower-lighting-core','tower-lighting-runtime','tower-heroes-core','tower-heroes-icons','tower-heroes-visuals','tower-heroes-runtime']){
   new vm.Script(await readFile(new URL(`../story/${asset}.js`,import.meta.url),'utf8'),{filename:asset+'.js'});
   assert.ok(html.includes(`src="story/${asset}.js?v=`),`缺少照明模組：${asset}`);
 }
@@ -17,6 +17,9 @@ new vm.Script(await readFile(new URL('../story/tower-foraging.js',import.meta.ur
 assert.ok(html.indexOf('src="story/tower-foraging.js')>=0&&html.indexOf('src="story/tower-foraging.js')<html.indexOf('src="story/tower-party-core.js'),'採集規則必須先於隊伍規則載入');
 assert.ok(html.indexOf('src="story/tower-lighting-runtime.js')<html.indexOf('src="story/tower-mode.js'),'照明畫面必須先於劇情引擎載入');
 assert.ok(html.indexOf('src="story/tower-underworld.js')<html.indexOf('src="story/tower-floor-lords.js'),'地下設定必須先於楼層主載入');
+assert.ok(html.indexOf('src="story/tower-cinematic-actors.js')<html.indexOf('src="story/tower-cinematics.js'),'人物動作必須先於鏡頭演出載入');
+assert.ok(html.indexOf('src="story/tower-cinematic-look.js')<html.indexOf('src="story/tower-story-theater.js'),'過場人物材質必須先於故事舞台載入');
+assert.ok(html.indexOf('src="story/tower-story-theater.js')<html.indexOf('src="story/tower-cinematics.js')&&html.indexOf('src="story/tower-cinematics.js')<html.indexOf('src="story/tower-mode.js'),'故事舞台與鏡頭演出必須先於劇情引擎載入');
 assert.ok(html.indexOf('src="story/tower-ascension-catalog.js')<html.indexOf('src="story/tower-hero-growth.js'),'進階招式必須先於成長規則載入');
 assert.ok(html.indexOf('src="story/tower-gear-tiers.js')<html.indexOf('src="story/tower-heroes-core.js'),'裝備階級必須先於人物規則載入');
 assert.ok(html.indexOf('src="story/tower-heroes-core.js')<html.indexOf('src="story/tower-cooperation-core.js'),'連攜定義必須在技能規則之後載入');
@@ -32,7 +35,7 @@ for(const asset of ['story-atlas-rules','story-atlas-items','story-atlas-coopera
   new vm.Script(await readFile(new URL(`../docs/${asset}.js`,import.meta.url),'utf8'),{filename:asset+'.js'});
 }
 
-for (const asset of ['battle-dock','pickup-objects','native-symbols','room-lifecycle','shop-collection-core','shop-collection','shop-claims-core','shop-claims','mode-variants-core','mode-variants','shop-chaos','shop-sale','tag-rage','mobile-controls','magic-map','maze-materials','gameplay-rules']) {
+for (const asset of ['classic-tactics-core','classic-tactics','battle-dock','pickup-objects','native-symbols','room-lifecycle','shop-collection-core','shop-collection','shop-claims-core','shop-claims','mode-variants-core','mode-variants','shop-chaos','shop-sale','tag-rage','mobile-controls','magic-map','maze-materials','gameplay-rules']) {
   new vm.Script(await readFile(new URL(`../assets/${asset}.js`, import.meta.url), 'utf8'), {filename:asset+'.js'});
   assert.match(html, new RegExp(`src="(?:\\./)?assets/${asset}\\.js(?:\\?v=[\\d.]+)?"`), `缺少遊戲模組：${asset}`);
 }

@@ -156,8 +156,9 @@ test('故事三頁可前後閱讀，不推進樓層／取得印記，已讀故�
 
 test('非章末可以正常下降，章末未取得印記不能靠重複碰門或確認跳過', () => {
   const normal = harness(runAt(94)); normal.start(); normal.exit(); assert.equal(normal.save().floor, 93);
-  const gated = harness(runAt(90)); gated.start(); gated.exit();
-  assert.equal(gated.state().run.floor, 90); assert.match(gated.get('towerDialog').innerHTML, /門上缺少一枚印記/);
+  const gated = harness(runAt(90)); gated.start(); const before=gated.get('towerDialog').innerHTML; gated.exit();
+  assert.equal(gated.state().run.floor, 90); assert.equal(gated.context.TowerMode.exitUnlocked(),false);
+  assert.equal(gated.get('towerDialog').innerHTML,before,'Locked stairs stay hidden without opening an obsolete door popup');
   gated.click('close'); gated.exit(); gated.api.handleAction('exit-confirm');
   assert.equal(gated.state().run.floor, 90); assert.equal(gated.save().floor, 90);
 });

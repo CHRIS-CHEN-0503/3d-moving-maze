@@ -101,11 +101,19 @@
     f.mood=mood;
     const blink=((time+f.phase)%4.7)<.12;
     const hurt=mood==='hurt',focus=mood==='focus'||mood==='cast',happy=mood==='happy',alert=mood==='alert',talk=mood==='talk',tired=mood==='tired';
-    for(let i=0;i<f.eyes.length;i++){const lid=blink?.08:hurt?.3:focus?.52:happy?.54:alert?.9:tired?.38:f.baseEyeY;f.eyes[i].scale.y=lid;f.whites[i].scale.y=lid/f.baseEyeY*(f.eyeWhiteY||1);if(f.pupils?.[i])f.pupils[i].position.x=(focus?0:Math.sin(time*.7+f.phase)*.002);}
-    f.brows[0].rotation.z=hurt?-.3:focus?-.24:happy?.16:alert?.25:0;
+    // Blend emotional response instead of snapping between a grin and a
+    // frown as nearest/threat changes at a corner. Blink and speech retain
+    // their quick physical rhythm. One tiny record, no per-frame allocations.
+    const lid=hurt?.3:focus?.52:happy?.54:alert?.9:tired?.38:f.baseEyeY,brow=hurt?-.3:focus?-.24:happy?.16:alert?.25:0,
+      lift=alert?.025:tired?-.014:0,mouthWidth=(hurt?.65:happy?1.2:alert?.55:1)*f.width,mouthHeight=hurt?2.5:happy?1.6:alert?3:mood==='cast'?2:1;
+    const pose=f.expression||(f.expression={eye:f.baseEyeY,brow:0,lift:0,mouthWidth:f.width,mouthHeight:1});
+    const blend=1-Math.exp(-dt/(hurt?.065:alert?.11:.2));
+    pose.eye+=(lid-pose.eye)*blend;pose.brow+=(brow-pose.brow)*blend;pose.lift+=(lift-pose.lift)*blend;pose.mouthWidth+=(mouthWidth-pose.mouthWidth)*blend;pose.mouthHeight+=(mouthHeight-pose.mouthHeight)*blend;
+    for(let i=0;i<f.eyes.length;i++){const open=blink?.08:pose.eye;f.eyes[i].scale.y=open;f.whites[i].scale.y=open/f.baseEyeY*(f.eyeWhiteY||1);if(f.pupils?.[i])f.pupils[i].position.x=(focus?0:Math.sin(time*.7+f.phase)*.002);}
+    f.brows[0].rotation.z=pose.brow;
     f.brows[1].rotation.z=-f.brows[0].rotation.z;
-    for(const b of f.brows)b.position.y=(f.browY??(f.browY=b.position.y))+(alert?.025:tired?-.014:0);
-    f.mouth.scale.set((hurt?.65:happy?1.2:alert?.55:1)*f.width,hurt?2.5:happy?1.6:alert?3:talk?1.5+Math.sin(time*15)*.8:mood==='cast'?2:1,1);
+    for(const b of f.brows)b.position.y=(f.browY??(f.browY=b.position.y))+pose.lift;
+    f.mouth.scale.set(pose.mouthWidth,talk?1.5+Math.sin(time*15)*.8:pose.mouthHeight,1);
     for(let i=0;i<f.lids.length;i++){f.lids[i].scale.y=f.eyes[i].scale.y*.82;f.lids[i].rotation.z=focus?(i?-.12:.12):0;}
     for(let i=0;i<f.lips.length;i++){f.lips[i].scale.x=f.mouth.scale.x;f.lips[i].position.y=f.mouth.position.y+(i?-.006:.006)*f.mouth.scale.y;}
     f.teeth.position.z=f.mouth.position.z+.003;f.teeth.visible=happy;for(const c of f.cheeks)c.visible=!f.cat&&!hurt&&!tired;

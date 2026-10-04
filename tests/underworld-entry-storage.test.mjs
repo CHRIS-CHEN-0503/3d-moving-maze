@@ -7,7 +7,7 @@ const require=createRequire(import.meta.url),C=require('../story/story-core.js')
 const source=readFileSync(new URL('../story/tower-mode.js',import.meta.url),'utf8');
 // Exercise the actual private runtime functions, not a rewritten storage mock.
 function extract(name){const start=source.indexOf('  function '+name+'(');assert.ok(start>=0,name);const end=source.indexOf('\n  function ',start+1);assert.ok(end>start,name);return source.slice(start,end);}
-const coreCode=['readSave','surfaceClear','underworldIntro','startUnderworld','syncEngine','save','transact','reachExit','action','chooseProfession','handleAction'].map(extract).join('\n');
+const coreCode=['readSave','surfaceClear','underworldIntro','startUnderworld','syncEngine','save','transact','exitUnlocked','reachExit','action','chooseProfession','handleAction'].map(extract).join('\n');
 const SAVE='test-tower',SURFACE_CLEAR=SAVE+'_surface_clear_v1';
 function winner(){const r=C.newRun({seed:59,name:'舊旅人'});r.floor=1;r.floorsCleared=99;r.hp=19;r.status='won';r.chronicle=N.newChronicle(1);r.chronicle.clues.push('clue:heart');r.chronicle.ending='keeper';r.gearBag.push(C.createGear('pan',1,r.seed,'old-pan'));return C.validateSave(r);}
 function harness(current=winner(),surface=winner()){
@@ -18,6 +18,8 @@ function harness(current=winner(),surface=winner()){
     active:false,paused:false,pauseAt:0,floorStarted:false,saveFailed:false,exitDeclined:false,explorer:null,partyUI:null,lightingUI:null,cinema:null,
     text:String,prose:rows=>rows.join('\n'),floorLabel:floor=>floor<0?'地下第 '+(-floor)+' 層':'第 '+floor+' 層',
     modern:()=>!!context.run?.party?.loadouts,inDungeon:()=>false,
+    // Rendering is outside this storage harness; use the real text fallback.
+    playStorySequence:()=>false,
     dialog:(...args)=>dialogs.push(args),showToast:message=>messages.push(message),enter:()=>events.entered++,open:()=>events.opened++,revealHero:()=>events.revealed++,
     damageFeedback(){},refreshGear(){},updateHud(){},document:{getElementById:()=>({value:'舊旅人'})},
     window:{},performance:{now:()=>1000},G:{running:true,satiety:73,shovels:2,kites:1,whistles:3,shovelRechargeAt:5500,skillCoolUntil:2200,hWalls:[],vWalls:[]},

@@ -9,6 +9,26 @@
   const visualFamilies=new Set(Object.values(FAMILIES));
   const familyFor=skill=>ROBOT_FAMILIES[skill?.id]||(visualFamilies.has(skill?.presentation?.family)?skill.presentation.family:FAMILIES[skill?.effect]);
   const colorsFor=skill=>Array.isArray(skill?.presentation?.colors)&&skill.presentation.colors.length===2&&skill.presentation.colors.every(n=>Number.isInteger(n)&&n>=0&&n<=0xffffff)?skill.presentation.colors:THEMES[skill?.effect]||PALETTES[skill?.job]||PALETTES.swordsman;
+  // A readable onset, held identity and recovery, rather than every layer
+  // appearing at full brightness and disappearing together. No added draws.
+  const SIGNATURES=Object.freeze({
+    swordsman:Object.freeze({name:'刃光與碎金',attack:.045,peak:.2,ground:.17}),
+    mage:Object.freeze({name:'元素凝聚與爆發',attack:.1,peak:.3,ground:.21}),
+    scout:Object.freeze({name:'翠影與風羽',attack:.035,peak:.17,ground:.1}),
+    chef:Object.freeze({name:'暖霧與湯滴',attack:.14,peak:.35,ground:.14}),
+    healer:Object.freeze({name:'花瓣與復甦',attack:.18,peak:.48,ground:.17}),
+    smith:Object.freeze({name:'熔金與金屬火星',attack:.045,peak:.19,ground:.16}),
+    archer:Object.freeze({name:'葉羽與箭芒',attack:.055,peak:.23,ground:.11}),
+    robot:Object.freeze({name:'機械壓力與核心脈衝',attack:.065,peak:.22,ground:.18})
+  });
+  const signatureFor=skill=>SIGNATURES[skill?.job]||SIGNATURES.swordsman;
+  const smooth=n=>{const t=Math.max(0,Math.min(1,n));return t*t*(3-2*t);};
+  function envelope(t,signature,kind='body'){
+    if(kind==='charge')return .2+.65*smooth(t);
+    if(kind==='ground')return smooth(t/.12)*(1-smooth((t-.35)/.55));
+    if(kind==='spark')return smooth(t/.035)*(1-smooth((t-.2)/.6));
+    return smooth((t+.018)/signature.attack)*(1-smooth((t-signature.peak)/Math.max(.15,.95-signature.peak)));
+  }
   const PARTICLE_VERTEX=[
     'attribute vec3 velocity; attribute float seed; attribute float pointSize;',
     'uniform float age; uniform float duration; uniform float travel; uniform float flow;',
@@ -25,8 +45,9 @@
   const PARTICLE_FRAGMENT=[
     'varying vec3 tint;varying float fade;uniform float shape;',
     'void main(){vec2 p=(gl_PointCoord-.5)*2.;float d=length(p);float petal=abs(p.x)*1.3+abs(p.y)*.75;',
-    'float alpha=pow(max(0.,1.-mix(d,petal,shape)),1.65)*fade;if(alpha<.012)discard;',
-    'gl_FragColor=vec4(mix(tint,vec3(1.),pow(max(0.,1.-d),5.)*.75),alpha);}'
+    'float edge=pow(max(0.,1.-mix(d,petal,shape)),1.65);',
+    'float core=pow(max(0.,1.-d*2.8),2.);float alpha=edge*fade;if(alpha<.012)discard;',
+    'gl_FragColor=vec4(mix(tint,vec3(1.),core*.85),alpha);}'
   ].join('\n');
   function create(T,ctx){
     let effects=[],destroyed=false;
@@ -47,7 +68,7 @@
       if(destroyed||!at||!skill||!familyFor(skill)||ctx.visible&&!ctx.visible(at))return null;
       if(effects.length>=limit)dispose(effects.shift());
       const baseFamily=familyFor(skill),family=options.impact?(skill.job==='robot'?'mechanical_hit':['storm','thorns'].includes(baseFamily)?baseFamily:'hit'):options.stage==='charge'?'charge':options.stage==='land'?(skill.job==='robot'?'quake':baseFamily==='meteor'?'meteor':'burst'):baseFamily;
-      const colors=colorsFor(skill),group=new T.Group();group.name='skill-vfx-'+skill.id;group.position.set(at.x,.04,at.z);group.rotation.y=angle;
+      const colors=colorsFor(skill),signature=signatureFor(skill),group=new T.Group();group.name='skill-vfx-'+skill.id;group.userData.signature=signature.name;group.position.set(at.x,.04,at.z);group.rotation.y=angle;
       const total=family==='thorns'&&options.impact?3:family==='storm'?.92:family==='hit'?.42:family==='charge'||family==='meteor'?Math.min(4,Math.max(.1,Number(options.duration)||.85)):reduced?.65:['heal','shield','sun'].includes(family)?1.6:1.15;
       const parts=[],mats=[],count=reduced?2:4,power=skill.unique?1.18:1;
       function material(color,opacity=.8,map=null,sprite=false){const opts={color,transparent:true,opacity,depthWrite:false,blending:T.AdditiveBlending,toneMapped:false,...(map?{map}:{}),...(!sprite?{side:T.DoubleSide,forceSinglePass:true}:{})},m=sprite?new T.SpriteMaterial(opts):new T.MeshBasicMaterial(opts);m.userData.baseOpacity=opacity;mats.push(m);return m;}
@@ -60,7 +81,8 @@
         cloud.onBeforeRender=()=>{const u=particleMaterial.uniforms,p=cloud.userData.phase;for(const key of ['age','duration','flow','shape'])u[key].value=p[key];particleMaterial.uniformsNeedUpdate=true;};
         group.add(cloud);parts.push({m:cloud,mode:'particles'});return cloud;
       }
-      const ground=new T.Mesh(new T.PlaneGeometry(3.6,3.6),material(colors[1],.24,glow));ground.rotation.x=-Math.PI/2;ground.position.y=.008;group.add(ground);
+      const ground=new T.Mesh(new T.PlaneGeometry(3.6,3.6),material(colors[1],signature.ground,glow));ground.rotation.x=-Math.PI/2;ground.position.y=.008;ground.name='spell-contact-light';group.add(ground);
+      ground.material.userData.envelope='ground';
       if(['rocket_fist','twin_fist'].includes(family)){
         // A filled, forward-facing fist silhouette, not a generic magic orb.
         const n=family==='twin_fist'&&!reduced?2:1;
@@ -115,27 +137,38 @@
         for(let i=0;i<count;i++){const a=i*Math.PI*2/count,shard=solid(new T.ConeGeometry(.24,.9,5),Math.sin(a)*1.05,.34,Math.cos(a)*1.05,i%2,'grow',.8);shard.rotation.z=Math.sin(a)*.2;}soft(0,.4,0,2.3,1,'breathe');
       }else if(['smoke','steam'].includes(family)){
         for(let i=0;i<count;i++){const a=i*2.4;soft(Math.sin(a)*.65,.25+i*.13,Math.cos(a)*.65,1.55,1,'mist',false,mist);}
+        if(family==='steam'){const steam=group.children.filter(o=>o.isSprite);for(let i=0;i<steam.length;i++){steam[i].name='culinary-warmth-'+i;steam[i].material.userData.baseOpacity=.46;}}
       }else if(family==='arrow'){
         soft(0,1.08,.6,1.1,0,'breathe');const n=reduced?1:skill.effect==='volley'?3:2;
         for(let i=0;i<n;i++){const s=new T.Shape();s.moveTo(0,1.35);s.lineTo(.13,.85);s.lineTo(.045,.92);s.lineTo(.04,0);s.lineTo(.13,-.2);s.lineTo(0,-.12);s.lineTo(-.13,-.2);s.lineTo(-.04,0);s.lineTo(-.045,.92);s.lineTo(-.13,.85);s.closePath();const arrow=solid(new T.ShapeGeometry(s),.24*(i-(n-1)/2),1.12,.2,i%2,'flight',.9);arrow.rotation.x=Math.PI/2;arrow.rotation.z=(i-(n-1)/2)*-.2;arrow.scale.setScalar(skill.unique?1.4:1);}
       }else if(family==='cast'){
-        soft(0,1.12,.6,1.3,0,'breathe');for(let i=0;i<count;i++)soft(Math.sin(i*1.9)*.28,.95+i*.07,.4+i*.16,.4,i%2,'spark');
+        soft(0,1.12,.6,1.15,0,'breathe');
+        const core=solid(new T.IcosahedronGeometry(.19,1),0,1.12,.62,0,'flight',.86);core.name=skill.job==='healer'?'purifying-light-seed':skill.job==='smith'?'weak-point-rivet':'arcane-condensed-core';
+        if(skill.job==='smith'){core.scale.set(.5,.5,1.65);}else core.scale.set(1,1,1.4);
+        for(let i=0;i<(reduced?1:3);i++)soft(Math.sin(i*1.9)*.28,.95+i*.07,.4+i*.16,.4,i%2,'spark');
       }else if(['hit','burst','impact','forge'].includes(family)){
         soft(0,1.05,0,family==='burst'?2.4:1.7,0,'breathe');
-        for(let i=0;i<count;i++){const a=i*Math.PI*2/count,shard=solid(new T.OctahedronGeometry(family==='forge'?.085:.12),Math.sin(a)*.25,.95+Math.cos(a)*.2,Math.cos(a)*.25,i%2,'contact',.8);shard.scale.y=1.7;}
+        const bladeHit=family==='hit'&&['blade','daggers'].includes(options.weapon);
+        for(let i=0;i<count;i++){const a=i*Math.PI*2/count;
+          let shape;if(bladeHit){const crescent=new T.Shape();crescent.moveTo(-.44,0);crescent.quadraticCurveTo(0,.42,.44,.02);crescent.quadraticCurveTo(0,.15,-.44,0);shape=new T.ShapeGeometry(crescent,10);}else shape=new T.OctahedronGeometry(family==='forge'?.085:.12);
+          const shard=solid(shape,Math.sin(a)*.25,.95+Math.cos(a)*.2,Math.cos(a)*.25,i%2,'contact',.8);shard.scale.y=bladeHit?1:1.7;shard.rotation.z=bladeHit?a:0;shard.name=bladeHit?'blade-contact-fragment':'impact-metal-spark';}
       }else if(['heal','cleanse'].includes(family)){
         soft(0,1.22,0,2.1,1,'breathe');const s=new T.Shape();s.moveTo(-.12,.46);s.lineTo(.12,.46);s.lineTo(.12,.12);s.lineTo(.46,.12);s.lineTo(.46,-.12);s.lineTo(.12,-.12);s.lineTo(.12,-.46);s.lineTo(-.12,-.46);s.lineTo(-.12,-.12);s.lineTo(-.46,-.12);s.lineTo(-.46,.12);s.lineTo(-.12,.12);s.closePath();const blessing=solid(new T.ShapeGeometry(s),0,1.65,.16,0,'rise',.7);blessing.name='restorative-blessing';
-        for(let i=0;i<(reduced?1:3);i++){const a=i*Math.PI*2/3;soft(Math.sin(a)*.78,.2+i*.25,Math.cos(a)*.78,.55,i%2,'orbit',true);}
+        for(let i=0;i<(reduced?1:3);i++){const a=i*Math.PI*2/3;const petal=soft(Math.sin(a)*.78,.2+i*.25,Math.cos(a)*.78,.55,i%2,family==='cleanse'?'purify':'orbit',true);petal.name=family==='cleanse'?'cleansing-dispersal-petal':'restorative-rising-petal';}
       }else{
         soft(0,['sun','heal','cleanse'].includes(family)?1.65:.6,0,family==='sun'?2.2:1.6,0,'breathe');
         for(let i=0;i<count;i++){const a=i*Math.PI*2/count;soft(Math.sin(a)*.78,.15+i*.25,Math.cos(a)*.78,.6,i%2,['scan','wave'].includes(family)?'spark':'orbit',['heal','aura','cleanse'].includes(family));}
       }
       particles(family==='charge'?2:['shield','heal','aura','cleanse','thorns','sun','rebuild','lubricate'].includes(family)?1:['steam','smoke'].includes(family)?3:0,['heal','aura','thorns','arrow'].includes(family));
+      // Preserve authored squash/stretch set by each silhouette builder. The
+      // animation multiplies this final shape, not its pre-decoration scale.
+      for(const part of parts)if(part.scale)part.scale.copy(part.m.scale);
+      for(const part of parts)if(['contact','spark','electric'].includes(part.mode)&&part.m.material?.userData)part.m.material.userData.envelope='spark';
       group.scale.setScalar(power);ctx.world().add(group);
-      const f={group,total,left:total,parts,mats,family,at:{x:at.x,z:at.z},skill:skill.id};effects.push(f);return f;
+      const f={group,total,left:total,parts,mats,family,signature,at:{x:at.x,z:at.z},skill:skill.id};effects.push(f);return f;
     }
     function tick(dt){if(!Number.isFinite(dt)||dt<0)return;for(let i=effects.length-1;i>=0;i--){const f=effects[i];f.left-=dt;if(f.left<=0){dispose(f);effects.splice(i,1);continue;}if(ctx.visible)f.group.visible=ctx.visible(f.at);
-      const t=1-f.left/f.total,fade=Math.min(1,(1-t)*3),travel=reduced?.25:1;for(const m of f.mats)if(m.userData.baseOpacity!==undefined)m.opacity=m.userData.baseOpacity*fade;
+      const t=1-f.left/f.total,fade=envelope(t,f.signature),travel=reduced?.25:1;for(const m of f.mats)if(m.userData.baseOpacity!==undefined)m.opacity=m.userData.baseOpacity*envelope(t,f.signature,m.userData.envelope||(f.family==='charge'?'charge':'body'));
       for(const p of f.parts){const{m,base,mode,scale}=p;if(mode==='particles'){m.userData.phase.age=f.total-f.left;continue;}if(m.userData.filledShield)m.userData.opacity=fade;let size=1;
         if(mode==='rise')m.position.y=base.y+t*.85*travel;
         if(mode==='fall'){m.position.y=Math.max(.12,base.y-t*4.5);m.rotation.z+=dt*1.2*travel;}
@@ -144,6 +177,7 @@
         if(mode==='sweep'){m.rotation.z+=dt*3*travel;size=.7+t*.95;}
         if(mode==='whirl'){m.rotation.y+=dt*5.5*travel;size=.8+t*.4;}
         if(mode==='orbit'){const a=t*2*travel;m.position.x=base.x*Math.cos(a)-base.z*Math.sin(a);m.position.z=base.x*Math.sin(a)+base.z*Math.cos(a);m.position.y=base.y+t*.7;}
+        if(mode==='purify'){m.position.x=base.x*(1+t*1.7*travel);m.position.z=base.z*(1+t*1.7*travel);m.position.y=base.y+t*.95*travel;size=1-t*.65;}
         if(mode==='grow')size=.12+.88*Math.min(1,t*7);
         if(mode==='electric')size=.94+.06*Math.sin(t*Math.PI*3);
         if(mode==='splat'){size=1+t*.9;m.position.y=base.y-t*.5;}
@@ -158,5 +192,5 @@
     function destroy(){if(destroyed)return;reset();for(const map of [glow,petal,mist])map.dispose();particleMaterial.dispose();shieldMaterial?.dispose();destroyed=true;}
     return {emit,tick,reset,cancel,destroy,stats:()=>({groups:effects.length,max:limit,meshes:effects.reduce((n,f)=>n+f.group.children.length,0),particles:effects.reduce((n,f)=>n+f.parts.filter(p=>p.mode==='particles').reduce((s,p)=>s+p.m.geometry.attributes.position.count,0),0),textureBytes:destroyed?0:49152})};
   }
-  root.TowerSkillEffects={create,FAMILIES,THEMES,ROBOT_FAMILIES,familyFor,colorsFor};
+  root.TowerSkillEffects={create,FAMILIES,THEMES,ROBOT_FAMILIES,SIGNATURES,familyFor,colorsFor,signatureFor,envelope};
 })(globalThis);

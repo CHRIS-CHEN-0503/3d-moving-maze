@@ -32,6 +32,19 @@ test('連續錄音重用同一播放器，舊音檔的延遲回呼不能結束�
   first.onended();first.onerror();assert.equal(h.voice.status().speaking,true);assert.equal(h.spoken.length,0);
   h.audio[1].onended();assert.equal(h.voice.status().speaking,false);
 });
+test('演出嘴型只跟隨實際播放，下載等待、停止及舊回呼不假裝說話',()=>{
+  const h=catalogHarness();h.voice.announce('單人遊戲');const first=h.audio[0];
+  assert.equal(h.voice.status().speaking,true);assert.equal(h.voice.status().playing,false);assert.equal(h.voice.status().loadingAudio,true);
+  first.onplaying();assert.equal(h.voice.status().playing,true);assert.equal(h.voice.status().loadingAudio,false);
+  first.onwaiting();assert.equal(h.voice.status().playing,false);first.onplaying();assert.equal(h.voice.status().playing,true);
+  h.voice.announce('多人遊戲',true);first.onplaying();assert.equal(h.voice.status().playing,false);
+  h.audio[1].onplaying();h.voice.stop();h.audio[1].onplaying();assert.equal(h.voice.status().playing,false);
+});
+test('裝置語音開始、暫停與結束可驅動演出，取消後不再張嘴',()=>{
+  const h=harness();h.voice.announce('你好');const u=h.spoken[0];assert.equal(h.voice.status().playing,false);
+  u.onstart();assert.equal(h.voice.status().playing,true);u.onpause();assert.equal(h.voice.status().playing,false);u.onresume();assert.equal(h.voice.status().playing,true);
+  u.onend();assert.equal(h.voice.status().playing,false);h.voice.announce('新對話',true);h.voice.stop();h.spoken.at(-1).onstart();assert.equal(h.voice.status().playing,false);
+});
 test('下載卡住會備援，已開始播放或關閉語音會清除等待計時',()=>{
   const h=catalogHarness();h.voice.announce('單人遊戲');assert.equal(h.timers.size,1);
   [...h.timers.values()][0]();assert.equal(h.spoken[0].text,'單人遊戲');assert.equal(h.timers.size,0);

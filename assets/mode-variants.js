@@ -79,7 +79,7 @@
     if(!ensure())return null;const p=state.progress[b.id];if(!p)return null;let point=null;
     if(['race','classic'].includes(mode())&&!p.checkpoint)point=state.points[0];
     if(mode()==='treasure'&&state.sealed&&MP.treasure?.holder===b.id)point=state.points.slice().sort((a,c)=>solveMaze(worldToCell(b.x,b.z).x,worldToCell(b.x,b.z).y,a.cx,a.cy).length-solveMaze(worldToCell(b.x,b.z).x,worldToCell(b.x,b.z).y,c.cx,c.cy).length)[0];
-    if(mode()==='tag'&&MP.taggedId!==b.id&&p.score<150&&Date.now()>=p.cool){const ghost=position(MP.taggedId);if(!ghost||!C.near(b,ghost,8))point=state.points[p.bell%state.points.length];}
+    if(mode()==='tag'&&MP.taggedId!==b.id&&p.score<150&&Date.now()>=p.cool){const ghost=window.ClassicTactics?.invisible(MP.taggedId,now)?b.threatLastSeen:position(MP.taggedId);if(!ghost||!C.near(b,ghost,8))point=state.points[p.bell%state.points.length];}
     if(mode()==='ctf'){const v=window.CaptureFlag?.view?.(),team=v?.members[b.id]?.team,s=state.shortcut[team];if(s&&v.flag.holder!==b.id&&MP.order.indexOf(b.id)%4>=2&&Date.now()>=s.cool&&Date.now()>=s.until)point=state.points[team];}
     return point?{goal:{x:point.cx,y:point.cy},key:'variant:'+layout+':'+point.cx+','+point.cy}:null;
   }

@@ -70,6 +70,26 @@
   function inspect(run,revision=run.revision){return C().transaction(run,revision,n=>{const s=ensure(n),q=s?.chain;if(!q||q.status!=='active'||q.targetFloor!==n.floor||n.expedition?.active)return {ok:false,message:'這一層沒有等待查看的後續留言。'};q.status='ready';return {ok:true,message:'找到'+KINDS[q.kind].person+'的回條，可在任務頁領取答謝。',effect:{chainReady:true}};});}
   function settle(run,abandon=false,revision=run.revision){return C().transaction(run,revision,n=>{const s=ensure(n),q=s?.chain;if(!q||!['active','ready'].includes(q.status)||!abandon&&q.status!=='ready')return {ok:false,message:'目前沒有可處理的後續委託。'};q.status=abandon?'abandoned':'claimed';if(abandon)return {ok:true,message:'已放下這次後續委託，主線仍可繼續。'};n.coins=Math.min(999999,n.coins+12);if(q.kind==='forest')addIngredient(n,'mushroom',2);else if(q.kind==='workshop')n.party.journey.scrap=Math.min(99,n.party.journey.scrap+2);else{addIngredient(n,'herb',1);addIngredient(n,'nectar',1);}return {ok:true,message:KINDS[q.kind].reward,effect:{chainClaimed:q.id}};});}
   function brief(run){const q=run.adventure?.events?.chain;if(!q||['claimed','abandoned'].includes(q.status))return null;return {name:KINDS[q.kind].person+'的後續留言',copy:KINDS[q.kind].follow,next:q.status==='ready'?'回條已找到，點「領取答謝」。':'前往'+(q.targetFloor<0?'地下 B'+(-q.targetFloor):q.targetFloor+' 層')+'，靠近固定景觀查看留言。',...q};}
+  // Version one stored historical identities, not historical alternatives.
+  // Read back only what remains provable; never turn an absent choice into 1.
+  function recollections(run){
+    if(!run||!isFloor(run.floor)||!int(run.seed,1,0xffffffff)||run.adventure?.events===undefined)return [];
+    const state=validate(run.adventure.events,{floor:run.floor,seed:run.seed});if(!state)return [];
+    const floorName=f=>f<0?'地下 '+(-f)+' 層':'第 '+f+' 層';
+    return state.history.slice(-6).reverse().map(id=>{
+      const [,rawFloor,,kind]=id.split(':'),floor=Number(rawFloor),event=KINDS[kind];
+      const choice=state.current?.id===id?state.current.choice:state.pending?.id===id?state.pending.choice:null;
+      const q=state.chain?.id===id?state.chain:null;
+      let status='已經歷',next='這段旅程已留下事件紀錄。';
+      if(q){
+        status={active:'後續待查',ready:'回條已找到',claimed:'答謝已領取',abandoned:'已放下後續'}[q.status];
+        next=q.status==='active'?'在'+floorName(q.targetFloor)+'的固定景觀旁查看'+event.person+'的留言。':q.status==='ready'?'回條已找到，可在任務頁領取答謝。':q.status==='claimed'?event.reward:'這次後續已放下；主線仍可繼續。';
+      }
+      const known=choice===0||choice===1;
+      const consequence=known?event.choices[choice].description:'當時的選項未保存在舊事件紀錄裡，不能由結果反推。';
+      return {id,floor,kind,title:event.name,choice,choiceLabel:known?event.choices[choice].label:'已經歷；選項未保存',consequence,next,status};
+    });
+  }
   function tick(run,dt){if(!Number.isFinite(dt)||dt<0)return;const b=run.adventure?.events?.benefit,l=run.adventure?.events?.lord;if(b?.left>0)b.left=Math.max(0,b.left-dt);if(l?.armed>0)l.armed=Math.max(0,l.armed-dt);}
   function senseScale(run){return run.adventure?.events?.benefit?.left>0?.7:1;}
   function lordState(run){return ensure(run)?.lord;}
@@ -82,5 +102,5 @@
   }
   function counter(run,index,revision=run.revision){return C().transaction(run,revision,n=>{const b=lordState(n);if(!b||b.phase!=='guarded'||!int(index,0,b.broken.length-1)||b.broken[index]||b.floor===60&&b.armed<=0)return {ok:false,message:'這處供能已停止，或還沒有完成場景反制。'};b.broken[index]=true;if(b.broken.every(Boolean)){b.phase='exposed';b.armed=0;}return {ok:true,message:b.phase==='exposed'?'樓主的護罩消退了，趁現在進攻！': '供能藤已斬斷，再找另一根。',effect:{lordExposed:b.phase==='exposed'}};});}
   function armCounter(run,revision=run.revision){return C().transaction(run,revision,n=>{const b=lordState(n);if(!b||b.floor!==60||b.phase!=='guarded')return {ok:false,message:'晶柱暫時不需要轉向。'};b.armed=8;return {ok:true,message:'晶柱已轉向，躲到後面引晶光擊中它！'};});}
-  return Object.freeze({KINDS,svg,fresh,validate,offer,ensure,choose,advance,inspect,settle,brief,tick,senseScale,lordState,limitLordDamage,counter,armCounter,nextFloor});
+  return Object.freeze({KINDS,svg,fresh,validate,offer,ensure,choose,advance,inspect,settle,brief,recollections,tick,senseScale,lordState,limitLordDamage,counter,armCounter,nextFloor});
 });

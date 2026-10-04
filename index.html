@@ -619,8 +619,8 @@ button:focus-visible,input:focus-visible{outline:3px solid #fff;outline-offset:3
 </style>
 <link rel="stylesheet" href="assets/game-polish.css?v=1.39.3">
 <link rel="stylesheet" href="assets/play-controls.css?v=1.55.0">
-<link rel="stylesheet" href="story/tower-party.css?v=1.55.0">
-<link rel="stylesheet" href="story/tower-cinematics.css?v=1.50.0">
+<link rel="stylesheet" href="story/tower-party.css?v=1.57.0">
+<link rel="stylesheet" href="story/tower-cinematics.css?v=1.57.0">
 <link rel="stylesheet" href="story/tower-cooperation.css?v=1.47.0">
 <link rel="stylesheet" href="story/tower-heroes.css?v=1.51.0">
 <link rel="stylesheet" href="story/tower-mobile.css?v=1.55.0">
@@ -982,7 +982,7 @@ button:focus-visible,input:focus-visible{outline:3px solid #fff;outline-offset:3
 
 <script src="./lib/three.min.js"></script>
 <script src="./assets/character-sculpt.js?v=1.54.0"></script>
-<script src="./assets/character-face.js?v=1.54.0"></script>
+<script src="./assets/character-face.js?v=1.57.0"></script>
 <script src="./assets/character-motion.js?v=1.51.0"></script>
 <script src="./assets/maze-atmosphere.js?v=1.44.0"></script>
 <script src="./assets/pickup-objects.js"></script>
@@ -999,10 +999,10 @@ button:focus-visible,input:focus-visible{outline:3px solid #fff;outline-offset:3
 <script src="./assets/role-voices.js?v=1.49.0"></script>
 <script src="./assets/character-voices.js?v=1.54.0"></script>
 <script src="story/tower-underworld.js?v=1.45.0"></script>
-<script src="story/tower-floor-lords.js?v=1.55.0"></script>
+<script src="story/tower-floor-lords.js?v=1.57.0"></script>
 <script src="./assets/voice-pack.js?v=1.49.0"></script>
 <script src="./assets/audio-settings.js?v=1.43.3"></script>
-<script src="./assets/game-voice.js?v=1.43.3"></script>
+<script src="./assets/game-voice.js?v=1.57.0"></script>
 <script src="./assets/maze-stone-audio.js?v=1.34.2"></script>
 <script src="./assets/combat-audio.js?v=1.54.0"></script>
 <script>
@@ -1011,7 +1011,7 @@ button:focus-visible,input:focus-visible{outline:3px solid #fff;outline-offset:3
    3D移動迷宮 — 給小朋友的變形迷宮冒險
    ===================================================== */
 const $=id=>document.getElementById(id);
-const GAME_VERSION='1.55.0';
+const GAME_VERSION='1.57.0';
 
 /* ---------- 設定（後台可調） ---------- */
 const DEFAULT_CFG={teamSize:2,shiftMin:3,itemCount:6,foodCount:4,hungerMin:3,stunSec:3,pingSec:3,smellCells:3,mazeSize:13,magicMap:0,duelMin:5,unpaidRate:100,musicOn:1,speechOn:1,speechVoice:'',apiUrl:'',roomMax:3,rounds:3,goodsCount:16,shopCollect:1,shopMin:2.5,cartFull:400,views:{fp:1,tp:1,top:1},broker:'wss://broker.emqx.io:8084/mqtt'};
@@ -1384,6 +1384,7 @@ const AudioEng={
    Three.js 場景
    ===================================================== */
 let renderer,scene,camera,wallMesh,floorMesh,exitGroup,playerGroup,envGroup,itemGroup,compass3D;
+let towerStairReveal=null;
 let previewRenderer,previewScene,previewCam,previewChar;
 const V3=THREE.Vector3;
 
@@ -1652,7 +1653,8 @@ function chooseStarts(n){
 function buildFloor(theme){
   if(floorMesh){disposeSceneObject(floorMesh);scene.remove(floorMesh);}
   const size=Math.max(G.mazeW,G.mazeH)*G.cell*3;
-  const geo=window.TowerMode?.active&&window.TowerStairs?TowerStairs.floor(THREE,size,cellToWorld(G.exitCell.x,G.exitCell.y)):new THREE.PlaneGeometry(size,size,1,1);
+  const stairAperture=!!(window.TowerMode?.active&&window.TowerStairs&&TowerMode.exitUnlocked());
+  const geo=stairAperture?TowerStairs.floor(THREE,size,cellToWorld(G.exitCell.x,G.exitCell.y)):new THREE.PlaneGeometry(size,size,1,1);
   const baseKind=theme.floorTex==='lava'?'rock':(theme.floorTex||'tile');
   const ft=makeTex(baseKind).clone(); ft.needsUpdate=true;
   ft.wrapS=ft.wrapT=THREE.RepeatWrapping; ft.repeat.set(size/8,size/8);
@@ -1665,11 +1667,13 @@ function buildFloor(theme){
     mat=new THREE.MeshLambertMaterial({color:theme.floor,map:ft});
   }
   floorMesh=new THREE.Mesh(geo,mat); floorMesh.rotation.x=-Math.PI/2; floorMesh.position.y=0;
+  floorMesh.userData.stairAperture=stairAperture;
   scene.add(floorMesh);
 }
 function buildExit(){
+  towerStairReveal?.dispose();towerStairReveal=null;
   if(exitGroup){disposeSceneObject(exitGroup);scene.remove(exitGroup);}
-  if(window.TowerMode?.active&&window.TowerStairs){exitGroup=TowerStairs.build(THREE);const p=cellToWorld(G.exitCell.x,G.exitCell.y);exitGroup.position.set(p.x,0,p.z);scene.add(exitGroup);return;}
+  if(window.TowerMode?.active&&window.TowerStairs){exitGroup=TowerStairs.build(THREE);const p=cellToWorld(G.exitCell.x,G.exitCell.y);exitGroup.position.set(p.x,0,p.z);scene.add(exitGroup);towerStairReveal=TowerStairs.createReveal(exitGroup,{reduced:matchMedia('(prefers-reduced-motion: reduce)').matches});towerStairReveal.setUnlocked(TowerMode.exitUnlocked(),{immediate:true});return;}
   exitGroup=new THREE.Group();
   const p=cellToWorld(G.exitCell.x,G.exitCell.y);
   const ringGeo=new THREE.TorusGeometry(1.1,0.14,10,28);
@@ -1682,6 +1686,18 @@ function buildExit(){
   exitGroup.position.set(p.x,0,p.z);
   exitGroup.userData.ring=ring;
   scene.add(exitGroup);
+}
+function updateTowerExit(dt){
+  if(!window.TowerMode?.active||!towerStairReveal||!floorMesh)return;
+  const unlocked=TowerMode.exitUnlocked();
+  if(unlocked&&!towerStairReveal.unlocked&&dt<=0)return;
+  if(floorMesh.userData.stairAperture!==unlocked){
+    const previous=floorMesh.geometry,size=Math.max(G.mazeW,G.mazeH)*G.cell*3;
+    floorMesh.geometry=unlocked?TowerStairs.floor(THREE,size,cellToWorld(G.exitCell.x,G.exitCell.y)):new THREE.PlaneGeometry(size,size,1,1);
+    floorMesh.userData.stairAperture=unlocked;previous.dispose();
+  }
+  if(towerStairReveal.setUnlocked(unlocked)&&unlocked)AudioEng.sfxShift();
+  towerStairReveal.frame(dt);
 }
 
 
@@ -2968,6 +2984,7 @@ function drawMap(cv,big){
   ctx.stroke();
   // 魔法地圖：金色路線
   if(performance.now()<G.mapUntil&&G.solutionPath&&G.solutionPath.length){
+    if(!window.TowerMode?.active||towerStairReveal?.unlocked){
     ctx.strokeStyle='#ffd54f'; ctx.lineWidth=big?6:3;
     ctx.beginPath();
     G.solutionPath.forEach(([x,y],i)=>{
@@ -2975,6 +2992,7 @@ function drawMap(cv,big){
       if(i===0)ctx.moveTo(px,py); else ctx.lineTo(px,py);
     });
     ctx.stroke();
+    }
     // 道具位置也顯示
     ctx.font=(big?18:9)+'px sans-serif'; ctx.textAlign='center';
     for(const it of G.items)if(!it.taken){
@@ -2994,7 +3012,7 @@ function drawMap(cv,big){
     ctx.textBaseline='alphabetic';
   };
   // 出口（搶購模式沒有出口就不畫）
-  if(!isShop()&&MP.mode!=='ctf')mark('🚩',G.exitCell.x,G.exitCell.y);
+  if(!isShop()&&MP.mode!=='ctf'&&(!window.TowerMode?.active||towerStairReveal?.unlocked))mark('🚩',G.exitCell.x,G.exitCell.y);
   if(window.TowerMode&&TowerMode.active&&TowerMode.mapMarkers){
     ctx.save();
     for(const m of TowerMode.mapMarkers()){
@@ -3187,6 +3205,7 @@ function nearRegister(x,z){
   let best=null,bd=1e9;
   for(const r of (G.registers||[])){
     const d=(r.x-x)**2+(r.z-z)**2;
+    if(window.GameplayRules&&!GameplayRules.clear({x,z},r,G.wallBoxes))continue;
     if(d<bd){bd=d;best=r;}
   }
   return best?{reg:best,dist:Math.sqrt(bd)}:null;
@@ -3210,7 +3229,7 @@ function updateCheckoutBtn(){
   $('coCnt').textContent='$'+(MP.carts[MP.id]||0);
 }
 function startCheckout(){
-  if(!isShop()||!MP.started||MP.ended||G.frozen)return;
+  if(!isShop()||!MP.started||MP.ended||G.frozen||G.shifting||performance.now()<G.stunnedUntil)return;
   if(isCheckingOut(MP.id))return;
   const near=nearRegister(G.px,G.pz);
   if(!near||near.dist>=CHECKOUT_RANGE){showToast('💳 要走到收銀機旁邊才能結帳',1400);return;}
@@ -3288,19 +3307,23 @@ function swingRob(){ // 搶奪動作：手往前抓一下
 function updateShopHud(){
   window.ShopCollection?.render();
   const on=isShop()&&MP.started&&!MP.ended;
-  refreshCarts();
   $('cartWrap').style.display=on?'':'none';
-  if(!on)return;
+  if(!on){updateShopHud._signature='';updateShopHud._cartRefs=null;return;}
+  const signature=[MP.seed,MP.seriesRound,G.startTime,matchRules().unpaidRate,JSON.stringify(MP.roster.map(r=>[r.id,MP.cartList[r.id]||[],MP.carts[r.id]||0,MP.banked[r.id]||0,MP.shopBonus?.[r.id]||0])),(G.goods||[]).filter(g=>g&&!g.taken).length,matchRules().cartFull].join('|');
+  const refs=[G.myCart,...MP.roster.map(r=>MP.players?.[r.id]?.cart)];
+  if(signature===updateShopHud._signature&&updateShopHud._cartRefs?.length===refs.length&&refs.every((r,i)=>r===updateShopHud._cartRefs[i]))return;
+  updateShopHud._signature=signature;updateShopHud._cartRefs=refs;refreshCarts();
   const cart=MP.carts[MP.id]||0, bank=MP.banked[MP.id]||0, mine=shopTotal(MP.id);
-  $('cartAmt').textContent='$'+mine;
+  const amount='$'+mine;if($('cartAmt').textContent!==amount)$('cartAmt').textContent=amount;
   const sorted=MP.roster.map(r=>({id:r.id,v:shopTotal(r.id)})).sort((a,b)=>b.v-a.v);
-  const rank=sorted.findIndex(x=>x.id===MP.id)+1;
-  const left=(G.goods||[]).filter(g=>!g.taken).length;
+  const rank=sorted.filter(r=>r.v>mine).length+1;
+  const left=(G.goods||[]).filter(g=>g&&!g.taken).length;
   const top=sorted[0];
   const load=Math.round(cartLoad(MP.id)*100);
   const wt=load>=100?'🐢滿了':(load>=75?'🐌重':(load>=50?'😮‍💨有點重':''));
-  $('cartRank').textContent='第'+rank+'名'+((top&&top.id!==MP.id)?('｜領先 $'+top.v):'')
+  const label='第'+rank+'名'+((top&&top.v>mine)?('｜差第一名 $'+(top.v-mine)):'')
     +'｜車上 $'+cart+'（'+load+'%'+(wt?' '+wt:'')+'）｜剩 '+left+' 件';
+  if($('cartRank').textContent!==label)$('cartRank').textContent=label;
 }
 
 /* =====================================================
@@ -3376,7 +3399,7 @@ function updateSmell(now){
    指南針
    ===================================================== */
 function updateCompass(){
-  const on=performance.now()<G.compassUntil;
+  const on=performance.now()<G.compassUntil&&(!window.TowerMode?.active||towerStairReveal?.unlocked);
   $('compassHud').style.display=on?'block':'none';
   if(!on){if(compass3D)compass3D.visible=false;return;}
   const goal=window.CaptureFlag&&MP.on&&MP.mode==='ctf'?CaptureFlag.goal():G.exitCell;
@@ -3519,8 +3542,9 @@ function relocateExit(){
   G.exitCell={x:pick[0],y:pick[1]};
   if(exitGroup){const wp=cellToWorld(pick[0],pick[1]);exitGroup.position.set(wp.x,0,wp.z);}
   if(window.TowerMode?.active&&window.TowerStairs&&floorMesh){
-    const previous=floorMesh.geometry;
-    floorMesh.geometry=TowerStairs.floor(THREE,Math.max(W,H)*G.cell*3,cellToWorld(pick[0],pick[1]));
+    const previous=floorMesh.geometry,size=Math.max(W,H)*G.cell*3,unlocked=TowerMode.exitUnlocked();
+    floorMesh.geometry=unlocked?TowerStairs.floor(THREE,size,cellToWorld(pick[0],pick[1])):new THREE.PlaneGeometry(size,size,1,1);
+    floorMesh.userData.stairAperture=unlocked;towerStairReveal?.setUnlocked(unlocked,{immediate:true});
     previous.dispose();
   }
 }
@@ -3759,6 +3783,7 @@ function startGame(){
   const theme=isShop()?SHOP_THEME:LEVELS[G.lvlIdx];
   cancelSceneTransition();
   clearMazeAtmosphere();
+  towerStairReveal?.dispose();towerStairReveal=null;
   if(!scene)scene=new THREE.Scene();
   else{disposeSceneObject(scene);while(scene.children.length)scene.remove(scene.children[0]);}
   particles=[];
@@ -3864,6 +3889,7 @@ function loop(tms){
   const screenActive=$('gameScreen').classList.contains('active'),storyPaused=!!(window.TowerMode?.active&&TowerMode.paused);
   MazeQuality.frame(rawDt*1000,screenActive&&!storyPaused&&!document.hidden&&!G.shifting);
   if(!screenActive||document.hidden)return;
+  updateTowerExit(!storyPaused&&!window.TowerMode?.cinematicActive&&G.running&&!G.frozen&&!G.shifting?dt:0);
   if(window.TowerMode?.cinematicActive){TowerMode.cinematicFrame(dt);renderMaze();return;}
   if(storyPaused){if(tms-lastPausedRender>=80){lastPausedRender=tms;renderMaze();}return;}
   if(G.running&&!G.shifting){
@@ -4161,6 +4187,29 @@ function makeTextSprite(text){
   c.strokeStyle='rgba(0,0,0,.75)';c.lineWidth=7;c.strokeText(text,128,34,240);
   c.fillStyle='#fff';c.fillText(text,128,34,240);
   const sp=new THREE.Sprite(new THREE.SpriteMaterial({map:new THREE.CanvasTexture(cv),transparent:true,depthWrite:false}));
+  // Keep authored world scale and sight visibility. Only the GPU billboard
+  // shrinks near the lens; one reusable viewport record serves every label.
+  const guard=makeTextSprite.screenGuard||(makeTextSprite.screenGuard={size:new THREE.Vector2(),limits:new THREE.Vector2(1,1)});
+  sp.material.userData.worldNameplate=true;
+  sp.material.customProgramCacheKey=()=> 'world-nameplate-screen-cap-v1';
+  sp.material.onBeforeCompile=shader=>{
+    shader.uniforms.worldLabelLimits={value:guard.limits};
+    shader.vertexShader=shader.vertexShader.replace('#include <common>','#include <common>\nuniform vec2 worldLabelLimits;\nvarying float worldLabelFade;').replace('vec2 alignedPosition =',[
+      'vec4 worldLabelClip = projectionMatrix * mvPosition;',
+      'float worldLabelW = max(abs(worldLabelClip.w), 0.0001);',
+      'vec2 worldLabelCenter = worldLabelClip.xy / worldLabelW;',
+      'worldLabelFade = worldLabelClip.w > 0.0 ? 1.0 - smoothstep(0.88, 1.0, max(abs(worldLabelCenter.x), abs(worldLabelCenter.y))) : 0.0;',
+      'vec2 worldLabelSize = vec2(abs(cos(rotation))*scale.x + abs(sin(rotation))*scale.y, abs(sin(rotation))*scale.x + abs(cos(rotation))*scale.y);',
+      'worldLabelSize *= vec2(abs(projectionMatrix[0][0]), abs(projectionMatrix[1][1])) / worldLabelW;',
+      'scale *= min(1.0, min(worldLabelLimits.x / max(worldLabelSize.x, 0.0001), worldLabelLimits.y / max(worldLabelSize.y, 0.0001)));',
+      'vec2 alignedPosition ='
+    ].join('\n'));
+    shader.fragmentShader=shader.fragmentShader.replace('#include <common>','#include <common>\nvarying float worldLabelFade;').replace('vec4 diffuseColor = vec4( diffuse, opacity );','vec4 diffuseColor = vec4( diffuse, opacity * worldLabelFade );');
+  };
+  sp.onBeforeRender=renderer=>{
+    renderer.getSize(guard.size);const w=Math.max(1,guard.size.x),h=Math.max(1,guard.size.y);
+    guard.limits.set(2*Math.min(w*.36,240)/w,2*Math.max(36,Math.min(44,h*.11))/h);
+  };
   sp.scale.set(2.6,0.65,1);
   return sp;
 }
@@ -4361,7 +4410,8 @@ function mpHandle(m){
         G.roundEndsAt=performance.now()+MP.roundMs;
         if(MP.taggedId){ // 公告初始鬼並讓他定住 3 秒
           MP.tagImmuneUntil=performance.now()+3000;
-          setTimeout(()=>announceTag(mpName(MP.taggedId),genderOf(MP.taggedId)),600);
+          const tagRoundStart=G.startTime,tagSeed=MP.seed,tagSeries=MP.seriesRound;
+          setTimeout(()=>{if(MP.on&&MP.started&&!MP.ended&&MP.mode==='tag'&&G.startTime===tagRoundStart&&MP.seed===tagSeed&&MP.seriesRound===tagSeries)announceTag(mpName(MP.taggedId),genderOf(MP.taggedId));},600);
           if(MP.taggedId===MP.id){
             G.stunnedUntil=Math.max(G.stunnedUntil,performance.now()+3000);
             if(MP.itPower==='shovel')grantShovelKit(true);
@@ -4509,7 +4559,10 @@ function mpHandle(m){
       break;}
     case 'costart':
       if(!MP.started||MP.mode!=='shop'||MP.ended)break;
-      MP.coUntil[m.f]=now+(m.ms||CHECKOUT_MS);
+      if(!MP.roster.some(r=>r.id===m.f&&!r.disconnected)||m.ms!==CHECKOUT_MS)break;
+      if(MP.host){const p=botPosOf(m.f),near=p&&nearRegister(p.x,p.z);if(G.shifting||!p||!near||near.dist>=CHECKOUT_RANGE+.3||!(MP.carts[m.f]||0))break;}
+      if(now<(MP.coUntil[m.f]||0))break; // A duplicate start never extends the protected wait.
+      MP.coUntil[m.f]=now+CHECKOUT_MS;
       if(m.f!==MP.id)showToast('💳 '+mpName(m.f)+' 正在結帳…',1400);
       break;
     case 'coend':
@@ -4805,7 +4858,7 @@ function shopRestock(now){
     mpSend({t:'restock',i,gi:window.ShopCollection?.goodForSlot(i,randomGood)??randomGood,cx,cy,round:MP.round});
   }
 }
-/* 🛒 搶購 AI：走去最近還沒被撿的商品；經過別人身邊偶爾也會搶一件 */
+/* 🛒 搶購 AI：依通路挑商品與收銀機；經過別人身邊偶爾也會搶一件 */
 function botSimShop(dt,now){
   for(const b of MP.bots){
     if(now<(b.stunnedUntil||0))continue;
@@ -4818,10 +4871,9 @@ function botSimShop(dt,now){
     const spd=loadSpeed(cartLoad(b.id))*(window.ShopChaos?ShopChaos.speed(b.id):1);
     // 車太重就先去結帳，結完再繼續買
     if(!b.coPending&&(cartLoad(b.id)>=0.6||window.ShopCollection?.ready(b.id)||(G.roundEndsAt-now<15000&&(MP.carts[b.id]||0)>0))&&(G.registers||[]).length){
-      let best=null,bd=1e9;
-      for(const r of G.registers){const d=(r.x-b.x)**2+(r.z-b.z)**2;if(d<bd){bd=d;best=r;}}
+      const best=window.ClassicTactics?ClassicTactics.nearest(b,G.registers,r=>({x:r.cx,y:r.cy}),()=>1,now):G.registers.slice().sort((a,c)=>Math.hypot(a.x-b.x,a.z-b.z)-Math.hypot(c.x-b.x,c.z-b.z))[0];
       if(best){
-        if(bd<CHECKOUT_RANGE*CHECKOUT_RANGE){
+        if(Math.hypot(best.x-b.x,best.z-b.z)<CHECKOUT_RANGE&&(!window.GameplayRules||GameplayRules.clear(b,best,G.wallBoxes))){
           b.coPending=true; b.coUntil=now+CHECKOUT_MS; b.path=null;
           mpSend({t:'costart',f:b.id,ms:CHECKOUT_MS});
         }else botWalk(b,{x:best.cx,y:best.cy},'reg'+best.cx+','+best.cy,dt,now,spd);
@@ -4831,15 +4883,13 @@ function botSimShop(dt,now){
     botTryRob(b,now);
     if(window.ShopSale?.collectForBot(b,dt,now,spd))continue;
     if(window.ShopChaos?.collectForBot(b,dt,now,spd))continue;
-    let best=null,bd=1e9,bi=-1;
-    (G.goods||[]).forEach((gd,i)=>{
-      if(!gd||gd.taken)return;
-      const d=((gd.x-b.x)**2+(gd.z-b.z)**2)*(window.ShopCollection?.needed(b.id,gd.gi) ? 0.35 : 1);
-      if(d<bd){bd=d;best=gd;bi=i;}
-    });
+    let best=null,bi=-1;
+    const candidates=(G.goods||[]).map((good,index)=>({good,index})).filter(r=>r.good&&!r.good.taken);
+    if(window.ClassicTactics){const pick=ClassicTactics.nearest(b,candidates,r=>({x:r.good.cx,y:r.good.cy}),r=>window.ShopCollection?.needed(b.id,r.good.gi)?.55:1,now);if(pick){best=pick.good;bi=pick.index;}}
+    else{let distance=Infinity;for(const r of candidates){const d=Math.hypot(r.good.x-b.x,r.good.z-b.z)*(window.ShopCollection?.needed(b.id,r.good.gi)?.55:1);if(d<distance){distance=d;best=r.good;bi=r.index;}}}
     if(!best)continue;
     const c=worldToCell(best.x,best.z);
-    botWalk(b,c,'g'+bi,dt,now,spd);
+    botWalk(b,c,'g'+bi+':'+best.spawnSerial,dt,now,spd);
     if((best.x-b.x)**2+(best.z-b.z)**2<1.4){ // 撿到（裝進購物車要花點時間，才不會把貨架掃光）
       if(window.ShopClaims){if(ShopClaims.request(b.id,bi)){b.stunnedUntil=now+1400;b.path=null;}continue;}
       best.taken=true; best.backAt=now+SHOP_RESTOCK_MS; best.sprite.visible=false; best.tag.visible=false;
@@ -4850,28 +4900,34 @@ function botSimShop(dt,now){
     }
   }
 }
-/* 鬼抓人 AI：當鬼→追最近的人；不是鬼→往離鬼最遠的角落逃 */
+/* 鬼抓人 AI：依迷宮通路追逐／選逃跑方向；隱身後只搜尋最後看見位置 */
 function botSimTag(dt,now){
   for(const b of MP.bots){
     if(now<(b.stunnedUntil||0))continue; // 暈眩中不能動
     if(MP.taggedId===b.id){
       const valid=id=>{
         if(id===b.id)return false;
+        if(MP.roster.find(r=>r.id===id)?.disconnected)return false;
         if(id===MP.prevIt&&now<(MP.prevItUntil||0)&&MP.roster.length>2)return false; // 防乒乓
         return true;
       };
       // 鎖定一個目標追 5 秒（每一幀換目標會在兩人之間搖擺，永遠追不到）
       if(!b.chaseId||!valid(b.chaseId)||now>(b.chaseUntil||0)){
-        let best=null,bd=1e9;
+        let best=null,bd=1e9;const targets=[];
         for(const r of MP.roster){
           if(!valid(r.id))continue;
+          if(window.ClassicTactics?.invisible(r.id,now))continue;
           const p2=botPosOf(r.id); if(!p2)continue;
-          const d=(p2.x-b.x)**2+(p2.z-b.z)**2;
-          if(d<bd){bd=d;best=r.id;}
+          targets.push({id:r.id,p:p2,cell:worldToCell(p2.x,p2.z)});
+          if(!window.ClassicTactics){const d=(p2.x-b.x)**2+(p2.z-b.z)**2;if(d<bd){bd=d;best=r.id;}}
         }
+        if(window.ClassicTactics)best=ClassicTactics.nearest(b,targets,r=>r.cell,()=>1,now)?.id||null;
         b.chaseId=best; b.chaseUntil=now+5000;
+        b.chaseLastSeen=null;
       }
-      const bpos=b.chaseId?botPosOf(b.chaseId):null;
+      const visible=b.chaseId&&!window.ClassicTactics?.invisible(b.chaseId,now);
+      if(visible){const seen=botPosOf(b.chaseId);if(seen)b.chaseLastSeen={...seen};}
+      const bpos=b.chaseLastSeen;
       if(bpos){
         const c=worldToCell(bpos.x,bpos.z);
         botWalk(b,c,'c'+c.x+','+c.y,dt,now,MP.itPower==='speed'?1.288:1.15); // 鬼＝1.15 倍速（疾風能力再 ×1.12）
@@ -4889,15 +4945,18 @@ function botSimTag(dt,now){
         }
       }
     }else{
-      const ip=botPosOf(MP.taggedId); if(!ip)continue;
+      if(b.threatId!==MP.taggedId){b.threatId=MP.taggedId;b.threatLastSeen=null;b.fleeGoal=null;}
+      if(!window.ClassicTactics?.invisible(MP.taggedId,now)){const seen=botPosOf(MP.taggedId);if(seen)b.threatLastSeen={...seen};}
+      const ip=b.threatLastSeen;if(!ip)continue;
       const dNow=(ip.x-b.x)**2+(ip.z-b.z)**2;
-      if(!b.fleeGoal||now>(b.fleeAt||0)||dNow<36){ // 鬼靠近就馬上換逃跑路線
-        b.fleeAt=now+2500;
+      if(!b.fleeGoal||now>(b.fleeAt||0)){ // Near threats reconsider at a bounded rate, not every frame.
+        b.fleeAt=now+(dNow<36?750:2500);
         const ic=worldToCell(ip.x,ip.z), W=G.mazeW,H=G.mazeH;
         const cands=[[1,1],[W-2,1],[1,H-2],[W-2,H-2],[W>>1,1],[1,H>>1],[W-2,H>>1],[W>>1,H-2]];
-        let bestC=cands[0],bd2=-1;
-        for(const c of cands){const d=Math.abs(c[0]-ic.x)+Math.abs(c[1]-ic.y);if(d>bd2){bd2=d;bestC=c;}}
-        b.fleeGoal={x:bestC[0],y:bestC[1]};
+        let bestC=null;
+        if(window.ClassicTactics)bestC=ClassicTactics.escape(b,ip,cands.map(c=>({x:c[0],y:c[1]})),now);
+        else{let distance=-1;for(const c of cands){const d=Math.abs(c[0]-ic.x)+Math.abs(c[1]-ic.y);if(d>distance){distance=d;bestC={x:c[0],y:c[1]};}}}
+        b.fleeGoal=bestC||worldToCell(b.x,b.z);
       }
       botWalk(b,b.fleeGoal,'f'+b.fleeGoal.x+','+b.fleeGoal.y,dt,now,1);
     }
@@ -5053,6 +5112,7 @@ function mpRenderLobby(){
   }
 }
 function mpLeave(){
+  clearTimeout($('tagAnnounce')._tm);$('tagAnnounce').style.display='none';
   window.ShopCollection?.reset();
   if(window.CaptureFlag)CaptureFlag.stop();
   try{mpSend({t:'bye'});}catch(e){}
@@ -5173,19 +5233,19 @@ window.addEventListener('pagehide',()=>{AudioEng.shiftSound?.stop();AudioEng.com
 <script src="story/tower-robot-core.js?v=1.55.0"></script>
 <script src="story/tower-ascension-catalog.js?v=1.54.0"></script>
 <script src="story/tower-gear-tiers.js?v=1.54.0"></script>
-<script src="story/tower-hero-growth.js?v=1.55.0"></script>
+<script src="story/tower-hero-growth.js?v=1.57.0"></script>
 <script src="story/tower-heroes-core.js?v=1.55.0"></script>
 <script src="story/tower-heroes-icons.js?v=1.54.0"></script>
 <script src="story/tower-combat-motion.js?v=1.54.0"></script>
 <script src="story/tower-menu-voice.js?v=1.42.4"></script>
 <script src="assets/equipment-surfaces.js?v=1.51.0"></script>
 <script src="story/tower-heroes-visuals.js?v=1.54.0"></script>
-<script src="story/tower-skill-effects.js?v=1.54.0"></script>
-<script src="story/tower-growth-runtime.js?v=1.54.0"></script>
+<script src="story/tower-skill-effects.js?v=1.57.0"></script>
+<script src="story/tower-growth-runtime.js?v=1.57.0"></script>
 <script src="story/tower-team-tactics.js?v=1.42.6"></script>
 <script src="story/tower-combat-intent.js?v=1.43.3"></script>
 <script src="story/tower-equipment-compare.js?v=1.44.0"></script>
-<script src="story/tower-heroes-runtime.js?v=1.55.0"></script>
+<script src="story/tower-heroes-runtime.js?v=1.57.0"></script>
 <script src="story/tower-cooperation-core.js?v=1.55.0"></script>
 <script src="story/tower-cooperation-runtime.js?v=1.55.0"></script>
 <script src="story/story-core.js?v=1.55.0"></script>
@@ -5202,7 +5262,7 @@ window.addEventListener('pagehide',()=>{AudioEng.shiftSound?.stop();AudioEng.com
 <script src="story/tower-loot.js?v=1.55.0"></script>
 <script src="story/tower-foraging.js?v=1.55.0"></script>
 <script src="story/tower-reinforcements.js?v=1.48.0"></script>
-<script src="story/tower-stairs.js?v=1.43.3"></script>
+<script src="story/tower-stairs.js?v=1.57.0"></script>
 <script src="story/tower-monster-sense.js?v=1.44.0"></script>
 <script src="story/tower-party-core.js?v=1.55.0"></script>
 <script src="story/tower-commission-cooking.js?v=1.54.0"></script>
@@ -5210,17 +5270,22 @@ window.addEventListener('pagehide',()=>{AudioEng.shiftSound?.stop();AudioEng.com
 <script src="story/tower-resource-icons.js?v=1.48.0"></script>
 <script src="story/tower-forge-icons.js?v=1.47.0"></script>
 <script src="story/tower-compact-help.js?v=1.54.0"></script>
-<script src="story/tower-party-runtime.js?v=1.55.0"></script>
+<script src="story/tower-party-runtime.js?v=1.57.0"></script>
 <script src="story/tower-lighting-runtime.js?v=1.54.2"></script>
 <script src="story/tower-encounter-alert.js?v=1.42.5"></script>
-<script src="story/tower-combat-readability.js?v=1.44.0"></script>
+<script src="story/tower-combat-readability.js?v=1.57.0"></script>
 <script src="story/tower-field-guide.js?v=1.55.0"></script>
 <script src="story/tower-creature-art.js?v=1.44.0"></script>
-<script src="story/tower-cinematics.js?v=1.50.0"></script>
+<script src="story/tower-cinematic-actors.js?v=1.57.0"></script>
+<script src="story/tower-cinematic-look.js?v=1.57.0"></script>
+<script src="story/tower-story-theater.js?v=1.57.0"></script>
+<script src="story/tower-cinematics.js?v=1.57.0"></script>
 <script src="story/tower-affixes.js?v=1.55.0"></script>
 <script src="story/tower-landmarks.js?v=1.55.0"></script>
-<script src="story/tower-adventure-events.js?v=1.55.0"></script>
-<script src="story/tower-mode.js?v=1.55.0"></script>
+<script src="story/tower-adventure-events.js?v=1.57.0"></script>
+<script src="story/tower-story-insights.js?v=1.57.0"></script>
+<script src="story/tower-environment-life.js?v=1.57.0"></script>
+<script src="story/tower-mode.js?v=1.57.0"></script>
 <script src="assets/room-lifecycle.js?v=1.55.0"></script>
 <script src="assets/shop-collection-core.js?v=1.55.0"></script>
 <script src="assets/shop-collection.js?v=1.55.0"></script>
@@ -5228,9 +5293,11 @@ window.addEventListener('pagehide',()=>{AudioEng.shiftSound?.stop();AudioEng.com
 <script src="assets/shop-sale.js?v=1.33.0"></script>
 <script src="assets/tag-rage.js"></script>
 <script src="assets/shop-claims-core.js?v=1.55.0"></script>
-<script src="assets/shop-claims.js?v=1.55.0"></script>
+<script src="assets/shop-claims.js?v=1.57.0"></script>
 <script src="assets/mode-variants-core.js?v=1.55.0"></script>
-<script src="assets/mode-variants.js?v=1.55.0"></script>
+<script src="assets/mode-variants.js?v=1.57.0"></script>
+<script src="assets/classic-tactics-core.js?v=1.57.0"></script>
+<script src="assets/classic-tactics.js?v=1.57.0"></script>
 <script src="assets/battle-dock.js?v=1.44.0"></script>
 <script src="assets/mobile-controls.js?v=1.42.1"></script>
 </body>

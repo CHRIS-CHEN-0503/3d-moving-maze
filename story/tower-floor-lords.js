@@ -51,22 +51,30 @@
     const add=(geo,color,x,y,z,glow=false)=>{const o=new T.Mesh(geo,mat(color,glow));o.position.set(x,y,z);body.add(o);return o;};
     const orb=(color,x,y,z,w,h=w,depth=w)=>{const o=add(new T.SphereGeometry(1,10,8),color,x,y,z);o.scale.set(w,h,depth);return o;};
     const plate=(w,h,zDepth,color,x,y,z)=>add(new T.BoxGeometry(w,h,zDepth),color,x,y,z);
-    orb(d.color,0,.25,0,.6,.72,.43);orb(d.color,0,1.12,.03,.41,.4,.34);
-    for(const side of [-1,1]){orb(d.color,side*.69,.25,0,.2,.5,.22);orb(d.color,side*.32,-.65,0,.22,.48,.25);add(new T.SphereGeometry(.055,8,6),d.accent,side*.15,1.18,.35,true);}
-    plate(.18,.05,.025,0x26313b,0,1.01,.375);
+    // Articulate the existing sculpture, not a second cutscene model. Reparent
+    // every ornament with its body part while preserving its authored position.
+    const joint=(name,x,y,z)=>{const g=new T.Group();g.name='cinema-'+name;g.position.set(x,y,z);body.add(g);return g;};
+    const head=joint('head',0,1.12,.03),torso=joint('torso',0,.25,0);
+    const arms=[joint('arm-left',.69,.7,0),joint('arm-right',-.69,.7,0)];
+    const legs=[joint('leg-left',.32,-.25,0),joint('leg-right',-.32,-.25,0)];
+    const mount=(mesh,g)=>{mesh.position.sub(g.position);g.add(mesh);return mesh;};
+    const arm=side=>arms[side>0?0:1],leg=side=>legs[side>0?0:1],eyes=[];
+    mount(orb(d.color,0,.25,0,.6,.72,.43),torso);mount(orb(d.color,0,1.12,.03,.41,.4,.34),head);
+    for(const side of [-1,1]){mount(orb(d.color,side*.69,.25,0,.2,.5,.22),arm(side));mount(orb(d.color,side*.32,-.65,0,.22,.48,.25),leg(side));eyes.push(mount(add(new T.SphereGeometry(.055,8,6),d.accent,side*.15,1.18,.35,true),head));}
+    const mouth=mount(plate(.18,.05,.025,0x26313b,0,1.01,.375),head);mouth.name='cinema-mouth';
     const env=d.environment;
-    if(['cloud','frost','heart'].includes(env)){for(const side of [-1,1]){const wing=plate(.7,.3,.15,d.accent,side*.75,.72,-.18);wing.rotation.z=side*.3;}add(new T.TorusGeometry(.42,.06,5,16),d.accent,0,1.17,-.06);}
-    if(env==='cloud'){orb(d.accent,-.82,.28,.23,.3,.4,.1);plate(.045,.85,.055,d.accent,.88,.44,.1);orb(d.accent,.88,.93,.1,.12,.15,.12);}
-    if(env==='frost'){for(const side of [-1,1])add(new T.OctahedronGeometry(.19),d.accent,side*.32,1.55,.02).scale.y=1.45;plate(.045,1.45,.045,d.accent,.86,.42,.1);add(new T.ConeGeometry(.11,.35,4),d.accent,.86,1.3,.1);}
-    if(['garden','roots'].includes(env)){for(let i=0;i<5;i++){const branch=add(new T.ConeGeometry(env==='roots'?.17:.12,.65,5),i%2?d.color:d.accent,(i-2)*.18,1.6,-.02);branch.rotation.z=(i-2)*.22;}for(const side of [-1,1]){const leaf=orb(d.accent,side*.7,.7,0,.2,.36,.1);leaf.rotation.z=side*.7;}}
-    if(env==='echo'){for(const side of [-1,1])add(new T.OctahedronGeometry(.28),d.accent,side*.6,.8,.05).scale.y=1.6;add(new T.OctahedronGeometry(.21),d.accent,0,.35,.45);}
-    if(env==='library'){plate(.8,.65,.14,d.accent,0,.16,.5);for(const side of [-1,1]){const cover=plate(.42,.68,.06,d.color,side*.22,.16,.61);cover.rotation.y=side*-.24;}plate(.85,.14,.75,d.color,0,1.56,.02);}
-    if(env==='mist'){const paddle=plate(.1,1.55,.09,d.accent,.9,.5,.1);paddle.rotation.z=-.3;plate(.35,.5,.12,d.color,1.12,-.2,.1);add(new T.ConeGeometry(.55,.36,8),d.accent,0,1.55,0);}
-    if(env==='clockwork'){for(const side of [-1,1]){const wheel=add(new T.TorusGeometry(.28,.08,5,12),d.accent,side*.58,.65,.02);wheel.rotation.y=Math.PI/2;}plate(.46,.46,.12,d.accent,.84,.25,.1);}
-    if(env==='furnace'){for(const side of [-1,1]){const horn=add(new T.ConeGeometry(.12,.48,5),d.accent,side*.34,1.52,0);horn.rotation.z=side*-.5;}orb(d.accent,0,.3,.43,.2,.28,.08);const hammer=plate(.7,.35,.36,d.color,.9,-.1,.1);plate(.1,.75,.1,d.accent,.9,.3,.1);hammer.rotation.z=.1;}
-    if(env==='heart')orb(d.accent,0,.4,.45,.22,.22,.1);
+    if(['cloud','frost','heart'].includes(env)){for(const side of [-1,1]){const wing=mount(plate(.7,.3,.15,d.accent,side*.75,.72,-.18),arm(side));wing.rotation.z=side*.3;}mount(add(new T.TorusGeometry(.42,.06,5,16),d.accent,0,1.17,-.06),head);}
+    if(env==='cloud'){mount(orb(d.accent,-.82,.28,.23,.3,.4,.1),arm(-1));mount(plate(.045,.85,.055,d.accent,.88,.44,.1),arm(1));mount(orb(d.accent,.88,.93,.1,.12,.15,.12),arm(1));}
+    if(env==='frost'){for(const side of [-1,1])mount(add(new T.OctahedronGeometry(.19),d.accent,side*.32,1.55,.02),head).scale.y=1.45;mount(plate(.045,1.45,.045,d.accent,.86,.42,.1),arm(1));mount(add(new T.ConeGeometry(.11,.35,4),d.accent,.86,1.3,.1),arm(1));}
+    if(['garden','roots'].includes(env)){for(let i=0;i<5;i++){const branch=mount(add(new T.ConeGeometry(env==='roots'?.17:.12,.65,5),i%2?d.color:d.accent,(i-2)*.18,1.6,-.02),head);branch.rotation.z=(i-2)*.22;}for(const side of [-1,1]){const leaf=mount(orb(d.accent,side*.7,.7,0,.2,.36,.1),arm(side));leaf.rotation.z=side*.7;}}
+    if(env==='echo'){for(const side of [-1,1])mount(add(new T.OctahedronGeometry(.28),d.accent,side*.6,.8,.05),arm(side)).scale.y=1.6;mount(add(new T.OctahedronGeometry(.21),d.accent,0,.35,.45),torso);}
+    if(env==='library'){mount(plate(.8,.65,.14,d.accent,0,.16,.5),torso);for(const side of [-1,1]){const cover=mount(plate(.42,.68,.06,d.color,side*.22,.16,.61),torso);cover.rotation.y=side*-.24;}mount(plate(.85,.14,.75,d.color,0,1.56,.02),head);}
+    if(env==='mist'){const paddle=mount(plate(.1,1.55,.09,d.accent,.9,.5,.1),arm(1));paddle.rotation.z=-.3;mount(plate(.35,.5,.12,d.color,1.12,-.2,.1),arm(1));mount(add(new T.ConeGeometry(.55,.36,8),d.accent,0,1.55,0),head);}
+    if(env==='clockwork'){for(const side of [-1,1]){const wheel=mount(add(new T.TorusGeometry(.28,.08,5,12),d.accent,side*.58,.65,.02),arm(side));wheel.rotation.y=Math.PI/2;}mount(plate(.46,.46,.12,d.accent,.84,.25,.1),arm(1));}
+    if(env==='furnace'){for(const side of [-1,1]){const horn=mount(add(new T.ConeGeometry(.12,.48,5),d.accent,side*.34,1.52,0),head);horn.rotation.z=side*-.5;}mount(orb(d.accent,0,.3,.43,.2,.28,.08),torso);const hammer=mount(plate(.7,.35,.36,d.color,.9,-.1,.1),arm(1));mount(plate(.1,.75,.1,d.accent,.9,.3,.1),arm(1));hammer.rotation.z=.1;}
+    if(env==='heart')mount(orb(d.accent,0,.4,.45,.22,.22,.1),torso);
     const ring=new T.Mesh(new T.RingGeometry(.7,1.05,24),new T.MeshBasicMaterial({color:0xd55668,transparent:true,opacity:.35,side:T.DoubleSide,depthWrite:false}));ring.rotation.x=-Math.PI/2;ring.position.y=.025;model.add(ring);
-    Object.assign(model.userData,{body,ring,accent:d.accent});return model;
+    Object.assign(model.userData,{body,ring,accent:d.accent,cinemaRig:{head,torso,arms,legs,mouth,eyes}});return model;
   }
   return Object.freeze({ID,UNDERWORLD_ID,LORDS,UNDERWORLD_LORDS,allLords,defs,forRun,spec,defeated,build,tracks:Object.freeze(tracks)});
 });

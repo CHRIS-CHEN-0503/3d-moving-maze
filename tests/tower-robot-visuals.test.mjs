@@ -18,7 +18,7 @@ test('male/female integrated robots have different proportions and faces, smooth
   assert.ok(names.includes('robot-rounded-pelvis'));assert.ok(names.includes('robot-seamless-cranium'));assert.ok(names.includes('robot-forward-knuckle'));assert.ok(names.includes('robot-flush-engraving'));
   assert.equal(names.some(n=>/hair|base-belt|skirt|shield|sword|hammer/.test(n)),false);
   assert.equal(m.userData.heroPieces.length,3);assert.equal(m.userData.heroPieces.filter(p=>p.userData.baseKind==='robot_fists').length,2);assert.equal(m.userData.hasShield,false);
-  assert.ok(m.userData.face.robot);const before=m.userData.face.brows[0].rotation.z;F.react(m,'focus',2);F.update(m,1);assert.notEqual(m.userData.face.brows[0].rotation.z,before);
+  assert.ok(m.userData.face.robot);F.update(m,.8);const before=m.userData.face.brows[0].rotation.z;F.react(m,'focus',2);F.update(m,1);assert.notEqual(m.userData.face.brows[0].rotation.z,before);
   for(const p of m.userData.heroPieces)assert.ok(p.userData.integratedRobotPart);m.updateMatrixWorld(true);assert.ok(new T.Box3().setFromObject(m).max.y<2.25);release(m);
  }
  const male=figure('male'),female=figure('female');assert.ok(new T.Box3().setFromObject(male).max.y>new T.Box3().setFromObject(female).max.y+.1);assert.notEqual(V.portrait('robot','male'),V.portrait('robot','female'));release(male);release(female);

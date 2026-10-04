@@ -9,7 +9,7 @@ function harness(floor=84,options={}){
   let run=P.enable(C.newRun({seed:31415}),'swordsman').run;run.floor=floor;run.floorsCleared=99-floor;run.chronicle=N.newChronicle(floor);P.advance(run);
   let paused=false,failSave=false,wall=false,swings=0,hits=0,world=new T.Group(),monsters=[],messages=[],dialog=null,followTargets=[],labels=[];
   const player=new T.Group(),G={px:0,pz:0,running:true,shifting:false};
-  const context=vm.createContext({TowerMaterials:Object.hasOwn(options,'materials')?options.materials:require('../story/tower-materials.js'),TowerResourceIcons:require('../story/tower-resource-icons.js'),TowerPartyCore:options.partyCore||P,TowerExpedition:require('../story/tower-expedition-core.js'),TowerCharacters:V,TowerMonsterSense:require('../story/tower-monster-sense.js'),TowerFieldGuide:Object.hasOwn(options,'fieldGuide')?options.fieldGuide:require('../story/tower-field-guide.js'),document:{getElementById:()=>null}});vm.runInContext(source,context);
+  const context=vm.createContext({TowerStoryInsights:options.insights,TowerMaterials:Object.hasOwn(options,'materials')?options.materials:require('../story/tower-materials.js'),TowerResourceIcons:require('../story/tower-resource-icons.js'),TowerPartyCore:options.partyCore||P,TowerExpedition:require('../story/tower-expedition-core.js'),TowerCharacters:V,TowerMonsterSense:require('../story/tower-monster-sense.js'),TowerFieldGuide:Object.hasOwn(options,'fieldGuide')?options.fieldGuide:require('../story/tower-field-guide.js'),document:{getElementById:()=>null}});vm.runInContext(source,context);
   let nextCell=1;
   const ui=context.TowerPartyRuntime.create({THREE:T,G,core:C,text:options.text||String,action:(label,key,id,disabled)=>`${label}|${key}|${id}|${disabled}`,dialog:(...args)=>dialog=args,
     transact:result=>{if(!result.ok||failSave)return false;run=result.run;return true;},save:()=>!failSave,toast:message=>messages.push(message),audio:{sfxHit:()=>hits++,sfxSwing(){},sfxUse(){},sfxGuardBlock(){}},quest(){},
@@ -21,16 +21,25 @@ function harness(floor=84,options={}){
   ui.build(()=>.5,new Set());
   return {ui,G,player,world,monsters,messages,followTargets,labels,get run(){return run;},set run(value){run=value;},get dialog(){return dialog;},get swings(){return swings;},get hits(){return hits;},set paused(v){paused=v;},set failSave(v){failSave=v;},set wall(v){wall=v;}};
 }
-test('bestiary keeps every creature in a closed compact card with actionable advice and no extra narration',()=>{
+test('fallback bestiary keeps every creature in a closed compact card with actionable advice and no extra narration',()=>{
   const h=harness(99),F=require('../story/tower-field-guide.js'),defs=P.defs(),before=JSON.stringify(h.run);
   h.ui.panel('bestiary');const body=h.dialog[3];
-  assert.equal((body.match(/<details\b/g)||[]).length,Object.keys(defs).length);
+  assert.equal((body.match(/class="tower-item tower-bestiary-card"/g)||[]).length,Object.keys(defs).length);
   assert.doesNotMatch(body,/<details[^>]*\bopen\b/);
   for(const def of Object.values(defs)){const guide=F.monster(def);assert.ok(body.includes(guide.role),def.id);assert.ok(body.includes(guide.tell),def.id);assert.ok(body.includes(guide.counter),def.id);}
   assert.equal(h.dialog[5].summary,'迷宮生物誌。了解怪物，收集材料。');assert.equal(h.messages.length,0);
   assert.equal(JSON.stringify(h.run),before);
   const fallback=harness(99,{fieldGuide:null});fallback.ui.panel('bestiary');
   assert.ok(fallback.dialog[3].includes(Object.values(defs)[0].description));
+});
+test('live bestiary keeps future guardians hidden and does not leak unread underground names via sensing metadata',()=>{
+  const I=require('../story/tower-story-insights.js'),h=harness(-40,{insights:I}),before=JSON.stringify(h.run);
+  h.ui.panel('bestiary');const body=h.dialog[3];
+  assert.match(body,/本環境可遇見/);assert.match(body,/章末守門者/);
+  assert.doesNotMatch(body,/璃安|燈火會熄滅/);
+  assert.ok(body.includes('data-monster="lord-underworld-furnace"'));
+  assert.ok(!body.includes('data-monster="lord-underworld-heart"'));
+  assert.equal(JSON.stringify(h.run),before);
 });
 test('bestiary escapes guide metadata, creature names and drop names before rendering',()=>{
   const text=value=>String(value).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));

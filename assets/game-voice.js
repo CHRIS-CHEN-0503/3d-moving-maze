@@ -38,7 +38,7 @@
     const speechSupported=!!(synth&&Utterance),AudioCtor=env.Audio,pack=env.MazeVoicePack;
     const recordedSupported=typeof AudioCtor==='function'&&!!pack?.get,supported=speechSupported||recordedSupported,now=()=>env.Date?.now?.()??Date.now();
     let enabled=true,preferred='',voices=[],queue=[],current=null,currentAudio=null,player=null,generation=0,lastStory=null,failure='',listener=()=>{},sequence=0,loadTimer=null,character=()=>({});
-    const recent=new Map(),pinnedVoices=new Map();let voiceTimer=null;
+    const recent=new Map(),pinnedVoices=new Map();let voiceTimer=null,voicePlaying=false;
     function characterSpeaker(){return {...character(),consistent:true};}
     function pinSpeaker(speaker){
       if(!speaker.consistent)return speaker;
@@ -48,13 +48,13 @@
       if(!pinnedVoices.has(key)&&chosen)pinnedVoices.set(key,chosen);
       return {...speaker,deviceOnly:true,pinnedVoice:pinnedVoices.get(key)||null};
     }
-    function status(){return {supported,enabled,speaking:!!(current||currentAudio),loadingVoice:voiceTimer!==null,voice:chooseVoice(voices,preferred),voices:voices.filter(v=>chooseVoice([v])),failure,recorded:recordedSupported};}
+    function status(){return {supported,enabled,speaking:!!(current||currentAudio),playing:voicePlaying,loadingAudio:!!currentAudio&&!voicePlaying,loadingVoice:voiceTimer!==null,voice:chooseVoice(voices,preferred),voices:voices.filter(v=>chooseVoice([v])),failure,recorded:recordedSupported};}
     function notify(){listener(status());}
     function clearLoadTimer(){if(loadTimer!==null){env.clearTimeout?.(loadTimer);loadTimer=null;}}
     function clearVoiceTimer(){if(voiceTimer!==null){env.clearTimeout?.(voiceTimer);voiceTimer=null;}}
     function refresh(){try{voices=synth?.getVoices()||[];}catch(_){voices=[];}if(chooseVoice(voices)){clearVoiceTimer();if(failure==='chinese-voice-unavailable')failure='';}notify();if(voiceTimer===null&&queue.length)next();}
     function stop(forget=false){
-      generation++;queue=[];current=null;clearLoadTimer();clearVoiceTimer();
+      generation++;queue=[];current=null;voicePlaying=false;clearLoadTimer();clearVoiceTimer();
       if(currentAudio){try{currentAudio.pause();currentAudio.currentTime=0;}catch(_){}currentAudio=null;}
       if(forget)lastStory=null;try{synth?.cancel();}catch(_){}notify();
     }
@@ -64,22 +64,22 @@
       const entry=queue.shift();if(!entry){notify();return;}
       if(entry.asset&&recordedSupported){
         // Reuse the user-activated media element; Safari permissions are per element.
-        const token=++generation,track=pack.get(entry.asset),audio=player||(player=new AudioCtor());currentAudio=audio;
+        const token=++generation,track=pack.get(entry.asset),audio=player||(player=new AudioCtor());currentAudio=audio;voicePlaying=false;
         audio.src=track.src;
         audio.preload='auto';audio.volume=1;
         audio.playbackRate=track.rate||1.16;audio.preservesPitch=true;
-        const finish=()=>{if(token!==generation||currentAudio!==audio)return;clearLoadTimer();currentAudio=null;next();};
+        const finish=()=>{if(token!==generation||currentAudio!==audio)return;clearLoadTimer();currentAudio=null;voicePlaying=false;next();};
         const fallback=()=>{
           if(token!==generation||currentAudio!==audio)return;
-          clearLoadTimer();try{audio.pause();}catch(_){}currentAudio=null;failure='recording-unavailable';
+          clearLoadTimer();try{audio.pause();}catch(_){}currentAudio=null;voicePlaying=false;failure='recording-unavailable';
           if(entry.group)queue=queue.filter(e=>e.group!==entry.group);
           // Never rematch a failed recording: use device speech once, then continue.
           queue.unshift(...chunks(entry.text).map(text=>({text,expires:entry.expires,eventGroup:entry.eventGroup,speaker:{...track,...entry.speaker}})));next();
         };
         audio.onended=finish;audio.onerror=fallback;
-        audio.onplaying=()=>{if(token===generation&&currentAudio===audio)clearLoadTimer();};
+        audio.onplaying=()=>{if(token===generation&&currentAudio===audio){voicePlaying=true;clearLoadTimer();notify();}};
         // A stalled download must not block every later voice event indefinitely.
-        const waiting=()=>{if(token===generation&&currentAudio===audio&&loadTimer===null&&env.setTimeout)loadTimer=env.setTimeout(fallback,8000);};
+        const waiting=()=>{if(token!==generation||currentAudio!==audio)return;voicePlaying=false;if(loadTimer===null&&env.setTimeout)loadTimer=env.setTimeout(fallback,8000);notify();};
         audio.onwaiting=waiting;audio.onstalled=waiting;waiting();
         try{audio.play()?.catch?.(fallback);notify();}catch(_){fallback();}return;
       }
@@ -92,10 +92,12 @@
         else{failure='chinese-voice-unavailable';next();notify();}return;
       }
       u.lang=voice?.lang||'zh-TW';if(voice)u.voice=voice;u.rate=1;u.pitch=profile.age==='elder'?.95:profile.age==='child'?1.06:1;u.volume=1;
-      current=u;
-      const finish=()=>{if(token!==generation||current!==u)return;current=null;next();};
-      u.onend=finish;u.onerror=e=>{if(token!==generation||current!==u)return;failure=e?.error||'unavailable';current=null;queue=[];notify();};
-      try{synth.speak(u);notify();}catch(_){failure='unavailable';current=null;queue=[];notify();}
+      current=u;voicePlaying=false;
+      const finish=()=>{if(token!==generation||current!==u)return;current=null;voicePlaying=false;next();};
+      const playing=value=>{if(token===generation&&current===u){voicePlaying=value;notify();}};
+      u.onstart=()=>playing(true);u.onresume=()=>playing(true);u.onpause=()=>playing(false);
+      u.onend=finish;u.onerror=e=>{if(token!==generation||current!==u)return;failure=e?.error||'unavailable';current=null;voicePlaying=false;queue=[];notify();};
+      try{synth.speak(u);notify();}catch(_){failure='unavailable';current=null;voicePlaying=false;queue=[];notify();}
     }
     function entriesFor(text,story,speaker={}){
       const recorded=speaker.consistent&&!speaker.npc&&recordedSupported&&pack.exact?.(text,speaker.gender);

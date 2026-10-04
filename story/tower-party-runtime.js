@@ -357,14 +357,17 @@
       }else if(kind==='bestiary'){
         copy='點開怪物，查看前兆、應對與可能掉落。';
         const dropNotes='<p>被選為討伐候選後，普通20%（四種常用食材'+(root.TowerLoot?.chance({type:'ingredient',key:'herb',rarity:'common'})??25)+'%）、少見12%、稀有6%、珍稀3%，不是每次都會掉落；落地需靠近拾取。</p>';
-        body=(ctx.help?.('討伐掉落規則',dropNotes)||dropNotes)+'<div class="tower-grid tower-bestiary">'+Object.entries(P.defs()).map(([id,m])=>{
-          const guide=root.TowerFieldGuide?.monster(m),sense=root.TowerMonsterSense?.profile(m);
-          const tactics=guide?'<p><b>前兆</b> '+esc(guide.tell)+'</p><p><b>應對</b> '+esc(guide.counter)+'</p>':'<p>'+esc(m.description)+'</p>';
-          const sensing=guide?'<p class="tower-bestiary-sense">察敵 '+esc(guide.range)+' 公尺 · '+esc(guide.personality)+'<br>'+esc(guide.sensing)+'</p>':sense?'<p>察敵 '+esc(sense.range)+' 公尺 · '+esc(sense.personality)+'</p>':'';
-          const materials=root.TowerMaterials,variant=materials?.ecology(run).variants[id],lord=id.startsWith('lord-');
+        const definitions=P.defs(),rows=root.TowerStoryInsights?.bestiary(run,definitions)||Object.entries(definitions).map(([id,m])=>({id,local:false,known:true,name:m.name,lore:root.TowerFieldGuide?.monster(m)?.lore||''}));
+        const card=row=>{const id=row.id,m=definitions[id];
+          const guide=root.TowerFieldGuide?.monster(m),sense=root.TowerMonsterSense?.profile(m),lord=id.startsWith('lord-'),unreadLord=lord&&row.storyKnown===false;
+          const tactics=guide?'<p><b>前兆</b> '+esc(guide.tell)+'</p><p><b>應對</b> '+esc(guide.counter)+'</p>':'<p>'+esc(unreadLord?'留意守門者的蓄力與攻擊前兆。':m.description)+'</p>';
+          const sensing=guide?'<p class="tower-bestiary-sense">察敵 '+esc(guide.range)+' 公尺 · '+esc(unreadLord?'章末守門者':guide.personality)+'<br>'+esc(guide.sensing)+'</p>':sense?'<p>察敵 '+esc(sense.range)+' 公尺 · '+esc(unreadLord?'章末守門者':sense.personality)+'</p>':'';
+          const materials=root.TowerMaterials,variant=materials?.ecology(run).variants[id];
           const drops=materials?lord?'補給物資':variant?materials.dropPool(run,{kind:id}).map(d=>esc((d.type==='material'?materials.MATERIALS:P.INGREDIENTS)[d.key])).join('、')||'補給物資':'本環境不出現此種怪物；換環境會有不同的食材與素材。':Object.keys(P.MONSTERS[id]?.drop||{shell:1}).map(k=>esc(P.INGREDIENTS[k]||k)).join('、');
-          return '<details class="tower-item tower-bestiary-card"><summary><strong>'+esc(variant?.name||m.name)+'</strong>'+(guide?'<span> · '+esc(guide.role)+'</span>':'')+'</summary><div class="tower-bestiary-notes">'+tactics+sensing+'<p>可能掉落：'+drops+(lord?'；另有50%機率掉裝備':'')+'</p>'+(variant?'<p>素材來自 '+esc(materials.ecology(run).name)+'，不是所有怪物都掉相同食材。</p>':'')+(guide?.gate?'<p>'+esc(guide.gate)+'</p>':'')+'</div></details>';
-        }).join('')+'</div>';
+          return '<details class="tower-item tower-bestiary-card" data-monster="'+esc(id)+'"><summary><strong>'+esc(row.name||variant?.name||m.name)+'</strong>'+(guide?'<span> · '+esc(guide.role)+'</span>':'')+'</summary><div class="tower-bestiary-notes">'+(row.lore?'<p class="bestiary-region">'+esc(row.lore)+'</p>':'')+tactics+sensing+'<p>可能掉落：'+drops+(lord?'；另有50%機率掉裝備':'')+'</p>'+(variant?'<p>素材來自 '+esc(materials.ecology(run).name)+'，不是所有怪物都掉相同食材。</p>':'')+(guide?.gate?'<p>'+esc(guide.gate)+'</p>':'')+'</div></details>';
+        };
+        const local=rows.filter(row=>row.local),known=rows.filter(row=>row.known&&!row.local),unseen=rows.filter(row=>!row.known).length;
+        body=(ctx.help?.('討伐掉落規則',dropNotes)||dropNotes)+'<h3>本環境可遇見</h3><p class="bestiary-region">'+esc(root.TowerMaterials?.ecology(run)?.name||'目前迷宮')+' · 生態名、可掉食材與戰術一起查看；實際出現仍由本層生成決定。</p><div class="tower-grid tower-bestiary">'+local.map(card).join('')+'</div><details class="tower-bestiary-archive"><summary>其他已知生物 · '+known.length+' 種</summary><div class="tower-grid tower-bestiary">'+known.map(card).join('')+'</div></details>'+(unseen?'<p class="bestiary-region">還有 '+unseen+' 位尚未遇見的樓層主，抵達對應章末後再留下紀錄。</p>':'');
       }else{
         body='<div class="tower-grid"><article class="tower-item">'+portrait(p.profession)+'<h3>'+esc(P.PROFESSIONS[p.profession].name)+' · 你</h3><p>'+esc(P.PROFESSIONS[p.profession].description)+'</p></article>'+p.members.map(m=>'<article class="tower-item">'+portrait(m.profession)+'<h3>'+esc(P.person(m.profession,P.sex(r(),m.id)))+' · '+esc(P.PROFESSIONS[m.profession].name)+'</h3><p>強度 '+m.level+'/5 · 生命 '+Math.ceil(m.hp)+'/'+P.memberMax(m)+(m.hp<=0?' · 需要料理或營地休息':'')+'</p>'+act('與他道別','party-dismiss-ask',m.id)+'</article>').join('')+'</div><p class="tower-copy">'+(p.buffs.length?p.buffs.map(b=>P.BUFFS[b.id]+'（'+b.floors+' 層）').join(' · '):'烹飪料理可獲得增益；最多同時保留兩種。')+'</p>';
       }
@@ -454,14 +457,14 @@
     function guard(m,dt){if(!live())return false;if(modern()&&root.TowerAffixes?.attackBlocked(r(),m.id,true)){m.windup=0;m.aim=null;m.path=[];return true;}if(heroes?.blocker(m,dt))return true;
       const provoke=modern()?H.state(r()).enemy[m.id]:null;if(provoke?.tauntLeft>0&&provoke.tauntId!==H.state(r()).active){const bait=actors.find(a=>a.id===provoke.tauntId);if(bait&&!(provoke?.root>0)&&H.hp(r(),bait.id)>0&&Math.hypot(bait.model.position.x-m.model.position.x,bait.model.position.z-m.model.position.z)>(m.def.ranged?7:1.7)){ctx.follow(m,dt,(m.def.speed??2.1)*(root.TowerAffixes?.movement(r(),m.id,true)??1),1.35,bait.model.position,{direct:true});return true;}}const a=actors.find(a=>{const member=records().find(x=>x.id===a.id);return (modern()?H.pv(r(),'guard_instinct',a.id)>0||(H.state(r()).enemy[m.id]?.tauntLeft>0&&H.state(r()).enemy[m.id]?.tauntId===a.id):member?.profession==='swordsman')&&member.hp>0&&Math.hypot(a.model.position.x-m.model.position.x,a.model.position.z-m.model.position.z)<(m.def.ranged?7:1.8)&&ctx.clear(a.model.position.x,a.model.position.z,m.model.position.x,m.model.position.z);});
       if(!a){m.partyGuardId=null;return false;}if(m.partyGuardId!==a.id&&guardVoiceLeft<=0){if(modern())heroes.battle(a.id);else root.GameVoice?.announceAsset('guard.hold','我來擋住牠，你先走！',true);guardVoiceLeft=8;}m.partyGuardId=a.id;m.path=[];m.model.rotation.y=Math.atan2(a.model.position.x-m.model.position.x,a.model.position.z-m.model.position.z);m.cooldown=Math.max(0,m.cooldown-dt);
-      if(m.windup>0){m.windup-=dt;if(m.windup<=0){if(modern())H.setBuff(r(),a.id,'intercept',.1,1);const status=modern()?H.state(r()).enemy[m.id]:null,weak=Math.max(status?.weak||0,status?.relayWeak>0?.25:0);if(status)status.weak=0;const hit=P.hurtMember(r(),a.id,m.def.damage*(1-weak)*(root.TowerAffixes?.offense(r(),m.id,true)??1),r().revision,m.id);if(commit(hit,false)){ctx.audio.sfxGuardBlock?.();if(hit.effect.down)ctx.toast(hit.message,2500,hit.message);}m.cooldown=2.4;}}
-      else if(m.cooldown<=0)m.windup=.9;return true;
+      if(m.windup>0){m.windup-=dt;if(m.windup<=0){if(modern())H.setBuff(r(),a.id,'intercept',.1,1);const status=modern()?H.state(r()).enemy[m.id]:null,weak=Math.max(status?.weak||0,status?.relayWeak>0?.25:0);if(status)status.weak=0;const hit=P.hurtMember(r(),a.id,m.def.damage*(1-weak)*(root.TowerAffixes?.offense(r(),m.id,true)??1),r().revision,m.id);if(commit(hit,false)){m.cueRelease=(m.cueRelease||0)+1;ctx.audio.sfxGuardBlock?.();if(hit.effect.down)ctx.toast(hit.message,2500,hit.message);}m.cooldown=2.4;}}
+      else if(m.cooldown<=0){m.windup=.9;m.windupTotal=.9;}return true;
     }
     function shift(){
       pruneRecruits();working=null;queueClock=0;if(modern()){const seconds=H.teamPassive(r(),'intuition');if(seconds)r().effects.reveal=seconds;}heroes?.reset();workHud();if(modern())root.TowerHeroGrowth.state(r()).route=null;const placed=[];
       for(const a of actors){
         const c=ctx.worldToCell(a.model.position.x,a.model.position.z),centre=ctx.cell(c.x,c.y),p=companionSpawn(centre,placed,placed.length);
-        a.model.position.set(p.x,0,p.z);a.path=[];a.pathLeft=0;a.safeTurn=false;a.queueLeader=null;a.assembly=null;placed.push(a);
+        a.model.position.set(p.x,0,p.z);a.path=[];a.pathLeft=0;a.safeTurn=false;a.queueLeader=null;a.assembly=null;a.retreating=false;placed.push(a);
       }
     }
     function orderQueue(dt){
@@ -497,6 +500,14 @@
       }
       return false;
     }
+    function retreat(actor,enemies,dt,speed,strategy){
+      if(!enemies.length||strategy==='manual'){actor.retreating=false;return null;}const p=actor.model.position,start={x:p.x,z:p.z},enemy=enemies[0],gap=q=>Math.min(...enemies.map(m=>Math.hypot(q.x-m.model.position.x,q.z-m.model.position.z))),before=gap(start),limit=enemy.def?.ranged?1.7:strategy==='survive'?3.8:strategy==='support'?3:2.1;
+      if(before>=limit+(actor.retreating ? .6 : 0)){actor.retreating=false;return null;}actor.retreating=true;const step=Math.min(Math.max(0,limit-before),speed*Math.min(Math.max(0,dt),.1));if(step<=0)return {moving:false};
+      const peers=[...actors.filter(a=>a!==actor).map(a=>a.model.position),{x:ctx.G.px,z:ctx.G.pz}],angle=Math.atan2(start.x-enemy.model.position.x,start.z-enemy.model.position.z),candidates=[];
+      for(const turn of [0,Math.PI/4,-Math.PI/4,Math.PI/2,-Math.PI/2]){const next={x:start.x+Math.sin(angle+turn)*step,z:start.z+Math.cos(angle+turn)*step};if(!walkClear(start,next)||gap(next)<=before+.001||distance(next)>Math.max(10,distance(start))||peers.some(q=>{const old=Math.hypot(start.x-q.x,start.z-q.z),d=Math.hypot(next.x-q.x,next.z-q.z);return d<BODY_GAP-.001&&d<=old+.00001;}))continue;candidates.push({next,gap:gap(next),turn});}
+      candidates.sort((a,b)=>b.gap-a.gap||Math.abs(a.turn)-Math.abs(b.turn));if(!candidates.length)return {moving:false};
+      const next=candidates[0].next;p.x=next.x;p.z=next.z;actor.path=[];actor.pathLeft=0;actor.safeTurn=false;actor.model.rotation.y=Math.atan2(enemy.model.position.x-p.x,enemy.model.position.z-p.z);return {moving:true};
+    }
     function friendlyVisibility(model){
       const camera=ctx.camera?.();if(!camera)return;const c=camera.position,p=model.position,dx=ctx.G.px-c.x,dz=ctx.G.pz-c.z,length=dx*dx+dz*dz,t=length>.01?((p.x-c.x)*dx+(p.z-c.z)*dz)/length:0;
       const cameraDistance=Math.hypot(p.x-c.x,p.z-c.z),occludes=c.y<3.5&&(cameraDistance<1.4||(t>0&&t<1&&Math.hypot(p.x-c.x-t*dx,p.z-c.z-t*dz)<.65));
@@ -515,17 +526,17 @@
       orderQueue(dt);
       let leader={x:ctx.G.px,z:ctx.G.pz},leaderId='player';
       for(const a of queue){if(ctx.paused())return;const m=records().find(m=>m.id===a.id);if(!m)continue;friendlyVisibility(a.model);a.model.userData.partyHp.scale.x=.94*Math.max(.001,m.hp/(modern()?H.maxHp(r(),m.id):P.memberMax(m)));a.model.rotation.z=m.hp<=0?.2:0;if(m.hp<=0)continue;
-        const focus=modern()?heroes.engagement(a.id):null,local=ctx.monsters().filter(e=>e.alive&&Math.hypot(e.model.position.x-a.model.position.x,e.model.position.z-a.model.position.z)<8&&ctx.clear(a.model.position.x,a.model.position.z,e.model.position.x,e.model.position.z)).sort((x,y)=>Math.hypot(x.model.position.x-a.model.position.x,x.model.position.z-a.model.position.z)-Math.hypot(y.model.position.x-a.model.position.x,y.model.position.z-a.model.position.z))[0];
+        const focus=modern()?heroes.engagement(a.id):null,localEnemies=ctx.monsters().filter(e=>e.alive&&Math.hypot(e.model.position.x-a.model.position.x,e.model.position.z-a.model.position.z)<8&&ctx.clear(a.model.position.x,a.model.position.z,e.model.position.x,e.model.position.z)&&(!root.MazeSight?.active()||root.MazeSight.visible(e.model.position.x,e.model.position.z))).sort((x,y)=>Math.hypot(x.model.position.x-a.model.position.x,x.model.position.z-a.model.position.z)-Math.hypot(y.model.position.x-a.model.position.x,y.model.position.z-a.model.position.z)),local=localEnemies[0];
         const enemy=focus&&ctx.clear(a.model.position.x,a.model.position.z,focus.model.position.x,focus.model.position.z)?focus:local,combatEnemy=focus||enemy;
         if(a.assembly){a.assembly.left-=dt;if(a.assembly.left<=0||H.actor(r(),a.id).hurt>0||a.assembly.active!==H.state(r()).active)a.assembly=null;}
         const assembling=!!a.assembly,fighting=!assembling&&!!(combatEnemy&&(focus||(modern()?root.TowerHeroGrowth.state(r()).policies[a.id].strategy!=='survive'&&H.pv(r(),'guard_instinct',a.id)>0:m.profession==='swordsman'))),target=assembling?a.assembly:fighting?combatEnemy.model.position:leader,targetId=assembling?'assembly':fighting?'enemy:'+combatEnemy.id:leaderId;
         if(a.queueLeader!==targetId){a.queueLeader=targetId;a.path=[];a.pathLeft=0;}
         const speed=(fighting?3.6:Math.hypot(target.x-a.model.position.x,target.z-a.model.position.z)>6?6.2:5.6)*(modern()?H.speed(r(),a.id):1);
         const standOff=fighting&&modern()&&H.ranged(r(),a.id)?Math.max(2.5,Math.min(6,H.stats(r(),a.id).reach-.6)):1.35;
-        const moving=modern()&&heroes.cooperating?.(a.id)?false:queueMove(a,dt,speed,assembling?.15:fighting?standOff:QUEUE_GAP,target);
+        const busy=modern()&&(heroes.cooperating?.(a.id)||heroes.preparing?.(a.id)),withdrawal=!assembling&&!busy&&modern()&&H.ranged(r(),a.id)?retreat(a,localEnemies,dt,3.6*H.speed(r(),a.id),root.TowerHeroGrowth.state(r()).policies[a.id].strategy):null,withdrawing=!!withdrawal,moving=busy?false:withdrawal?withdrawal.moving:queueMove(a,dt,speed,assembling?.15:fighting?standOff:QUEUE_GAP,target);
         // A guard who leaves the line must not drag the rest of the party into
         // battle; downed companions likewise never become a stationary leader.
-        if(!fighting){leader=a.model.position;leaderId=a.id;}
+        if(!fighting&&!withdrawing){leader=a.model.position;leaderId=a.id;}
         friendlyVisibility(a.model);
         if(root.CharacterFace)root.CharacterFace.update(a.model,now/1000,modern()&&H.actor(r(),a.id).hurt>0?'hurt':enemy?'focus':m.hp<(modern()?H.maxHp(r(),m.id):P.memberMax(m))*.25?'tired':'calm');
         for(const key of ['legL','legR'])if(a.model.userData[key])a.model.userData[key].rotation.x=moving?Math.sin(now*.01)*(key==='legL'?1:-1)*.35:0;

@@ -45,3 +45,12 @@ test('安全鐘只增加小額積分、不把最後的鬼改成勝者；結束�
   const r=fixture('tag'),p=r.api.state().points[0];r.place('a',p);r.api.frame();r.advance(1000);assert.equal(r.api.state().progress.a.score,25);
   r.ctx.showMPResults('結果','',r.ctx.MP.roster.map(x=>({...x,win:x.id!=='d',points:x.id==='d'?0:1000})));assert.equal(r.results[0].rows[0].points,1025);assert.equal(r.results[0].rows[3].win,false);assert.equal(r.nodes.get('modeObjective').hidden,true);r.ctx.mpLeave();assert.equal(r.ctx.scene.children.length,0);
 });
+test('實際botWalk的安全鐘覆寫僅使用隱身鬼最後位置，不讀取新的隱藏座標',()=>{
+  const r=fixture('tag'),b=r.ctx.MP.bots[0],html=readFileSync(new URL('../index.html',import.meta.url),'utf8');
+  r.ctx.ModeVariants=r.api;r.ctx.window.ClassicTactics={invisible:()=>true};r.ctx.playerInWall=()=>false;
+  vm.runInContext(html.slice(html.indexOf('function botWalk('),html.indexOf('function botPosOf(')),r.ctx);
+  b.threatLastSeen={x:-24,z:-24};r.place('d',{x:b.x+1,z:b.z});
+  r.ctx.botWalk(b,r.ctx.G.exitCell,'exit',.01,r.now(),1);assert.match(b.goalKey,/^variant:/);const key=b.goalKey;
+  b.path=null;r.place('d',{x:-20,z:-20});r.ctx.botWalk(b,r.ctx.G.exitCell,'exit',.01,r.now(),1);assert.equal(b.goalKey,key);
+  b.path=null;b.threatLastSeen={x:b.x+1,z:b.z};r.ctx.botWalk(b,r.ctx.G.exitCell,'exit',.01,r.now(),1);assert.equal(b.goalKey,'exit');
+});

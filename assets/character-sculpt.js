@@ -45,6 +45,18 @@
       x*=1-.035*Math.exp(-((y-.28)**2/.06));p.setXYZ(i,x*w/2,y*h/2,z*d/2);
     }g.computeVertexNormals();return g;
   }
+  function knightHead(T){
+    // Keep the forehead/scalp seam and existing segment budget. Shape the lower
+    // face into lean cheek planes and a longer, tapered jaw, not a round ball.
+    const g=head(T,.54,.55,.48,{jaw:1.06,cheek:1.12,chin:1.04,detail:'hero'}),p=g.attributes.position;
+    for(let i=0;i<p.count;i++){
+      const x=p.getX(i),y=p.getY(i),z=p.getZ(i),lower=Math.max(0,-y/.275),faceBand=Math.max(0,Math.min(1,(.11-y)/.16)),front=Math.max(0,z/.24);
+      const lean=1-faceBand*(.075+.19*lower);
+      const cheekPlane=.022*front*Math.exp(-((Math.abs(x)-.15)**2/.005+(y+.07)**2/.006));
+      p.setXYZ(i,x*lean,y*(1+.20*lower),z-cheekPlane);
+    }
+    g.computeVertexNormals();g.userData.knightFace=true;return g;
+  }
   function capsule(T,w,h,d){
     const cap=Math.min(h*.28,w*.48),points=[new T.Vector2(0,-h/2),new T.Vector2(w*.31,-h/2+cap*.2),new T.Vector2(w*.47,-h/2+cap*.65),new T.Vector2(w/2,-h/2+cap),new T.Vector2(w*.48,h/2-cap),new T.Vector2(w*.43,h/2-cap*.5),new T.Vector2(w*.27,h/2-cap*.15),new T.Vector2(0,h/2)];
     const g=new T.LatheGeometry(points,10);g.scale(1,1,d/w);return g;
@@ -52,6 +64,19 @@
   function torso(T,w,h,d){
     const points=[[.12,-.5],[.4,-.47],[.46,-.3],[.48,.04],[.5,.23],[.43,.42],[.29,.5],[0,.5]].map(([r,y])=>new T.Vector2(r*w,y*h));
     const g=new T.LatheGeometry(points,12);g.scale(1,1,d/w);return g;
+  }
+  function knightTorso(T,w,h,d){
+    // Same ring and segment budget as the shared torso. A tapered waist,
+    // sloped deltoids and fuller upper chest replace the short barrel shape.
+    const points=[[.12,-.5],[.35,-.47],[.38,-.3],[.44,.04],[.5,.23],[.44,.42],[.27,.5],[0,.5]].map(([r,y])=>new T.Vector2(r*w,y*h));
+    const g=new T.LatheGeometry(points,12);g.scale(1,1,d/w);g.userData.knightSculpt=true;return g;
+  }
+  function gripHand(T){
+    // One connected gloved palm and curled finger surface, replacing the old
+    // floating thumb rather than adding five separate finger draw calls.
+    const g=new T.SphereGeometry(1,12,8),p=g.attributes.position;
+    for(let i=0;i<p.count;i++){const x=p.getX(i),y=p.getY(i),z=p.getZ(i),finger=Math.max(0,-x),groove=1-.055*finger*Math.sin((y+1)*Math.PI*3)**2;p.setXYZ(i,x*.077*groove+.046,y*.096-.03,z*.074*groove+.006);}
+    g.computeVertexNormals();g.userData.closedGrip=true;return g;
   }
   function roundedBox(T,w,h,d){
     const b=Math.min(w,h,d)*.22,r=Math.min(w,h)*.22,s=new T.Shape(),x=w/2-b,y=h/2-b,q=Math.max(0,r-b);
@@ -68,12 +93,17 @@
   // positions AND normals so a helmet can hide the crown without floating locks.
   function hair(T,{job='classic',sex='male',detail='hero'}={}){
     const female=sex==='female',long=female&&['mage','healer','archer'].includes(job),braided=female&&['classic','swordsman','scout','smith'].includes(job),low=detail==='npc',segments=low?18:28,rings=low?10:14,seam=rings/2,braidSegments=low?16:24,braidSides=low?5:7;
-    const length=long?(job==='archer'?.83:job==='mage'?.73:.67):female?.3:job==='mage'?.33:.24,positions=[0,.335,-.018],indices=[],braids=[];
+    const knight=job==='swordsman'&&!female,length=long?(job==='archer'?.83:job==='mage'?.73:.67):female?.3:job==='mage'?.33:.24,positions=[knight?-.018:0,knight?.321:.335,-.018],indices=[],braids=[];
     for(let row=1;row<=rings;row++)for(let i=0;i<segments;i++){
       const a=i/segments*Math.PI*2,v=row/rings,cap=Math.min(1,v/.5),drop=Math.max(0,(v-.5)/.5),front=Math.max(0,Math.min(1,(Math.cos(a)-.25)/.5)),back=1-front;
       const theta=cap*Math.PI/2,r=Math.sin(theta),wave=(long?.016:.004)*Math.sin(a*7+drop*3)*Math.sin(drop*Math.PI*.8),tip=long?1-.085*Math.sin(a*3)**2-.035*Math.cos(a*5):1;
       const x=(.289*r+wave*back)*(1+back*drop*(long?.07:-.06)-back*Math.max(0,drop-.75)*.15)*Math.sin(a);
-      const y=.335-.255*(1-Math.cos(theta))+drop*(front*(.018+Math.sin(a)*.025)-back*length*tip);
+      // A small lift along the low side of the part leaves the remodeled brow
+      // visible without floating it away from the real facial surface.
+      // The knight has an ear-above short cut, not the shared cheek-length
+      // side locks. Only the rear nape is longer; the scalp seam stays intact.
+      const trim=knight?.012+.063*Math.max(0,-Math.cos(a))**2:length*tip;
+      const y=.335-.255*(1-Math.cos(theta))+drop*(front*(.018+Math.sin(a)*.025)-back*trim)+(knight?front*(.025*Math.sin(a-.35)+.030*Math.exp(-((Math.sin(a)+.36)**2/.07)))*Math.sin(theta):0);
       const z=(.267*r+wave)*Math.cos(a)-.018-back*drop*(long?.025:.004);
       positions.push(x,y,z);
     }
@@ -89,5 +119,5 @@
     }}
     return {crown,drape,braids,long,braided};
   }
-  return Object.freeze({ellipsoid,head,catHead,catEye,catDetails,catTail,capsule,torso,roundedBox,cloth,hair});
+  return Object.freeze({ellipsoid,head,knightHead,catHead,catEye,catDetails,catTail,capsule,torso,knightTorso,gripHand,roundedBox,cloth,hair});
 });

@@ -64,8 +64,8 @@
     }
     if(s.effect==='barrier')return '護盾最多五分鐘；先被傷害耗盡就立即失效，不等於無敵。';
     if(s.effect==='fortress')return '護盾五分鐘；挑釁及四次耐久保護十五秒，三者不是同一時限。';
-    if(s.effect==='sanctuary')return '領域十秒，合計恢復最大生命40%；施放時扶起一人至30%生命。';
-    if(s.effect==='feast')return '十秒恢復最大生命20%；全隊增傷15%持續四十五秒。';
+    if(s.effect==='sanctuary')return '領域十秒，合計恢復最大生命'+fmt(s.power[0])+'%；施放時扶起一人至'+G().HEALING.sanctuaryRevivePercent+'%生命。';
+    if(s.effect==='feast')return '十秒恢復最大生命'+G().HEALING.feastPercent+'%；全隊增傷15%持續四十五秒。';
     if(s.effect==='escape')return '引路線十二秒，沿線免一般陷阱。';
     const durations={guard:8,rally:10,speed:20,polish:20,fortify:30,reveal:8,stomach:30,barricade:25,frost:6};
     if(Object.hasOwn(durations,s.effect))return '基礎持續 '+(p.duration??durations[s.effect])+' 秒。'+(s.effect==='barricade'?'場上最多一座，生命歸零會提早消失。':'');

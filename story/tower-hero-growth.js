@@ -7,6 +7,10 @@
   const F=()=>typeof module==='object'&&module.exports?require('./tower-affixes.js'):globalThis.TowerAffixes;
   const copy=v=>JSON.parse(JSON.stringify(v)),num=(v,a,b)=>Number.isFinite(v)&&v>=a&&v<=b;
   const A=()=>typeof module==='object'&&module.exports?require('./tower-ascension-catalog.js'):globalThis.TowerAscensionCatalog;
+  // Only skill restoration is rebalanced. Potions, recipe base HP, shields and
+  // mechanical/equipment repairs still use their original independent rules.
+  const HEALING=Object.freeze({multiplier:1.5,herbalCooldown:5,feastPercent:30,sanctuaryPercent:60,sanctuaryRevivePercent:45,manyFlavorsPercent:37.5,forestRecoveryPercent:18});
+  const healingRanks=values=>values.map(value=>value*HEALING.multiplier);
   const XP_SCALE=7.5,XP=Object.freeze([... [0,70,180,350,580,860,1220,1660,2190,2810].map(n=>Math.round(n*XP_SCALE)),27500,35000,43500,53000,63000]);
   const STRATEGIES=Object.freeze({attack:{name:'積極攻擊',description:'優先輸出技能，必要時救援或治療。'},support:{name:'優先輔助',description:'優先治療、護盾與增益，再找機會攻擊。'},survive:{name:'保命優先',description:'優先救援、自保與牽制，再進行攻擊。'}});
   function setStrategy(run,id,strategy){return C().transaction(run,run.revision,n=>{const p=state(n).policies[id];if(!p||!Object.hasOwn(STRATEGIES,strategy))return {ok:false,message:'請選擇有效的隊員與策略。'};p.strategy=strategy;p.thinkLeft=0;return {ok:true,message:'戰鬥策略：'+STRATEGIES[strategy].name};});}
@@ -16,8 +20,8 @@
     active('decisive_slash','swordsman','破陣決斬',true,450,60,'decisive','蓄力後向前斬擊450%，中斷一般怪物蓄力；不能穿牆。'),
     active('star_ring','mage','星環轟擊',true,540,75,'star_ring','三道星光轟擊可見區域，合計540%；牆壁可阻擋。'),
     active('escape_line','scout','安全撤離線',false,25,75,'escape','已探索走道鋪六格引路線，十二秒內沿線加速25%、免一般陷阱。'),
-    active('hero_feast','chef','迷宮盛宴',false,35,120,'feast','三種不同食材各一份：飽食+35、十秒恢復20%生命、全隊增傷15%四十五秒。'),
-    active('dawn_sanctuary','healer','黎明聖域',false,40,120,'sanctuary','十秒治療領域恢復40%生命，施放時扶起一位隊友至30%生命。',{herb:3}),
+    active('hero_feast','chef','迷宮盛宴',false,35,120,'feast','三種不同食材各一份：飽食+35、十秒恢復30%生命、全隊增傷15%四十五秒。'),
+    active('dawn_sanctuary','healer','黎明聖域',false,HEALING.sanctuaryPercent,120,'sanctuary','十秒治療領域恢復60%生命，施放時扶起一位隊友至45%生命。',{herb:3}),
     active('moving_fortress','smith','移動堡壘',false,100,90,'fortress','自身100%生命護盾五分鐘；十五秒持續挑釁、抵銷四次耐久消耗。挑釁上限依技能等級：一～二級一隻、三～四級兩隻、五～六級三隻；目標離開可見近處才補選。',{shell:2}),
     active('worldtree_arrow','archer','世界樹之箭',true,480,65,'great_arrow','凝聚精靈之力射出強力箭，傷害480%，並使怪物緩速；不能穿牆。'),
     {...active('steel_meteor_fist','robot','鋼鐵隕拳',true,450,65,'robot_meteor','巨拳轟向前方八公尺內可見敵人，最多波及三體，擊退1.5公尺；樓層主不被推動。'),params:{reach:8,radius:2.4,maxTargets:3,knockback:1.5},presentation:{family:'quake',sound:'metal',motion:'ground_slam',colors:[0x93dafa,0xffc784]}},
@@ -30,8 +34,8 @@
     passive('hunter_eye','scout','獵手之眼',[5,10,15,20,25,30],'背後命中傷害增加百分比。'),
     passive('quick_hands','scout','迅捷雙手',[2,4,6,8,10,12],'普通攻擊間隔縮短百分比。'),
     passive('ingredient_care','chef','珍惜食材',[5,10,15,20,25,30],'料理或耗材技能有機會省下一份食材，機率為百分比。'),
-    passive('food_sharing','chef','餐桌分享',[1,2,3,4,5,6],'食用料理時，每位存活隊友額外恢復生命。'),
-    passive('gentle_care','healer','溫柔照護',[1,2,3,4,5,6],'本人治療技能額外恢復生命。'),
+    passive('food_sharing','chef','餐桌分享',healingRanks([1,2,3,4,5,6]),'食用料理時，每位存活隊友額外恢復生命。'),
+    passive('gentle_care','healer','溫柔照護',healingRanks([1,2,3,4,5,6]),'本人治療技能額外恢復生命。'),
     passive('steadfast','healer','堅韌祝福',[.5,1,1.5,2,2.5,3],'持有者存活時，全隊防禦增加。'),
     passive('tempered_edge','smith','淬刃',[2,4,6,8,10,12],'本人武器傷害增加百分比。'),
     passive('sturdy_gear','smith','厚實護具',[1,1.5,2,2.5,3,3.5],'穿戴未損壞防具時，本人防禦增加。'),
@@ -40,7 +44,7 @@
     passive('unyielding','swordsman','不退之誓',Array(6).fill(25),'生命降至30%以下：25%生命護盾五分鐘、增傷25%八秒；間隔90秒。',true),
     passive('twin_stars','mage','雙星共鳴',Array(6).fill(45),'每第三次有效攻擊技能追加45%傷害回響，不重複控制效果。',true),
     passive('relay_opening','scout','破綻接力',Array(6).fill(60),'背後命中標記六秒；下一位隊友命中增傷60%，敵人弱化四秒；每敵間隔20秒。',true),
-    passive('many_flavors','chef','百味養生',Array(6).fill(30),'吃兩種不同料理：全隊回復25%生命、30%生命護盾五分鐘；間隔90秒。',true),
+    passive('many_flavors','chef','百味養生',Array(6).fill(30),'吃兩種不同料理：全隊回復37.5%生命、30%生命護盾五分鐘；間隔90秒。',true),
     passive('life_covenant','healer','守命之約',Array(6).fill(30),'附近隊友受致命怪物或一般陷阱傷害：保留1生命、30%護盾五分鐘；間隔180秒。',true),
     passive('artisan_soul','smith','匠魂刻印',Array(6).fill(20),'營地對修滿裝備花兩零件刻印：20%耐久護層；武器增傷15%或防具防禦+2。每人限一件。',true),
     passive('forest_echo','archer','森靈追擊',Array(6).fill(40),'射擊已被緩速的怪物額外增傷40%；纏枝箭與隊友的緩速都能觸發。',true),
@@ -80,10 +84,10 @@
   }
   function consumeCost(run,id,cost){const h=H();let saved=false;for(const[k,v]of Object.entries(cost)){let count=v;if(!saved&&h.roll(run,id,'ingredient-care')<h.pv(run,'ingredient_care',id)){count--;saved=true;}run.party.ingredients[k]-=count;}}
   function afterCast(run,id,s,near){const h=H(),m=modifiers(run,id,s.id);if(s.effect==='fortress'){shield(run,id,h.maxHp(run,id)*power(run,id,s)/100);h.setBuff(run,id,'fortress',s.params?.duration||15,1);h.setBuff(run,id,'fortify',s.params?.duration||15,Math.round(4*m.power));run.party.journey.scrap-=2;}
-    if(s.effect==='feast'){const keys=Object.keys(run.party.ingredients).filter(k=>run.party.ingredients[k]>0).slice(0,3);keys.forEach(k=>run.party.ingredients[k]--);run.hunger=Math.min(100,run.hunger+power(run,id,s));near.filter(k=>h.hp(run,k)>0).forEach(k=>{h.setBuff(run,k,'regen',10,h.maxHp(run,k)*.02*m.power*(id==='hero'?1+.02*(h.level(run,id)-1):1));h.setBuff(run,k,'rally',45,15*m.power);});}
-    if(s.effect==='sanctuary'){const down=near.find(k=>h.organicHealable(run,k)&&h.hp(run,k)<=0);if(down)h.setHp(run,down,h.maxHp(run,down)*.3*m.power);h.setBuff(run,id,'sanctuary',10,1);}
+    if(s.effect==='feast'){const keys=Object.keys(run.party.ingredients).filter(k=>run.party.ingredients[k]>0).slice(0,3);keys.forEach(k=>run.party.ingredients[k]--);run.hunger=Math.min(100,run.hunger+power(run,id,s));near.filter(k=>h.hp(run,k)>0).forEach(k=>{h.setBuff(run,k,'regen',10,h.maxHp(run,k)*HEALING.feastPercent/100/10*m.power*(id==='hero'?1+.02*(h.level(run,id)-1):1));h.setBuff(run,k,'rally',45,15*m.power);});}
+    if(s.effect==='sanctuary'){const down=near.find(k=>h.organicHealable(run,k)&&h.hp(run,k)<=0);if(down)h.setHp(run,down,h.maxHp(run,down)*HEALING.sanctuaryRevivePercent/100*m.power);h.setBuff(run,id,'sanctuary',10,1);}
   }
-  function recipe(run,key){const h=H();for(const owner of h.ids(run).filter(k=>has(run,'many_flavors',k))){const g=record(run,owner),m=modifiers(run,owner,'many_flavors');if(!g.tastes.includes(key))g.tastes.push(key);if(g.tastes.length>=2&&g.tasteLeft<=0){h.ids(run).filter(id=>h.hp(run,id)>0).forEach(id=>{h.heal(run,id,h.maxHp(run,id)*.25*m.power);shield(run,id,h.maxHp(run,id)*.3*m.power,owner);});g.tastes=[];g.tasteLeft=90*m.cooldown;}}
+  function recipe(run,key){const h=H();for(const owner of h.ids(run).filter(k=>has(run,'many_flavors',k))){const g=record(run,owner),m=modifiers(run,owner,'many_flavors');if(!g.tastes.includes(key))g.tastes.push(key);if(g.tastes.length>=2&&g.tasteLeft<=0){h.ids(run).filter(id=>h.hp(run,id)>0).forEach(id=>{h.heal(run,id,h.maxHp(run,id)*HEALING.manyFlavorsPercent/100*m.power);shield(run,id,h.maxHp(run,id)*.3*m.power,owner);});g.tastes=[];g.tasteLeft=90*m.cooldown;}}
     const bonus=h.teamPassive(run,'food_sharing');if(bonus)h.ids(run).filter(id=>h.hp(run,id)>0).forEach(id=>h.heal(run,id,bonus));
   }
   function imprint(run,id,gearId,safe){return C().transaction(run,run.revision,n=>{const h=H(),owner=h.ids(n).find(k=>has(n,'artisan_soul',k)),g=h.equipment(n,id)&&Object.values(h.equipment(n,id)).find(g=>g?.id===gearId);if(!safe||!owner||!g||h.ROBOT.isCore(g)||g.durability!==g.maxDurability||n.party.journey.scrap<2)return {ok:false,message:'需要營地、存活的刻印鍛匠、修滿的普通裝備及兩份零件。'};n.party.journey.scrap-=2;const boost=modifiers(n,owner,'artisan_soul').power;state(n).imprints[id]={gearId,left:Math.ceil(g.maxDurability*.2*boost),boost};return {ok:true,message:'完成匠魂刻印'};});}
@@ -147,5 +151,5 @@
     if(g.route!==null&&(!g.route||!num(g.route.left,0,12)||!C().isFloor(g.route.floor)||g.route.power!==undefined&&!num(g.route.power,0,100)||!Array.isArray(g.route.points)||g.route.points.length>6||!g.route.points.every(p=>num(p.x,-1000,1000)&&num(p.z,-1000,1000))))return null;
     if(!g.nearby||typeof g.nearby!=='object'||Object.entries(g.nearby).some(([id,list])=>!ids.includes(id)||!Array.isArray(list)||list.length>5||!list.every(k=>ids.includes(k))))return null;return g;
   }
-  return {XP,XP_SCALE,STRATEGIES,setStrategy,actives,passives,itemIds,policy,freshRecord,fresh,state,record,progression:record,has,skillLevel,sixth,awaken,available,choose,ultimateOptions,availableUltimate,chooseUltimate,branches,modifiers,power,shield,afterDamage,beforeDamage,strikeMultiplier,consumeCost,afterCast,recipe,imprint,imprintFor,use,autoItems,skillRange,aiChoice,tick,validate};
+  return {HEALING,healingRanks,XP,XP_SCALE,STRATEGIES,setStrategy,actives,passives,itemIds,policy,freshRecord,fresh,state,record,progression:record,has,skillLevel,sixth,awaken,available,choose,ultimateOptions,availableUltimate,chooseUltimate,branches,modifiers,power,shield,afterDamage,beforeDamage,strikeMultiplier,consumeCost,afterCast,recipe,imprint,imprintFor,use,autoItems,skillRange,aiChoice,tick,validate};
 });

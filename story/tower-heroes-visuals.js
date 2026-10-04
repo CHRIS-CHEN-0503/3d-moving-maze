@@ -169,7 +169,7 @@
     const herald=(x,y,z,r=.07,c=gold)=>{const motifs={swordsman:[[0,.85],[.7,.55],[.5,-.2],[0,-.85],[-.5,-.2],[-.7,.55]],mage:[[0,1],[.63,0],[0,-1],[-.63,0]],scout:[[-.6,.9],[.35,-.5],[.05,-.9],[-.35,-.5],[.6,.9],[0,.1]],chef:[[-.75,.3],[-.55,-.65],[.55,-.65],[.75,.3]],healer:[[0,-1],[.6,-.25],[.25,1],[0,.55],[-.25,1],[-.6,-.25]],smith:[[-.9,.4],[.9,.4],[.5,-.2],[.3,-.25],[.4,-.75],[-.4,-.75],[-.3,-.25],[-.5,-.2]],archer:[[0,-1],[.75,.15],[.2,1],[-.15,.55],[-.75,.15]]},points=motifs[job]||motifs.swordsman,s=new T.Shape();s.moveTo(points[0][0]*r,points[0][1]*r);for(const p of points.slice(1))s.lineTo(p[0]*r,p[1]*r);s.closePath();const m=mesh(new T.ShapeGeometry(s),c,x,y,z,'metal');m.name='profession-raised-heraldry';return m;};
     const rivet=(x,y,z,r=.016)=>{const m=mesh(new T.CylinderGeometry(r,r,.009,6),gold,x,y,z,'metal');m.rotation.x=Math.PI/2;m.name='forged-rivet';return m;};
     const grip=(x,y,z,length=.25)=>{for(let i=0;i<4;i++){const ring=mesh(new T.TorusGeometry(.042,.006,3,8),look.accent,x,y-length/2+(i+.5)*length/4,z,'fabric');ring.rotation.x=Math.PI/2;ring.name='wrapped-grip';}};
-    if(['longsword','greatsword','twin_daggers'].includes(kind)){const big=kind==='greatsword',small=kind==='twin_daggers',length=(big?1.1:small?.4:.72)*(1+(tier-1)*.045),width=(big?.17:small?.07:.1)*(1+(tier-1)*.15);rod(.04,.25,wood,0,-.05);const guard=box((big?.42:.28)+(tier-1)*.035,.055,.08,gold,0,.1);guard.rotation.z=tier===3?.13:0;const blade=new T.Shape();blade.moveTo(-width/2,0);blade.lineTo(-width/2,length*.78);blade.lineTo(0,length+.11);blade.lineTo(width/2,length*.78);blade.lineTo(width/2,0);blade.closePath();const steel=new T.ExtrudeGeometry(blade,{depth:.018,bevelEnabled:true,bevelThickness:.011,bevelSize:width*.16,bevelSegments:1,steps:1});steel.translate(0,0,-.009);mesh(steel,iron,0,.14).name='forged-tapered-blade';rod(.055,.055,gold,0,-.195);if(tier>1)for(const side of [-1,1]){const fin=box(.055,.14,.045,gold,side*(big?.18:.12),.155);fin.rotation.z=-side*.45;}}
+    if(['longsword','greatsword','twin_daggers'].includes(kind)){const big=kind==='greatsword',small=kind==='twin_daggers',length=(big?1.1:small?.4:.72)*(1+(tier-1)*.045),width=(big?.17:small?.07:.1)*(1+(tier-1)*.15);rod(.04,big?.4:.25,wood,0,big?-.125:-.05);const guard=box((big?.42:.28)+(tier-1)*.035,.055,.08,gold,0,.1);guard.rotation.z=tier===3?.13:0;const blade=new T.Shape();blade.moveTo(-width/2,0);blade.lineTo(-width/2,length*.78);blade.lineTo(0,length+.11);blade.lineTo(width/2,length*.78);blade.lineTo(width/2,0);blade.closePath();const steel=new T.ExtrudeGeometry(blade,{depth:.018,bevelEnabled:true,bevelThickness:.011,bevelSize:width*.16,bevelSegments:1,steps:1});steel.translate(0,0,-.009);mesh(steel,iron,0,.14).name='forged-tapered-blade';rod(.055,.055,gold,0,big?-.345:-.195);if(tier>1)for(const side of [-1,1]){const fin=box(.055,.14,.045,gold,side*(big?.18:.12),.155);fin.rotation.z=-side*.45;}}
     else if(kind==='arcane_staff'){rod(.035,1.3,wood,0,.35);for(const y of [-.2,.76])rod(.06,.1,gold,0,y);const crown=mesh(new T.TorusGeometry(.2,.035,5,12),gold,0,1.1);crown.rotation.y=.2;if(master)crown.scale.set(tier===4?.85:1.18,tier===4?1.2:.92,1);mesh(new T.OctahedronGeometry(.13+tier*.012),master?.gem||0xbab2f2,0,1.1,0,'gem');if(tier>1){const orbit=mesh(new T.TorusGeometry(.24,.018,4,16,Math.PI*1.6),iron,0,1.1);orbit.rotation.set(.55,.6,master?tier===4?.6:-.45:.25);}if(tier>=3)for(const side of [-1,1]){const arm=box(.035,.28,.04,gold,side*.155,.85);arm.rotation.z=-side*.55;}}
     else if(kind==='spellbook'){for(const side of [-1,1]){const cover=box(.29,.07,master?.45+(tier-3)*.025:.45,master?dark:0x46757f,side*.14,0,.07);cover.rotation.z=side*.22;const pages=mesh(root.CharacterSculpt?root.CharacterSculpt.roundedBox(T,.25,.05,master?.4+(tier-3)*.025:.4):new T.BoxGeometry(.25,.05,master?.4+(tier-3)*.025:.4),0xf3ddad,side*.14,.055,.07,'paper');pages.rotation.z=side*.22;for(const y of [.062,.079]){const script=box(.13,.007,.014,0x89785e,side*.15,y,.09);script.rotation.z=side*.22;}if(tier>1)for(const z of [-.1,.23])box(.055,.02,.055,gold,side*.24,.04,z);}box(.035,.025,.33,gold,0,.11,.08);if(tier>=3){const tab=box(.065,.025,.21,look.accent,.16,.028,.35);tab.rotation.x=-.3-(tier-3)*.2;}}
     else if(kind==='elven_bow'){
@@ -200,7 +200,13 @@
       const jewel=mesh(new T.SphereGeometry(.062,8,6),female?(job==='healer'?0xb8e4cf:0xc5ace7):0x91d8e4,0,1.77,.34);jewel.scale.set(female?.72:.85,female?1.2:1.1,.42);
       for(const side of [-1,1]){const scroll=mesh(new T.TorusGeometry(.09,.012,4,10,Math.PI),gold,side*.12,1.77,.31);scroll.rotation.z=side<0?0:Math.PI;}
     }
-    else if(kind==='heavy_armor'){body(female?.68:.76,female?.62:.59,.46,iron,1.03);for(const y of [female?.79:.76,.9,1.22]){const band=mesh(new T.TorusGeometry(female?.285:.34,.022,4,12),dark,0,y);band.rotation.x=Math.PI/2;band.scale.y=.67;}for(const side of [-1,1]){soft(female?.22:.3,female?.16:.25,.42,iron,side*(female?.335:.39),1.25);if(female){const plate=box(.23,.25,.09,iron,side*.22,.7,.14);plate.rotation.z=side*.16;plate.name='female-armored-fauld';}}const crest=soft(female?.085:.12,.15,.035,gold,0,1.12,.25);crest.name=female?'female-leaf-crest':'male-shield-crest';coat(look.cloak,female?.58:.62);}
+    else if(kind==='heavy_armor'){
+      const knight=!female&&job==='swordsman';
+      if(knight&&root.CharacterSculpt?.knightTorso)mesh(root.CharacterSculpt.knightTorso(T,.74,.67,.43),iron,0,1.03).name='knight-fitted-cuirass';else body(female?.68:.76,female?.62:.59,.46,iron,1.03);
+      for(const y of [female?.79:.76,.9,1.22]){const band=mesh(new T.TorusGeometry(female?.285:knight?.305:.34,.022,4,12),dark,0,y);band.rotation.x=Math.PI/2;band.scale.y=.67;}
+      for(const side of [-1,1]){const pad=soft(female?.22:knight?.26:.3,female?.16:knight?.19:.25,knight?.37:.42,iron,side*(female?.335:knight?.36:.39),knight?1.27:1.25);if(knight)pad.rotation.z=-side*.17;if(female){const plate=box(.23,.25,.09,iron,side*.22,.7,.14);plate.rotation.z=side*.16;plate.name='female-armored-fauld';}}
+      const crest=soft(female?.085:knight?.105:.12,.15,.035,gold,0,1.12,.25);crest.name=female?'female-leaf-crest':'male-shield-crest';coat(look.cloak,female?.58:.62);
+    }
     else if(kind==='light_armor'){const leather=female?look.leather:0x89664a;body(female?.63:.7,female?.65:.63,.42,leather,1.0);for(const side of [-1,1]){const strap=box(.045,.57,.043,female?look.accent:0xc1a17b,side*(female?.1:.14),1,.215);strap.rotation.z=side*(female?.26:.16);}const belt=mesh(new T.TorusGeometry(female?.235:.31,.035,4,12),wood,0,.77);belt.rotation.x=Math.PI/2;belt.scale.y=.72;coat(female?look.cloak:leather,.6);if(female){neck(look.skin,1.26,.24);soft(.085,.07,.028,gold,0,1.1,.245);}else{const sash=box(.065,.61,.04,look.accent,0,1.0,.225);sash.rotation.z=-.6;}}
     else if(kind==='robe'){const cloth=look.cloak;if(female){const back=mesh(new T.CylinderGeometry(.25,.35,.85,14,1,true,Math.PI/2,Math.PI),cloth,0,.59,-.04);back.scale.z=.74;back.name='continuous-robe-back';for(const side of [-1,1]){const panel=box(.22,.79,.07,cloth,side*.22,.61,.17);panel.rotation.z=side*.095;panel.name='female-slit-robe';}}else{const skirt=mesh(new T.CylinderGeometry(.27,.37,.74,14),cloth,0,.66);skirt.scale.z=.75;}body(female?.64:.7,female?.64:.58,.43,cloth,1.06);for(const side of [-1,1])box(.035,female?.64:.79,.03,gold,side*(female?.13:.18),female?1.02:.91,.225);const belt=mesh(new T.TorusGeometry(female?.23:.3,.025,4,12),gold,0,female?.85:.92);belt.rotation.x=Math.PI/2;belt.scale.y=.75;if(female)neck(look.skin,1.3,.24);else{for(const side of [-1,1]){const lapel=box(.12,.26,.05,look.accent,side*.09,1.23,.23);lapel.rotation.z=-side*.3;}}}
     // Readable construction details sit flush to the silhouette. Surface grain,
@@ -209,7 +215,7 @@
     if(['longsword','greatsword','twin_daggers'].includes(kind)){
       const big=kind==='greatsword',small=kind==='twin_daggers',length=(big?1.1:small?.4:.72)*(1+(tier-1)*.045),w=big?.075:small?.026:.04;
       for(const side of [-1,1])inlay([[side*w,.23],[side*w*.65,.14+length*.55],[0,.14+length*.87]],dark,0,0,.027,'blade-fuller',.0035);
-      grip(0,-.04,0,.21);herald(0,.17,.033,small?.03:.045);rivet(0,-.19,.058,.025);
+      grip(0,big?-.115:-.04,0,big?.37:.21);herald(0,.17,.033,small?.03:.045);rivet(0,big?-.34:-.19,.058,.025);
     }else if(kind==='arcane_staff'){
       grip(0,.27,0,.32);inlay([[-.12,.84],[-.2,1.04],[0,1.22],[.2,1.04],[.12,.84]],gold,0,0,.018,'staff-crystal-cradle',.012);herald(0,.65,.05,.055);
     }else if(kind==='spellbook'){
@@ -248,6 +254,7 @@
       const big=kind==='greatsword',small=kind==='twin_daggers',length=(big?1.1:small?.4:.72)*(1+(tier-1)*.045),width=(big?.17:small?.07:.1)*(1+(tier-1)*.15);
       const blade=g.getObjectByName('forged-tapered-blade');blade.geometry.computeBoundingBox();
       g.userData.contact={kind:'blade-edge',center:[width/2,.14+length*.66,0],normal:[1,0,0],tip:[0,blade.position.y+blade.geometry.boundingBox.max.y,0],axis:[0,1,0],grip:[0,0,0]};
+      if(big)g.userData.contact.supportGrip=[0,-.20,0];
     }else if(kind==='arcane_staff')g.userData.contact={kind:'magic-emitter',center:[0,1.1,0],normal:[0,1,0],axis:[0,1,0],grip:[0,0,0]};
     else if(kind==='spellbook')g.userData.contact={kind:'magic-emitter',center:[0,.09,.3],normal:[0,0,1],axis:[0,0,1],grip:[0,0,0]};
     if(tier>1){
@@ -268,7 +275,7 @@
   // no item duplication, gender equip locks, stat changes or save migration.
   const VARIANTS=Object.freeze({
     robot:{male:{shirt:0x687c88,skin:0xb7c6c9,hair:0x687c88,eyes:0x72dce9,cloak:0x263a45,accent:0xc1a474,leather:0x263a45,width:1.04,height:1.03,face:1,shape:'heavy-machine',description:'鐵衡：鋼藍機殼、寬肩重拳、黃銅雕紋與藍色動力核'},female:{shirt:0xdad5bd,skin:0xeee5c9,hair:0xdad5bd,eyes:0x91dfa8,cloak:0x4b554c,accent:0xbb9663,leather:0x4b554c,width:.95,height:.95,face:1,shape:'rounded-machine',description:'鈴芯：象牙弧面機殼、圓潤臉孔、黃銅鑲邊與綠色動力核'}},
-    swordsman:{male:{hair:0x4d352e,cloak:0x293f66,accent:0xb9d4e8,leather:0x6a4b3b,description:'俐落短髮、寬肩、短戰袍與盾徽'},female:{hair:0x953f34,shirt:0x7595b5,cloak:0x426993,accent:0xe2c585,leather:0x705241,description:'赤銅側辮、修身分片護甲與藍色長戰袍'}},
+    swordsman:{male:{width:.99,height:1.18,face:.94,hair:0x40332f,skin:0xe0b999,cloak:0x293f66,accent:0xb9d4e8,leather:0x6a4b3b,description:'高挑勻稱、俐落側分短髮、收腰騎士鎧甲與盾徽'},female:{hair:0x953f34,shirt:0x7595b5,cloak:0x426993,accent:0xe2c585,leather:0x705241,description:'赤銅側辮、修身分片護甲與藍色長戰袍'}},
     mage:{male:{hair:0xbabecb,cloak:0x3f436b,accent:0xaacbda,leather:0x534662,description:'灰銀短髮、短鬚、立領長袍'},female:{hair:0x493457,shirt:0x9174b2,cloak:0x674677,accent:0xe4bd85,leather:0x76516e,description:'紫黑長波浪髮、收腰側開衩法袍'}},
     scout:{male:{hair:0x654132,cloak:0x244f47,accent:0x99c5b4,leather:0x785843,description:'斜瀏海、斜背束帶與短獵裝'},female:{hair:0xbc7845,shirt:0x76a18b,cloak:0x377561,accent:0xe4bc8b,leather:0x705b4f,description:'蜜銅側編髮、斜肩披巾與分片輕甲'}},
     chef:{male:{hair:0x4f3428,cloak:0x70503b,accent:0xf0ddbd,leather:0x876248,description:'濃髭、圓肩、雙排扣短圍裙'},female:{hair:0x7d3937,shirt:0xbb9070,cloak:0x946458,accent:0xf4dcc2,leather:0x9e7763,description:'側髻與捲髮、收腰圍裙式輕甲'}},
@@ -295,11 +302,11 @@
     model.userData.bowArms=rig;poseBowArms(model,0,0,0,0,0);return rig;
   }
   function placeBowArm(rig,arm,x,y,z,wx,wy,wz){
-    const shoulder=arm.upper.position,d=rig.delta.set(x,y,z).sub(shoulder),length=Math.min(.839,d.length()),dir=rig.dir.copy(d).normalize();
+    const bone=arm.bone||.42,shoulder=arm.upper.position,d=rig.delta.set(x,y,z).sub(shoulder),length=Math.min(bone*2-.001,d.length()),dir=rig.dir.copy(d).normalize();
     // Bend outwards and forwards. This keeps both upper arms outside the
     // torso and both forearms in front, instead of folding through armor.
     const pole=rig.pole.set(arm.side*d.z,0,-arm.side*d.x);pole.addScaledVector(dir,-pole.dot(dir)).normalize();
-    const joint=rig.joint.copy(shoulder).addScaledVector(dir,length/2).addScaledVector(pole,Math.sqrt(.42*.42-length*length/4));
+    const joint=rig.joint.copy(shoulder).addScaledVector(dir,length/2).addScaledVector(pole,Math.sqrt(bone*bone-length*length/4));
     arm.upper.quaternion.setFromUnitVectors(rig.down,rig.lower.copy(joint).sub(shoulder).normalize());
     rig.inverse.copy(arm.upper.quaternion).invert();rig.lower.set(x,y,z).sub(joint).normalize().applyQuaternion(rig.inverse);arm.elbow.quaternion.setFromUnitVectors(rig.down,rig.lower);
     rig.orientation.setFromEuler(rig.euler.set(wx,wy,wz));arm.hand.quaternion.copy(arm.upper.quaternion).multiply(arm.elbow.quaternion).invert().multiply(rig.orientation);
@@ -312,6 +319,65 @@
     const across=Math.max(0,(a-.35)/.65),forward=Math.min(1,a/.35);
     placeBowArm(r,r.left,.42-.52*across,y,.10+(.28-draw)*forward,0,0,0);
   }
+  function knightBody(T,model,look){
+    const retired=new Set(),replace=(mesh,geometry)=>{retired.add(mesh.geometry);mesh.geometry=geometry;};
+    replace(model.userData.body,root.CharacterSculpt.knightTorso(T,.66,.73,.38));model.userData.body.position.y=1.075;
+    for(const [key,side]of [['armR',-1],['armL',1]]){const arm=model.userData[key];replace(arm,root.CharacterSculpt.capsule(T,.16,.61,.17));arm.geometry.translate(0,-.25,0);arm.position.set(side*.40,1.25,0);}
+    for(const [key,side]of [['legR',-1],['legL',1]]){const leg=model.userData[key];replace(leg,root.CharacterSculpt.capsule(T,.195,.68,.215));leg.geometry.translate(0,-.305,0);leg.position.set(side*.145,.75,0);for(const child of leg.children){if(child.geometry?.type==='ExtrudeGeometry'){child.position.y=-.585;child.scale.x=.96;}else if(child.geometry?.type==='BoxGeometry'){child.position.y=-.66;child.scale.x=.96;}}}
+    for(const part of model.userData.baseClothing||[])if(part!==model.userData.body)part.position.y+=.125;
+    model.userData.head.position.y=1.68;model.userData.head.scale.y=.92;
+    const neck=model.getObjectByName('anatomical-neck');if(neck)neck.position.y=1.48;
+    const palm=model.userData.armR.children.find(c=>c.geometry?.type==='SphereGeometry');
+    if(palm){replace(palm,root.CharacterSculpt.gripHand(T));palm.material=new T.MeshPhongMaterial({color:look.leather,specular:0x332c29,shininess:16});palm.name='knight-grip-gauntlet';palm.position.set(0,-.46,.10);model.userData.knightRightHand=palm;}
+    // The authored hand anchor is cosmetic and never changes the hitbox or
+    // gameplay reach. All attack offsets still come from the existing tracks.
+    model.userData.heroGrip=[0,-.46,.10];model.userData.knightSculpt=true;
+    for(const geometry of retired)geometry.dispose();
+  }
+  function fitKnightFace(T,model){
+    const face=model.userData.face,head=model.userData.headMesh;if(!face||!head)return;
+    // Sample the authored local triangles once while building the character.
+    // Reuse the existing geometry/material; no extra rendered mesh or texture.
+    const probe=new T.Mesh(head.geometry,head.material),ray=new T.Raycaster(),origin=new T.Vector3(),direction=new T.Vector3(0,0,-1);
+    probe.updateMatrixWorld(true);
+    face.surface=(x,y)=>{ray.set(origin.set(x,y,1),direction);const hit=ray.intersectObject(probe,false)[0];return hit?hit.point.z+.006:.24;};
+    const eyeX=.105,eyeY=.038,browY=.073;
+    for(let i=0;i<face.eyes.length;i++){
+      const side=i?1:-1,eye=face.eyes[i];eye.position.set(side*eyeX,eyeY,face.surface(side*eyeX,eyeY));
+      face.whites[i].position.copy(eye.position);face.whites[i].position.z-=.005;
+      if(face.lids[i]){face.lids[i].position.copy(eye.position);face.lids[i].position.z+=.006;}
+      face.brows[i].position.set(side*eyeX,browY,face.surface(side*eyeX,browY)+.004);
+    }
+    face.browY=browY;face.width=.90;face.mouth.position.y=-.139;face.mouth.position.z=face.surface(0,-.139)+.001;
+    for(let i=0;i<face.lips.length;i++){const lip=face.lips[i];lip.position.y=face.mouth.position.y+(i?-.006:.006);lip.position.z=face.surface(0,lip.position.y)+.003;}
+    for(let i=0;i<face.corners.length;i++){const corner=face.corners[i];corner.position.set((i?1:-1)*.049,-.137,face.surface((i?1:-1)*.049,-.137)+.002);}
+    for(const cheek of face.cheeks){cheek.position.x*=.9;cheek.position.y=-.069;cheek.position.z=face.surface(cheek.position.x,cheek.position.y);}
+    face.teeth.position.set(0,face.mouth.position.y,face.mouth.position.z+.003);
+  }
+  function swordSupportRig(T,model,active){
+    let rig=model.userData.swordSupportArm;
+    if(!rig&&active){
+      const upper=model.userData.armL,elbow=new T.Group(),hand=new T.Group(),owner=new T.Mesh(upper.geometry,upper.material),skin=upper.material;
+      owner.name='sword-arm-owned-rest-geometry';owner.visible=false;model.add(owner);
+      const bone=.44,upperGeometry=root.CharacterSculpt.capsule(T,.16,bone,.17);upperGeometry.translate(0,-bone/2,0);
+      const forearm=new T.Mesh(root.CharacterSculpt.capsule(T,.145,bone,.16),skin);forearm.geometry.translate(0,-bone/2,0);forearm.name='sword-support-forearm';elbow.add(forearm);elbow.position.y=-bone;hand.position.y=-bone;upper.add(elbow);elbow.add(hand);elbow.name='sword-support-elbow';hand.name='sword-support-hand';
+      rig={upper,elbow,hand,owner,upperGeometry,idleGeometry:upper.geometry,bone,side:1,down:new T.Vector3(0,-1,0),delta:new T.Vector3(),dir:new T.Vector3(),pole:new T.Vector3(),joint:new T.Vector3(),lower:new T.Vector3(),inverse:new T.Quaternion(),orientation:new T.Quaternion(),euler:new T.Euler(),target:new T.Vector3(),contact:new T.Vector3(),active:false};
+      const palm=upper.children.find(c=>c.geometry?.type==='SphereGeometry');if(palm){palm.geometry.dispose();palm.geometry=root.CharacterSculpt.gripHand(T);palm.material=new T.MeshPhongMaterial({color:style('swordsman','male').leather,specular:0x332c29,shininess:16});palm.name='knight-support-gauntlet';rig.palm=palm;rig.palmRest=palm.position.clone();}
+      model.userData.swordSupportArm=rig;
+    }
+    if(!rig||rig.active===active)return;
+    rig.active=active;rig.elbow.visible=active;rig.upper.geometry=active?rig.upperGeometry:rig.idleGeometry;rig.owner.geometry=active?rig.idleGeometry:rig.upperGeometry;
+    if(rig.palm){(active?rig.hand:rig.upper).add(rig.palm);rig.palm.position.copy(active?rig.contact.set(0,0,0):rig.palmRest);rig.palm.quaternion.identity();}
+  }
+  function poseSwordSupport(model,p,q){
+    const rig=model.userData.swordSupportArm;if(!rig?.active)return;
+    // Compute the secondary grip in model space, so heading, scale and body
+    // lean are inherited exactly once. The arm solver allocates nothing.
+    const right=model.userData.armR,grip=model.userData.heroGrip;
+    rig.target.fromArray(grip).applyQuaternion(right.quaternion).add(right.position);rig.target.x+=p.wpx;rig.target.y+=p.wpy;rig.target.z+=p.wpz;
+    q.setFromEuler(rig.euler.set(p.wx,p.wy,p.wz));rig.target.add(rig.contact.set(0,-.20,0).applyQuaternion(q));
+    placeBowArm(rig,rig,rig.target.x,rig.target.y,rig.target.z,p.wx,p.wy,p.wz);
+  }
   function base(job,build,identity='hero',sex=root.TowerPartyCore?.PROFESSIONS[job]?.gender||'male'){
     if(job==='robot')return robotBase(root.THREE,sex,identity);
     const s=style(job,sex),female=sex==='female',m=build({shirt:s.shirt,pants:0x354351,skin:s.skin,hair:s.hair,type:female?'girl':'boy',heroJob:job,heroSex:sex}),T=root.THREE;
@@ -320,8 +386,8 @@
     const head=m.userData.head;if(!T||!head)return m;head.scale.set(s.face*(female?.87:1.03),female?.94:job==='chef'?.96:job==='archer'?1.07:1,1);if(female)head.position.y+=.07;
     // Preserve the character-owned complexion map when upgrading surface response.
     const replaced=new Map();m.traverse(o=>{if(!o.isMesh||o.material?.type!=='MeshLambertMaterial')return;const old=o.material;if(!replaced.has(old)){const isHair=old.color.getHex()===s.hair,isSkin=old.color.getHex()===s.skin,mat=new T.MeshPhongMaterial({color:old.color,map:old.map,bumpMap:old.bumpMap,bumpScale:old.bumpScale,specular:isHair?0x313038:isSkin?0x332521:0x171c22,shininess:isHair?27:isSkin?13:5,transparent:old.transparent,opacity:old.opacity,side:old.side});mat.userData={...old.userData};replaced.set(old,mat);}o.material=replaced.get(old);});for(const old of replaced.keys())old.dispose();
-    const jaw=({swordsman:1.14,mage:.94,scout:.95,chef:1.1,healer:1.0,smith:1.18,archer:.9}[job])*(female?.85:1),faceMesh=m.userData.headMesh;
-    if(faceMesh&&root.CharacterSculpt?.head){faceMesh.geometry.dispose();faceMesh.geometry=root.CharacterSculpt.head(T,.54,.55,.48,{jaw:female&&job==='smith'?.94:jaw,cheek:job==='chef'?1.45:female&&job==='smith'?1.45:female?1.2:1,chin:female?.86:job==='smith'?1.12:1,detail:'hero'});}
+    const knight=job==='swordsman'&&!female,jaw=({swordsman:knight?1.06:1.14,mage:.94,scout:.95,chef:1.1,healer:1.0,smith:1.18,archer:.9}[job])*(female?.85:1),faceMesh=m.userData.headMesh;
+    if(faceMesh&&root.CharacterSculpt?.head){faceMesh.geometry.dispose();faceMesh.geometry=knight&&root.CharacterSculpt.knightHead?root.CharacterSculpt.knightHead(T):root.CharacterSculpt.head(T,.54,.55,.48,{jaw:female&&job==='smith'?.94:jaw,cheek:job==='chef'?1.45:female&&job==='smith'?1.45:female?1.2:1,chin:female?.86:job==='smith'?1.12:1,detail:'hero'});}
     for(const child of head.children)if(child.name==='hair-side'||job==='archer'&&child.name==='human-ear')child.visible=false;
     if(m.children.find(c=>c.name==='base-skirt'))m.children.find(c=>c.name==='base-skirt').visible=false;
     const mats=new Map(),add=(geo,color,x,y,z,parent=head)=>{if(!mats.has(color))mats.set(color,new T.MeshLambertMaterial({color}));const o=new T.Mesh(geo,mats.get(color));o.position.set(x,y,z);parent.add(o);return o;};
@@ -333,6 +399,7 @@
     const bridge=soft(.048,.105,.044,s.skin,0,-.015,.244);bridge.name='nose-bridge';for(const side of [-1,1]){const nostril=soft(.013,.012,.01,0x8b6055,side*.024,-.074,.286);nostril.name='nostril';}
     const face=m.userData.face;if(face){const eyeMaterial=new T.MeshLambertMaterial({color:s.eyes});for(const eye of face.eyes){eye.material=eyeMaterial;eye.scale.x=female&&job==='smith'?.96:female?.88:.76;}for(const b of face.brows){b.scale.x=(job==='smith'?(female?.86:1.2):job==='healer'?.8:1)*(female?.9:1.1);b.scale.y=female?.7:1.2;}face.width=(job==='chef'?1.15:job==='archer'?.85:1)*(female?.9:1);for(const lip of face.lips||[])lip.material.color.setHex(female?0xb3747b:0xae8170);for(const cheek of face.cheeks)cheek.material.opacity=female?.34:.24;}
     root.CharacterFace?.refine(T,m,{job,sex,skin:s.skin,hair:s.hair,eyes:s.eyes});
+    if(knight)fitKnightFace(T,m);
     // A real short neck overlaps chin and collar, avoiding floating female heads.
     const neckMesh=new T.Mesh(root.CharacterSculpt.capsule(T,female?.19:.22,.23,.19),new T.MeshPhongMaterial({color:s.skin,specular:0x332521,shininess:13}));neckMesh.name='anatomical-neck';neckMesh.position.set(0,1.35,-.015);m.add(neckMesh);
     if(job==='scout')for(const side of [-1,1])for(let i=0;i<2;i++)add(new T.SphereGeometry(.012,5,4),0xa56a51,side*(.15+i*.04),-.055,.265);
@@ -342,6 +409,7 @@
     const badge=add(new T.SphereGeometry(.045,8,5),s.accent,.2,1.21,.23,m);badge.scale.z=.4;m.userData.baseClothing?.push(badge);
     if(female){for(const leg of [m.userData.legL,m.userData.legR]){leg.material=new T.MeshPhongMaterial({color:s.skin,specular:0x332521,shininess:13});const boot=leg.children.find(c=>c.geometry?.type==='ExtrudeGeometry');if(boot){boot.scale.y=1.8;boot.position.y=-.38;}}}
     for(const arm of [m.userData.armL,m.userData.armR]){const sleeve=arm.children.find(c=>c.geometry?.type==='LatheGeometry');if(sleeve){sleeve.scale.set(1.12,female?.86:1.04,1.12);sleeve.name='connected-shoulder-sleeve';}const cuff=arm.children.find(c=>c.geometry?.type==='BoxGeometry');if(cuff){cuff.scale.set(1.06,1.1,1.06);cuff.name='tailored-wrist-cuff';}}
+    if(knight)knightBody(T,m,s);
     if(job==='archer'){const old=m.userData.armR.geometry;bowArmRig(T,m);old.dispose();}
     return m;
   }
@@ -354,12 +422,18 @@
   function poseRobotLegArmor(model){if(model.userData.heroJob!=='robot')return;for(const shell of model.userData.heroPieces||[])if(shell.userData.baseKind==='robot_shell')for(const plate of shell.children){const joint=model.userData[plate.userData.robotJoint];if(joint){plate.position.copy(joint.position);plate.quaternion.copy(joint.quaternion);plate.scale.copy(joint.scale);}}}
   function dress(T,model,equipment,dispose,{showHelmet=true}={}){const appearance={job:model.userData.heroJob,sex:model.userData.heroSex},info=appearance.job==='robot'?robotLight(equipment):null;equipment=Object.fromEntries(Object.entries(equipment).filter(([slot,g])=>!['core1','core2'].includes(slot)&&g?.slot!=='core').map(([slot,g])=>[slot,g?.durability===0?null:g]));const geometrySignature=(appearance.job||'')+'|'+(appearance.sex||'male')+'|'+showHelmet+'|'+Object.values(equipment).map(g=>g?.kind||'-').join('|'),signature=geometrySignature+(info?'|core:'+info.tier:'');if(model.userData.heroDress===signature)return;if(model.userData.heroDressGeometry===geometrySignature){if(info)colorRobotEnergy(model,info);model.userData.heroDress=signature;return;}
     for(const p of model.userData.heroPieces||[]){p.parent?.remove(p);dispose(p);}const pieces=[];
+    if(model.userData.knightSculpt)swordSupportRig(T,model,H.GEAR[equipment.weapon?.kind]?.baseKind==='greatsword');
     for(const item of Object.values(equipment).filter(g=>g&&(g.slot!=='helmet'||showHelmet))){const piece=gear(T,item.kind,appearance),slot=item.slot;pieces.push(piece);
       const baseKind=H.GEAR[item.kind].baseKind;
-      if(slot==='weapon'){if(baseKind==='elven_bow'&&model.userData.bowArms){piece.position.set(0,0,0);model.userData.bowArms.right.hand.add(piece);}else{piece.position.set(0,baseKind==='robot_fists'?-.53:-.36,baseKind==='robot_fists'?.07:.13);model.userData.armR.add(piece);}if(baseKind==='twin_daggers'||baseKind==='robot_fists'){const left=gear(T,item.kind,appearance);left.position.set(0,baseKind==='robot_fists'?-.53:-.36,baseKind==='robot_fists'?.07:.13);if(baseKind==='robot_fists')left.scale.x=-1;model.userData.armL.add(left);pieces.push(left);}else if(baseKind==='spellbook'){piece.position.set(0,1.04,.49);model.add(piece);}}
+      if(slot==='weapon'){if(baseKind==='elven_bow'&&model.userData.bowArms){piece.position.set(0,0,0);model.userData.bowArms.right.hand.add(piece);}else{if(model.userData.heroGrip)piece.position.fromArray(model.userData.heroGrip);else piece.position.set(0,baseKind==='robot_fists'?-.53:-.36,baseKind==='robot_fists'?.07:.13);model.userData.armR.add(piece);}if(baseKind==='twin_daggers'||baseKind==='robot_fists'){const left=gear(T,item.kind,appearance);left.position.set(0,baseKind==='robot_fists'?-.53:-.36,baseKind==='robot_fists'?.07:.13);if(baseKind==='robot_fists')left.scale.x=-1;model.userData.armL.add(left);pieces.push(left);}else if(baseKind==='spellbook'){piece.position.set(0,1.04,.49);model.add(piece);}}
       else if(slot==='shield'){piece.position.set(.07,-.32,.08);piece.rotation.y=Math.PI/3;model.userData.armL.add(piece);}else model.add(piece);
+      if(model.userData.knightSculpt&&slot==='armor'){piece.scale.set(.95,1,.94);piece.position.y=.125;}
+      if(model.userData.knightSculpt&&slot==='helmet'){piece.scale.set(.93,.96,.95);piece.position.y=.19;}
     }
-    for(const p of model.userData.head?.children||[])if(p.name==='hair-crown'||p.name==='hair-fringe')p.visible=!showHelmet||!equipment.helmet||H.GEAR[equipment.helmet.kind]?.baseKind==='rune_crown';
+    // His cropped hair is entirely under a full helmet; do not leave the thin
+    // lower fringe floating along the cheek guards. Other hairstyles keep their
+    // visible braids/nape. Removing or hiding the helmet restores the short cut.
+    for(const p of model.userData.head?.children||[])if(p.name==='hair-crown'||p.name==='hair-fringe'||model.userData.knightSculpt&&p.name==='profession-hair')p.visible=!showHelmet||!equipment.helmet||H.GEAR[equipment.helmet.kind]?.baseKind==='rune_crown';
     // Equipment owns the torso/waist silhouette; old uniform trim must never
     // protrude from a slimmer robe or female armor. Broken/removed armor restores it.
     for(const p of model.userData.baseClothing||[])p.visible=!equipment.armor;
@@ -375,8 +449,10 @@
       // every compass direction instead of pitching around the world's X axis.
       model.rotation.order='YXZ';model.rotation.x=p.lean;model.rotation.z=p.tilt;
       for(const part of model.userData.heroPieces||[]){part.visible=!fp||part.parent===right||part.parent===left||part.parent===bow?.right.hand||part.userData.baseKind==='spellbook';
-        if(part.userData.baseKind===kind){if(kind==='spellbook'){part.position.set(0,1.04+p.bookLift,.49+p.bookPush);part.rotation.set(p.bookTilt,0,0);}else if(kind==='elven_bow'&&bow){part.position.set(0,0,0);part.quaternion.identity();}else{const l=part.parent===left;offset.set(l?p.lpx:p.wpx,l?p.lpy:p.wpy,l?p.lpz:p.wpz).applyQuaternion(q.copy(part.parent.quaternion).invert());part.position.set(0,kind==='robot_fists'?-.53:-.36,kind==='robot_fists'?.07:.13).add(offset);e.set(l?p.lwx:p.wx,l?p.lwy:p.wy,l?p.lwz:p.wz);q.setFromEuler(e);part.quaternion.copy(part.parent.quaternion).invert().multiply(q);}}
+        if(part.userData.baseKind===kind){if(kind==='spellbook'){part.position.set(0,1.04+p.bookLift,.49+p.bookPush);part.rotation.set(p.bookTilt,0,0);}else if(kind==='elven_bow'&&bow){part.position.set(0,0,0);part.quaternion.identity();}else{const l=part.parent===left;offset.set(l?p.lpx:p.wpx,l?p.lpy:p.wpy,l?p.lpz:p.wpz).applyQuaternion(q.copy(part.parent.quaternion).invert());if(model.userData.heroGrip&&!l)part.position.fromArray(model.userData.heroGrip);else part.position.set(0,kind==='robot_fists'?-.53:-.36,kind==='robot_fists'?.07:.13);part.position.add(offset);e.set(l?p.lwx:p.wx,l?p.lwy:p.wy,l?p.lwz:p.wz);q.setFromEuler(e);part.quaternion.copy(part.parent.quaternion).invert().multiply(q);}}
       }
+      if(model.userData.knightRightHand){const hand=model.userData.knightRightHand;e.set(p.wx,p.wy,p.wz);q.setFromEuler(e);hand.quaternion.copy(right.quaternion).invert().multiply(q);offset.set(p.wpx,p.wpy,p.wpz).applyQuaternion(q.copy(right.quaternion).invert());hand.position.fromArray(model.userData.heroGrip).add(offset);}
+      poseSwordSupport(model,p,q);
       if(model.userData.legL)model.userData.legL.rotation.x-=p.knee;if(model.userData.legR)model.userData.legR.rotation.x+=p.knee;poseRobotLegArmor(model);return;
     }
     const t=remaining>0?Math.max(0,Math.min(1,1-remaining/interval)):1,swing=remaining>0?Math.sin(t*Math.PI):0;

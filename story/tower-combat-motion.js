@@ -68,13 +68,18 @@
     double_punch:[{rx:-.9,lx:-.9,rz:-.28,lz:.28,wx:0,lwx:0,wz:0,lwz:0,lean:-.06},{rx:-1.47,lx:-.72,wx:0,lwx:0,wz:0,lwz:0,wpz:.18,lean:.12},{rx:-.72,lx:-1.47,wx:0,lwx:0,wz:0,lwz:0,lpz:.18,lean:.12}],
     core_aid:[{rx:-.9,lx:-.9,rz:.3,lz:-.3,wx:0,lwx:0,wz:0,lwz:0},{rx:-1.3,lx:-1.3,rz:-.25,lz:.25,wx:0,lwx:0,wz:0,lwz:0,wpy:.09,lpy:.09,lean:-.02},{rx:-.85,lx:-.85,wx:0,lwx:0,wz:0,lwz:0}],
   };
+  // Greatsword support grips must remain reachable during support gestures,
+  // not just ordinary strikes. Keep the weapon over the body centerline and
+  // reuse the authored two-hand diagonal sweep for the circular skill.
+  const TWO_HAND_SKILLS=Object.freeze({spin:WEAPONS.greatsword[1],ward:SKILL_TRACKS.ward.map(p=>({...p,rz:.65})),rally:SKILL_TRACKS.rally.map(p=>({...p,rz:.65}))});
   const motionFamilies=new Set(Object.values(FAMILIES));
   const familyFor=skill=>ROBOT_FAMILIES[skill?.id]||(motionFamilies.has(skill?.presentation?.motion)?skill.presentation.motion:FAMILIES[skill?.effect]||'');
-  function rest(kind,shield){const p={...REST};if(shield)p.lx=-.35;if(['greatsword','warhammer','arcane_staff'].includes(kind)){p.rx=-.35;p.lx=-.5;p.rz=.65;p.lz=-.9;}if(kind==='spellbook'){p.rx=p.lx=-1;p.rz=.5;p.lz=-.5;}if(kind==='elven_bow'){p.rx=-.7;p.lx=-.35;p.wx=0;}if(kind==='robot_fists'){p.rx=p.lx=-.64;p.rz=-.14;p.lz=.14;p.wx=p.lwx=p.wz=p.lwz=0;}return p;}
+  function rest(kind,shield){const p={...REST};if(shield)p.lx=-.35;if(['greatsword','warhammer','arcane_staff'].includes(kind)){p.rx=-.35;p.lx=-.5;p.rz=.65;p.lz=-.9;}if(['longsword','greatsword'].includes(kind)){p.wy=Math.PI/2;p.wz=0;}if(kind==='spellbook'){p.rx=p.lx=-1;p.rz=.5;p.lz=-.5;}if(kind==='elven_bow'){p.rx=-.7;p.lx=-.35;p.wx=0;}if(kind==='robot_fists'){p.rx=p.lx=-.64;p.rz=-.14;p.lz=.14;p.wx=p.lwx=p.wz=p.lwz=0;}return p;}
   function sample(kind,action='attack',variant=0,progress=1,shield=false,family='',out={}){
     kind=kind.replace(/_t[2-5]$/,'');
     const base=rest(kind,shield),track=(WEAPONS[kind]||WEAPONS.unarmed)[variant%2];let poses=track;
     if(action==='skill'||action==='charge'){poses=family==='bow'?WEAPONS.elven_bow[variant%2]:family==='slash'?(kind==='greatsword'?WEAPONS.greatsword[0]:WEAPONS.longsword[0]):family==='heavy'?track:family==='thrust'&&['longsword','greatsword'].includes(kind)?WEAPONS.longsword[1]:family==='thrust'&&kind==='twin_daggers'?WEAPONS.twin_daggers[0]:SKILL_TRACKS[family]||SKILL_TRACKS.cast;}
+    if((action==='skill'||action==='charge')&&kind==='greatsword'&&TWO_HAND_SKILLS[family])poses=TWO_HAND_SKILLS[family];
     const t=clamp(progress);if(action!=='charge'&&t===1){Object.assign(out,base);return out;}
     if(action==='charge'){const prep=poses[0],amount=Math.min(1,t*5);for(const k in base)out[k]=base[k]+((prep[k]??base[k])-base[k])*amount;return out;}
     const times=[0,.22,.48,.7,1],frames=[base,poses[0],poses[1],poses[2],base];let i=0;while(i<3&&t>times[i+1])i++;const u=clamp((t-times[i])/(times[i+1]-times[i])),smooth=u*u*(3-2*u);

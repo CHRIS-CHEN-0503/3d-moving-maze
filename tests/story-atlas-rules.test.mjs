@@ -58,6 +58,19 @@ test('documentation separates five-minute shields from much shorter taunt and im
   assert.match(detail(D.skill('worldroot_arrow'),'持續／附帶效果'),/束縛 2 秒.*緩速 60% 持續 8 秒/);
 });
 
+test('healing guide reads current shared skill numbers without stale percent descriptions',()=>{
+  assert.equal(detail(D.skill('herbal_heal'),'冷卻'),G.HEALING.herbalCooldown+' 秒');
+  assert.equal(D.skill('herbal_heal').levels[0].value,30);
+  assert.equal(D.skill('banquet_broth').levels[0].value,120);
+  assert.equal(D.skill('dawn_return').levels[0].value,90);
+  assert.equal(detail(D.skill('dawn_sanctuary'),'持續／附帶效果'),'領域十秒，合計恢復最大生命'+H.SKILLS.dawn_sanctuary.power[0]+'%；施放時扶起一人至'+G.HEALING.sanctuaryRevivePercent+'%生命。');
+  assert.equal(detail(D.skill('hero_feast'),'持續／附帶效果'),'十秒恢復最大生命'+G.HEALING.feastPercent+'%；全隊增傷15%持續四十五秒。');
+  const html=readFileSync(new URL('../docs/職業裝備圖鑑.html',import.meta.url),'utf8');
+  const section=html.match(/<section><h3>療癒與自動補血<\/h3>([\s\S]*?)<\/section>/)?.[1];
+  assert.ok(section);
+  for(const pattern of [/冷卻五秒/,/生命恢復量提高50%/,/料理與藥品本身.*不增加/,/允許技能消耗食材／零件/,/低於50%生命/,/不能隔牆.*機器人/,/自動喝療癒藥.*另行設定/])assert.match(section,pattern);
+});
+
 test('all gear stats, five tiers, wear and price ranges use game definitions rather than historical docs',()=>{
   for(const record of D.build().gear){
     const def=H.GEAR[record.id],m=C.durabilityMultiplier(record.id);

@@ -34,13 +34,13 @@
     ['rift_mark','裂隙標記','mark',true,290,28,'刺出290%傷害，標記敵人破綻10秒。標記期間隊伍命中更痛；背後命中也能接續破綻接力。',{params:{markSeconds:10},presentation:look('cast','metal','thrust',0xffaa80,0x91efdc)}],
     ['hunt_chain','獵陣接力',30,15,'破綻接力的隊友追加傷害提高30%、同一敵人的觸發間隔縮短15%；裂隙標記的傷害提高30%、冷卻縮短15%。']);
   branch('hero_feast','chef','active','盛宴廚路',
-    ['banquet_broth','百席暖宴','soup',false,80,52,'消耗2份香草與1份甜根莖，立刻為附近存活隊友各恢復80生命。可在盛宴的緩慢恢復之外，救急補血。',{cost:{herb:2,root:1},preparation:1,presentation:look('steam','cook','cook',0xffca6b,0xffecb6)}],
+    ['banquet_broth','百席暖宴','soup',false,120,52,'消耗2份香草與1份甜根莖，立刻為附近存活隊友各恢復120生命。可在盛宴的緩慢恢復之外，救急補血。',{cost:{herb:2,root:1},preparation:1,presentation:look('steam','cook','cook',0xffca6b,0xffecb6)}],
     ['lasting_banquet','餘香長宴',25,15,'迷宮盛宴的飽食、恢復與增傷效果提高25%；百席暖宴的恢復量提高25%。兩招冷卻縮短15%，持續時間不變。']);
   branch('many_flavors','chef','passive','養生廚路',
     ['nourishing_brew','暖胃護湯','barrier',false,65,40,'消耗1份香草與1份甜根莖，給一位隊友65點護盾，最多維持五分鐘。這碗護湯不算料理食譜，不累積百味養生。',{cost:{herb:1,root:1},presentation:look('shield','cook','cook',0xffd588,0xa9edb8)}],
     ['hundred_flavor_heart','百味長養',35,20,'百味養生的恢復量與護盾提高35%、觸發間隔縮短20%；暖胃護湯的護盾提高35%、冷卻縮短20%。仍需兩種不同料理。']);
   branch('dawn_sanctuary','healer','active','曙光聖路',
-    ['dawn_return','曙光續命','revive',false,60,70,'消耗3份香草，扶起一位倒地隊友，恢復其60%最大生命。與黎明聖域搭配，先救人、再持續治療。',{cost:{herb:3},preparation:1.5,presentation:look('heal','heal','heal',0xffe9a3,0xfffbdb)}],
+    ['dawn_return','曙光續命','revive',false,90,70,'消耗3份香草，扶起一位倒地隊友，恢復其90%最大生命。與黎明聖域搭配，先救人、再持續治療。',{cost:{herb:3},preparation:1.5,presentation:look('heal','heal','heal',0xffe9a3,0xfffbdb)}],
     ['endless_dawn','長明聖域',25,15,'黎明聖域與曙光續命的恢復量提高25%，冷卻縮短15%。不會讓聖域額外扶起第二位隊友。']);
   branch('life_covenant','healer','passive','守命聖路',
     ['covenant_ward','約定守護','ward',false,10,55,'消耗1份香草，給一位隊友十秒守護，擋下一次一般異常狀態。這不是傷害無敵，也不取代守命之約的救命效果。',{cost:{herb:1},presentation:look('shield','shield','ward',0x92e8ed,0xe5fffa)}],

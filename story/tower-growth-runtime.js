@@ -46,7 +46,7 @@
     }
     function tick(dt){hud();if(!ready())return;const h=H,g=R.state(r()),ids=h.ids(r()),adj={};for(const id of ids){const p=pos(id);adj[id]=p?ids.filter(k=>pos(k)&&dist(p,pos(k))<=6&&clear(p,pos(k))):[];}g.nearby=adj;
       for(const id of ids){const p=pos(id);if(!p||h.hp(r(),id)<=0)continue;const fortress=h.buff(r(),'fortress',id);if(fortress)h.applyTaunt(r(),id,{monsters:ctx.monsters(),origin:p,clear,seconds:Math.min(.35,fortress.left),retain:true});
-        if(h.buff(r(),'sanctuary',id))adj[id].filter(k=>h.hp(r(),k)>0).forEach(k=>h.heal(r(),k,h.maxHp(r(),k)*.04*R.modifiers(r(),id,'dawn_sanctuary').power*Math.min(dt,h.buff(r(),'sanctuary',id).left)*(id==='hero'?1+.02*(h.level(r(),id)-1):1)));
+        if(h.buff(r(),'sanctuary',id))adj[id].filter(k=>h.hp(r(),k)>0).forEach(k=>h.heal(r(),k,h.maxHp(r(),k)*R.power(r(),id,h.SKILLS.dawn_sanctuary)/100/10*Math.min(dt,h.buff(r(),'sanctuary',id).left)*(id==='hero'?1+.02*(h.level(r(),id)-1):1)));
       }
       const route=g.route;if(route&&route.floor===r().floor){const key=JSON.stringify(route.points);if(key!==routeKey){clearRoute();routeKey=key;for(const p of route.points){const m=new T.Mesh(new T.RingGeometry(.3,.45,12),new T.MeshBasicMaterial({color:0x8fffe2,transparent:true,opacity:.65,depthWrite:false,side:T.DoubleSide}));m.rotation.x=-Math.PI/2;m.position.set(p.x,.04,p.z);ctx.world().add(m);routeMeshes.push(m);}}for(const id of ids){const p=pos(id);if(p&&route.points.some(k=>dist(p,k)<1.8&&clear(p,k)))h.setBuff(r(),id,'escape',Math.min(.3,route.left),route.power??25);}}else if(routeMeshes.length)clearRoute();
       clock+=dt;if(clock<.35)return;clock=0;

@@ -56,7 +56,7 @@ test('every level-twelve active is castable through actual progression; its mast
     if(s.effect==='ward'){approx(H.buff(n,'ward').left,power*(1+H.stats(n).support));assert.equal(H.buff(n,'ward').power,1);}
     if(s.effect==='fortify'){approx(H.buff(n,'fortify').power,power);assert.equal(H.buff(n,'fortify').left,30);}
     if(s.effect==='barrier'){assert.equal(H.buff(n,'barrier').left,300);assert.ok(H.buff(n,'barrier').power>=power);}
-    if(s.effect==='revive')assert.equal(H.hp(n,target),Math.ceil(H.maxHp(n,target)*power/100));
+    if(s.effect==='revive')assert.equal(H.hp(n,target),Math.min(H.maxHp(n,target),Math.ceil(H.maxHp(n,target)*power/100)));
     if(s.effect==='soup')assert.ok(H.hp(n,target)>before);
     if(s.effect==='repair')approx(H.equipment(n,target).weapon.durability,Math.min(gear.maxDurability,durability+power));
     if(s.job==='archer')assert.equal(n.bag.arrow,r.bag.arrow-(s.effect==='volley'?3:1));
@@ -81,9 +81,9 @@ test('mastered fortress, feast, sanctuary, wards and imprints have actual booste
   let r=supply(awaken('moving_fortress',15));r=cast(r,'moving_fortress').run;
   approx(H.buff(r,'barrier').power,H.maxHp(r)*1.25);assert.equal(H.buff(r,'fortify').power,5);assert.equal(H.buff(r,'fortress').left,15);assert.equal(H.buff(r,'barrier').left,300);
   r=supply(awaken('hero_feast',15));H.setHp(r,'hero',1);r=cast(r,'hero_feast').run;
-  approx(r.hunger,10+35*1.25);approx(H.buff(r,'rally').power,15*1.25);approx(H.buff(r,'regen').power,H.maxHp(r)*.02*1.25*1.28);assert.equal(H.buff(r,'regen').left,10);
+  approx(r.hunger,10+35*1.25);approx(H.buff(r,'rally').power,15*1.25);approx(H.buff(r,'regen').power,H.maxHp(r)*.03*1.25*1.28);assert.equal(H.buff(r,'regen').left,10);
   r=supply(awaken('dawn_sanctuary',15,true));const ally=r.party.members[0].id;H.setHp(r,ally,0);r=cast(r,'dawn_sanctuary',{targetId:'hero'}).run;
-  approx(H.hp(r,ally),H.maxHp(r,ally)*.3*1.25);assert.equal(H.buff(r,'sanctuary').left,10);
+  approx(H.hp(r,ally),H.maxHp(r,ally)*.45*1.25);assert.equal(H.buff(r,'sanctuary').left,10);
   r=supply(awaken('life_covenant',15));r=cast(r,'covenant_ward').run;assert.equal(H.inflict(r,'hero','slow',5,.3),false);assert.equal(H.inflict(r,'hero','slow',5,.3),true,'only one state is blocked');assert.ok(C.validateSave(r));
   r=supply(awaken('artisan_soul',15));const weapon=H.equipment(r).weapon,baseDamage=H.stats(r).damage;r=expectOk(G.imprint(r,'hero',weapon.id,true));
   const mark=G.imprintFor(r,'hero',H.equipment(r).weapon);assert.equal(mark.left,Math.ceil(weapon.maxDurability*.26));assert.equal(mark.boost,1.3);assert.ok(H.stats(r).damage>baseDamage);

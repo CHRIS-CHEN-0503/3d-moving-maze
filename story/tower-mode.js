@@ -26,7 +26,7 @@
   let shiftLeft = C.floorConfig(99).shiftSeconds, wasShifting = false, floorConfig = null, saveClock = 0, hudClock = 0;
   let heroFp=null,heroFpKind='';
   let attackLeft = 0, hurtLeft = 0, warning = false, floorStarted = false, saveFailed = false;
-  let encounterHold = 0;
+  let encounterHold = 0, bossEncounterHold = 0, campDialog = false;
   let cinema = null,storyTheater=null,storyTheaterKey='',storyPreviewScreen='';
   const encounterAlert=window.TowerEncounterAlert?.create({THREE,world:()=>world,player:()=>playerGroup,camera:()=>camera,firstPerson:()=>G.view==='fp',voice:()=>window.GameVoice?.announceAsset('alert.monster','小心，附近有怪物。留意地上的紅圈，準備閃避，或請護衛攔住牠。',true)});
   let objectiveHint = null;
@@ -229,7 +229,7 @@
         close:closeDialog,refreshGear,hurt:()=>hurtLeft>0,passage:openExplorationPassage,
         makeHero:(job,identity,gender)=>HeroVisual.base(job,buildCharacter,identity,gender||P.sex(run,identity)),hazards:()=>hazards,clearSlow:()=>{hazardSlow=1;},
         beforeAction:()=>!checkLordEntrance(),beforeMonsterHit:allowMonsterHit,
-        monsterEngaged:(m)=>{if(m.lord&&!cinema)lordVoice(m,'encounter');},monsterDefeated:(m)=>{restoreDrops();if(m.lord)presentLord(m,'defeat');},
+        monsterEngaged:(m)=>{if(m.lord){encounterHold=bossEncounterHold=4;window.TowerAudio?.setEncounter(true,true);if(!cinema)lordVoice(m,'encounter');}},monsterDefeated:(m)=>{restoreDrops();if(m.lord){bossEncounterHold=0;window.TowerAudio?.setEncounter(encounterHold>0,false);presentLord(m,'defeat');}},
         bind:bindActionBtn,swing:()=>{attackLeft=.8/(modern()?1:C.hasteMultiplier(run));window.CharacterMotion?.beginAction(playerGroup,'attack',attackLeft);if(modern())window.TowerCombatMotion?.begin(playerGroup,'attack',Heroes.stats(run).interval);}});
       partyUI.install();
     }
@@ -246,8 +246,23 @@
   function action(label, key, item, disabled) {
     return '<button class="tower-btn" data-tower="' + key + '"' + (item ? ' data-item="' + text(item) + '"' : '') + (disabled ? ' disabled' : '') + '>' + text(label) + '</button>';
   }
+  function isCampMusicDialog(kicker, narration, actions) {
+    if (!active || !G.running || run?.status !== 'playing' || !partyUI?.safeCamp?.()) return false;
+    if (narration.commerce === 'camp') return true;
+    if (narration.workshop && kicker === '營地工坊 · 暫停中') return true;
+    if (kicker === '安全營地 · 動力核心') return true;
+    if (kicker === '機體強化 · 暫停中' && !String(actions).includes('data-tower="party-merchant-forge"')) return true;
+    // General robot management also has craft/workshop buttons in its footer;
+    // only the actual service confirmations may inherit an established camp.
+    if (!campDialog) return false;
+    const returnAction = kicker === '製作核心確認' ? 'hero-core-craft' : kicker === '機體進階確認' ? 'hero-robot-workshop' :
+      /^(?:確認修理|確認鍛造|確認材料附魔|拆解裝備確認)$/.test(kicker) ? 'party-forge-back' : null;
+    return returnAction !== null && String(actions).includes('data-tower="' + returnAction + '"');
+  }
   function dialog(kicker, title, copy, body, actions, narration={}) {
     el('towerTalkBtn').hidden=true;
+    campDialog = isCampMusicDialog(kicker, narration, actions);
+    window.TowerAudio?.setCamp(campDialog);
     if (active && !paused) {
       paused = true; pauseAt = performance.now(); G.frozen = true;
       if(window.TowerAudio)window.TowerAudio.setPaused(true);
@@ -285,6 +300,7 @@
   function openBattleSettings(quiet=false){if(!active||!G.running)return;dialog('旅程暫停中','遊戲設定','調整聲音、畫質與操作，關閉後繼續冒險。',window.MazeAudioSettings.controls()+(window.MazeQuality?.controls()||'')+'<div class="battle-settings-options">'+action('音樂：'+(G.muted?'關':'開'),'battle-music')+(modern()?'<button class="tower-btn" data-tower="battle-auto-aim" role="switch" aria-checked="'+autoAim+'">自動對準：'+(autoAim?'開':'關')+'</button>'+action('技能排序','hero-order')+action('自動行動／快捷欄','hero-policy'):'')+'</div>'+(modern()?'<p class="tower-copy">自動對準：按攻擊或對敵技能時，朝向攻擊範圍內最近、未被牆壁遮擋的怪物。不會自動走位；輔助技能仍由你選隊友。</p>':''),action('繼續遊戲','close')+action('離開遊戲','quit'),{silent:quiet,summary:'遊戲設定。可以調整音量、畫質、自動對準與隊友行動。'});}
   function closeDialog() {
     if(pendingDungeonShift)return;
+    campDialog = false; window.TowerAudio?.setCamp(false);
     pendingWarriorReplacement=null;
     pendingCooking=null;
     window.GameVoice?.stop(true);
@@ -450,7 +466,7 @@
     if (!run.party && run.charIdx === 4 && !G.shovels && !G.shovelRechargeAt) G.shovelRechargeAt = performance.now() + shovelCdMs();
     updateShovelBtn(); updateKiteBtn(); updateWhistleBtn();
     el('hudLvlName').textContent = floorConfig.name; el('hudRound').textContent = instance?'副本':'劇情';
-    buildTowerEnvironment(); buildWorld(); gearVisual=null;gearSignature='';refreshGear();encounterHold = 0; soundChanged();
+    buildTowerEnvironment(); buildWorld(); gearVisual=null;gearSignature='';refreshGear();encounterHold = bossEncounterHold = 0; campDialog = false; soundChanged();
     floorStarted = true; saveClock = 0; attackLeft = 0; hurtLeft = 3; wasShifting = false;
     clearHurtFeedback();guardClashAt=0;
     save(); updateHud();
@@ -1149,7 +1165,8 @@
     window.TowerAudio.configure({context:AudioEng.ctx,output:AudioEng.musicGain});
     window.TowerAudio.setMuted(G.muted);
     window.TowerAudio.setEnvironment(floorConfig.environmentId);
-    window.TowerAudio.setEncounter(encounterHold>0);
+    window.TowerAudio.setEncounter(encounterHold>0,bossEncounterHold>0);
+    window.TowerAudio.setCamp(campDialog);
     window.TowerAudio.setPaused(paused);
   }
   function scheduleShift() { shiftLeft = dungeonOffer()?.shiftSeconds || C.floorConfig(run.floor).shiftSeconds; warning = false; G.preWarned = false; }
@@ -1280,10 +1297,14 @@
       window.TowerCombatReadability?.update(THREE,monster,{dt,stunned:(run.monsterStuns[monster.id]||0)>0,visible:monster.model.visible&&(!window.MazeSight?.active()||MazeSight.visible(monster.model.position.x,monster.model.position.z)),reducedMotion:!!reducedMotion?.matches,bounds:{minX:center.x-half,minZ:center.z-half,maxX:center.x+half,maxZ:center.z+half}});
     }
     updateBolts(dt);
-    const threat=!nearest&&run.effects.repel<=0&&!(now<G.invisUntil)&&monsters.some(m=>m.alive&&hasClearPath(G.px,G.pz,m.model.position.x,m.model.position.z)&&!isHeld(m)&&!(run.monsterStuns[m.id]>0)&&(m.awarenessLeft>0||m.windup>0));
+    let threat=false,lordThreat=false;
+    if(!nearest&&run.effects.repel<=0&&!(now<G.invisUntil))for(const m of monsters){
+      if(m.alive&&hasClearPath(G.px,G.pz,m.model.position.x,m.model.position.z)&&!isHeld(m)&&!(run.monsterStuns[m.id]>0)&&(m.awarenessLeft>0||m.windup>0)){
+        threat=true;if(m.lord)lordThreat=true;if(lordThreat)break;
+      }
+    }
     encounterAlert?.update(threat,dt);
-    encounterHold=threat?4:Math.max(0,encounterHold-dt);
-    if(window.TowerAudio)window.TowerAudio.setEncounter(encounterHold>0);
+    updateEncounterMusic(threat,lordThreat,dt);
     if(window.CharacterFace){
       CharacterFace.update(playerGroup,now/1000,hurtLeft>0?'hurt':threat?'focus':nearest||nearestWarrior||nearbyEncounter?'happy':'calm');
       for(const npc of [...traders,warriorNpc,explorer].filter(Boolean))if(npc.model?.visible)CharacterFace.update(npc.model,now/1000,npc===nearest||npc===nearestWarrior||npc===nearbyEncounter?'happy':'calm');
@@ -1292,6 +1313,11 @@
     hudClock+=dt;if(hudClock>.15){hudClock=0;updateHud();}
     saveClock+=dt;if(saveClock>8){saveClock=0;save();}
     objectiveHint?.refresh();
+  }
+  function updateEncounterMusic(threat, lordThreat, dt) {
+    encounterHold=threat?4:Math.max(0,encounterHold-dt);
+    bossEncounterHold=lordThreat?4:monsters.some(m=>m.lord&&m.alive)?Math.max(0,bossEncounterHold-dt):0;
+    if(window.TowerAudio)window.TowerAudio.setEncounter(encounterHold>0,bossEncounterHold>0);
   }
   function hasClearPath(ax,az,bx,bz) {
     const steps=Math.ceil(Math.hypot(bx-ax,bz-az)/.3);
@@ -1764,7 +1790,7 @@
     cancelSceneTransition();G.running=false;G.frozen=true;
     window.GameVoice?.stop(true);
     if(window.TowerAudio)window.TowerAudio.stop();
-    active=false;floorStarted=false;paused=false;encounterAlert?.clearVisual();
+    active=false;floorStarted=false;paused=false;campDialog=false;bossEncounterHold=0;encounterAlert?.clearVisual();
     objectiveHint?.stop();
     partyUI?.reset();
     lightingUI?.reset();

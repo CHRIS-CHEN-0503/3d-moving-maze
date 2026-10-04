@@ -6,8 +6,14 @@
 })(typeof globalThis !== 'undefined' ? globalThis : this, function (root) {
   'use strict';
   const ENVIRONMENTS = new Set(['summoning', 'garden', 'roots', 'echo', 'library', 'mist', 'frost', 'clockwork', 'furnace', 'heart']);
-  const FADE_SECONDS = 1, VOLUME = 0.78;
-  let context = null, output = null, environment = null, encounter = false, paused = false, muted = false;
+  const FADE_SECONDS = 1, VOLUME = 0.78, CACHE_LIMIT = 3;
+  // Formal loop files omit the audition's four-second fading room tail.
+  const TRACKS = Object.freeze({
+    'orchestra-summit': Object.freeze({ loopStart: 0, loopEnd: 50.526326530612245, sha256: 'aae7cb2b46c74f2e84010f1a1e6c7550a5b3be875f7159ba33c5dfefdad79371' }),
+    'orchestra-boss': Object.freeze({ loopStart: 0, loopEnd: 49.41176870748299, sha256: 'f8f3a2d14f920dc9cee9f576079e3497d7fd843c7a92abc3d65bcdf20d8d9f48' }),
+    'orchestra-camp': Object.freeze({ loopStart: 0, loopEnd: 49.23077097505669, sha256: 'ad429176e8b51da009b863e334bbf029ad55a6c92463249e8c74b3763713c3c4' }),
+  });
+  let context = null, output = null, environment = null, encounter = false, bossEncounter = false, camp = false, paused = false, muted = false;
   let epoch = 0, current = null;
   const cache = new Map(), requests = new Map(), voices = new Set(), warned = new Set();
 
@@ -34,8 +40,15 @@
     requests.clear();
   }
 
+  function environmentTrack() { return environment === 'summoning' ? 'orchestra-summit' : environment; }
+  function targetTrack() { return camp ? 'orchestra-camp' : bossEncounter ? 'orchestra-boss' : encounter ? 'combat' : environmentTrack(); }
   function pruneCache() {
-    for (const id of cache.keys()) if (id !== environment && id !== 'combat') cache.delete(id);
+    const allowed = new Set([environmentTrack(), 'combat', 'orchestra-boss', 'orchestra-camp']);
+    for (const id of cache.keys()) if (!allowed.has(id)) cache.delete(id);
+    for (const id of cache.keys()) {
+      if (cache.size <= CACHE_LIMIT) break;
+      if (id !== targetTrack() && id !== current?.id) cache.delete(id);
+    }
   }
 
   function ramp(voice, target) {
@@ -59,7 +72,10 @@
   }
 
   async function load(id, requestEpoch) {
-    if (cache.has(id)) return cache.get(id);
+    if (cache.has(id)) {
+      const buffer = cache.get(id); cache.delete(id); cache.set(id, buffer);
+      return buffer;
+    }
     const controller = new root.AbortController();
     const request = { controller };
     requests.set(id, request);
@@ -70,8 +86,8 @@
       if (controller.signal.aborted || epoch !== requestEpoch) return null;
       const buffer = await context.decodeAudioData(bytes);
       if (controller.signal.aborted || epoch !== requestEpoch || requests.get(id) !== request) return null;
-      if (id !== environment && id !== 'combat') return null;
-      pruneCache(); cache.set(id, buffer);
+      if (id !== targetTrack()) return null;
+      cache.set(id, buffer); pruneCache();
       return buffer;
     } finally {
       if (requests.get(id) === request) requests.delete(id);
@@ -80,12 +96,17 @@
 
   function play(id, buffer) {
     if (current && !current.disposed && !current.fading && current.id === id) return;
+    const loop = TRACKS[id];
+    if (loop && !(Number.isFinite(buffer.duration) && buffer.duration >= loop.loopEnd - .06)) throw new Error('循環音檔長度不足：' + id);
     // Only one old voice may overlap the new voice during a crossfade.
     for (const voice of [...voices]) if (voice !== current) dispose(voice);
     const previous = current;
     const source = context.createBufferSource(), gain = context.createGain();
     const voice = { id, source, gain, fading: false, disposed: false };
     source.buffer = buffer; source.loop = true;
+    if (loop) {
+      source.loopStart = loop.loopStart; source.loopEnd = Math.min(loop.loopEnd, buffer.duration);
+    }
     gain.gain.setValueAtTime(0, context.currentTime);
     source.connect(gain); gain.connect(output);
     source.onended = () => dispose(voice);
@@ -103,7 +124,7 @@
   function transition() {
     cancelRequests(); pruneCache();
     if (!context || !output || !environment || muted) return;
-    const id = encounter ? 'combat' : environment, requestEpoch = epoch;
+    const id = targetTrack(), requestEpoch = epoch;
     if (current && !current.disposed && !current.fading && current.id === id) return;
     load(id, requestEpoch).then(buffer => {
       if (!buffer || epoch !== requestEpoch || muted || !environment) return;
@@ -132,10 +153,16 @@
     environment = id; transition();
   }
 
-  function setEncounter(value) {
+  function setEncounter(value, boss = false) {
+    const next = Boolean(value), nextBoss = next && Boolean(boss);
+    if (encounter === next && bossEncounter === nextBoss) return;
+    encounter = next; bossEncounter = nextBoss; transition();
+  }
+
+  function setCamp(value) {
     const next = Boolean(value);
-    if (encounter === next) return;
-    encounter = next; transition();
+    if (camp === next) return;
+    camp = next; transition();
   }
 
   function setPaused(value) {
@@ -155,8 +182,23 @@
 
   function stop() {
     cancelRequests(); silence(); cache.clear();
-    environment = null; encounter = false; paused = false;
+    environment = null; encounter = false; bossEncounter = false; camp = false; paused = false;
   }
 
-  return Object.freeze({ configure, setEnvironment, setEncounter, setPaused, setMuted, stop });
+  function snapshot() {
+    const live = [...voices].filter(voice => !voice.disposed).map(voice => Object.freeze({
+      id: voice.id, fading: voice.fading,
+      loopStart: voice.source.loopStart || 0, loopEnd: voice.source.loopEnd || voice.source.buffer.duration,
+    }));
+    return Object.freeze({ environment, encounter, bossEncounter, camp, paused, muted,
+      target: environment ? targetTrack() : null, current: current && !current.disposed ? current.id : null,
+      activeCount: live.length, voices: Object.freeze(live), cacheIDs: Object.freeze([...cache.keys()]),
+      requestIDs: Object.freeze([...requests.keys()]),
+      expectedSha256: current && !current.disposed ? TRACKS[current.id]?.sha256 || null : null,
+      loopStart: current && !current.disposed ? current.source.loopStart || 0 : null,
+      loopEnd: current && !current.disposed ? current.source.loopEnd || current.source.buffer.duration : null,
+    });
+  }
+
+  return Object.freeze({ configure, setEnvironment, setEncounter, setCamp, setPaused, setMuted, stop, snapshot });
 });

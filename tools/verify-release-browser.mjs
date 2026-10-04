@@ -21,6 +21,7 @@ const modules=[
  ['TowerStoryDirection','story/tower-story-direction.js','plan'],
  ['TowerSkillEffects','story/tower-skill-effects.js','create'],
  ['CombatAudio','assets/combat-audio.js','create'],
+ ['TowerAudio','story/tower-audio.js','setCamp'],
  ['TowerHeroVisuals','story/tower-heroes-visuals.js','base'],
  ['TowerStoryInsights','story/tower-story-insights.js','journal'],
  ['TowerEnvironmentLife','story/tower-environment-life.js','create']
@@ -65,6 +66,7 @@ const durabilityVersion=Number(durabilityDefinition[1]);report.durabilityVersion
 assert.ok(durabilityVersion>0,'fixed source durability format is valid');
 const files=new Set(['index.html','manifest.webmanifest','package.json','assets/equipment-surfaces.js','assets/character-face.js','assets/character-sculpt.js','assets/character-motion.js','story/story-core.js','story/tower-combat-motion.js','story/tower-heroes-visuals.js','story/tower-characters.js','story/tower-party-runtime.js','story/tower-lighting-runtime.js','story/tower-party.css','story/tower-mobile.css','story/tower-mode.js','docs/職業裝備圖鑑.html','docs/story-atlas-rules.js','docs/story-atlas-items.js','docs/story-atlas-cooperation.js','story/tower-affixes.js','story/tower-adventure-events.js','story/tower-landmarks.js','story/tower-cooperation-core.js','story/tower-cooperation-runtime.js','assets/mode-variants-core.js','assets/mode-variants.js','assets/shop-claims-core.js','assets/shop-claims.js']);
 for(const file of moduleFiles)files.add(file);files.add('story/tower-cinematics.css');
+for(const file of ['orchestra-manifest.json','orchestra-summit.m4a','orchestra-boss.m4a','orchestra-camp.m4a'])files.add('assets/music/'+file);
 for(const m of index.matchAll(/(?:src|href)="([^"#]+)"/g)){
  if(/^(?:https?:|data:|\/\/)/.test(m[1]))continue;
  const name=m[1].split(/[?#]/)[0].replace(/^\.\//,'');
@@ -94,7 +96,8 @@ try{
  // Pages can serve the SPA index for an unknown path. It must never serve a
  // development report; the clean archive and exact root allowlist are primary.
  if(excluded.ok)assert.equal(digest(Buffer.from(await excluded.arrayBuffer())),digest(Buffer.from(index)),'development report was published');
- browser=await chromium.launch({executablePath:'/Applications/Google Chrome.app/Contents/MacOS/Google Chrome',headless:true,args:['--use-angle=swiftshader','--enable-webgl']});
+ const graphicsBackend=process.env.MAZE_QA_GL||'swiftshader';assert.ok(['swiftshader','metal'].includes(graphicsBackend));report.graphicsBackend=graphicsBackend;
+ browser=await chromium.launch({executablePath:'/Applications/Google Chrome.app/Contents/MacOS/Google Chrome',headless:true,args:['--use-angle='+graphicsBackend,'--enable-webgl']});
  for(const [width,height,job]of [[1440,900,'scout'],[844,390,'robot'],[568,320,'mage'],[390,844,'']]){
   const context=await browser.newContext({viewport:{width,height},hasTouch:true,serviceWorkers:'block'}),page=await context.newPage();page.setDefaultTimeout(45000);page.setDefaultNavigationTimeout(60000);page.on('pageerror',e=>report.errors.push(e.stack));
   const currentLoads=[];

@@ -13,7 +13,9 @@ const version=JSON.parse(await readFile(new URL('../package.json',import.meta.ur
 await mkdir(out,{recursive:true});
 const report={version,base,localOnly:true,entry:[],layouts:[],loaded:[],errors:[],blocked:[],sockets:[],limitations:['Real browser natural-entry regression using touch emulation, not physical iPhone performance.','Read-only configuration and score responses are isolated local mocks.','Multiplayer stops at the room chooser; no real room or network write is permitted.']};
 const responseWork=[],contexts=new Set();
-const browser=await chromium.launch({executablePath:'/Applications/Google Chrome.app/Contents/MacOS/Google Chrome',headless:true,args:['--use-angle=swiftshader','--enable-webgl']});
+const graphicsBackend=process.env.MAZE_QA_GL||'swiftshader';
+assert.ok(['swiftshader','metal'].includes(graphicsBackend));report.graphicsBackend=graphicsBackend;
+const browser=await chromium.launch({executablePath:'/Applications/Google Chrome.app/Contents/MacOS/Google Chrome',headless:true,args:['--use-angle='+graphicsBackend,'--enable-webgl']});
 let page;
 async function makePage(width,height){
   const c=await browser.newContext({viewport:{width,height},hasTouch:true,serviceWorkers:'block'});contexts.add(c);
@@ -36,23 +38,43 @@ async function resume(p){
   const close=p.locator('[data-tower="close"]').first();if(await close.isVisible())await close.tap();
   await p.waitForFunction(()=>TowerMode.active&&!TowerMode.paused&&G.running&&!G.frozen,null,{timeout:15000});
 }
+async function cameraView(p,target){
+  assert.ok(['fp','tp','top'].includes(target));const before=await p.evaluate(()=>G.view);let taps=0;
+  while(await p.evaluate(()=>G.view)!==target&&taps<3){await p.locator('#viewToggle').tap();taps++;}
+  assert.equal(await p.evaluate(()=>G.view),target,'public camera cycle must reach '+target);
+  await p.waitForFunction(view=>G.view===view&&(view==='fp'?!playerGroup.visible&&TowerMode.sightRoot()?.getObjectByName('hero-first-person-weapon')?.visible:playerGroup.visible),target);
+  const actual=await p.evaluate(()=>{
+    const headwear=playerGroup.userData.heroPieces.filter(p=>['heavy_helm','light_hood','rune_crown'].includes(p.userData.baseKind)),fp=TowerMode.sightRoot()?.getObjectByName('hero-first-person-weapon');
+    const visible=o=>{for(let node=o;node;node=node.parent)if(!node.visible)return false;return true;};
+    const hats=headwear.map(h=>{let visibleMeshes=0;h.traverse(o=>{if(o.isMesh&&visible(o))visibleMeshes++;});return {kind:h.userData.baseKind,parentIsHead:h.parent===playerGroup.userData.head,effectivelyVisible:visible(h),visibleMeshes};});
+    let fpVisibleMeshes=0;fp?.traverse(o=>{if(o.isMesh&&visible(o))fpVisibleMeshes++;});
+    return {view:G.view,bodyVisible:playerGroup.visible,headwear:hats,fpVisible:!!fp&&visible(fp),fpVisibleMeshes,fpKinds:fp?.children.map(p=>p.userData.baseKind)||[]};
+  });
+  assert.equal(actual.headwear.length,1,'new game must equip an actual headpiece');assert.ok(actual.headwear.every(h=>h.parentIsHead),'headpiece remains attached to its animated head');
+  if(target==='fp'){assert.equal(actual.bodyVisible,false);assert.ok(actual.fpVisible&&actual.fpVisibleMeshes>0,'first person renders the actual weapon meshes');assert.ok(actual.headwear.every(h=>!h.effectivelyVisible&&h.visibleMeshes===0),'headwear has no actually visible mesh in first person');assert.ok(actual.fpKinds.every(k=>!['heavy_helm','light_hood','rune_crown'].includes(k)),'first-person weapon group must not clone hats');}
+  else{assert.equal(actual.bodyVisible,true);assert.ok(actual.headwear.every(h=>h.effectivelyVisible&&h.visibleMeshes>0),'headwear restores in third-person and top views');assert.equal(actual.fpVisible,false);}
+  return {before,taps,...actual};
+}
 async function closeContext(c,p){report.sockets.push(...await p.evaluate(()=>__roomAttempts));await Promise.all(responseWork);await c.close();contexts.delete(c);}
 try{
   for(const [width,height]of [[1440,900],[844,390],[568,320]]){
-    const selectedJob=width===1440?'smith':width===844?'scout':'healer';
+    const selectedJob=width===1440?'smith':width===844?'scout':'healer',selectedSex=width===844?'female':'male';
     const {c,p}=await makePage(width,height);page=p;report.currentCase={width,height,stage:'home'};
     await p.locator('#enterMenuBtn').tap();assert.ok(await p.locator('#storyEntryBtn').isVisible());const screenshots={home:await shot(p,width+'-home')};
     report.currentCase.stage='multiplayer-chooser';await p.locator('#mpBtn').tap();await p.locator('#playerName').fill('本機比例驗證');await p.locator('#profileNextBtn').tap();await p.locator('#startBtn').tap();
     assert.ok(await p.locator('#mpCreate').isVisible());assert.ok(await p.locator('#mpJoin').isVisible());assert.deepEqual(await p.evaluate(()=>({on:MP.on,sockets:__roomAttempts.length})),{on:false,sockets:0});screenshots.multiplayer=await shot(p,width+'-multiplayer-chooser');
     await p.locator('#mpClose').tap();await home(p);await p.locator('#enterMenuBtn').tap();await p.locator('#storyEntryBtn').tap();await p.locator('[data-tower="new"]').tap();
     report.currentCase.stage='profession-selection';const jobs=await p.locator('[data-tower="profession"]').evaluateAll(nodes=>nodes.map(n=>n.dataset.item));assert.equal(jobs.length,8);assert.equal(new Set(jobs).size,8);assert.ok(jobs.includes('robot')&&jobs.includes('swordsman'));assert.equal(await p.locator('.hero-skill-list').count(),0);screenshots.professions=await shot(p,width+'-eight-professions');
-    const jobNames=await p.locator('[data-tower="profession"]').allTextContents();assert.ok(jobNames.some(n=>n.includes('遊俠')));assert.ok(jobNames.every(n=>!n.includes('斥候')));await p.locator('#heroNameInput').fill('本機造型確認');await p.locator('[data-tower="profession"][data-item="'+selectedJob+'"]').tap();assert.equal(await p.locator('.hero-skill-list article').count(),5);screenshots.skills=await shot(p,width+'-five-skill-reveal');
-    report.currentCase.stage='natural-new-game';await p.locator('[data-tower="hero-create-start"]').tap();await resume(p);
-    const save=await p.evaluate(()=>{const r=TowerCore.validateSave(JSON.parse(localStorage.getItem('maze3d_tower_v1')));return {valid:!!r,floor:r?.floor,job:r?.party.profession,running:G.running,frozen:G.frozen,active:TowerMode.active,paused:TowerMode.paused,sockets:__roomAttempts.length};});
-    assert.deepEqual(save,{valid:true,floor:99,job:selectedJob,running:true,frozen:false,active:true,paused:false,sockets:0});screenshots.game=await shot(p,width+'-natural-new-game');
+    const jobNames=await p.locator('[data-tower="profession"]').allTextContents();assert.ok(jobNames.some(n=>n.includes('遊俠')));assert.ok(jobNames.every(n=>!n.includes('斥候')));await p.locator('#heroNameInput').fill('本機造型確認');if(selectedSex==='female')await p.locator('[data-tower="hero-sex"][data-item="female"]').tap();await p.locator('[data-tower="profession"][data-item="'+selectedJob+'"]').tap();assert.equal(await p.locator('.hero-skill-list article').count(),5);screenshots.skills=await shot(p,width+'-five-skill-reveal');
+    report.currentCase.stage='natural-new-game';await p.locator('[data-tower="hero-create-start"]').tap();
+    let cinema=null;if(width===844){await p.locator('#towerCinema').waitFor({state:'visible'});await p.waitForTimeout(500);screenshots.cinema=await shot(p,width+'-female-scout-cloud-opening');cinema={floor:99,job:selectedJob,sex:selectedSex,visible:await p.locator('#towerCinema').isVisible(),screenshot:screenshots.cinema};assert.ok(cinema.visible);}
+    await resume(p);
+    const save=await p.evaluate(()=>{const r=TowerCore.validateSave(JSON.parse(localStorage.getItem('maze3d_tower_v1')));return {valid:!!r,floor:r?.floor,job:r?.party.profession,sex:r?.party.sex,running:G.running,frozen:G.frozen,active:TowerMode.active,paused:TowerMode.paused,sockets:__roomAttempts.length};});
+    assert.deepEqual(save,{valid:true,floor:99,job:selectedJob,sex:selectedSex,running:true,frozen:false,active:true,paused:false,sockets:0});screenshots.game=await shot(p,width+'-natural-new-game');
     report.currentCase.stage='bag';await p.locator('#towerBagBtn').tap();assert.ok(await p.locator('#towerDialog').isVisible());assert.equal(await p.evaluate(()=>document.documentElement.scrollWidth>innerWidth),false);screenshots.bag=await shot(p,width+'-bag');await resume(p);
     report.currentCase.stage='journal';await p.locator('#towerJournalBtn').tap();assert.ok(await p.locator('#towerDialog').isVisible());assert.equal(await p.evaluate(()=>document.documentElement.scrollWidth>innerWidth),false);screenshots.journal=await shot(p,width+'-journal');await resume(p);
-    const overflow=await p.evaluate(()=>document.documentElement.scrollWidth>innerWidth);assert.equal(overflow,false);report.entry.push({width,height,jobs,skillsBeforeSelection:0,revealedSkills:5,save,multiplayerChooser:true,bag:true,journal:true,overflow,screenshots});await closeContext(c,p);console.log('natural entry passed',width,height);
+    report.currentCase.stage='camera-restoration';const cameraViews=[];for(const target of ['fp','tp','top']){cameraViews.push(await cameraView(p,target));screenshots[target]=await shot(p,width+'-'+target+'-camera');}
+    const overflow=await p.evaluate(()=>document.documentElement.scrollWidth>innerWidth);assert.equal(overflow,false);report.entry.push({width,height,selectedJob,selectedSex,jobs,skillsBeforeSelection:0,revealedSkills:5,save,cinema,cameraViews,multiplayerChooser:true,bag:true,journal:true,overflow,screenshots});await closeContext(c,p);console.log('natural entry passed',width,height);
   }
   {
     const {c,p}=await makePage(390,844);page=p;report.currentCase={width:390,height:844,stage:'portrait-gate'};assert.ok(await p.locator('#landscapeGate').isVisible());assert.equal(await p.evaluate(()=>document.documentElement.scrollWidth>innerWidth),false);report.entry.push({width:390,height:844,portraitGate:true,overflow:false,screenshot:await shot(p,'390-portrait-gate')});await closeContext(c,p);

@@ -10,7 +10,7 @@ test('v1.55.0 gameplay additions have versioned real entrypoints in both game an
   for(const name of ['mode-variants-core','mode-variants','shop-claims-core','shop-claims','shop-collection','shop-collection-core','setup-controls','game-rules','capture-mode'])assert.equal(references(game).find(r=>r.path==='assets/'+name+'.js')?.version,['shop-claims','mode-variants'].includes(name)?'1.57.0':'1.55.0',name);
   assert.equal(references(game).find(r=>r.path==='story/tower-floor-lords.js')?.version,'1.57.0');
   assert.equal(references(atlas).find(r=>r.path==='story-atlas-cooperation.js')?.version,'1.55.0');
-  assert.match(game,/const GAME_VERSION='1\.57\.5'/);assert.match(atlas,/v1\.57\.5 圖鑑/);
+  assert.match(game,/const GAME_VERSION='1\.57\.7'/);assert.match(atlas,/v1\.57\.7 圖鑑/);
 });
 test('changed shared atlas rules reject both stale and absent cache tags',()=>{
   for(const path of [...sharedChangedRules.map(name=>'../story/'+name+'.js'),'story-atlas-cooperation.js']){

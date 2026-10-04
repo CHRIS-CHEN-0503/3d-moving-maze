@@ -463,6 +463,22 @@
     q.setFromEuler(rig.euler.set(p.wx,p.wy,p.wz));rig.target.add(rig.contact.set(0,-.20,0).applyQuaternion(q));
     placeBowArm(rig,rig,rig.target.x,rig.target.y,rig.target.z,p.wx,p.wy,p.wz);
   }
+  function joinHumanShoulders(T,model){
+    // A sleeve rotates about an outboard arm pivot; simply widening it leaves
+    // a gap again when raised. These fitted inner sleeves overlap the real
+    // torso and the pivot sleeve in every direction, without moving the hands,
+    // changing the bow/support solvers, or adding anything to the frame loop.
+    const positions=[],normals=[],indices=[],centers=[];
+    for(const [key,side]of [['armR',-1],['armL',1]]){
+      const arm=model.userData[key],center=[arm.position.x-side*.105,arm.position.y,arm.position.z],g=new T.SphereGeometry(1,8,3);
+      g.scale(.15,.10,.135);g.translate(...center);centers.push({side,center});
+      const offset=positions.length/3;positions.push(...g.attributes.position.array);normals.push(...g.attributes.normal.array);indices.push(...Array.from(g.index.array,i=>i+offset));g.dispose();
+    }
+    // Both largely hidden seams share one draw call and 64 triangles total.
+    const geometry=new T.BufferGeometry();geometry.setAttribute('position',new T.Float32BufferAttribute(positions,3));geometry.setAttribute('normal',new T.Float32BufferAttribute(normals,3));geometry.setIndex(indices);
+    const sleeve=model.userData.armR.children.find(p=>p.name==='connected-shoulder-sleeve'),joint=new T.Mesh(geometry,sleeve?.material||model.userData.body.material);
+    joint.name='anatomical-shoulder-sockets';joint.userData.shoulderCenters=centers;model.add(joint);model.userData.shoulderJoints=[joint];
+  }
   function base(job,build,identity='hero',sex=root.TowerPartyCore?.PROFESSIONS[job]?.gender||'male'){
     if(job==='robot')return robotBase(root.THREE,sex,identity);
     const s=style(job,sex),female=sex==='female',m=build({shirt:s.shirt,pants:0x354351,skin:s.skin,hair:s.hair,type:female?'girl':'boy',heroJob:job,heroSex:sex}),T=root.THREE;
@@ -497,6 +513,7 @@
     if(job==='smith')smithDwarfBody(T,m);
     if(knight)knightBody(T,m,s);
     if(job==='archer'){const old=m.userData.armR.geometry;bowArmRig(T,m);old.dispose();}
+    joinHumanShoulders(T,m);
     return m;
   }
   function portrait(job,sex='male'){
@@ -505,6 +522,32 @@
     const braids=female&&job==='smith'?'<g data-hair="twin-braids" fill="none" stroke="'+hex(s.hair)+'" stroke-width="8" stroke-linecap="round"><path d="M24 51q-10 8-4 18t-1 17"/><path d="M72 51q10 8 4 18t1 17"/></g><path d="M14 84h12m44 0h12" stroke="'+hex(s.accent)+'" stroke-width="4"/>':female&&!long?'<path d="M72 50q11 7 3 21t-1 17" fill="none" stroke="'+hex(s.hair)+'" stroke-width="8" stroke-linecap="round"/>':'';
     return '<svg class="hero-portrait" viewBox="0 0 96 112" role="img" aria-label="'+H.JOBS[job].name+' · 成年'+(female?'女性':'男性')+' · '+s.description+'"><rect x="2" y="2" width="92" height="108" rx="20" fill="#1b333d"/>'+hair+ears+'<path d="'+face+'" fill="'+hex(s.skin)+'"/><path d="M'+(female?'19':'12')+' 110V92q0-20 '+(female?'29':'36')+'-20t'+(female?'29':'36')+' 20v18" fill="'+hex(s.cloak)+'"/><path d="M27 32q17-28 43-4l-16 7-11-8-16 16Z" fill="'+hex(s.hair)+'"/><path d="M30 42h12m12 0h12" stroke="'+hex(s.hair)+'" stroke-width="'+(female?2:3)+'" stroke-linecap="round"/><ellipse cx="36" cy="49" rx="3" ry="4" fill="'+hex(s.eyes)+'"/><ellipse cx="60" cy="49" rx="3" ry="4" fill="'+hex(s.eyes)+'"/><path d="m48 49-3 8h5m-9 7q7 4 14 0" fill="none" stroke="'+(female?'#aa6672':'#936f60')+'" stroke-width="2" stroke-linecap="round"/>'+braids+(!female&&['chef','mage','smith'].includes(job)?'<path '+(job==='smith'?'data-beard="long-dwarf" d="M34 65q14 10 28 0 1 21-14 36-15-15-14-36Z"':'d="m34 65 14 4 14-4-5 11H39Z"')+' fill="'+hex(s.hair)+'"/>':'')+'<path d="M'+(female?'32 83 48 98 64 83':'27 85h42m-33 0 12 16 12-16')+'" fill="none" stroke="'+hex(s.accent)+'" stroke-width="3"/></svg>';
   }
+  function mountHeadwear(T,model,piece){
+    const head=model.userData.head;
+    if(!head||head.isMesh){model.add(piece);return;}
+    const kind=piece.userData.baseKind,female=model.userData.heroSex==='female';
+    if(kind==='heavy_helm'||kind==='light_hood'){
+      // The retained lower hair starts at head-local y=.08. Seat the cap
+      // slightly over that continuous seam, with its own shell thickness.
+      // Head-local fitting follows the actual face scale and animation.
+      const radius=kind==='heavy_helm'?(female?.285:.315):(female?.285:.325);
+      const height=radius*(female?(kind==='heavy_helm'?.86:.75):1);
+      const anchor=kind==='heavy_helm'?(female?1.75:1.68):(female?1.74:1.66);
+      piece.scale.set(.303/radius,.28/height,.28/(radius*.9));
+      piece.position.set(0,.074-anchor*piece.scale.y,-.018);
+    }else if(kind==='rune_crown'){
+      // An open circlet follows the rounded brow; keep the full hairstyle.
+      const radius=female?.3:.31;
+      piece.scale.set(.274/(radius*1.05),1,.240/radius);
+      piece.position.set(0,.18-1.785,-.018);
+    }else{
+      // Preserve the authored rest placement for any future headgear type.
+      head.updateMatrix();piece.updateMatrix();
+      const local=new T.Matrix4().copy(head.matrix).invert().multiply(piece.matrix);
+      local.decompose(piece.position,piece.quaternion,piece.scale);
+    }
+    head.add(piece);
+  }
   function poseRobotLegArmor(model){if(model.userData.heroJob!=='robot')return;for(const shell of model.userData.heroPieces||[])if(shell.userData.baseKind==='robot_shell')for(const plate of shell.children){const joint=model.userData[plate.userData.robotJoint];if(joint){plate.position.copy(joint.position);plate.quaternion.copy(joint.quaternion);plate.scale.copy(joint.scale);}}}
   function dress(T,model,equipment,dispose,{showHelmet=true}={}){const appearance={job:model.userData.heroJob,sex:model.userData.heroSex},info=appearance.job==='robot'?robotLight(equipment):null;equipment=Object.fromEntries(Object.entries(equipment).filter(([slot,g])=>!['core1','core2'].includes(slot)&&g?.slot!=='core').map(([slot,g])=>[slot,g?.durability===0?null:g]));const geometrySignature=(appearance.job||'')+'|'+(appearance.sex||'male')+'|'+showHelmet+'|'+Object.values(equipment).map(g=>g?.kind||'-').join('|'),signature=geometrySignature+(info?'|core:'+info.tier:'');if(model.userData.heroDress===signature)return;if(model.userData.heroDressGeometry===geometrySignature){if(info)colorRobotEnergy(model,info);model.userData.heroDress=signature;return;}
     for(const p of model.userData.heroPieces||[]){p.parent?.remove(p);dispose(p);}const pieces=[];
@@ -512,10 +555,9 @@
     for(const item of Object.values(equipment).filter(g=>g&&(g.slot!=='helmet'||showHelmet))){const piece=gear(T,item.kind,appearance),slot=item.slot;pieces.push(piece);
       const baseKind=H.GEAR[item.kind].baseKind;
       if(slot==='weapon'){if(baseKind==='elven_bow'&&model.userData.bowArms){piece.position.set(0,0,0);model.userData.bowArms.right.hand.add(piece);}else{if(model.userData.heroGrip)piece.position.fromArray(model.userData.heroGrip);else piece.position.set(0,baseKind==='robot_fists'?-.53:-.36,baseKind==='robot_fists'?.07:.13);model.userData.armR.add(piece);}if(baseKind==='twin_daggers'||baseKind==='robot_fists'){const left=gear(T,item.kind,appearance);left.position.set(0,baseKind==='robot_fists'?-.53:-.36,baseKind==='robot_fists'?.07:.13);if(baseKind==='robot_fists')left.scale.x=-1;model.userData.armL.add(left);pieces.push(left);}}
-      else if(slot==='shield'){piece.position.set(.07,-.32,.08);piece.rotation.y=Math.PI/3;model.userData.armL.add(piece);}else model.add(piece);
+      else if(slot==='shield'){piece.position.set(.07,-.32,.08);piece.rotation.y=Math.PI/3;model.userData.armL.add(piece);}else if(slot==='helmet')mountHeadwear(T,model,piece);else model.add(piece);
       if(model.userData.knightSculpt&&slot==='armor'){piece.scale.set(.95,1,.94);piece.position.y=.125-KNIGHT_LEG_TRIM;}
-      if(model.userData.knightSculpt&&slot==='helmet'){piece.scale.set(.93,.96,.95);piece.position.y=.19-KNIGHT_LEG_TRIM;}
-      if(model.userData.smithLegTrim&&(slot==='armor'||slot==='helmet'))piece.position.y-=model.userData.smithLegTrim;
+      if(model.userData.smithLegTrim&&slot==='armor')piece.position.y-=model.userData.smithLegTrim;
     }
     // His cropped hair is entirely under a full helmet; do not leave the thin
     // lower fringe floating along the cheek guards. Other hairstyles keep their
@@ -551,7 +593,7 @@
     else if(kind==='twin_daggers'){left.rotation.x=-.3-Math.sin(Math.min(1,t+.2)*Math.PI)*swing;left.rotation.z=.12;}
     else{left.rotation.z=.05;left.rotation.x=model.userData.hasShield?-.35:0;}
     const T=root.THREE,q=model.userData.heroWrist||(model.userData.heroWrist=new T.Quaternion()),e=model.userData.heroWristEuler||(model.userData.heroWristEuler=new T.Euler());
-    for(const p of model.userData.heroPieces||[]){p.visible=!fp||p.parent===right||p.parent===left||kind==='spellbook';
+    for(const p of model.userData.heroPieces||[]){p.visible=!fp||p.parent===right||p.parent===left||p.userData.baseKind==='spellbook';
       if(p.userData.baseKind===kind&&p.parent!==model){const phase=p.parent===left?swing*.8:swing;if(kind==='spellbook'){e.set(-swing*.2,0,0);bookPose(p,swing);}else if(kind==='twin_daggers')e.set(Math.PI/2-2.7*phase,Math.PI/2,p.parent===left?.15:-.15);else e.set(.25+1.35*phase,.16*phase,.12-.3*phase);q.setFromEuler(e);p.quaternion.copy(p.parent.quaternion).invert().multiply(q);}
     }
   }

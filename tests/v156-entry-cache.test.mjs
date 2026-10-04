@@ -8,9 +8,9 @@ const release='1.57.4',knightHealingVersion='1.57.2',gameEntry='index.html',atla
 const game=readFileSync(new URL(gameEntry,root),'utf8');
 const atlas=readFileSync(new URL(atlasEntry,root),'utf8');
 const packageInfo=JSON.parse(readFileSync(new URL('package.json',root),'utf8'));
-// The entrypoint advances independently from asset caches. Only the character
-// changed profession displays/models/motion and their shared rules advance in
-// 1.57.4; this round advances only the theater/direction/effects/audio to 1.57.5.
+// Entrypoint versions advance independently from asset caches. Headwear and
+// shoulder fitting changes the visual provider in 1.57.6. The 1.57.7 music
+// controller and its mode routing advance without refreshing unchanged assets.
 const changedGameAssets=[
   {asset:'assets/game-voice.js',kind:'script'},
   {asset:'story/tower-floor-lords.js',kind:'script'},
@@ -21,7 +21,8 @@ const changedGameAssets=[
   {asset:'story/tower-story-theater.js',kind:'script',version:'1.57.5'},
   {asset:'assets/combat-audio.js',kind:'script',version:'1.57.5'},
   {asset:'story/tower-cinematics.js',kind:'script'},
-  {asset:'story/tower-mode.js',kind:'script',version:release},
+  {asset:'story/tower-mode.js',kind:'script',version:'1.57.7'},
+  {asset:'story/tower-audio.js',kind:'script',version:'1.57.7'},
   {asset:'story/tower-team-tactics.js',kind:'script',version:'1.57.1'},
   {asset:'story/tower-cooperation-runtime.js',kind:'script',version:'1.57.1'},
   {asset:'story/tower-cinematics.css',kind:'link'},
@@ -35,7 +36,7 @@ const changedGameAssets=[
   {asset:'story/tower-heroes-runtime.js',kind:'script',version:'1.57.1'},
   {asset:'story/tower-party-runtime.js',kind:'script',version:'1.57.1'},
   {asset:'assets/character-sculpt.js',kind:'script',version:knightHealingVersion},
-  {asset:'story/tower-heroes-visuals.js',kind:'script',version:release},
+  {asset:'story/tower-heroes-visuals.js',kind:'script',version:'1.57.6'},
   {asset:'story/tower-combat-motion.js',kind:'script',version:release},
   {asset:'story/tower-heroes-core.js',kind:'script',version:release},
   {asset:'story/tower-ascension-catalog.js',kind:'script',version:knightHealingVersion},
@@ -79,8 +80,8 @@ function assertReleaseReferences(html,entry,expected){
 function assertGameVersion(html,manifest){
   const declarations=[...html.matchAll(/\bconst\s+GAME_VERSION\s*=\s*(["'])([^"']+)\1/g)];
   assert.equal(declarations.length,1,'one real game version declaration');
-  assert.equal(declarations[0][2],'1.57.5','GAME_VERSION');
-  assert.equal(manifest.version,'1.57.5','package.json version');
+  assert.equal(declarations[0][2],'1.57.7','GAME_VERSION');
+  assert.equal(manifest.version,'1.57.7','package.json version');
 }
 
 function assertCinematicOrder(html){
@@ -100,12 +101,12 @@ function sectionText(html,title){
   return section[1].replace(/<[^>]*>/g,' ').replace(/\s+/g,' ').trim();
 }
 
-test('actual v1.57.5 game and package versions are synchronized',()=>{
+test('actual v1.57.7 game and package versions are synchronized',()=>{
   assertGameVersion(game,packageInfo);
-  assert.match(atlas,/劇情模式\s*·\s*v1\.57\.5 圖鑑/);
+  assert.match(atlas,/劇情模式\s*·\s*v1\.57\.7 圖鑑/);
 });
 
-test('v1.57.5 cinematic and spell assets update while unchanged profession assets retain their tags',()=>{
+test('v1.57.7 music updates while prior visual fitting and unchanged assets retain their tags',()=>{
   assertReleaseReferences(game,gameEntry,changedGameAssets);
   assertReleaseReferences(atlas,atlasEntry,changedAtlasAssets);
   for(const {asset}of [...changedGameAssets,...changedAtlasAssets])assert.ok(statSync(new URL(asset,root)).isFile(),asset+' must exist');
@@ -133,7 +134,7 @@ test('every changed game and atlas asset rejects stale, malformed, unversioned a
     for(const {asset}of expected){
       const ref=references(html,entry).find(ref=>ref.asset===asset);
       assert.ok(ref,asset+' must be found before mutation');
-      for(const value of ['1.56.0','1.57.0-old','broken','',...['1.57.0','1.57.1','1.57.2','1.57.3','1.57.4'].filter(version=>version!==ref.version)]){
+      for(const value of ['1.56.0','1.57.0-old','broken','',...['1.57.0','1.57.1','1.57.2','1.57.3','1.57.4','1.57.5','1.57.6'].filter(version=>version!==ref.version)]){
         const source=ref.source.replace(/([?&])v=[^&#]*/,'$1v='+value);
         assert.notEqual(source,ref.source,asset+' mutation must take effect');
         assert.throws(()=>assertReleaseReferences(html.replace(ref.source,source),entry,expected),undefined,entry+': '+asset+' rejects '+JSON.stringify(value));
@@ -148,8 +149,8 @@ test('every changed game and atlas asset rejects stale, malformed, unversioned a
 });
 
 test('invalid source and manifest versions fail independently instead of matching each other',()=>{
-  for(const stale of ['1.55.0','1.57.3','1.57.4']){
-    const oldGame=game.replace(/(\bconst\s+GAME_VERSION\s*=\s*["'])1\.57\.5/,(_,prefix)=>prefix+stale);
+  for(const stale of ['1.55.0','1.57.3','1.57.4','1.57.5','1.57.6']){
+    const oldGame=game.replace(/(\bconst\s+GAME_VERSION\s*=\s*["'])1\.57\.7/,(_,prefix)=>prefix+stale);
     assert.notEqual(oldGame,game,'version mutation must take effect');
     assert.throws(()=>assertGameVersion(oldGame,packageInfo));
     assert.throws(()=>assertGameVersion(game,{...packageInfo,version:stale}));

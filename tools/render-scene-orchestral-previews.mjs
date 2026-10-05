@@ -10,15 +10,35 @@ import boss from './orchestra-scores/boss.mjs';
 import camp from './orchestra-scores/camp.mjs';
 
 export const scores=[summit,boss,camp];
+// Explicit audition-only identities may use extra installed instruments
+// and a different metre. Existing/approved score contracts stay unchanged.
+export const identityProfiles=Object.freeze({
+  'garden-identity':{metre:3,desks:['harp','pizzicato','flute','violas']},
+  'echo-identity':{metre:4,desks:['celesta','vibraphone','violins','flute']},
+  'clockwork-identity':{metre:4,desks:['harpsichord','pizzicato','bassoon','clarinet']},
+  'roots-identity':{metre:6,desks:['marimba','panflute','oboe','celli']},
+  'library-identity':{metre:3,desks:['piano','oboe','clarinet','celli']},
+  'mist-identity':{metre:4,desks:['clarinet','harp','violas','celli']},
+  'frost-identity':{metre:4,desks:['piano','celesta','violins','horn']},
+  'furnace-identity':{metre:5,desks:['trombone','tuba','horn','celli']},
+  'heart-identity':{metre:4,desks:['trumpet','horn','choir','violins']},
+  'underworld-roots-identity':{metre:4,desks:['chant','organ','celli','bassoon']},
+  'underworld-mist-identity':{metre:6,desks:['englishhorn','guitar','celli','vibraphone']},
+  'underworld-library-identity':{metre:4,desks:['organ','harpsichord','oboe','celli']},
+  'underworld-furnace-identity':{metre:4,desks:['piano','contrabass','mutedtrumpet','tremolo']},
+  'underworld-heart-identity':{metre:4,desks:['choir','organ','harp','violins','celesta']}
+});
 export function validate(score){
-  const duration=score.bars*score.beatsPerBar*60/score.bpm+score.tail,desks=new Set(score.desks.map(p=>p.id));
-  assert.ok(duration>=45&&duration<=60);assert.ok(score.bpm>=60&&score.bpm<=160);assert.equal(score.beatsPerBar,4);
+  const identity=score.revision==='identity-audition',profile=identityProfiles[score.id];
+  if(identity)assert.ok(profile,'unknown identity audition');else assert.ok(!profile,'identity audition requires its explicit revision');
+  const body=score.bars*score.beatsPerBar,duration=body*60/score.bpm+score.tail,desks=new Set(score.desks.map(p=>p.id));
+  assert.ok(duration>=45&&duration<=60);assert.ok(score.bpm>=60&&score.bpm<=160);assert.equal(score.beatsPerBar,identity?profile.metre:4);
   assert.equal(desks.size,score.desks.length);assert.ok(score.desks.length>=4&&score.desks.length<=6);
-  for(const p of score.desks){assert.ok(['violins','violas','celli','flute','horn','clarinet'].includes(p.id));assert.ok(p.gain>=-28&&p.gain<=-8&&Math.abs(p.pan)<=1);}
-  for(const n of score.notes){assert.ok(desks.has(n.desk));assert.ok([n.beat,n.length,n.key,n.velocity].every(Number.isFinite));assert.ok(n.beat>=0&&n.length>0&&n.beat+n.length<=score.bars*4+.001);assert.ok(Number.isInteger(n.key)&&n.key>=0&&n.key<=127&&Number.isInteger(n.velocity)&&n.velocity>0&&n.velocity<=127);}
+  for(const p of score.desks){assert.ok((identity?profile.desks:['violins','violas','celli','flute','horn','clarinet']).includes(p.id));assert.ok(p.gain>=-28&&p.gain<=-8&&Math.abs(p.pan)<=1);}
+  for(const n of score.notes){assert.ok(desks.has(n.desk));assert.ok([n.beat,n.length,n.key,n.velocity].every(Number.isFinite));assert.ok(n.beat>=0&&n.length>0&&n.beat+n.length<=body+.001);assert.ok(Number.isInteger(n.key)&&n.key>=0&&n.key<=127&&Number.isInteger(n.velocity)&&n.velocity>0&&n.velocity<=127);}
   const lastOff=new Map();for(const n of [...score.notes].sort((a,b)=>a.beat-b.beat)){const key=n.desk+'-'+n.key;assert.ok((lastOff.get(key)??-1)<=n.beat+.00001,'overlapping same-key notes can truncate a sampled phrase');lastOff.set(key,n.beat+n.length);}
-  for(const c of score.controls){assert.ok(desks.has(c.desk));assert.equal(c.controller,11);assert.ok(c.beat>=0&&c.beat<=score.bars*4&&Number.isInteger(c.value)&&c.value>=0&&c.value<=127);}
-  for(const p of score.percussion){assert.ok(['timpani','tom','snare','cymbal','shaker','bell'].includes(p.type));assert.ok(Number.isFinite(p.beat)&&p.beat>=0&&p.beat<=score.bars*4&&p.gain>0&&p.gain<=.16);if(p.pitch!==undefined)assert.ok(Number.isFinite(p.pitch)&&p.pitch>=30&&p.pitch<=3000);}
+  for(const c of score.controls){assert.ok(desks.has(c.desk));assert.equal(c.controller,11);assert.ok(c.beat>=0&&c.beat<=body&&Number.isInteger(c.value)&&c.value>=0&&c.value<=127);}
+  for(const p of score.percussion){assert.ok(['timpani','tom','snare','cymbal','shaker','bell'].includes(p.type));assert.ok(Number.isFinite(p.beat)&&p.beat>=0&&p.beat<=body&&p.gain>0&&p.gain<=.16);if(p.pitch!==undefined)assert.ok(Number.isFinite(p.pitch)&&p.pitch>=30&&p.pitch<=3000);}
   let next=0;for(const s of score.sections){assert.equal(s.fromBar,next);assert.ok(s.toBar>s.fromBar&&s.toBar<=score.bars);next=s.toBar;}assert.equal(next,score.bars);
   const events=score.notes.flatMap(n=>[{beat:n.beat,delta:1},{beat:n.beat+n.length,delta:-1}]).sort((a,b)=>a.beat-b.beat||a.delta-b.delta);
   let active=0,maxPolyphony=0;for(const e of events){active+=e.delta;maxPolyphony=Math.max(maxPolyphony,active);}assert.equal(active,0);assert.ok(maxPolyphony<=40);
@@ -81,7 +101,7 @@ function wav(pcm){const b=Buffer.alloc(44+pcm.length);b.write('RIFF');b.writeUIn
 const sha=b=>createHash('sha256').update(b).digest('hex');
 async function protectedHashes(){return Object.fromEntries(await Promise.all(['index.html','package.json','assets/classic-audio.js','assets/voice-pack.js','story/tower-audio.js','story/tower-mode.js','assets/music/orchestra-manifest.json','assets/music/orchestra-summit.m4a','assets/music/orchestra-boss.m4a','assets/music/orchestra-camp.m4a'].map(async f=>[f,sha(await readFile(new URL('../'+f,import.meta.url)))])));}
 export async function renderAuditions(selectedScores,output,{pageTitle='三場景配樂試聽',introduction='雲頂探索、刺激鼓動的樓主戰與營地休息。先確認風格；不自動播放，尚未替換正式遊戲音樂。'}={}){
-  assert.ok(selectedScores.length>0&&selectedScores.length<=3);assert.equal(new Set(selectedScores.map(s=>s.id)).size,selectedScores.length);
+  assert.ok(selectedScores.length>0&&selectedScores.length<=16);assert.equal(new Set(selectedScores.map(s=>s.id)).size,selectedScores.length);
   const out=resolve(output);
   assert.ok(out.startsWith(resolve('.agent-run')+'/'));await mkdir(out,{recursive:true});
   const protectedBefore=await protectedHashes(),report={pass:false,localOnly:true,officialMusicChanged:false,sourceSamplesRedistributed:false,tracks:[],protectedBefore,limitations:['Sample-based original arrangements with original procedural percussion, not live orchestra recordings.','Signal and file checks do not claim a human subjective listening review.','Only preview files are created in the ignored local evidence folder; nothing is deployed.']};

@@ -20,7 +20,10 @@ assert.ok(['http:', 'https:'].includes(address.protocol));
 const sha = bytes => createHash('sha256').update(bytes).digest('hex');
 const manifest = JSON.parse(await readFile(join(source, 'assets/music/orchestra-manifest.json'), 'utf8'));
 assert.equal(manifest.originalScore, true);
-assert.deepEqual(manifest.tracks.map(t => t.id).sort(), ['boss', 'camp', 'summit']);
+assert.deepEqual(manifest.tracks.slice(0,3).map(t => t.id), ['summit', 'boss', 'camp']);
+const regions = [['garden',89],['roots',79],['echo',69],['library',59],['mist',49],['frost',39],['clockwork',29],['furnace',19],['heart',9],
+  ['underworld-roots',-1],['underworld-mist',-11],['underworld-library',-21],['underworld-furnace',-31],['underworld-heart',-41]];
+assert.deepEqual(manifest.tracks.slice(3).map(t => t.id), regions.map(([id]) => id));
 const expected = new Map();
 for (const track of manifest.tracks) {
   assert.equal(track.file, 'assets/music/orchestra-' + track.id + '.m4a');
@@ -181,14 +184,18 @@ async function leaveGame() {
   assert.equal(state.snapshot.activeCount, 0);
   assert.equal(state.native.activeMusicCount, 0);
 }
-async function fixture(kind) {
+async function fixture(kind, regionFloor = null) {
   assert.equal(await page.evaluate(() => TowerMode.active), false, 'Fixture never replaces a live game');
-  const prepared = await page.evaluate(kind => {
+  const prepared = await page.evaluate(({kind, regionFloor}) => {
     let run = TowerCore.newRun({seed: 31, name: '隔離配樂驗證'});
-    run.floor = kind === 'boss' ? 90 : 99;
-    run.floorsCleared = 99 - run.floor;
+    run.floor = kind === 'region' ? regionFloor : kind === 'boss' ? 90 : 99;
+    run.floorsCleared = run.floor < 0 ? 99 + (-run.floor - 1) : 99 - run.floor;
     run.chronicle = TowerNarrative.newChronicle(run.floor);
     run.chronicle.read = TowerNarrative.unlockedScenes(run.floor).map(s => s.id);
+    if (run.floor < 0) {
+      run.chronicle.ending = TowerNarrative.ENDINGS[0].id;
+      run.underworld = {version: 1, departed: null, surfaceEnding: run.chronicle.ending};
+    }
     const selected = TowerPartyCore.enable(run, 'smith', 'male');
     if (!selected.ok) throw Error('Public profession preparation failed');
     const modern = TowerHeroes.enable(selected.run);
@@ -196,7 +203,7 @@ async function fixture(kind) {
     run = modern.run;
     TowerPartyCore.advance(run, {reward: false});
     const specs = TowerPartyCore.monsterSpecs(run), live = kind === 'boss' ? specs.find(s => s.lord) : kind === 'ordinary' ? specs.find(s => !s.lord) : null;
-    if (kind !== 'camp' && !live) throw Error('Missing real encounter specification');
+    if (!['camp','region'].includes(kind) && !live) throw Error('Missing real encounter specification');
     run.defeatedMonsters = specs.filter(s => s.id !== live?.id).map(s => s.id);
     run.effects.freeze = 120; // A valid existing potion effect keeps the path stable.
     const validated = TowerCore.validateSave(run);
@@ -204,7 +211,7 @@ async function fixture(kind) {
     localStorage.setItem('maze3d_tower_v1', JSON.stringify(validated));
     return {kind, valid: true, floor: validated.floor, seed: validated.seed, liveMonster: live ? {id: live.id, kind: live.kind, lord: !!live.lord} : null,
       monstersDefeatedForIsolation: validated.defeatedMonsters, realPlayerProgress: false};
-  }, kind);
+  }, {kind, regionFloor});
   report.stages.push({name: 'legal-' + kind + '-save-fixture', fixture: prepared});
   await home();
   await page.locator('#storyEntryBtn').click();
@@ -291,7 +298,7 @@ async function assertLoops(state, id) {
 try {
   browser = await chromium.launch({executablePath: '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome', headless: true,
     args: ['--use-angle=metal', '--enable-webgl', '--mute-audio']});
-  deadline = setTimeout(() => {report.deadlineExceeded = true; void browser.close();}, 360000);
+  deadline = setTimeout(() => {report.deadlineExceeded = true; void browser.close();}, 480000);
   const context = await browser.newContext({viewport: {width: 844, height: 390}, hasTouch: true, serviceWorkers: 'block'});
   contexts.add(context);
   await context.addInitScript(instrumentNativeAudio, {knownBuffers});
@@ -453,6 +460,37 @@ try {
   assert.ok(ordinary.native.sources.some(s => s.active && s.track === 'combat' && s.sha256 === sha(originalCombat)));
   assert.ok(!ordinary.native.sources.some(s => s.active && s.track === 'orchestra-boss'));
   await leaveGame();
+
+  report.regions = [];
+  for (const [id,floor] of regions) {
+    currentStage = 'region-' + id;
+    await fixture('region', floor);
+    const target = 'orchestra-' + id;
+    await settle(target);
+    const state = await checkpoint('region-' + id + '-natural-continue', {target});
+    assert.equal(state.runtime.floor, floor);assert.equal(state.snapshot.environment, id);
+    assert.ok(state.snapshot.cacheIDs.length <= 3);
+    const source = await assertLoops(state, target);
+    report.regions.push({id,floor,nativeSource:source,legalPublicContinue:true});
+    if (id === 'garden') {
+      await page.locator('#towerBagBtn').click();
+      let before = null, after = null;
+      for (let polls = 0; polls < 60; polls++) {
+        const actual = await capture(), voice = actual.native.sources.find(s => s.sourceId === source.sourceId);
+        assert.ok(voice?.active && voice.contextState === 'running');assert.equal(actual.snapshot.current,target);
+        const elapsed = voice.contextTime - voice.startAt;
+        if (elapsed < voice.loopEnd && elapsed >= voice.loopEnd - 2) before = {elapsed,voice};
+        if (elapsed > voice.loopEnd + .5) {after = {elapsed,voice};break;}
+        await page.waitForTimeout(elapsed > voice.loopEnd - 3 ? 350 : 1800);
+      }
+      assert.ok(before && after,'Actual three-beat region source crosses its native loop boundary');
+      assert.equal(before.voice.sourceId,after.voice.sourceId);assert.equal(after.voice.ended,false);
+      report.nativeRegionLoopBoundary = {id,before,after,realContextTime:true,replacedClockOrSource:false};
+      await closeDialog();
+    }
+    await leaveGame();
+    console.log('Native regional music passed: ' + id + ' at floor ' + floor);
+  }
 
   await Promise.allSettled(responseWork);
   report.sourceHashes = sourcePaths.map(path => {

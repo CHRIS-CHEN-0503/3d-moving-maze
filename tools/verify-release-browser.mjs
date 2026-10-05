@@ -67,6 +67,8 @@ assert.ok(durabilityVersion>0,'fixed source durability format is valid');
 const files=new Set(['index.html','manifest.webmanifest','package.json','assets/equipment-surfaces.js','assets/character-face.js','assets/character-sculpt.js','assets/character-motion.js','story/story-core.js','story/tower-combat-motion.js','story/tower-heroes-visuals.js','story/tower-characters.js','story/tower-party-runtime.js','story/tower-lighting-runtime.js','story/tower-party.css','story/tower-mobile.css','story/tower-mode.js','docs/職業裝備圖鑑.html','docs/story-atlas-rules.js','docs/story-atlas-items.js','docs/story-atlas-cooperation.js','story/tower-affixes.js','story/tower-adventure-events.js','story/tower-landmarks.js','story/tower-cooperation-core.js','story/tower-cooperation-runtime.js','assets/mode-variants-core.js','assets/mode-variants.js','assets/shop-claims-core.js','assets/shop-claims.js']);
 for(const file of moduleFiles)files.add(file);files.add('story/tower-cinematics.css');
 for(const file of ['orchestra-manifest.json','orchestra-summit.m4a','orchestra-boss.m4a','orchestra-camp.m4a'])files.add('assets/music/'+file);
+const musicManifest=JSON.parse(await readFile(path.join(releaseDir,'assets/music/orchestra-manifest.json'),'utf8'));
+for(const track of musicManifest.tracks){assert.match(track.file,/^assets\/music\/orchestra-[a-z-]+\.m4a$/);files.add(track.file);}
 for(const m of index.matchAll(/(?:src|href)="([^"#]+)"/g)){
  if(/^(?:https?:|data:|\/\/)/.test(m[1]))continue;
  const name=m[1].split(/[?#]/)[0].replace(/^\.\//,'');

@@ -21,7 +21,7 @@ async function main(){
   assert.ok(source.startsWith((await realpath('.agent-run'))+'/'));
   const port=Number(process.argv[3]||8798);assert.ok(Number.isInteger(port)&&port>=1024&&port<=65535);
   const report=JSON.parse(await readFile(source+'/report.json','utf8'));
-  assert.equal(report.pass,true);assert.equal(report.officialMusicChanged,false);assert.ok(report.tracks.length>=1&&report.tracks.length<=3);
+  assert.equal(report.pass,true);assert.equal(report.officialMusicChanged,false);assert.ok(report.tracks.length>=1&&report.tracks.length<=16);
   const names=['index.html',...report.tracks.map(t=>t.filename)],files=new Map();
   for(const name of names){assert.equal(basename(name),name);assert.ok(name==='index.html'||name.endsWith('.mp3'));
     const path=await realpath(source+'/'+name);assert.ok(path.startsWith(source+'/'));

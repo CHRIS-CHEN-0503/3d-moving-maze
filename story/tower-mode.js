@@ -1164,7 +1164,7 @@
     AudioEng.stopMusic(); AudioEng.resume();
     window.TowerAudio.configure({context:AudioEng.ctx,output:AudioEng.musicGain});
     window.TowerAudio.setMuted(G.muted);
-    window.TowerAudio.setEnvironment(floorConfig.environmentId);
+    window.TowerAudio.setEnvironment(floorConfig.environmentId,floorConfig.underworld===true);
     window.TowerAudio.setEncounter(encounterHold>0,bossEncounterHold>0);
     window.TowerAudio.setCamp(campDialog);
     window.TowerAudio.setPaused(paused);

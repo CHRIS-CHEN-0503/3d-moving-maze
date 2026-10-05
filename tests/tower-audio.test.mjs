@@ -39,6 +39,8 @@ function harness({ deferFetch = false, deferDecode = false, failFetch = false, b
 test('orchestral requests use actual recording revisions; ordinary combat URL remains unchanged', async()=>{
   const h=harness(),manifest=JSON.parse(readFileSync(new URL('../assets/music/orchestra-manifest.json',import.meta.url),'utf8'));
   h.audio.setEnvironment('summoning');await flush();h.audio.setCamp(true);await flush();h.audio.setCamp(false);h.audio.setEncounter(true,true);await flush();h.audio.setEncounter(true,false);await flush();
+  h.audio.setEncounter(false);await flush();
+  for(const track of manifest.tracks.slice(3)){h.audio.setEnvironment(track.id);await flush();h.advance(1);}
   for(const track of manifest.tracks){const request=h.fetches.find(row=>row.id==='orchestra-'+track.id);assert.ok(request);assert.equal(request.url,'assets/music/orchestra-'+track.id+'.m4a?v='+track.sha256.slice(0,12));}
   assert.equal(h.fetches.find(row=>row.id==='combat').url,'assets/music/combat.m4a');
 });
@@ -48,8 +50,8 @@ test('rapid environment change aborts old fetch and a stale successful response 
   h.audio.setEnvironment('summoning'); const old = h.fetches[0];
   h.audio.setEnvironment('garden'); const latest = h.fetches[1];
   assert.equal(old.signal.aborted, true);
-  h.respond(latest); await flush(); assert.deepEqual(h.playing(), ['garden']);
-  h.respond(old); await flush(); assert.deepEqual(h.playing(), ['garden']);
+  h.respond(latest); await flush(); assert.deepEqual(h.playing(), ['orchestra-garden']);
+  h.respond(old); await flush(); assert.deepEqual(h.playing(), ['orchestra-garden']);
   assert.equal(h.decoded.length, 1);
 });
 
@@ -57,9 +59,9 @@ test('already decoding stale audio is discarded after a newer environment wins',
   const h = harness({ deferDecode: true });
   h.audio.setEnvironment('summoning'); await flush();
   h.audio.setEnvironment('garden'); await flush();
-  h.decoded[1].task.resolve({ id: 'garden' }); await flush();
+  h.decoded[1].task.resolve({ id: 'orchestra-garden', duration:70 }); await flush();
   h.decoded[0].task.resolve({ id: 'summoning' }); await flush();
-  assert.deepEqual(h.playing(), ['garden']);
+  assert.deepEqual(h.playing(), ['orchestra-garden']);
   assert.equal(h.sources.length, 1);
 });
 
@@ -82,7 +84,7 @@ test('encounter crossfades in one second and reuses only current environment plu
   assert.deepEqual(h.playing(), ['combat']);
   assert.equal(h.fetches.filter(item => item.id === 'combat').length, 1, 'The combat buffer remains cached');
   h.audio.setEncounter(false); await flush(); h.advance(1);
-  assert.deepEqual(h.playing(), ['garden']);
+  assert.deepEqual(h.playing(), ['orchestra-garden']);
   h.audio.setEnvironment('summoning'); await flush(); h.advance(1);
   assert.equal(h.fetches.filter(item => item.id === 'orchestra-summit').length, 2, 'Leaving an environment evicts it instead of accumulating decoded buffers');
   assert.deepEqual(h.playing(), ['orchestra-summit']);
@@ -148,7 +150,7 @@ test('ordinary combat never selects boss music, lord engagement does, and rapid 
   h.audio.setEncounter(true, false); await flush();
   assert.equal(h.audio.snapshot().current, 'combat'); assert.ok(h.playing().length <= 2);
   h.audio.setEncounter(false, true); await flush(); h.advance(1);
-  assert.deepEqual(h.playing(), ['garden'], 'An inactive encounter cannot select boss music');
+  assert.deepEqual(h.playing(), ['orchestra-garden'], 'An inactive encounter cannot select boss music');
 });
 
 test('a camp service overrides encounter music and closes back to the correct live encounter', async () => {
@@ -171,8 +173,8 @@ test('a camp service overrides encounter music and closes back to the correct li
 test('pause alone changes volume without selecting a camp or fetching another track', async () => {
   const h = harness(); h.audio.setEnvironment('roots'); await flush();
   h.audio.setPaused(true); await flush();
-  assert.deepEqual(h.playing(), ['roots']); assert.equal(h.fetches.length, 1);
-  assert.equal(h.audio.snapshot().camp, false); assert.equal(h.audio.snapshot().target, 'roots');
+  assert.deepEqual(h.playing(), ['orchestra-roots']); assert.equal(h.fetches.length, 1);
+  assert.equal(h.audio.snapshot().camp, false); assert.equal(h.audio.snapshot().target, 'orchestra-roots');
 });
 
 test('decoded cache remains capped at three buffers across environment, combat, boss, and camp', async () => {
@@ -202,7 +204,7 @@ test('camp closing aborts its pending request and a late success cannot replace 
 
 test('stale camp decode is discarded when a newer boss target wins', async () => {
   const h = harness({ deferDecode: true }); h.audio.setEnvironment('garden'); await flush();
-  h.decoded[0].task.resolve({ id: 'garden', duration: 70 }); await flush();
+  h.decoded[0].task.resolve({ id: 'orchestra-garden', duration: 70 }); await flush();
   h.audio.setCamp(true); await flush(); const camp = h.decoded.at(-1);
   h.audio.setEncounter(true, true); h.audio.setCamp(false); await flush();
   const boss = h.decoded.at(-1); assert.equal(boss.id, 'orchestra-boss');
@@ -229,4 +231,20 @@ test('AAC loop metadata clamps to decoded duration and a substantially truncated
   const short = harness({ bufferDuration: 10 }); short.audio.setEnvironment('summoning'); await flush();
   assert.deepEqual(short.playing(), []); assert.equal(short.warnings.length, 1);
   assert.equal(short.audio.snapshot().activeCount, 0);
+});
+test('same base environment routes underground separately, aborts stale decoding and bounds caches', async()=>{
+  const h=harness({deferDecode:true});h.audio.setEnvironment('roots');await flush();const surface=h.decoded[0];
+  h.audio.setEnvironment('roots',true);await flush();const below=h.decoded[1];
+  assert.equal(below.id,'orchestra-underworld-roots');
+  below.task.resolve({id:below.id,duration:70});await flush();surface.task.resolve({id:surface.id,duration:70});await flush();
+  assert.deepEqual(h.playing(),['orchestra-underworld-roots']);assert.equal(h.audio.snapshot().environment,'underworld-roots');
+  const live=harness();
+  for(const id of ['roots','mist','library','furnace','heart'])for(const underworld of [false,true]){
+    live.audio.setEnvironment(id,underworld);await flush();live.advance(1);
+    assert.equal(live.audio.snapshot().current,'orchestra-'+(underworld?'underworld-':'')+id);
+    assert.ok(live.audio.snapshot().cacheIDs.length<=3);assert.ok(live.playing().length<=2);
+  }
+  live.audio.setEnvironment('echo',true);await flush();live.advance(1);
+  assert.equal(live.audio.snapshot().current,'orchestra-echo','unmapped side-instance retains its matching surface theme');
+  live.audio.setEnvironment('unknown',true);await flush();assert.equal(live.warnings.length,1);assert.equal(live.audio.snapshot().current,'orchestra-echo');
 });

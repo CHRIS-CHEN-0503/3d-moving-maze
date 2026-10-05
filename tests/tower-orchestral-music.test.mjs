@@ -149,9 +149,15 @@ test('music resynchronization uses the existing context and current real scene w
   h.api.soundChanged();
   const [configuration] = h.last('configure');
   assert.equal(configuration.context, h.context.AudioEng.ctx); assert.equal(configuration.output, h.context.AudioEng.musicGain);
-  assert.deepEqual(h.last('setEnvironment'), ['summoning']); assert.deepEqual(h.last('setEncounter'), [true, true]);
+  assert.deepEqual(h.last('setEnvironment'), ['summoning',false]); assert.deepEqual(h.last('setEncounter'), [true, true]);
   assert.deepEqual(h.last('setCamp'), [false]); assert.deepEqual(h.last('setPaused'), [true]);
   h.api.inactive(); const count = h.calls.length; h.api.soundChanged(); assert.equal(h.calls.length, count);
+});
+
+test('underground runtime explicitly selects its own environment without changing surface routing',()=>{
+  const h=runtime();h.run.floor=-21;h.api.setup(h.run);h.api.soundChanged();
+  assert.deepEqual(h.last('setEnvironment'),['library',true]);
+  h.run.floor=59;h.api.setup(h.run);h.api.soundChanged();assert.deepEqual(h.last('setEnvironment'),['library',false]);
 });
 
 test('loop constants and expected diagnostic hashes match the shipped manifest exactly', () => {

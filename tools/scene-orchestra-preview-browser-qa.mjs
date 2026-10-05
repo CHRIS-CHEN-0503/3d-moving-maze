@@ -12,9 +12,12 @@ const out=resolve(process.env.ORCHESTRA_QA_OUT||'.agent-run/scene-orchestra-prev
 assert.ok(['localhost','127.0.0.1'].includes(new URL(base).hostname));
 assert.ok(source.startsWith(resolve('.agent-run')+'/')&&out.startsWith(resolve('.agent-run')+'/'));
 const expected=JSON.parse(await readFile(source+'/report.json','utf8'));
-assert.equal(expected.pass,true);assert.equal(expected.officialMusicChanged,false);assert.ok(expected.tracks.length>=1&&expected.tracks.length<=3);assert.equal(new Set(expected.tracks.map(t=>t.id)).size,expected.tracks.length);
+assert.equal(expected.pass,true);assert.equal(expected.officialMusicChanged,false);assert.ok(expected.tracks.length>=1&&expected.tracks.length<=16);assert.equal(new Set(expected.tracks.map(t=>t.id)).size,expected.tracks.length);
+const identityAudition=expected.tracks.every(t=>t.id.endsWith('-identity'));
 await mkdir(out,{recursive:true});
 const origin=new URL(base).origin,sha=bytes=>createHash('sha256').update(bytes).digest('hex');
+const paths=['index.html',...expected.tracks.map(t=>t.filename)],sourceFiles=new Map();
+for(const name of paths){const bytes=await readFile(source+'/'+name);sourceFiles.set(new URL(base).pathname+(name==='index.html'?'':name),{name,bytes:bytes.length,sha256:sha(bytes)});}
 const report={base,localOnly:true,pass:false,cases:[],loaded:[],errors:[],blocked:[],limitations:['Muted browser decoding and media playback checks, not a subjective listening review.','Touch-emulated viewports, not physical iPhone speakers or performance.','No room, production network or game-music mutation.']};
 const work=[],contexts=new Set();let page;
 const browser=await chromium.launch({executablePath:'/Applications/Google Chrome.app/Contents/MacOS/Google Chrome',headless:true,args:['--mute-audio']});
@@ -24,13 +27,43 @@ try{
     page=await context.newPage();page.setDefaultTimeout(15000);
     page.on('pageerror',e=>report.errors.push(e.stack));
     page.on('console',m=>{if(m.type()==='error')report.errors.push(m.text());});
-    page.on('response',r=>{if([200,206].includes(r.status())&&new URL(r.url()).origin===origin)work.push((async()=>{const bytes=await r.body();report.loaded.push({url:r.url(),status:r.status(),bytes:bytes.length,contentRange:r.headers()['content-range']||null,sha256:sha(bytes)});})().catch(e=>report.errors.push(e.message)));});
+    const captured=new Map();let skippedRepeatCaptures=0;
+    const captureResponse=r=>{
+      if(![200,206].includes(r.status())||new URL(r.url()).origin!==origin)return;
+      const pathname=decodeURIComponent(new URL(r.url()).pathname),original=sourceFiles.get(pathname);
+      // Once this viewport has a verified complete transfer, replay/seek can
+      // legitimately cancel a redundant media range. Do not ask Chromium for
+      // that discarded body; retain strict full-file proof for every viewport.
+      if(captured.has(pathname)){skippedRepeatCaptures++;return;}
+      work.push((async()=>{
+        const bytes=await r.body(),row={width,height,url:r.url(),status:r.status(),bytes:bytes.length,contentRange:r.headers()['content-range']||null,sha256:sha(bytes)};report.loaded.push(row);
+        if(original&&row.bytes===original.bytes&&(!row.contentRange||row.contentRange===`bytes 0-${original.bytes-1}/${original.bytes}`)){assert.equal(row.sha256,original.sha256);captured.set(pathname,{name:original.name,sha256:row.sha256});}
+      })().catch(e=>report.errors.push(e.message)));
+    };
+    page.on('response',captureResponse);
     await context.route('**/*',r=>{const q=r.request();if(new URL(q.url()).origin!==origin||!['GET','HEAD'].includes(q.method())){report.blocked.push({url:q.url(),method:q.method()});return r.abort();}return r.continue();});
     await page.goto(base,{waitUntil:'domcontentloaded'});
     assert.equal(await page.locator('article').count(),expected.tracks.length);assert.equal(await page.locator('audio[autoplay]').count(),0);
     assert.ok(await page.getByText('尚未替換正式遊戲音樂',{exact:false}).isVisible());
     const layout=await page.evaluate(()=>({width:innerWidth,scrollWidth:document.documentElement.scrollWidth,players:[...document.querySelectorAll('audio')].map(a=>({paused:a.paused,preload:a.preload,controls:a.controls,width:a.getBoundingClientRect().width}))}));
     assert.ok(layout.scrollWidth<=width);assert.ok(layout.players.every(a=>a.paused&&a.preload==='none'&&a.controls&&a.width>=240));
+    if(identityAudition){
+      assert.ok([3,14].includes(expected.tracks.length));
+      for(const track of expected.tracks)assert.ok((await page.locator('article').filter({has:page.getByRole('heading',{name:track.title,exact:true})}).innerText()).includes(track.regionName));
+      await page.getByRole('button',{name:'隱藏地區名稱試聽',exact:true}).tap();
+      assert.equal(await page.locator('#blindToggle').getAttribute('aria-pressed'),'true');
+      assert.ok(await page.locator('article header').evaluateAll(nodes=>nodes.every(n=>getComputedStyle(n).display==='none')));
+      assert.ok(await page.locator('.blind-label').evaluateAll(nodes=>nodes.every(n=>getComputedStyle(n).display!=='none')));
+      assert.equal(await page.locator('audio').count(),expected.tracks.length);
+      await page.getByRole('button',{name:'顯示地區名稱',exact:true}).tap();assert.equal(await page.locator('#blindToggle').getAttribute('aria-pressed'),'false');
+    }
+    if(expected.tracks.length===14){
+      assert.equal(await page.locator('#surface article').count(),9);assert.equal(await page.locator('#underground article').count(),5);
+      for(const track of expected.tracks){const card=page.locator('article').filter({has:page.getByRole('heading',{name:track.title,exact:true})});assert.equal(await card.count(),1);assert.ok((await card.innerText()).includes(track.regionName));}
+      await page.screenshot({path:out+'/'+width+'-preview-top.png'});
+      await page.getByRole('link',{name:'地下篇 5 首',exact:true}).tap();await page.waitForFunction(()=>location.hash==='#underground');
+      assert.ok(await page.locator('#underground h2').isVisible());await page.screenshot({path:out+'/'+width+'-preview-underground.png'});await page.evaluate(()=>scrollTo(0,0));
+    }
     const tracks=[];
     for(let i=0;i<expected.tracks.length;i++){
       const control=page.locator('audio').nth(i),track=expected.tracks[i];
@@ -50,11 +83,23 @@ try{
       await control.tap({position:{x:25,y:27}});assert.equal(await control.evaluate(a=>a.paused),true);
       tracks.push({title:track.title,...playing,pauseStable:true,middle});
     }
+    let exclusivePlayback=null;
+    if(expected.tracks.length===14||identityAudition){
+      for(const index of [0,1]){const control=page.locator('audio').nth(index);await control.scrollIntoViewIfNeeded();await control.tap({position:{x:25,y:27}});await page.waitForFunction(i=>!document.querySelectorAll('audio')[i].paused,index);}
+      // Native paused changes before its queued play event reaches the page.
+      // Observe exclusive playback after that real event, not the tap instant.
+      await page.waitForFunction(()=>{const nodes=document.querySelectorAll('audio');return nodes[0].paused&&!nodes[1].paused;});
+      const playing=await page.locator('audio').evaluateAll(nodes=>nodes.flatMap((node,index)=>node.paused?[]:[index]));assert.deepEqual(playing,[1]);
+      await page.locator('audio').nth(1).tap({position:{x:25,y:27}});assert.ok(await page.locator('audio').evaluateAll(nodes=>nodes.every(node=>node.paused)));
+      exclusivePlayback={playing,previousPaused:true,allPausedAfter:true};
+    }
     await page.evaluate(()=>scrollTo(0,0));await page.screenshot({path:out+'/'+width+'-preview.png',fullPage:true});
-    report.cases.push({width,height,layout,tracks,screenshot:width+'-preview.png'});
-    await Promise.all(work);await context.close();contexts.delete(context);
+    page.off('response',captureResponse);await Promise.all(work);
+    assert.equal(captured.size,paths.length,'every viewport loaded every complete audition source');
+    report.cases.push({width,height,layout,tracks,exclusivePlayback,sourceHashes:[...captured.values()],skippedRepeatCaptures,screenshot:width+'-preview.png'});
+    await context.close();contexts.delete(context);
   }
-  const paths=['index.html',...expected.tracks.map(t=>t.filename)];report.sourceHashes=[];
+  report.sourceHashes=[];
   for(const name of paths){const bytes=await readFile(source+'/'+name),digest=sha(bytes),loaded=report.loaded.filter(row=>(decodeURIComponent(new URL(row.url).pathname)===new URL(base).pathname+name||(name==='index.html'&&new URL(row.url).pathname===new URL(base).pathname))&&row.bytes===bytes.length&&(!row.contentRange||row.contentRange===`bytes 0-${bytes.length-1}/${bytes.length}`)).at(-1);assert.ok(loaded,'complete source was actually loaded: '+name);assert.equal(loaded.sha256,digest);report.sourceHashes.push({name,sha256:digest});}
   assert.deepEqual(report.errors,[]);assert.deepEqual(report.blocked,[]);report.pass=true;
 }catch(error){report.failure=error.stack;report.mediaAtFailure=await page?.evaluate(()=>[...document.querySelectorAll('audio')].map(a=>({paused:a.paused,currentTime:a.currentTime,seeking:a.seeking,readyState:a.readyState,error:a.error?.code||null,seekable:[...Array(a.seekable.length)].map((_,i)=>[a.seekable.start(i),a.seekable.end(i)])}))).catch(()=>null);await page?.screenshot({path:out+'/failure.png',fullPage:true}).catch(()=>{});throw error;}

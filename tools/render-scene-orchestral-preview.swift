@@ -11,7 +11,7 @@ struct Note: Decodable { let desk: String; let beat: Double; let length: Double;
 struct Control: Decodable { let desk: String; let beat: Double; let controller: Int; let value: Int }
 struct Score: Decodable {
     let id: String; let title: String; let bpm: Double; let beatsPerBar: Int
-    let bars: Int; let tail: Double; let reverb: Float
+    let bars: Int; let tail: Double; let reverb: Float; let roomPreset: String?
     let desks: [Desk]; let notes: [Note]; let controls: [Control]
 }
 func require(_ condition: Bool, _ message: String) throws {
@@ -22,7 +22,8 @@ let fm = FileManager.default, source = URL(fileURLWithPath: CommandLine.argument
 let out = URL(fileURLWithPath: CommandLine.arguments[2], isDirectory: true).standardizedFileURL
 try require(out.path.contains("/.agent-run/"), "Preview stays in local ignored evidence directory")
 let score = try JSONDecoder().decode(Score.self, from: Data(contentsOf: source))
-try require(["summit", "boss", "camp"].contains(score.id), "Unknown scene")
+let scenes = ["summit", "boss", "camp", "garden", "roots", "echo", "library", "mist", "frost", "clockwork", "furnace", "heart", "underworld-roots", "underworld-mist", "underworld-library", "underworld-furnace", "underworld-heart", "garden-identity", "echo-identity", "clockwork-identity", "roots-identity", "library-identity", "mist-identity", "frost-identity", "furnace-identity", "heart-identity", "underworld-roots-identity", "underworld-mist-identity", "underworld-library-identity", "underworld-furnace-identity", "underworld-heart-identity"]
+try require(scenes.contains(score.id), "Unknown scene")
 try require(score.bpm >= 60 && score.bpm <= 160 && score.bars > 0, "Invalid score tempo")
 let secondsPerBeat = 60 / score.bpm, duration = Double(score.bars * score.beatsPerBar) * secondsPerBeat + score.tail
 try require(duration >= 45 && duration <= 60, "Preview duration must be 45–60 seconds")
@@ -36,19 +37,34 @@ let installed = [
     "flute": garage + "Flute iOS KB.exs", "horn": garage + "French Horn iOS KB.exs",
     "clarinet": garage + "Clarinet iOS KB.exs"
 ]
+let soundBank = "/System/Library/Components/CoreAudio.component/Contents/Resources/gs_instruments.dls"
+let bankPrograms: [String: UInt8] = ["harp": 46, "celesta": 8, "vibraphone": 11, "pizzicato": 45, "harpsichord": 6, "bassoon": 70,
+    "marimba": 12, "panflute": 75, "oboe": 68, "piano": 0, "trombone": 57, "tuba": 58, "trumpet": 56,
+    "choir": 52, "chant": 53, "organ": 19, "englishhorn": 69, "guitar": 24, "contrabass": 43, "mutedtrumpet": 59, "tremolo": 44]
 let sampleRate = 44100.0, format = AVAudioFormat(standardFormatWithSampleRate: 44100, channels: 2)!
 let engine = AVAudioEngine(), orchestra = AVAudioMixerNode(), reverb = AVAudioUnitReverb()
 engine.attach(orchestra); engine.attach(reverb)
-reverb.loadFactoryPreset(.largeHall); reverb.wetDryMix = score.reverb
+switch score.roomPreset {
+case "smallRoom": reverb.loadFactoryPreset(.smallRoom)
+case "cathedral": reverb.loadFactoryPreset(.cathedral)
+case "mediumHall": reverb.loadFactoryPreset(.mediumHall)
+case nil: reverb.loadFactoryPreset(.largeHall)
+default: throw NSError(domain: "Instrument", code: 1, userInfo: [NSLocalizedDescriptionKey: "Unsupported room preset"])
+}
+reverb.wetDryMix = score.reverb
 engine.mainMixerNode.outputVolume = 0.62
 var samplers: [AVAudioUnitSampler] = [], deskIndex: [String: Int] = [:]
 for desk in score.desks {
     try require(deskIndex[desk.id] == nil, "Duplicate instrument desk")
-    guard let path = installed[desk.id] else { throw NSError(domain: "Instrument", code: 1, userInfo: [NSLocalizedDescriptionKey: "Unsupported instrument"]) }
-    try require(fm.fileExists(atPath: path), "Installed instrument missing; no downloading or fallback")
     try require(desk.gain >= -28 && desk.gain <= -8 && abs(desk.pan) <= 1, "Invalid desk level or pan")
     let sampler = AVAudioUnitSampler(); engine.attach(sampler)
-    try sampler.loadInstrument(at: URL(fileURLWithPath: path))
+    if let path = installed[desk.id] {
+        try require(fm.fileExists(atPath: path), "Installed instrument missing; no downloading or fallback")
+        try sampler.loadInstrument(at: URL(fileURLWithPath: path))
+    } else if let program = bankPrograms[desk.id] {
+        try require(score.id.hasSuffix("-identity") && fm.fileExists(atPath: soundBank), "New instruments are local identity auditions only")
+        try sampler.loadSoundBankInstrument(at: URL(fileURLWithPath: soundBank), program: program, bankMSB: UInt8(kAUSampler_DefaultMelodicBankMSB), bankLSB: 0)
+    } else { throw NSError(domain: "Instrument", code: 1, userInfo: [NSLocalizedDescriptionKey: "Unsupported instrument"]) }
     sampler.overallGain = desk.gain; sampler.stereoPan = desk.pan * 100
     deskIndex[desk.id] = samplers.count; samplers.append(sampler)
     print("Loaded installed section: \(desk.id)")
@@ -115,7 +131,8 @@ let receipt: [String: Any] = [
     "bars": score.bars, "sampleRate": sampleRate, "channels": 2, "renderedFrames": cursor,
     "noteCount": score.notes.count, "eventCount": events.count, "dispatchedEvents": next,
     "rawPeak": peak, "rawRms": sqrt(sum / Double(max(1, samples))), "file": raw.path,
-    "instrumentPaths": score.desks.map { ["desk": $0.id, "installedInstrument": installed[$0.id]!] },
+    "instrumentPaths": score.desks.map { ["desk": $0.id, "installedInstrument": installed[$0.id] ?? soundBank + "#program=" + String(bankPrograms[$0.id]!)] },
+    "roomPreset": score.roomPreset ?? "largeHall", "beatsPerBar": score.beatsPerBar,
     "renderMethod": "Original authored score using installed instrument samples; not a live orchestra recording",
     "sourceSamplesRedistributed": false, "officialMusicChanged": false,
     "licenseSources": ["https://www.apple.com/legal/sla/docs/LogicPro.pdf", "https://www.apple.com/legal/sla/docs/GarageBand.pdf"]

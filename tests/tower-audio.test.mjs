@@ -23,7 +23,7 @@ function harness({ deferFetch = false, deferDecode = false, failFetch = false, b
   };
   const output = {};
   const root = vm.createContext({ AbortController, console: { warn: (...args) => warnings.push(args) }, fetch: (url, { signal }) => {
-    const task = deferred(), id = url.split('/').at(-1).replace('.m4a', ''), item = { id, url, signal, task }; fetches.push(item);
+    const task = deferred(), id = new URL(url,'https://maze-audio.test/').pathname.split('/').at(-1).replace('.m4a', ''), item = { id, url, signal, task }; fetches.push(item);
     if (!deferFetch) task.resolve({ ok: !failFetch, status: failFetch ? 404 : 200, arrayBuffer: async () => ({ id }) });
     return task.promise;
   } });
@@ -35,6 +35,13 @@ function harness({ deferFetch = false, deferDecode = false, failFetch = false, b
   function advance(seconds) { context.currentTime += seconds; for (const voice of sources) if (!voice.stopped && voice.stops.some(time => time !== undefined && time <= context.currentTime)) { voice.stopped = true; voice.onended?.(); } }
   return { audio, context, output, fetches, decoded, sources, gains, warnings, respond, playing, advance };
 }
+
+test('orchestral requests use actual recording revisions; ordinary combat URL remains unchanged', async()=>{
+  const h=harness(),manifest=JSON.parse(readFileSync(new URL('../assets/music/orchestra-manifest.json',import.meta.url),'utf8'));
+  h.audio.setEnvironment('summoning');await flush();h.audio.setCamp(true);await flush();h.audio.setCamp(false);h.audio.setEncounter(true,true);await flush();h.audio.setEncounter(true,false);await flush();
+  for(const track of manifest.tracks){const request=h.fetches.find(row=>row.id==='orchestra-'+track.id);assert.ok(request);assert.equal(request.url,'assets/music/orchestra-'+track.id+'.m4a?v='+track.sha256.slice(0,12));}
+  assert.equal(h.fetches.find(row=>row.id==='combat').url,'assets/music/combat.m4a');
+});
 
 test('rapid environment change aborts old fetch and a stale successful response cannot play', async () => {
   const h = harness({ deferFetch: true });
@@ -115,7 +122,8 @@ test('summoning lazily selects the authored summit loop on the existing context 
   const h = harness();
   assert.equal(h.fetches.length, 0);
   h.audio.setEnvironment('summoning'); await flush();
-  assert.equal(h.fetches[0].url, 'assets/music/orchestra-summit.m4a');
+  const manifest = JSON.parse(readFileSync(new URL('../assets/music/orchestra-manifest.json', import.meta.url), 'utf8'));
+  assert.equal(h.fetches[0].url, 'assets/music/orchestra-summit.m4a?v=' + manifest.tracks.find(t=>t.id==='summit').sha256.slice(0,12));
   assert.equal(h.sources[0].loopStart, 0);
   assert.equal(h.sources[0].loopEnd, 50.526326530612245);
   assert.equal(h.gains[0].connected, h.output);

@@ -79,14 +79,14 @@ export function percussionMix(score,frames,sampleRate=44100){
 }
 function wav(pcm){const b=Buffer.alloc(44+pcm.length);b.write('RIFF');b.writeUInt32LE(b.length-8,4);b.write('WAVEfmt ',8);b.writeUInt32LE(16,16);b.writeUInt16LE(3,20);b.writeUInt16LE(2,22);b.writeUInt32LE(44100,24);b.writeUInt32LE(44100*8,28);b.writeUInt16LE(8,32);b.writeUInt16LE(32,34);b.write('data',36);b.writeUInt32LE(pcm.length,40);pcm.copy(b,44);return b;}
 const sha=b=>createHash('sha256').update(b).digest('hex');
-async function protectedHashes(){return Object.fromEntries(await Promise.all(['index.html','package.json','assets/classic-audio.js','assets/voice-pack.js','story/tower-audio.js','story/tower-mode.js'].map(async f=>[f,sha(await readFile(new URL('../'+f,import.meta.url)))])));}
-async function main(){
-  const args=process.argv.slice(2),out=resolve(args.find(a=>!a.startsWith('--'))||'.agent-run/scene-orchestra-previews');
+async function protectedHashes(){return Object.fromEntries(await Promise.all(['index.html','package.json','assets/classic-audio.js','assets/voice-pack.js','story/tower-audio.js','story/tower-mode.js','assets/music/orchestra-manifest.json','assets/music/orchestra-summit.m4a','assets/music/orchestra-boss.m4a','assets/music/orchestra-camp.m4a'].map(async f=>[f,sha(await readFile(new URL('../'+f,import.meta.url)))])));}
+export async function renderAuditions(selectedScores,output,{pageTitle='三場景配樂試聽',introduction='雲頂探索、刺激鼓動的樓主戰與營地休息。先確認風格；不自動播放，尚未替換正式遊戲音樂。'}={}){
+  assert.ok(selectedScores.length>0&&selectedScores.length<=3);assert.equal(new Set(selectedScores.map(s=>s.id)).size,selectedScores.length);
+  const out=resolve(output);
   assert.ok(out.startsWith(resolve('.agent-run')+'/'));await mkdir(out,{recursive:true});
-  if(args.includes('--validate-only')){console.log(JSON.stringify(scores.map(validate)));return;}
   const protectedBefore=await protectedHashes(),report={pass:false,localOnly:true,officialMusicChanged:false,sourceSamplesRedistributed:false,tracks:[],protectedBefore,limitations:['Sample-based original arrangements with original procedural percussion, not live orchestra recordings.','Signal and file checks do not claim a human subjective listening review.','Only preview files are created in the ignored local evidence folder; nothing is deployed.']};
   const ffmpeg='/opt/homebrew/bin/ffmpeg',ffprobe='/opt/homebrew/bin/ffprobe';
-  try{for(const score of scores){
+  try{for(const score of selectedScores){
     const summary=validate(score),scorePath=out+'/'+score.id+'-score.json';await writeFile(scorePath,JSON.stringify(score,null,2));console.log('Rendering '+score.title+' '+summary.seconds.toFixed(2)+' seconds');
     command('/usr/bin/swift',[fileURLToPath(new URL('./render-scene-orchestral-preview.swift',import.meta.url)),scorePath,out],{timeout:210000});
     const receipt=JSON.parse(await readFile(out+'/'+score.id+'-render-receipt.json','utf8')),raw=out+'/'+score.id+'-orchestra.wav',source=await readFile(raw);
@@ -111,9 +111,15 @@ async function main(){
   report.protectedAfter=await protectedHashes();assert.deepEqual(report.protectedAfter,protectedBefore);
   const escape=s=>String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
   const cards=report.tracks.map(t=>`<article><h2>${escape(t.title)}</h2><p>${escape(t.description)}</p><small>${t.seconds.toFixed(1)} 秒 · ${t.bpm} 拍 · 原創管弦取樣編曲</small><audio controls preload="none" src="${encodeURIComponent(basename(t.file))}"></audio><a href="${encodeURIComponent(basename(t.file))}" download>下載試聽</a></article>`).join('');
-  await writeFile(out+'/index.html',`<!doctype html><html lang="zh-Hant"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>三場景配樂試聽</title><style>*{box-sizing:border-box}body{margin:0;background:#111f2d;color:#f5e6c7;font:17px system-ui,sans-serif}main{max-width:900px;margin:auto;padding:24px}h1{font-size:28px}h2{font-size:23px;margin:0}p{line-height:1.65;color:#bed0db}article{background:#1b3040;border:1px solid #526a79;border-radius:18px;padding:22px;margin:20px 0}small{display:block;color:#dbc79b}audio{display:block;width:100%;margin:20px 0 15px}a{color:#d9c194}footer{color:#a5bccd;font-size:14px;line-height:1.6}@media(max-width:480px){main{padding:14px}article{padding:18px}}</style><main><h1>三場景配樂試聽</h1><p>雲頂探索、刺激鼓動的樓主戰與營地休息。先確認風格；不自動播放，尚未替換正式遊戲音樂。</p>${cards}<footer>使用已安裝管弦樂器取樣及原創合成打擊編曲，不是真人樂團錄音；未散布原始取樣。音量與檔案已檢查，聽感仍請實際試聽確認。<br>取樣條款參考：<a href="https://www.apple.com/legal/sla/docs/LogicPro.pdf">Logic Pro</a>、<a href="https://www.apple.com/legal/sla/docs/GarageBand.pdf">GarageBand</a></footer></main></html>`);
+  await writeFile(out+'/index.html',`<!doctype html><html lang="zh-Hant"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${escape(pageTitle)}</title><style>*{box-sizing:border-box}body{margin:0;background:#111f2d;color:#f5e6c7;font:17px system-ui,sans-serif}main{max-width:900px;margin:auto;padding:24px}h1{font-size:28px}h2{font-size:23px;margin:0}p{line-height:1.65;color:#bed0db}article{background:#1b3040;border:1px solid #526a79;border-radius:18px;padding:22px;margin:20px 0}small{display:block;color:#dbc79b}audio{display:block;width:100%;margin:20px 0 15px}a{color:#d9c194}footer{color:#a5bccd;font-size:14px;line-height:1.6}@media(max-width:480px){main{padding:14px}article{padding:18px}}</style><main><h1>${escape(pageTitle)}</h1><p>${escape(introduction)}</p>${cards}<footer>使用已安裝管弦樂器取樣的原創編曲，不是真人樂團錄音；未散布原始取樣。音量與檔案已檢查，聽感仍請實際試聽確認。<br>取樣條款參考：<a href="https://www.apple.com/legal/sla/docs/LogicPro.pdf">Logic Pro</a>、<a href="https://www.apple.com/legal/sla/docs/GarageBand.pdf">GarageBand</a></footer></main></html>`);
   report.pass=true; // Success includes the completed, usable preview page.
   }catch(error){report.pass=false;report.failure=error.stack;throw error;}finally{await writeFile(out+'/report.json',JSON.stringify(report,null,2));}
   console.log(JSON.stringify({pass:report.pass,tracks:report.tracks.map(t=>({title:t.title,file:t.file,seconds:t.seconds,bpm:t.bpm})),officialMusicChanged:false,report:out+'/report.json'}));
+  return report;
+}
+async function main(){
+  const args=process.argv.slice(2),out=resolve(args.find(a=>!a.startsWith('--'))||'.agent-run/scene-orchestra-previews');
+  if(args.includes('--validate-only')){console.log(JSON.stringify(scores.map(validate)));return;}
+  await renderAuditions(scores,out);
 }
 if(process.argv[1]&&resolve(process.argv[1])===fileURLToPath(import.meta.url))await main();

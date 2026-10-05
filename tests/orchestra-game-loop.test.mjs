@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
 import {createHash} from 'node:crypto';
-import {foldTail} from '../tools/finalize-scene-orchestral-music.mjs';
+import {foldTail,replaceSelectedTracks,APPROVED_LEGATO_HASHES} from '../tools/finalize-scene-orchestral-music.mjs';
 
 test('natural release folds into the next whole stereo phrase without losing beats',()=>{
   const pcm=Buffer.alloc(48);for(let i=0;i<12;i++)pcm.writeFloatLE(i/32,i*4);
@@ -14,6 +14,14 @@ test('loop folding rejects incomplete frames, non-finite release and invalid per
   for(const frames of [0,-1,1.5,3])assert.throws(()=>foldTail(Buffer.alloc(16),frames));
   assert.throws(()=>foldTail(Buffer.alloc(17),1));
   const pcm=Buffer.alloc(16);pcm.writeFloatLE(NaN,8);assert.throws(()=>foldTail(pcm,1));
+});
+test('legato replacement preserves the existing boss metadata and forbids replacing a boss or duplicate scene',()=>{
+  const manifest={version:1,tracks:[{id:'summit',sha256:'old-summit'},{id:'boss',sha256:'keep-boss',loopEnd:49.41176870748299},{id:'camp',sha256:'old-camp'}]};
+  const original=structuredClone(manifest),updates=[{id:'summit',sha256:'new-summit'},{id:'camp',sha256:'new-camp'}];
+  const next=replaceSelectedTracks(manifest,updates);assert.deepEqual(next.tracks[1],manifest.tracks[1]);assert.deepEqual(manifest,original);
+  assert.deepEqual(next.tracks.map(t=>t.sha256),['new-summit','keep-boss','new-camp']);
+  assert.throws(()=>replaceSelectedTracks(manifest,[{id:'boss'}]));assert.throws(()=>replaceSelectedTracks(manifest,[updates[0],updates[0]]));
+  assert.deepEqual(Object.keys(APPROVED_LEGATO_HASHES),['summit','camp']);
 });
 test('published complete recordings match their manifest, whole-bar loops and bounded mobile size',()=>{
   const root=new URL('../',import.meta.url),manifest=JSON.parse(readFileSync(new URL('assets/music/orchestra-manifest.json',root),'utf8'));

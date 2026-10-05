@@ -10,7 +10,7 @@
   "tracks": [
     {
       "id": "summit",
-      "title": "雲海與回聲",
+      "title": "雲海與回聲・連奏版",
       "file": "assets/music/orchestra-summit.m4a",
       "bpm": 76,
       "bars": 16,
@@ -19,11 +19,11 @@
       "frames": 2228211,
       "loopStart": 0,
       "loopEnd": 50.526326530612245,
-      "bytes": 818924,
-      "sha256": "aae7cb2b46c74f2e84010f1a1e6c7550a5b3be875f7159ba33c5dfefdad79371",
-      "integratedLoudness": -18.04,
-      "truePeakDb": -5.77,
-      "seamDelta": 0.0011783396985265426
+      "bytes": 819008,
+      "sha256": "d0973461fce0cf30ad55974ac59a8893877793ceb4d41fccdf6d1adde16182e2",
+      "integratedLoudness": -18.08,
+      "truePeakDb": -5.67,
+      "seamDelta": 0.004345875349827111
     },
     {
       "id": "boss",
@@ -44,7 +44,7 @@
     },
     {
       "id": "camp",
-      "title": "火光下的約定",
+      "title": "火光下的約定・連奏版",
       "file": "assets/music/orchestra-camp.m4a",
       "bpm": 78,
       "bars": 16,
@@ -53,11 +53,11 @@
       "frames": 2171077,
       "loopStart": 0,
       "loopEnd": 49.23077097505669,
-      "bytes": 798465,
-      "sha256": "ad429176e8b51da009b863e334bbf029ad55a6c92463249e8c74b3763713c3c4",
-      "integratedLoudness": -18.03,
-      "truePeakDb": -5.5,
-      "seamDelta": 0.0008599477878306061
+      "bytes": 797856,
+      "sha256": "57802bd99ebf7249140cfac061f9cad5c573a1ca49e358a793cc9da03f59d72d",
+      "integratedLoudness": -18.05,
+      "truePeakDb": -5.01,
+      "seamDelta": 0.0007960775110404938
     }
   ]
 }

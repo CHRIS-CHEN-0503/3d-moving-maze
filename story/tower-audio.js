@@ -9,9 +9,9 @@
   const FADE_SECONDS = 1, VOLUME = 0.78, CACHE_LIMIT = 3;
   // Formal loop files omit the audition's four-second fading room tail.
   const TRACKS = Object.freeze({
-    'orchestra-summit': Object.freeze({ loopStart: 0, loopEnd: 50.526326530612245, sha256: 'aae7cb2b46c74f2e84010f1a1e6c7550a5b3be875f7159ba33c5dfefdad79371' }),
+    'orchestra-summit': Object.freeze({ loopStart: 0, loopEnd: 50.526326530612245, sha256: 'd0973461fce0cf30ad55974ac59a8893877793ceb4d41fccdf6d1adde16182e2' }),
     'orchestra-boss': Object.freeze({ loopStart: 0, loopEnd: 49.41176870748299, sha256: 'f8f3a2d14f920dc9cee9f576079e3497d7fd843c7a92abc3d65bcdf20d8d9f48' }),
-    'orchestra-camp': Object.freeze({ loopStart: 0, loopEnd: 49.23077097505669, sha256: 'ad429176e8b51da009b863e334bbf029ad55a6c92463249e8c74b3763713c3c4' }),
+    'orchestra-camp': Object.freeze({ loopStart: 0, loopEnd: 49.23077097505669, sha256: '57802bd99ebf7249140cfac061f9cad5c573a1ca49e358a793cc9da03f59d72d' }),
   });
   let context = null, output = null, environment = null, encounter = false, bossEncounter = false, camp = false, paused = false, muted = false;
   let epoch = 0, current = null;
@@ -80,7 +80,8 @@
     const request = { controller };
     requests.set(id, request);
     try {
-      const response = await root.fetch('assets/music/' + id + '.m4a', { signal: controller.signal });
+      const revision = TRACKS[id] ? '?v=' + TRACKS[id].sha256.slice(0, 12) : '';
+      const response = await root.fetch('assets/music/' + id + '.m4a' + revision, { signal: controller.signal });
       if (!response.ok) throw new Error('HTTP ' + response.status);
       const bytes = await response.arrayBuffer();
       if (controller.signal.aborted || epoch !== requestEpoch) return null;

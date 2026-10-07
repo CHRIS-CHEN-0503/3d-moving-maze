@@ -11,7 +11,7 @@
   const reducedMotion=window.matchMedia?.('(prefers-reduced-motion: reduce)');
   const modern=()=>!!run?.party?.loadouts;
   let partyUI = null, lightingUI = null, lightingRig = null, pendingProfession = null, pendingHero = null, pendingSex = 'male', upgradingProfession = false;
-  const SAVE = 'maze3d_tower_v1';
+  const SAVE = (window.TowerGM?.active?.()?window.TowerGM.GM_SAVE:'maze3d_tower_v1');
   const SURFACE_CLEAR=SAVE+'_surface_clear_v1';
   const AUTO_AIM_SETTING='maze3d_tower_auto_aim_v1';
   let autoAim=false;try{autoAim=localStorage.getItem(AUTO_AIM_SETTING)==='on';}catch(_){}
@@ -2015,7 +2015,9 @@
   function robotEnergy(){if(!active||!modern()||Heroes.job(run)!=='robot')return null;return {value:Heroes.actor(run).robot.fuel};}
   function movementLocked(){return !!(active&&modern()&&partyUI?.movementLocked?.());}
   function movementScale(){if(!active||paused||G.shifting)return 1;const traits=run.party?window.TowerExpedition.traits(run):{speed:1,grip:0};return (modern()?Heroes.speed(run):C.hasteMultiplier(run))*Math.min(1,hazardSlow+(traits.grip>0?.15:0))*(run.party?.slowLeft>0?(traits.grip>0?.8:.6):1)*(modern()?1:traits.speed);}
-  window.TowerMode = { get cinematicActive(){return !!cinema?.active;},cinematicFrame:dt=>cinema?.frame(dt),prepareMaze,openBattleSettings, sightRoot:()=>active?world:null, voiceProfile, toolUsed, robotEnergy, get active(){return active;}, get paused(){return paused;}, get partyActive(){return active&&!!run?.party;}, temporaryMapRadius:()=>modern()?(Heroes.buff(run,'path_eye')?.power||0):0, lightRadius:()=>active?lightingUI?.radius():null, useProfessionSkill:()=>partyUI?.skill(), movementLocked, movementScale, open, beginNew, tick, floorSeed, atmosphereStyle, scheduleShift, updateShift, exitUnlocked, reachExit, defeat, requestQuit, canCollectOriginal, collectedOriginal, itemConfig, reservedCells, preserveFloorPickups, soundChanged, mapMarkers };
+  // startSaved/pauseForPanel/leaveForReload serve the 逃生梯 (GM) panel: load the prepared sandbox journey,
+  // pause while it is open, or end the floor normally (saved, engine stopped) before a reload.
+  window.TowerMode = { startSaved:()=>{open(true);handleAction('continue');},pauseForPanel:()=>{if(active&&floorStarted&&!paused&&run?.status==='playing')pauseMenu();},leaveForReload:()=>{if(active)stop();return !active;},get cinematicActive(){return !!cinema?.active;},cinematicFrame:dt=>cinema?.frame(dt),prepareMaze,openBattleSettings, sightRoot:()=>active?world:null, voiceProfile, toolUsed, robotEnergy, get active(){return active;}, get paused(){return paused;}, get partyActive(){return active&&!!run?.party;}, temporaryMapRadius:()=>modern()?(Heroes.buff(run,'path_eye')?.power||0):0, lightRadius:()=>active?lightingUI?.radius():null, useProfessionSkill:()=>partyUI?.skill(), movementLocked, movementScale, open, beginNew, tick, floorSeed, atmosphereStyle, scheduleShift, updateShift, exitUnlocked, reachExit, defeat, requestQuit, canCollectOriginal, collectedOriginal, itemConfig, reservedCells, preserveFloorPickups, soundChanged, mapMarkers };
   window.TowerMode.cinematicRender=draw=>cinema?cinema.render(draw):draw();
   install();
 })();

@@ -8,7 +8,7 @@ const require=createRequire(import.meta.url),GameRules=require('../assets/game-r
 function block(start,end){const a=html.indexOf(start),b=html.indexOf(end,a);assert.ok(a>=0&&b>a);return html.slice(a,b);}
 function peer(host=true){
   const nodes=new Map(),sent=[],messages=[];
-  const c=vm.createContext({GAME_VERSION:'1.58.0',MP:{host,id:host?'host':'guest',mode:'race',maxPlayers:5,fillBots:false,roster:[{id:'host',charIdx:0,name:'房主'}]},
+  const c=vm.createContext({GAME_VERSION:'1.58.1',MP:{host,id:host?'host':'guest',mode:'race',maxPlayers:5,fillBots:false,roster:[{id:'host',charIdx:0,name:'房主'}]},
     CFG:{mazeSize:13,shiftMin:3,hungerMin:3},G:{lvlIdx:0},SERIES:{total:3},GameRules,CHARS:Array.from({length:6},()=>({emoji:''})),
     clearInterval(){},escapeHtml:s=>s,modeLabel:m=>m,performance:{now:()=>1000},MP_ROUND_EVENTS:new Set(),
     $:id=>{if(!nodes.has(id))nodes.set(id,{style:{},checked:false});return nodes.get(id);},

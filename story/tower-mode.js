@@ -21,6 +21,8 @@
   let world = null, loot = [], monsters = [], traders = [], nearest = null;
   let environmentLife=null;
   let tradeCategory='supplies',tradeMerchant='',pendingCooking=null;
+  // Menus opened from a shop keep a way back to it while the player stays there.
+  let menuReturn=null,lastPressed=null,discardFrom='bag';
   let warriorNpc = null, nearestWarrior = null, escort = null;
   let explorer = null, chest = null, relic = null, nearbyEncounter = null, lastSurveyCell = '', gearVisual = null, gearSignature = '', exitDeclined = false;
   let shiftLeft = C.floorConfig(99).shiftSeconds, wasShifting = false, floorConfig = null, saveClock = 0, hudClock = 0;
@@ -29,9 +31,14 @@
   let encounterHold = 0, bossEncounterHold = 0, campDialog = false;
   let cinema = null,storyTheater=null,storyTheaterKey='',storyPreviewScreen='';
   const encounterAlert=window.TowerEncounterAlert?.create({THREE,world:()=>world,player:()=>playerGroup,camera:()=>camera,firstPerson:()=>G.view==='fp',voice:()=>window.GameVoice?.announceAsset('alert.monster','小心，附近有怪物。留意地上的紅圈，準備閃避，或請護衛攔住牠。',true)});
-  let objectiveHint = null;
+  let objectiveHint = null, hiddenDuringShift = 0, liveValidateClock = 0;
+  // Each new journey keeps a full backup of the replaced save. Keep only the
+  // newest few so repeated restarts cannot exhaust storage and block saving.
+  function pruneHeroBackups(keep,prefix=SAVE+'_before_heroes_'){try{const keys=[];for(let i=0;i<localStorage.length;i++){const key=localStorage.key(i);if(key&&key.startsWith(prefix)&&/^\d+$/.test(key.slice(prefix.length)))keys.push(key);}keys.sort((a,b)=>Number(a.slice(prefix.length))-Number(b.slice(prefix.length)));for(const key of keys.slice(0,Math.max(0,keys.length-keep)))localStorage.removeItem(key);}catch(_){/* storage unavailable: the caller reports it */}}
+  // Robot core slots ride in run.equipment too; label them instead of printing "undefined".
+  const GEAR_SLOT_LABELS = Object.freeze({helmet:'盔',armor:'甲',shield:'盾',weapon:'武',core1:'核一',core2:'核二'});
   let hurtFlash = 0, guardClashAt = 0;
-  let bolts = [];
+  let bolts = [], boltParts = null, traderSafe = false;
   let mainClue = null, rift = null, dungeonObjects = [], nearbyJourney = null, exploredCells = new Set(), reader = null, sideReader = null;
   let pendingDungeonShift = null;
   let hazards = [], hazardSlow = 1, hazardGrace = 3;
@@ -190,6 +197,7 @@
     overlay.addEventListener('click', event => {
       const button = event.target.closest('button[data-tower]');
       if (button && !button.disabled) {
+        lastPressed={tower:button.dataset.tower,item:button.dataset.item||''};
         const label=window.TowerMenuVoice?.label(button.dataset.tower,button.dataset.item);
         handleAction(button.dataset.tower, button.dataset.item);
         if(label)window.GameVoice?.announce(label,true);
@@ -219,11 +227,13 @@
     });
     document.addEventListener('visibilitychange', () => {
       if (document.hidden && active && !paused && !G.shifting && run.status === 'playing') pauseMenu();
+      // Leaving mid-shift cannot open a dialog yet; pause as soon as the walls settle.
+      else if (document.hidden && active && !paused && G.shifting && run.status === 'playing') hiddenDuringShift = hiddenDuringShift || performance.now();
       if (active) save();
     });
     window.addEventListener('pagehide', () => { if (active) save(); });
     if(P&&window.TowerPartyRuntime){
-      partyUI=window.TowerPartyRuntime.create({THREE,G,core:C,text,action,dialog,help:(title,html)=>window.TowerCompactHelp?.render(title,html)||html,transact,save,toast:showToast,audio:AudioEng,quest:questEvent,
+      partyUI=window.TowerPartyRuntime.create({THREE,G,core:C,text,action,returnAction:()=>returnAction(),dialog,help:(title,html)=>window.TowerCompactHelp?.render(title,html)||html,transact,save,toast:showToast,audio:AudioEng,quest:questEvent,
         run:()=>run,paused:()=>paused,world:()=>world,monsters:()=>monsters,traders:()=>traders,player:()=>playerGroup,camera:()=>camera,inDungeon,autoAim:()=>autoAim,
         clear:hasClearPath,followClear:followerClear,followDistance:followerDistance,cell:cellPoint,worldToCell,chooseCell,makeText:makeTextSprite,follow:followNpc,dispose:disposeSceneObject,damage,
         close:closeDialog,refreshGear,hurt:()=>hurtLeft>0,passage:openExplorationPassage,
@@ -243,8 +253,15 @@
     // Keep every left-side layer in normal flow; opening details pushes rows down.
     const effects=el('effectChips');if(effects)leftHud.appendChild(effects);
   }
+  // Confirmations read as the main choice, irreversible ones as warnings and
+  // leaving the menu as the quiet exit; keys and order never change.
   function action(label, key, item, disabled) {
-    return '<button class="tower-btn" data-tower="' + key + '"' + (item ? ' data-item="' + text(item) + '"' : '') + (disabled ? ' disabled' : '') + '>' + text(label) + '</button>';
+    const tone=/(?:-confirm|-do)$|^hero-robot-upgrade$/.test(key)?' primary':/^(?:discard|party-dismantle|party-dismiss)$/.test(key)?' danger':key==='close'?' is-exit':'';
+    return '<button class="tower-btn'+tone+'" data-tower="' + key + '"' + (item ? ' data-item="' + text(item) + '"' : '') + (disabled ? ' disabled' : '') + '>' + text(label) + '</button>';
+  }
+  function returnAction(){
+    const shop=menuReturn&&nearest&&nearest.id===menuReturn.merchant&&Math.hypot(G.px-nearest.x,G.pz-nearest.z)<2.6;
+    return shop?action('回到商店','trade-back',menuReturn.merchant):'';
   }
   function isCampMusicDialog(kicker, narration, actions) {
     if (!active || !G.running || run?.status !== 'playing' || !partyUI?.safeCamp?.()) return false;
@@ -272,6 +289,11 @@
     objectiveHint?.suspend();
     partyUI?.refreshWorkProgress();
     if (el('towerOverlay').hidden) modalFocus = document.activeElement;
+    // A quiet refresh of the same page (after buying, cooking, equipping…)
+    // keeps the reader's place and the pressed button instead of jumping to the top.
+    // Tabs and workshop sub-pages are different pages even under the same title.
+    const pageMarks=[...new Set(String(body||'').match(/aria-current="page"[^>]*?data-item="[^"]*"|data-forge-page="[a-z]+"/g)||[])].join(',');
+    const pageKey=kicker+'|'+title+'|'+pageMarks,dialogNode=el('towerDialog'),sameRefresh=narration.silent===true&&!el('towerOverlay').hidden&&dialogNode.dataset?.pageKey===pageKey,keepScroll=sameRefresh?dialogNode.querySelector?.('.tower-dialog-content')?.scrollTop||0:0;
     el('towerOverlay').hidden = false;
     const closeButton=!pendingDungeonShift&&(!active||(run.status==='playing'&&G.running&&floorStarted))?'<button class="tower-close" data-tower="close" aria-label="關閉對話並返回">返回</button>':'';
     const voiceControls=window.GameVoice?.status().enabled&&window.GameVoice?.status().supported?'<nav class="tower-voice-controls" data-voice-controls aria-label="故事朗讀"><button class="tower-btn" type="button" data-voice-action="replay" aria-label="重新朗讀這一頁"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 9h4l5-4v14l-5-4H4Z M17 8q5 4 0 8 M19 4q9 8 0 16"/></svg>重聽</button><button class="tower-btn" type="button" data-voice-action="stop" aria-label="停止朗讀"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="5" y="5" width="14" height="14" rx="2"/></svg>停止</button></nav>':'';
@@ -282,9 +304,15 @@
     el('towerDialog').setAttribute?.('data-commerce',narration.commerce||'');
     const wallet=Number.isFinite(narration.wallet)?'<span class="tower-trade-wallet" aria-label="持有銅幣 '+text(narration.wallet)+'">'+(window.TowerResourceIcons?.svg('coin')||'')+text(narration.wallet)+' 幣</span>':'';
     el('towerDialog').innerHTML = '<header class="tower-dialog-header"><div class="tower-dialog-titles'+(wallet?' tower-titles-with-wallet':'')+'"><div class="tower-kicker">' + text(kicker) + '</div><h2 class="tower-heading" id="towerDialogTitle">' + text(title) + '</h2>'+wallet+'</div>'+voiceControls+closeButton+'</header><div class="tower-dialog-content" tabindex="0" role="region" aria-label="對話內容">'+(copy?'<p class="tower-copy">' + text(copy) + '</p>':'') + (body || '') + '</div><div class="tower-actions">' + actions + '</div>';
+    if(dialogNode.dataset)dialogNode.dataset.pageKey=pageKey;
+    // Page-level rules live behind one "?" in the header instead of a full row.
+    const pageHelp=dialogNode.querySelector?.('.tower-dialog-content > .tower-compact-help'),dialogHeader=dialogNode.querySelector?.('.tower-dialog-header');
+    if(pageHelp&&typeof dialogHeader?.insertBefore==='function'){pageHelp.classList?.add('in-header');dialogHeader.insertBefore(pageHelp,dialogHeader.querySelector('.tower-close'));}
     window.TowerCompactHelp?.install(document);
-    el('towerDialog').focus();
+    const restored=sameRefresh&&lastPressed?[...(dialogNode.querySelectorAll?.('button[data-tower]')||[])].find(b=>b.dataset.tower===lastPressed.tower&&(b.dataset.item||'')===lastPressed.item&&!b.disabled):null;
+    (restored||el('towerDialog')).focus();
     el('towerDialog').scrollTop=0;
+    if(keepScroll){const content=dialogNode.querySelector?.('.tower-dialog-content');if(content)content.scrollTop=keepScroll;}
     el('towerDialog').voiceScope=narration.full?'full':'summary';
     el('towerDialog').voiceSummary=narration.summary||'';
     el('towerDialog').voiceText=narration.text;
@@ -300,6 +328,7 @@
   function openBattleSettings(quiet=false){if(!active||!G.running)return;dialog('旅程暫停中','遊戲設定','調整聲音、畫質與操作，關閉後繼續冒險。',window.MazeAudioSettings.controls()+(window.MazeQuality?.controls()||'')+'<div class="battle-settings-options">'+action('音樂：'+(G.muted?'關':'開'),'battle-music')+(modern()?'<button class="tower-btn" data-tower="battle-auto-aim" role="switch" aria-checked="'+autoAim+'">自動對準：'+(autoAim?'開':'關')+'</button>'+action('技能排序','hero-order')+action('自動行動／快捷欄','hero-policy'):'')+'</div>'+(modern()?'<p class="tower-copy">自動對準：按攻擊或對敵技能時，朝向攻擊範圍內最近、未被牆壁遮擋的怪物。不會自動走位；輔助技能仍由你選隊友。</p>':''),action('繼續遊戲','close')+action('離開遊戲','quit'),{silent:quiet,summary:'遊戲設定。可以調整音量、畫質、自動對準與隊友行動。'});}
   function closeDialog() {
     if(pendingDungeonShift)return;
+    menuReturn=null;if(el('towerDialog').dataset)el('towerDialog').dataset.pageKey='';
     campDialog = false; window.TowerAudio?.setCamp(false);
     pendingWarriorReplacement=null;
     pendingCooking=null;
@@ -321,6 +350,12 @@
     try { return C.validateSave(JSON.parse(localStorage.getItem(SAVE) || 'null')); }
     catch (_) { return null; }
   }
+  // A stored journey that no longer validates (damaged, or written by a newer
+  // version) must not look like "no save": warn and keep its raw text.
+  function unreadableSave() {
+    try { return !!localStorage.getItem(SAVE) && !readSave(); }
+    catch (_) { return false; }
+  }
   function surfaceClear() {
     const current=readSave();
     if(current?.status==='won'&&current.floor===1)return current;
@@ -333,10 +368,12 @@
     pendingUnderworld=result.run;pendingUnderworldSource=JSON.stringify(cleared);pendingUnderworldActive=localStorage.getItem(SAVE);
     const departed=pendingUnderworld.underworld?.departed,job=departed?P.PROFESSIONS[departed.profession]?.name:'';
     const farewell=departed?`${job||'同伴'}${departed.name?'・'+departed.name:''}搖了搖頭：「我答應陪你走出高塔。現在已經做到了，我想先回家休息。你們要平安回來。」你尊重這個決定，接過對方留下的裝備，好好道別。`:'沒有同伴需要道別。你收好裝備，決定親自查明樓梯下方的秘密。';
-    const current=readSave(),replaces=current&&current.status!=='won';
+    const current=readSave(),replaces=current&&current.status!=='won',replacesFinished=current?.status==='won'&&current.floor<0;
     const paragraphs=['你已經走出高塔。幾天後，一名旅人帶來消息：第 1 層樓主離開後，原本封閉的石壁竟露出隱藏樓梯。','高塔之下，還有一座更古老的地下城。這一次沒有召喚，也沒有強迫。帶著好奇，你決定回去看看。',farewell,'地下怪物更加強大。你可招募最多四名同伴，與主角組成五人隊伍。前四十層沿用最大的迷宮；最後十層還會更寬廣。'];
-    const decide=()=>dialog('通關後的新篇章 · 地下五十層','門外，還有一條向下的路','是否開始這次自願的探索？','<p class="tower-copy">承接地上通關時的等級、技能、裝備與補給。離隊只發生這一次；續玩不會再次抽選。'+(replaces?'目前另有未完成旅程，確認後會先備份，再切換成地下篇。':'地上通關存檔會另行保留。')+'</p>',action('先留在塔外','underworld-cancel')+action('帶著好奇，進入地下城','underworld-start'),{silent:true});
-    if(!playStorySequence({id:'underworld-introduction',title:'門外，還有一條向下的路',floor:1,paragraphs},decide,decide))dialog('通關後的新篇章 · 地下五十層','門外，還有一條向下的路','',prose(paragraphs),action('先留在塔外','underworld-cancel')+action('帶著好奇，進入地下城','underworld-start'),{full:true});
+    const note=replaces?'目前另有未完成旅程，確認後會先備份，再切換成地下篇。':replacesFinished?'這會從地上通關時重新出發，取代已完成的地下篇紀錄；確認後會先另存備份，地上通關存檔也會保留。':'地上通關存檔會另行保留。';
+    const decide=()=>dialog('通關後的新篇章 · 地下五十層','門外，還有一條向下的路','是否開始這次自願的探索？','<p class="tower-copy">承接地上通關時的等級、技能、裝備與補給。離隊只發生這一次；續玩不會再次抽選。'+note+'</p>',action('先留在塔外','underworld-cancel')+action('帶著好奇，進入地下城','underworld-start'),{silent:true});
+    // Without the film stage the same backup and replacement notice follows the story text.
+    if(!playStorySequence({id:'underworld-introduction',title:'門外，還有一條向下的路',floor:1,paragraphs},decide,decide))dialog('通關後的新篇章 · 地下五十層','門外，還有一條向下的路','',prose(paragraphs)+'<p class="tower-copy">'+note+'</p>',action('先留在塔外','underworld-cancel')+action('帶著好奇，進入地下城','underworld-start'),{full:true});
   }
   function startUnderworld(){
     if(!pendingUnderworld)return;
@@ -348,7 +385,11 @@
     try{
       const old=localStorage.getItem(SAVE);
       localStorage.setItem(SURFACE_CLEAR,JSON.stringify(cleared));
-      if(old)localStorage.setItem(SAVE+'_before_underworld',old);
+      // Never overwrite the first backup: it may hold the surface journey this
+      // expedition first replaced. Later replacements keep the newest two stamped copies.
+      const first=localStorage.getItem(SAVE+'_before_underworld');
+      if(old&&!first)localStorage.setItem(SAVE+'_before_underworld',old);
+      else if(old&&old!==first){pruneHeroBackups(1,SAVE+'_before_underworld_');localStorage.setItem(SAVE+'_before_underworld_'+Date.now(),old);}
       localStorage.setItem(SAVE,JSON.stringify(candidate));
     }catch(_){showToast('無法備份並保存地下旅程，目前進度未變。請先騰出瀏覽器儲存空間。',4000);return;}
     run=candidate;pendingUnderworld=null;floorStarted=false;enter();
@@ -367,25 +408,28 @@
     try {
       const raw=localStorage.getItem(SAVE);let previous=null;
       try{previous=raw?JSON.parse(raw):null;}catch(_){}
-      if(run.party?.journey&&previous?.party&&!previous.party.journey&&C.validateSave(previous))localStorage.setItem(SAVE+'_before_expedition2',raw);
-      if(run.party?.light&&previous?.party&&previous.party.light===undefined&&C.validateSave(previous))localStorage.setItem(SAVE+'_before_lighting',raw);
-      if(run.party?.journey?.materials&&previous?.party&&previous.party.journey?.materials===undefined&&C.validateSave(previous)&&!localStorage.getItem(SAVE+'_before_regional_crafting'))localStorage.setItem(SAVE+'_before_regional_crafting',raw);
-      if(run.party?.travellers&&previous?.party&&previous.party.travellers===undefined&&C.validateSave(previous)&&!localStorage.getItem(SAVE+'_before_traveller_reunion'))localStorage.setItem(SAVE+'_before_traveller_reunion',raw);
-      if(run.party?.foraging&&previous?.party&&previous.party.foraging===undefined&&C.validateSave(previous)&&!localStorage.getItem(SAVE+'_before_foraging_v1'))localStorage.setItem(SAVE+'_before_foraging_v1',raw);
-      if(run.party?.foraging?.version===4&&[1,2,3].includes(previous?.party?.foraging?.version)&&C.validateSave(previous)&&!localStorage.getItem(SAVE+'_before_foraging_v4'))localStorage.setItem(SAVE+'_before_foraging_v4',raw);
-      if(previous&&typeof Heroes!=='undefined'&&Heroes?.ROBOT?.needsMigration(previous)&&C.validateSave(previous)&&!localStorage.getItem(SAVE+'_before_robot_power_v1'))localStorage.setItem(SAVE+'_before_robot_power_v1',raw);
-      if(previous&&typeof Heroes!=='undefined'&&Heroes?.ROBOT?.needsCoreExpiryMigration(previous)&&C.validateSave(previous)&&!localStorage.getItem(SAVE+'_before_core_expiry_v1'))localStorage.setItem(SAVE+'_before_core_expiry_v1',raw);
-      if(run.party?.loadouts?.growth&&previous?.party?.loadouts&&!previous.party.loadouts.growth&&C.validateSave(previous)&&!localStorage.getItem(SAVE+'_before_hero_growth'))localStorage.setItem(SAVE+'_before_hero_growth',raw);
-      if(run.party?.loadouts?.growth?.version===2&&previous?.party?.loadouts&&previous.party.loadouts.growth?.version!==2&&C.validateSave(previous)&&!localStorage.getItem(SAVE+'_before_underground_growth_v2'))localStorage.setItem(SAVE+'_before_underground_growth_v2',raw);
-      if(run.party?.loadouts?.xpScale===10&&previous?.party?.loadouts&&previous.party.loadouts.xpScale===undefined&&C.validateSave(previous)&&!localStorage.getItem(SAVE+'_before_xp10'))localStorage.setItem(SAVE+'_before_xp10',raw);
+      // Validating the old save is the expensive part of every save; check cheap
+      // migration conditions first and validate at most once, only when needed.
+      let previousChecked=false,previousIsValid=false;const validPrevious=()=>{if(!previousChecked){previousChecked=true;previousIsValid=!!C.validateSave(previous);}return previousIsValid;};
+      if(run.party?.journey&&previous?.party&&!previous.party.journey&&validPrevious())localStorage.setItem(SAVE+'_before_expedition2',raw);
+      if(run.party?.light&&previous?.party&&previous.party.light===undefined&&validPrevious())localStorage.setItem(SAVE+'_before_lighting',raw);
+      if(run.party?.journey?.materials&&previous?.party&&previous.party.journey?.materials===undefined&&!localStorage.getItem(SAVE+'_before_regional_crafting')&&validPrevious())localStorage.setItem(SAVE+'_before_regional_crafting',raw);
+      if(run.party?.travellers&&previous?.party&&previous.party.travellers===undefined&&!localStorage.getItem(SAVE+'_before_traveller_reunion')&&validPrevious())localStorage.setItem(SAVE+'_before_traveller_reunion',raw);
+      if(run.party?.foraging&&previous?.party&&previous.party.foraging===undefined&&!localStorage.getItem(SAVE+'_before_foraging_v1')&&validPrevious())localStorage.setItem(SAVE+'_before_foraging_v1',raw);
+      if(run.party?.foraging?.version===4&&[1,2,3].includes(previous?.party?.foraging?.version)&&!localStorage.getItem(SAVE+'_before_foraging_v4')&&validPrevious())localStorage.setItem(SAVE+'_before_foraging_v4',raw);
+      if(previous&&typeof Heroes!=='undefined'&&Heroes?.ROBOT?.needsMigration(previous)&&!localStorage.getItem(SAVE+'_before_robot_power_v1')&&validPrevious())localStorage.setItem(SAVE+'_before_robot_power_v1',raw);
+      if(previous&&typeof Heroes!=='undefined'&&Heroes?.ROBOT?.needsCoreExpiryMigration(previous)&&!localStorage.getItem(SAVE+'_before_core_expiry_v1')&&validPrevious())localStorage.setItem(SAVE+'_before_core_expiry_v1',raw);
+      if(run.party?.loadouts?.growth&&previous?.party?.loadouts&&!previous.party.loadouts.growth&&!localStorage.getItem(SAVE+'_before_hero_growth')&&validPrevious())localStorage.setItem(SAVE+'_before_hero_growth',raw);
+      if(run.party?.loadouts?.growth?.version===2&&previous?.party?.loadouts&&previous.party.loadouts.growth?.version!==2&&!localStorage.getItem(SAVE+'_before_underground_growth_v2')&&validPrevious())localStorage.setItem(SAVE+'_before_underground_growth_v2',raw);
+      if(run.party?.loadouts?.xpScale===10&&previous?.party?.loadouts&&previous.party.loadouts.xpScale===undefined&&!localStorage.getItem(SAVE+'_before_xp10')&&validPrevious())localStorage.setItem(SAVE+'_before_xp10',raw);
       const previousGear=previous?[...(previous.gearBag||[]),...Object.values(previous.equipment||{}),...Object.values(previous.party?.loadouts?.actors||{}).flatMap(a=>Object.values(a?.equipment||{})),...(previous.party?.loot?.entries||[]).filter(e=>e.type==='gear').map(e=>e.gear)].filter(Boolean):[];
-      if(previous&&C.validateSave(previous)&&previousGear.some(g=>g.durabilityVersion===undefined)&&!localStorage.getItem(SAVE+'_before_durability2'))localStorage.setItem(SAVE+'_before_durability2',raw);
-      if(previous&&C.validateSave(previous)&&previousGear.some(g=>g.durabilityVersion===undefined||g.durabilityVersion===2)&&!localStorage.getItem(SAVE+'_before_durability3'))localStorage.setItem(SAVE+'_before_durability3',raw);
-      if(previous&&C.validateSave(previous)&&previousGear.some(g=>g.durabilityVersion===undefined||g.durabilityVersion===2||g.durabilityVersion===3)&&!localStorage.getItem(SAVE+'_before_durability4'))localStorage.setItem(SAVE+'_before_durability4',raw);
-      if(previous&&C.validateSave(previous)&&previousGear.some(g=>g.durabilityVersion===undefined||g.durabilityVersion<5)&&!localStorage.getItem(SAVE+'_before_durability5'))localStorage.setItem(SAVE+'_before_durability5',raw);
-      if(C.DURABILITY_VERSION>=6&&previous&&C.validateSave(previous)&&previousGear.some(g=>g.durabilityVersion===undefined||g.durabilityVersion<6)&&!localStorage.getItem(SAVE+'_before_durability6'))localStorage.setItem(SAVE+'_before_durability6',raw);
+      if(previous&&previousGear.some(g=>g.durabilityVersion===undefined)&&!localStorage.getItem(SAVE+'_before_durability2')&&validPrevious())localStorage.setItem(SAVE+'_before_durability2',raw);
+      if(previous&&previousGear.some(g=>g.durabilityVersion===undefined||g.durabilityVersion===2)&&!localStorage.getItem(SAVE+'_before_durability3')&&validPrevious())localStorage.setItem(SAVE+'_before_durability3',raw);
+      if(previous&&previousGear.some(g=>g.durabilityVersion===undefined||g.durabilityVersion===2||g.durabilityVersion===3)&&!localStorage.getItem(SAVE+'_before_durability4')&&validPrevious())localStorage.setItem(SAVE+'_before_durability4',raw);
+      if(previous&&previousGear.some(g=>g.durabilityVersion===undefined||g.durabilityVersion<5)&&!localStorage.getItem(SAVE+'_before_durability5')&&validPrevious())localStorage.setItem(SAVE+'_before_durability5',raw);
+      if(C.DURABILITY_VERSION>=6&&previous&&previousGear.some(g=>g.durabilityVersion===undefined||g.durabilityVersion<6)&&!localStorage.getItem(SAVE+'_before_durability6')&&validPrevious())localStorage.setItem(SAVE+'_before_durability6',raw);
       if(run.status==='won'&&run.floor===1&&C.validateSave(run))localStorage.setItem(SURFACE_CLEAR,JSON.stringify(run));
-      localStorage.setItem(SAVE, JSON.stringify(run)); return true;
+      localStorage.setItem(SAVE, JSON.stringify(run)); saveFailed = false; return true;
     }
     catch (_) { if (!saveFailed) { saveFailed = true; showToast('瀏覽器無法保存進度，請保持此分頁開啟。', 4000); } return false; }
   }
@@ -407,7 +451,7 @@
     const saved = readSave(),cleared=surfaceClear(),underground=saved?.floor<0;
     const professionCount=P?.PROFESSIONS?Object.keys(P.PROFESSIONS).length:'多';
     const unlock=cleared&&Underworld?'<section class="underworld-unlock"><small>已解鎖 · 通關後篇章</small><h3>石壁後的隱藏樓梯</h3><p>走出高塔不是唯一的答案。地下五十層，還留著無人聽見的聲音。</p><p>更強的怪物 · 最多五人隊伍 · 五座地下封印</p>'+action(underground&&saved.status!=='won'?'繼續地下旅程':'探索地下五十層',underground&&saved.status!=='won'?'continue':'underworld-intro')+'</section>':'';
-    dialog(cleared?'地上篇已完成 · 下一段旅程由你決定':'單人長篇冒險 · 高塔遠征', cleared?'倒轉高塔・歸途之外':'倒轉高塔・第 99 層', '你在陌生的召喚陣中醒來。塔頂只有一扇向下的門。與同樣受困的旅人組隊、討伐怪物、採集食材，在移動的迷宮裡煮一頓熱飯，再一起尋找回家的路。', '<div class="tower-story-cover" role="img" aria-label="被召喚到雲上高塔的冒險者"></div>'+(saved&&!saved.party?.loadouts?'<p class="tower-copy">目前旅程是舊版規則，仍可繼續。要體驗三主動、兩被動與逐人裝備，請選「重新開始故事」；選好職業後會先備份舊旅程。</p>':'')+'<p class="tower-copy">'+professionCount+'種職業 · 地上四人／地下五人隊伍 · '+(P?.RECIPES?Object.keys(P.RECIPES).length:'多種')+' 道料理 · 合作連攜 · 職業探索與鍛造。第 90 至 10 層的整十樓層及第 1 層，各有專屬挑戰。</p><p class="tower-copy">沿用原本移動操作 · 每層自動保存（續玩回到當層入口） · 魔法地圖變形後重新探索。</p><p class="tower-copy">特定職業學會指定技能，並符合附近站位及視線條件時，可按連攜鈕發動合作招式；會消耗參與技能的冷卻及物資。</p><p><a class="tower-atlas-link" href="docs/職業裝備圖鑑.html" target="_blank" rel="noopener">開啟劇情完整圖鑑與連攜說明</a></p>',
+    dialog(cleared?'地上篇已完成 · 下一段旅程由你決定':'單人長篇冒險 · 高塔遠征', cleared?'倒轉高塔・歸途之外':'倒轉高塔・第 99 層', '你在陌生的召喚陣中醒來。塔頂只有一扇向下的門。與同樣受困的旅人組隊、討伐怪物、採集食材，在移動的迷宮裡煮一頓熱飯，再一起尋找回家的路。', '<div class="tower-story-cover" role="img" aria-label="被召喚到雲上高塔的冒險者"></div>'+(!saved&&unreadableSave()?'<p class="tower-copy tower-save-warning" role="alert">目前的存檔無法讀取（可能已損毀，或來自較新的遊戲版本）。原始資料仍保留在瀏覽器中；若剛更新過遊戲，請先重新整理網頁。建立新主角前會先另存備份，不會直接刪除。</p>':'')+(saved&&!saved.party?.loadouts?'<p class="tower-copy">目前旅程是舊版規則，仍可繼續。要體驗三主動、兩被動與逐人裝備，請選「重新開始故事」；選好職業後會先備份舊旅程。</p>':'')+'<p class="tower-copy">'+professionCount+'種職業 · 地上四人／地下五人隊伍 · '+(P?.RECIPES?Object.keys(P.RECIPES).length:'多種')+' 道料理 · 合作連攜 · 職業探索與鍛造。第 90 至 10 層的整十樓層及第 1 層，各有專屬挑戰。</p><p class="tower-copy">沿用原本移動操作 · 每層自動保存（續玩回到當層入口） · 魔法地圖變形後重新探索。</p><p class="tower-copy">特定職業學會指定技能，並符合附近站位及視線條件時，可按連攜鈕發動合作招式；會消耗參與技能的冷卻及物資。</p><p><a class="tower-atlas-link" href="docs/職業裝備圖鑑.html" target="_blank" rel="noopener">開啟劇情完整圖鑑與連攜說明</a></p>',
       (saved && saved.status !== 'won' ? action('繼續：' + floorLabel(saved.floor), 'continue') : saved&&N?action('回顧已完成故事','story-archive'):'') + action(saved ? '重新開始地上篇' : '建立主角', 'new') + action('回首頁', 'close'),{silent});
     if(unlock)el('towerDialog').querySelector('.tower-dialog-content').insertAdjacentHTML('afterbegin',unlock);
   }
@@ -437,13 +481,13 @@
     el('playerName').value = run.name;
     loadFloor(true);
   }
-  function loadFloor(intro) {
+  function loadFloor(intro, returning=false) {
     clearStoryTheater();
     environmentLife?.destroy();environmentLife=null;
     encounterAlert?.clearVisual();
     objectiveHint?.suspend();
     pendingDungeonShift=null;closeDialog(); floorStarted = false; reader=null;sideReader=null;
-    lightingUI?.reset();
+    lightingUI?.reset();window.TowerCreatureArt?.release?.();
     // Remove live effects before startGame disposes the old scene. Their
     // manager-owned particle programs/textures must survive the floor change.
     partyUI?.reset();
@@ -467,14 +511,16 @@
     updateShovelBtn(); updateKiteBtn(); updateWhistleBtn();
     el('hudLvlName').textContent = floorConfig.name; el('hudRound').textContent = instance?'副本':'劇情';
     buildTowerEnvironment(); buildWorld(); gearVisual=null;gearSignature='';refreshGear();encounterHold = bossEncounterHold = 0; campDialog = false; soundChanged();
-    floorStarted = true; saveClock = 0; attackLeft = 0; hurtLeft = 3; wasShifting = false;
+    floorStarted = true; saveClock = 0; attackLeft = 0; hurtLeft = 3; wasShifting = false; hiddenDuringShift = 0; liveValidateClock = 0;
     clearHurtFeedback();guardClashAt=0;
     save(); updateHud();
     objectiveHint?.enter();
     if(instance){dungeonBriefing();return;}
     if(N){
       const chapter=N.chapterForFloor(run.floor),scene=run.floor===chapter.high&&N.scenesForFloor(run.floor).find(entry=>!run.chronicle.read.includes(entry.id));
-      if(scene){readStory(scene.id,true);return;}
+      // Coming back out of a rift shows its settlement first; an unread chapter
+      // opening stays in the journal instead of covering that summary.
+      if(scene&&!returning){readStory(scene.id,true);return;}
       if(intro&&!playStorySequence({id:'floor-brief:'+run.floor,title:floorConfig.name,floor:run.floor,paragraphs:[N.objective(run)]},closeDialog,closeDialog))dialog('倒轉高塔 · 主線續章',floorConfig.name,N.objective(run),'<p class="tower-copy">每章中段尋找主線印記，章末出口需要印記。背包的故事日誌可重讀已抵達的章節。</p>'+floorFacts(),action('踏入迷宮','close')+action('故事日誌','journal'));
       return;
     }
@@ -577,9 +623,12 @@
     model.add(makePickupMarker(tint,label));model.userData.role=shape;model.userData.icon=mesh;return model;
   }
   function buildJourneyWorld(random,used) {
-    if(N){const chapter=N.chapterForFloor(run.floor);if(run.floor<=chapter.mid&&!run.chronicle.clues.includes(chapter.clueId)){const point=chooseCell(random,used),model=journeyMarker('主線・'+chapter.clueName,0xffdf83);model.position.set(point.x,0,point.z);world.add(model);mainClue={...point,model};}}
-    const offer=D&&D.offer(run);
-    if(offer){const point=chooseCell(random,used),model=journeyMarker('裂隙・'+offer.title,0x7fe2db,'rift');model.position.set(point.x,0,point.z);model.visible=run.expedition.discovered;world.add(model);rift={...point,model,offer};}
+    // Every optional object reserves its cell whether or not it appears this time,
+    // so finishing a rift, taking a clue or ending a commission never moves the
+    // rest of the floor (or revives a disarmed trap somewhere else) after a reload.
+    if(N){const chapter=N.chapterForFloor(run.floor),cluePoint=run.floor<=chapter.mid?chooseCell(random,used):null;if(cluePoint&&!run.chronicle.clues.includes(chapter.clueId)){const point=cluePoint,model=journeyMarker('主線・'+chapter.clueName,0xffdf83);model.position.set(point.x,0,point.z);world.add(model);mainClue={...point,model};}}
+    const offer=D&&D.offer(run),riftPoint=chooseCell(random,used);
+    if(offer){const point=riftPoint,model=journeyMarker('裂隙・'+offer.title,0x7fe2db,'rift');model.position.set(point.x,0,point.z);model.visible=run.expedition.discovered;world.add(model);rift={...point,model,offer};}
   }
   function nearEntity(item,distance=2.6) { return !!(item&&item.model.visible&&Math.hypot(G.px-item.model.position.x,G.pz-item.model.position.z)<distance&&hasClearPath(G.px,G.pz,item.model.position.x,item.model.position.z)); }
   function updateJourneyNearby() {
@@ -688,8 +737,8 @@
     syncEngine();const offer=dungeonOffer(),title=offer.title,story=sideStory(offer.kind),result=D.finish(run,outcome,run.revision);
     if(!result.ok){dialog('副本尚未結算','請先整理背包',result.message,'',action('整理背包','bag')+action('放棄報酬並退出','dungeon-leave'));return;}
     if(!transact(result)){dialog('副本尚未保存','請重試保存結算','這次結算尚未生效，報酬不會重複領取。副本倒數已暫停，請保持分頁開啟。','',action('重試保存','dungeon-settle',outcome));return;}
-    floorStarted=false;loadFloor(false);
-    const cell=result.effect.returnCell,p=cellToWorld(cell.x,cell.y);G.px=p.x;G.pz=p.z;playerGroup.position.set(p.x,0,p.z);shiftLeft=result.effect.returnShift;exitDeclined=true;restoreWarriorPosition();
+    floorStarted=false;loadFloor(false,true);
+    const cell=result.effect.returnCell,p=cellToWorld(cell.x,cell.y);G.px=p.x;G.pz=p.z;playerGroup.position.set(p.x,0,p.z);shiftLeft=result.effect.returnShift;exitDeclined=true;restoreWarriorPosition();partyUI?.regroup?.();
     if(explorer&&run.adventure.quest?.type==='escort')explorer.model.position.set(p.x,0,p.z);
     save();updateHud();
     dialog('回到第 '+run.floor+' 層',outcome==='completed'?title+' · 記憶歸還':outcome==='expired'?'裂隙的時間已盡':'你離開了裂隙',outcome==='completed'?'副本報酬：'+rewardDescription(result.effect.reward):'這次沒有帶出報酬。你的旅程仍能繼續，消耗的裝備與補給不會重置。',(outcome==='completed'&&story?'<aside class="tower-story-echo"><small>永久逸聞已收錄 · '+text(story.record.title)+'</small><p>'+text(story.outro[0])+'</p></aside>':'')+'<p class="tower-copy">原層任務與主線保留；已拾取物、商店庫存與已擊敗怪物不重生。</p>',action('繼續旅程','close')+(outcome==='completed'&&story?action('閱讀副本後記','side-story-outro',story.kind):'')+action('整理裝備','bag'),{silent:outcome==='completed',summary:outcome==='completed'?title+'。副本完成。'+rewardSpeech(result.effect.reward):'你離開了裂隙。這次沒有帶出報酬，旅程仍能繼續。'});
@@ -775,7 +824,7 @@
     return cellPoint(0, 0);
   }
   function buildWorld() {
-    clearBolts();
+    clearBolts();clearTagTextures();
     partyUI?.reset();
     hazards=[];hazardSlow=1;hazardGrace=3;
     loot = []; monsters = []; traders = []; nearest = null; warriorNpc = nearestWarrior = escort = null;
@@ -816,8 +865,8 @@
     if(!run.party)buildWarriors(used);
     const chestOffer=E.chestOffer(run.floor,run.seed,modern());
     if(chestOffer){const point=chooseCell(random,used),model=V.buildChest({THREE});model.position.set(point.x,0,point.z);model.visible=!run.adventure.claimed.includes(chestOffer.id);world.add(model);chest={...point,offer:chestOffer,model};}
-    const explorerOffer=E.explorerOffer(run);
-    if(explorerOffer){const identity=explorerOffer.explorer||{id:'eve',name:'伊芙',title:'探索者'},point=chooseCell(random,used),model=V.buildExplorer(identity.id,{THREE,CHARS,buildCharacter});model.position.set(point.x,0,point.z);if(run.adventure.quest?.type==='escort'&&run.adventure.quest.status==='active')model.position.set(G.px,0,G.pz);const tag=makeTextSprite(identity.title+'・'+identity.name);tag.position.y=2.6;model.add(tag);world.add(model);explorer={...point,offer:explorerOffer,model,path:[],pathLeft:0};}
+    const explorerOffer=E.explorerOffer(run),explorerPoint=chooseCell(random,used);
+    if(explorerOffer){const identity=explorerOffer.explorer||{id:'eve',name:'伊芙',title:'探索者'},point=explorerPoint,model=V.buildExplorer(identity.id,{THREE,CHARS,buildCharacter});model.position.set(point.x,0,point.z);if(run.adventure.quest?.type==='escort'&&run.adventure.quest.status==='active')model.position.set(G.px,0,G.pz);const tag=makeTextSprite(identity.title+'・'+identity.name);tag.position.y=2.6;model.add(tag);world.add(model);explorer={...point,offer:explorerOffer,model,path:[],pathLeft:0};}
     // 尋物目標獨立於消耗物資，種子固定，讀檔或變形不會重抽。
     const point=chooseCell(random,used),model=new THREE.Group();model.position.set(point.x,0,point.z);
     const cache=V.buildChest({THREE});cache.scale.setScalar(.65);model.add(cache);model.name='quest-relic-cache';
@@ -853,7 +902,7 @@
     const s=run.adventure?.events;if(!s)return;
     if(eventMarker)eventMarker.model.visible=s.current?.choice===null;
     if(followupMarker)followupMarker.model.visible=s.chain?.status==='active'&&s.chain.targetFloor===run.floor;
-    for(const item of counterObjects){item.model.visible=s.lord?.phase==='guarded'&&!s.lord.broken[item.index];item.model.traverse(o=>{if(o.isMesh)o.material.emissiveIntensity=s.lord?.armed>0?.65:.15;});}
+    for(const item of counterObjects){item.model.visible=s.lord?.phase==='guarded'&&!s.lord.broken[item.index];const glow=s.lord?.armed>0?.65:.15;if(item.glow!==glow){item.glow=glow;item.model.traverse(o=>{if(o.isMesh)o.material.emissiveIntensity=glow;});}}
     if(s.lord?.phase==='guarded'&&!lordCounterNotice){lordCounterNotice=true;showToast(run.floor===80?'園后的根盾亮起了！找出兩根供能藤。':'伯爵的晶罩亮起了！轉動晶柱，引晶光擊中它。',4200);AudioEng.sfxAction?.('barrier');}
     nearbyAdventure=[eventMarker,followupMarker,...counterObjects].find(o=>o?.model.visible&&Math.hypot(G.px-o.x,G.pz-o.z)<2.6&&hasClearPath(G.px,G.pz,o.x,o.z))||null;
   }
@@ -1035,12 +1084,22 @@
     const tag = strengthTag(C.MONSTERS[kind].name, strength);tag.position.y=2.35;group.add(tag);group.userData.body=body;group.userData.tag=tag;
     return group;
   }
+  // Label canvases depend only on their caption, so a stun toggle reuses the
+  // floor's texture instead of drawing and uploading a new 512x80 canvas.
+  // They are flagged shared (scene disposal skips them) and freed per floor.
+  const tagTextures = new Map();
+  function clearTagTextures() { for (const texture of tagTextures.values()) texture.dispose?.(); tagTextures.clear(); }
   function strengthTag(label, strength) {
-    const canvas = document.createElement('canvas'); canvas.width = 512; canvas.height = 80;
-    const ctx = canvas.getContext('2d'); ctx.font = 'bold 34px sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-    ctx.strokeStyle = '#14202d'; ctx.lineWidth = 8; ctx.fillStyle = '#fff1c9';
-    const caption = label + ' · ' + strength + '/5'; ctx.strokeText(caption,256,40,490); ctx.fillText(caption,256,40,490);
-    const tag = new THREE.Sprite(new THREE.SpriteMaterial({map:new THREE.CanvasTexture(canvas),transparent:true,depthWrite:false}));
+    const caption = label + ' · ' + strength + '/5';
+    let texture = tagTextures.get(caption);
+    if (!texture) {
+      const canvas = document.createElement('canvas'); canvas.width = 512; canvas.height = 80;
+      const ctx = canvas.getContext('2d'); ctx.font = 'bold 34px sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+      ctx.strokeStyle = '#14202d'; ctx.lineWidth = 8; ctx.fillStyle = '#fff1c9';
+      ctx.strokeText(caption,256,40,490); ctx.fillText(caption,256,40,490);
+      texture = new THREE.CanvasTexture(canvas); texture.userData = {...texture.userData, sharedResource:true}; tagTextures.set(caption, texture);
+    }
+    const tag = new THREE.Sprite(new THREE.SpriteMaterial({map:texture,transparent:true,depthWrite:false}));
     tag.scale.set(run?.party ? 1.65 : 3.4,run?.party ? .26 : .53,1); return tag;
   }
   function buildWarriorModel(strength, label) {
@@ -1172,7 +1231,7 @@
   function scheduleShift() { shiftLeft = dungeonOffer()?.shiftSeconds || C.floorConfig(run.floor).shiftSeconds; warning = false; G.preWarned = false; }
   function updateShift() {
     if (!active) return;
-    el('shiftCountdown').textContent = Math.ceil(Math.max(0, shiftLeft)) + '秒';
+    const countdown = Math.ceil(Math.max(0, shiftLeft)) + '秒'; if (el('shiftCountdown').textContent !== countdown) el('shiftCountdown').textContent = countdown;
     if (paused || !G.running || G.shifting) return;
     if (shiftLeft <= 3.5) {
       el('preWarn').style.display = 'block'; el('preWarnSec').textContent = Math.ceil(Math.max(0,shiftLeft));
@@ -1180,27 +1239,34 @@
     }
     if (shiftLeft <= 0) { el('preWarn').style.display = 'none'; wasShifting = true; doShift(); }
   }
+  // Write a HUD value only when it differs from what the element already shows;
+  // updateHud runs about seven times a second during play.
+  function hudSet(id,key,value){const node=el(id);if(!node)return;if(key==='textContent')value=String(value);if(node[key]!==value)node[key]=value;}
   function updateHud() {
     if (!active) return;
-    el('towerFloor').textContent = run.floor<0?'B'+Math.abs(run.floor):run.floor + ' F'; el('towerHealth').textContent = Math.ceil(run.hp) + ' / '+(modern()?Heroes.maxHp(run):C.MAX_HP);el('towerHp').max=modern()?Heroes.maxHp(run):C.MAX_HP;
-    el('towerHp').value = run.hp; el('towerCoins').textContent = run.coins;
-    el('towerChapter').textContent = floorConfig.name;
-    el('towerTalkBtn').disabled = !nearest && !nearestWarrior && !nearbyEncounter; el('towerTalkBtn').ariaLabel = nearbyEncounter ? (nearbyEncounter===chest?'開箱（R）':'對話（R）') : nearestWarrior ? '對話：聘請（R）' : nearest ? '對話：交易（R）' : '附近無人';
-    if(!run.party){el('towerGuardStatus').hidden = !run.warrior;el('towerGuardStatus').textContent = warriorStatus();}
-    el('towerGearStatus').textContent=Object.entries(run.equipment).map(([slot,gear])=>({helmet:'盔',armor:'甲',shield:'盾',weapon:'武'}[slot])+' '+(gear?gear.durability:'—')).join(' · ');
-    el('towerAttackBtn').disabled = attackLeft > 0 || !run.equipment.weapon || robotEnergy()?.value===0;if(window.BattleDock)BattleDock.attackLabel(!run.equipment.weapon?'徒手':'揮擊',attackLeft);else el('towerAttackBtn').textContent = !run.equipment.weapon?'需裝備武器':attackLeft > 0 ? '擊暈 ' + attackLeft.toFixed(1) : '擊暈 X';
+    const maxHp=modern()?Heroes.maxHp(run):C.MAX_HP,dungeon=inDungeon();
+    let floorText=run.floor<0?'B'+Math.abs(run.floor):run.floor + ' F';
+    hudSet('towerHealth','textContent',Math.ceil(run.hp) + ' / '+maxHp);hudSet('towerHp','max',maxHp);
+    hudSet('towerHp','value',run.hp); hudSet('towerCoins','textContent',run.coins);
+    hudSet('towerChapter','textContent',floorConfig.name);
+    let talkDisabled = !nearest && !nearestWarrior && !nearbyEncounter, talkLabel = nearbyEncounter ? (nearbyEncounter===chest?'開箱（R）':'對話（R）') : nearestWarrior ? '對話：聘請（R）' : nearest ? '對話：交易（R）' : '附近無人';
+    if(!run.party){hudSet('towerGuardStatus','hidden',!run.warrior);hudSet('towerGuardStatus','textContent',warriorStatus());}
+    hudSet('towerGearStatus','textContent',Object.entries(run.equipment).filter(([slot])=>GEAR_SLOT_LABELS[slot]).map(([slot,gear])=>GEAR_SLOT_LABELS[slot]+' '+(gear?gear.durability:'—')).join(' · '));
+    if(dungeon){hudSet('towerAttackBtn','disabled',true);if(window.BattleDock)BattleDock.attackLabel('探索',0);else hudSet('towerAttackBtn','textContent','探索試煉');}
+    else{hudSet('towerAttackBtn','disabled',attackLeft > 0 || !run.equipment.weapon || robotEnergy()?.value===0);if(window.BattleDock)BattleDock.attackLabel(!run.equipment.weapon?'徒手':'揮擊',attackLeft);else hudSet('towerAttackBtn','textContent',!run.equipment.weapon?'需裝備武器':attackLeft > 0 ? '擊暈 ' + attackLeft.toFixed(1) : '擊暈 X');}
     const effects = Object.entries(run.effects).filter(([,v])=>v>0).map(([k,v])=>({shield:'護盾',freeze:'定牆',repel:'驅怪',reveal:'出口路線',haste:'加速'}[k])+' '+Math.ceil(v)+'秒');
-    el('towerObjective').textContent = nearestWarrior ? '戰士 '+nearestWarrior.offer.strength+'/5 · '+costText(nearestWarrior.offer.cost)+' · 點「聘請」查看契約' : effects.length ? effects.join(' · ') : nearest ? nearest.name + '：靠近後可購買／出售補給' : '找到樓梯，前往' + ([1,-50].includes(run.floor)?'歸途':floorLabel(run.floor-1));
+    let objective = nearestWarrior ? '戰士 '+nearestWarrior.offer.strength+'/5 · '+costText(nearestWarrior.offer.cost)+' · 點「聘請」查看契約' : effects.length ? effects.join(' · ') : nearest ? nearest.name + '：靠近後可購買／出售補給' : '找到樓梯，前往' + ([1,-50].includes(run.floor)?'歸途':floorLabel(run.floor-1));
     const q=run.adventure.quest;
-    if(nearbyEncounter)el('towerObjective').textContent=nearbyEncounter===chest?'封印寶箱 · 可能藏著強化裝備，也可能是陷阱':explorerName()+' · 對話查看委託';
-    else if(q&&q.status!=='claimed'&&!nearest&&!nearestWarrior)el('towerObjective').textContent=(E.explorerOffer(run)?.title||'探索者委託')+' · '+q.progress+'/'+q.goal+(q.status==='ready'?' · 報酬待領':'');
-    else if(N&&!nearest&&!nearestWarrior)el('towerObjective').textContent=N.objective(run);
-    if(inDungeon()){const offer=dungeonOffer(),state=run.expedition.active;el('towerFloor').textContent='裂隙 · '+run.floor+' F';el('towerObjective').textContent=offer.title+' · '+state.progress.length+'/3 · 剩 '+Math.ceil(Math.max(0,offer.timeLimit-state.elapsed))+' 秒'+(['bells','threads'].includes(offer.kind)?' · '+offer.order.map(i=>i+1).join('→'):offer.kind==='stars'&&state.progress.length===1?(state.shiftCount>state.shiftAtStart?' · 星路已更新':' · 等待牆壁變形'):'');el('towerAttackBtn').disabled=true;if(window.BattleDock)BattleDock.attackLabel('探索',0);else el('towerAttackBtn').textContent='探索試煉';}
-    if(nearbyJourney){el('towerTalkBtn').disabled=false;el('towerTalkBtn').ariaLabel=nearbyJourney===rift?'裂隙（R）':nearbyJourney===mainClue?'印記（R）':'調查（R）';el('towerObjective').textContent=nearbyJourney===rift?'裂隙副本 · 自願進入，結束回到原層':nearbyJourney===mainClue?'主線印記 · '+N.chapterForFloor(run.floor).clueName:el('towerObjective').textContent;}
-    if(nearbyAdventure){el('towerTalkBtn').disabled=false;el('towerTalkBtn').ariaLabel='調查（R）';el('towerObjective').textContent=nearbyAdventure===eventMarker?eventMarker.offer.name:nearbyAdventure===followupMarker?'後續留言 · 靠近查看':run.floor===80?'供能藤 · 靠近斬斷':'晶柱 · 轉向後引來晶光';}
-    if(el('towerTalkBtn').disabled&&canObserveLandmark()){el('towerTalkBtn').disabled=false;el('towerTalkBtn').ariaLabel='觀察地標（R）';}
-    el('towerTalkBtn').hidden=paused||!G.running||el('towerTalkBtn').disabled;
-    document.body.classList.toggle('tower-danger',run.hp<=(modern()?Heroes.maxHp(run):C.MAX_HP)*.25);
+    if(nearbyEncounter)objective=nearbyEncounter===chest?'封印寶箱 · 可能藏著強化裝備，也可能是陷阱':explorerName()+' · 對話查看委託';
+    else if(q&&q.status!=='claimed'&&!nearest&&!nearestWarrior)objective=(E.explorerOffer(run)?.title||'探索者委託')+' · '+q.progress+'/'+q.goal+(q.status==='ready'?' · 報酬待領':'');
+    else if(N&&!nearest&&!nearestWarrior)objective=N.objective(run);
+    if(dungeon){const offer=dungeonOffer(),state=run.expedition.active;floorText='裂隙 · '+run.floor+' F';objective=offer.title+' · '+state.progress.length+'/3 · 剩 '+Math.ceil(Math.max(0,offer.timeLimit-state.elapsed))+' 秒'+(['bells','threads'].includes(offer.kind)?' · '+offer.order.map(i=>i+1).join('→'):offer.kind==='stars'&&state.progress.length===1?(state.shiftCount>state.shiftAtStart?' · 星路已更新':' · 等待牆壁變形'):'');}
+    if(nearbyJourney){talkDisabled=false;talkLabel=nearbyJourney===rift?'裂隙（R）':nearbyJourney===mainClue?'印記（R）':'調查（R）';objective=nearbyJourney===rift?'裂隙副本 · 自願進入，結束回到原層':nearbyJourney===mainClue?'主線印記 · '+N.chapterForFloor(run.floor).clueName:objective;}
+    if(nearbyAdventure){talkDisabled=false;talkLabel='調查（R）';objective=nearbyAdventure===eventMarker?eventMarker.offer.name:nearbyAdventure===followupMarker?'後續留言 · 靠近查看':run.floor===80?'供能藤 · 靠近斬斷':'晶柱 · 轉向後引來晶光';}
+    if(talkDisabled&&canObserveLandmark()){talkDisabled=false;talkLabel='觀察地標（R）';}
+    hudSet('towerFloor','textContent',floorText);hudSet('towerObjective','textContent',objective);
+    hudSet('towerTalkBtn','disabled',talkDisabled);hudSet('towerTalkBtn','ariaLabel',talkLabel);hudSet('towerTalkBtn','hidden',paused||!G.running||talkDisabled);
+    document.body.classList.toggle('tower-danger',run.hp<=maxHp*.25);
     partyUI?.hud();
     lightingUI?.hud();
     if(typeof updateSatietyBar==='function')updateSatietyBar();
@@ -1224,6 +1290,7 @@
     if(G.shifting)clearBolts();
     if (wasShifting && !G.shifting) {
       wasShifting = false;
+      if (hiddenDuringShift) { const since = hiddenDuringShift; hiddenDuringShift = 0; if (active && !paused && run.status === 'playing') { pauseMenu(); pauseAt = Math.min(pauseAt, since); } }
       hazardGrace=3;hazardSlow=1;
       wallMesh.material.color.setHex(environmentSpec()[1]);
       monsters.forEach(m=>{ const c=worldToCell(m.model.position.x,m.model.position.z),p=cellToWorld(c.x,c.y);m.model.position.set(p.x,0,p.z);m.path=[];m.pathLeft=0;m.windup=0;m.cooldown=2; });
@@ -1241,7 +1308,11 @@
     run.hunger = G.satiety;
     if(modern())run.engine.shovels=G.shovels;
     const previousControlled=modern()?Heroes.state(run).active:null,previousControlledHp=previousControlled?Heroes.hp(run,previousControlled):0;
-    const ticked = C.tickEffects(run, dt); run = ticked.run || ticked;
+    // Validate-and-copy once per second of play; the frames in between use the
+    // in-place live tick with the same bookkeeping (no per-frame save clone).
+    liveValidateClock += dt;
+    const validateNow = liveValidateClock >= 1 || !C.tickEffectsLive; if (validateNow) liveValidateClock = 0;
+    const ticked = validateNow ? C.tickEffects(run, dt) : C.tickEffectsLive(run, dt); run = ticked.run || ticked;
     if(previousControlled&&Heroes.hp(run,previousControlled)<previousControlledHp){hurtFlash=.65;el('towerHurtGlow').style.opacity='1';AudioEng.sfxHurt?.();}
     if(previousControlled&&previousControlled!==Heroes.state(run).active){partyUI?.switchControl(previousControlled,Heroes.state(run).active);hurtLeft=Heroes.actor(run).hurt;refreshGear();partyUI?.refreshActors();updateHud();save();}
     AdventureEvents?.tick(run,dt);
@@ -1250,7 +1321,7 @@
     if(ticked.effect && ticked.effect.warriorReleased){dismissEscort();showToast('護衛已盡力撤退，怪物將恢復追擊！',3500);save();}
     if (run.effects.freeze<=0) shiftLeft -= dt;
     attackLeft=Math.max(0,attackLeft-dt);hurtLeft=Math.max(0,hurtLeft-dt);
-    hurtFlash=Math.max(0,hurtFlash-dt);el('towerHurtGlow').style.opacity=String(hurtFlash/.65);
+    if(hurtFlash>0){hurtFlash=Math.max(0,hurtFlash-dt);el('towerHurtGlow').style.opacity=String(hurtFlash/.65);}
     if(modern()){G.drainPerSec=.12*Heroes.hungerScale(run);if(G.shovels!==run.engine.shovels){G.shovels=run.engine.shovels;updateShovelBtn();}HeroVisual.pose(playerGroup,Heroes.actor(run).attack,Heroes.stats(run).interval,G.view==='fp',dt);updateHeroFirstPerson();}
     if(gearVisual?.userData.weapon){
       if(window.CharacterMotion)window.CharacterMotion.worldWeaponPose(gearVisual.userData.weapon,playerGroup,1-attackLeft/.8,G.view==='fp');
@@ -1278,8 +1349,10 @@
       }
     }
     nearest=traders.find(n=>Math.hypot(G.px-n.x,G.pz-n.z)<2.6&&hasClearPath(G.px,G.pz,n.x,n.z))||null;
-    const groundIds=new Set(run.party?.loot.entries.map(e=>e.id)||[]);
-    for(const item of loot.filter(l=>l.entry&&!groundIds.has(l.id))){item.model.parent?.remove(item.model);disposeSceneObject(item.model);}loot=loot.filter(l=>!l.entry||groundIds.has(l.id));
+    if(loot.some(l=>l.entry&&!run.party?.loot.entries.some(e=>e.id===l.id))){
+      const groundIds=new Set(run.party?.loot.entries.map(e=>e.id)||[]);
+      for(const item of loot.filter(l=>l.entry&&!groundIds.has(l.id))){item.model.parent?.remove(item.model);disposeSceneObject(item.model);}loot=loot.filter(l=>!l.entry||groundIds.has(l.id));
+    }
     nearestWarrior=warriorNpc&&warriorNpc.model.visible&&Math.hypot(G.px-warriorNpc.x,G.pz-warriorNpc.z)<2.6&&hasClearPath(G.px,G.pz,warriorNpc.x,warriorNpc.z)?warriorNpc:null;
     if(nearestWarrior&&nearest&&Math.hypot(G.px-nearest.x,G.pz-nearest.z)<Math.hypot(G.px-nearestWarrior.x,G.pz-nearestWarrior.z))nearestWarrior=null;
     const closeEntities=[chest,explorer].filter(n=>n&&n.model.visible&&Math.hypot(G.px-n.model.position.x,G.pz-n.model.position.z)<2.6&&hasClearPath(G.px,G.pz,n.model.position.x,n.model.position.z));
@@ -1290,6 +1363,7 @@
     partyUI?.tick(dt,now);
     if(paused)return;
     updateWarrior(dt,now);
+    traderSafe=traders.some(n=>Math.hypot(G.px-n.x,G.pz-n.z)<2.6&&hasClearPath(G.px,G.pz,n.x,n.z));
     for(const monster of monsters){
       updateMonster(monster,dt,now);
       if(paused)return;
@@ -1299,7 +1373,7 @@
     updateBolts(dt);
     let threat=false,lordThreat=false;
     if(!nearest&&run.effects.repel<=0&&!(now<G.invisUntil))for(const m of monsters){
-      if(m.alive&&hasClearPath(G.px,G.pz,m.model.position.x,m.model.position.z)&&!isHeld(m)&&!(run.monsterStuns[m.id]>0)&&(m.awarenessLeft>0||m.windup>0)){
+      if(m.alive&&(m.awarenessLeft>0||m.windup>0)&&!isHeld(m)&&!(run.monsterStuns[m.id]>0)&&hasClearPath(G.px,G.pz,m.model.position.x,m.model.position.z)){
         threat=true;if(m.lord)lordThreat=true;if(lordThreat)break;
       }
     }
@@ -1307,13 +1381,14 @@
     updateEncounterMusic(threat,lordThreat,dt);
     if(window.CharacterFace){
       CharacterFace.update(playerGroup,now/1000,hurtLeft>0?'hurt':threat?'focus':nearest||nearestWarrior||nearbyEncounter?'happy':'calm');
-      for(const npc of [...traders,warriorNpc,explorer].filter(Boolean))if(npc.model?.visible)CharacterFace.update(npc.model,now/1000,npc===nearest||npc===nearestWarrior||npc===nearbyEncounter?'happy':'calm');
+      for(const npc of traders)npcFace(npc,now);npcFace(warriorNpc,now);npcFace(explorer,now);
     }
     if(run.effects.reveal>0){G.mapUntil=now+250; if(!G.solutionPath){const p=worldToCell(G.px,G.pz);G.solutionPath=solveMaze(p.x,p.y);}}
     hudClock+=dt;if(hudClock>.15){hudClock=0;updateHud();}
     saveClock+=dt;if(saveClock>8){saveClock=0;save();}
     objectiveHint?.refresh();
   }
+  function npcFace(npc,now){if(npc?.model?.visible)CharacterFace.update(npc.model,now/1000,npc===nearest||npc===nearestWarrior||npc===nearbyEncounter?'happy':'calm');}
   function updateEncounterMusic(threat, lordThreat, dt) {
     encounterHold=threat?4:Math.max(0,encounterHold-dt);
     bossEncounterHold=lordThreat?4:monsters.some(m=>m.lord&&m.alive)?Math.max(0,bossEncounterHold-dt):0;
@@ -1346,7 +1421,8 @@
     // Stunned and guard-held monsters returned above; walls still block contact.
     if(!blocked&&distance<1.15&&hasClearPath(p.x,p.z,G.px,G.pz)){damage(monsterDamage,'monster','',m.id);if(status)status.weak=0;}
     if(run.status!=='playing')return;
-    const safe=traders.some(n=>Math.hypot(G.px-n.x,G.pz-n.z)<2.6&&hasClearPath(G.px,G.pz,n.x,n.z));
+    // Computed once per frame after companions and dashes have moved the player.
+    const safe=traderSafe;
     const hidden=modern()&&(Heroes.buff(run,'stealth')||status?.blind>0);
     const repelled=run.effects.repel>0||safe||now<G.invisUntil;
     const sense=window.TowerMonsterSense,baseProfile=sense?.profile(m.def)||{range:m.def.sight},profile={...baseProfile,range:baseProfile.range*(AdventureEvents?.senseScale(run)??1)},inRange=distance<=profile.range+(m.alertLeft>0?4:0),line=inRange&&hasClearPath(p.x,p.z,G.px,G.pz),concealed=hidden||now<G.invisUntil,detected=distance<=(concealed?Math.min(2,profile.range):profile.range)+(m.alertLeft>0?4:0)&&(line||profile.hearing&&!concealed);
@@ -1398,7 +1474,8 @@
   function launchBolt(m){
     if(bolts.length>=8||!world||window.TowerAffixes?.attackBlocked(run,m.id,true))return;
     const p=m.model.position,dx=m.aim.x-p.x,dz=m.aim.z-p.z,len=Math.hypot(dx,dz);if(len<.01)return;
-    const model=new THREE.Mesh(new THREE.OctahedronGeometry(.22),new THREE.MeshBasicMaterial({color:0x84f1ff}));
+    if(!boltParts){boltParts={geometry:new THREE.OctahedronGeometry(.22),material:new THREE.MeshBasicMaterial({color:0x84f1ff})};for(const part of Object.values(boltParts))part.userData={...part.userData,sharedResource:true};}
+    const model=new THREE.Mesh(boltParts.geometry,boltParts.material);
     m.cueRelease=(m.cueRelease||0)+1;
     model.position.set(p.x,1,p.z);world.add(model);bolts.push({model,owner:m.id,vx:dx/len*5,vz:dz/len*5,left:2.2,damage:m.def.damage*(window.TowerAffixes?.offense(run,m.id,true)??1)*(modern()?1-Math.max(Heroes.state(run).enemy[m.id]?.weak||0,Heroes.state(run).enemy[m.id]?.relayWeak>0?.25:0):1)});if(modern()&&Heroes.state(run).enemy[m.id])Heroes.state(run).enemy[m.id].weak=0;AudioEng.sfxSwing();
   }
@@ -1593,8 +1670,9 @@
     if(!explorer||run.adventure.quest?.type!=='escort'||run.adventure.quest.status!=='active')return;
     const moving=followNpc(explorer,dt,5.5,1.2,{x:G.px,z:G.pz},{direct:true});
     explorer.model.userData.legL.rotation.x=moving?Math.sin(now*.008)*.3:0;explorer.model.userData.legR.rotation.x=-explorer.model.userData.legL.rotation.x;
-    const portal=cellToWorld(G.exitCell.x,G.exitCell.y),p=explorer.model.position;
-    if(Math.hypot(G.px-portal.x,G.pz-portal.z)<2.2&&nearExplorer())questEvent('escort',{atExit:hasClearPath(p.x,p.z,portal.x,portal.z),distance:Math.hypot(p.x-portal.x,p.z-portal.z)});
+    const portal=cellToWorld(G.exitCell.x,G.exitCell.y),p=explorer.model.position,distance=Math.hypot(p.x-portal.x,p.z-portal.z);
+    // questProgress refuses a traveller farther than 2.8 m or out of sight of the stairs.
+    if(distance<=2.8&&Math.hypot(G.px-portal.x,G.pz-portal.z)<2.2&&nearExplorer()&&hasClearPath(p.x,p.z,portal.x,portal.z))questEvent('escort',{atExit:true,distance});
   }
   function nearExplorer() { return !inDungeon()&&explorer&&Math.hypot(G.px-explorer.model.position.x,G.pz-explorer.model.position.z)<2.8&&hasClearPath(G.px,G.pz,explorer.model.position.x,explorer.model.position.z); }
   function rewardDescription(reward) {
@@ -1636,45 +1714,72 @@
   function inventory(quiet=false) {
     if(!active||G.shifting||run.status!=='playing')return;
     syncEngine();
-    const cards=(run.party&&lightingUI?'<article class="tower-item supply-light"><div><h3>照明工具</h3><p>火把五分鐘 · 日光術十分鐘</p></div>'+action('照明補給','light-panel')+'</article>':'')+Object.entries(C.ITEMS).filter(([id])=>id!=='coin'&&(id!=='arrow'||modern())).sort(([a],[b])=>Number(!!run.bag[b])-Number(!!run.bag[a])).map(([id,item])=>{
+    const supplyCard=([id,item])=>{
       const guide=window.TowerFieldGuide?.item(id,run),owned=run.bag[id]||0;
       return '<article class="tower-item supply-card'+(owned?'':' is-empty')+'">'+(window.TowerHeroIcons?.svg('item_'+id)||'')+'<h3>'+text(item.name)+' <span>×'+owned+'</span></h3><p>'+text(guide?.effect||item.description||item.desc||'高塔冒險補給')+'</p>'+(guide?'<details class="supply-guide"><summary>何時使用？</summary><p>'+text(guide.when)+'</p><small>'+text(guide.caution)+'</small></details>':'')+action(id==='arrow'?'射擊自動消耗':id==='feather'?'瀕死自動使用':'使用','use',id,!owned||['arrow','feather'].includes(id))+'</article>';
-    }).join('');
+    };
+    const supplies=Object.entries(C.ITEMS).filter(([id])=>id!=='coin'&&(id!=='arrow'||modern())).sort(([a],[b])=>Number(!!run.bag[b])-Number(!!run.bag[a]));
+    const lightCard=run.party&&lightingUI?'<article class="tower-item supply-light'+(modern()?' is-compact':'')+'"><div><h3>照明工具</h3><p>火把五分鐘 · 日光術十分鐘</p></div>'+action('照明補給','light-panel')+'</article>':'';
+    const cards=lightCard+supplies.map(supplyCard).join('');
     const stats=C.equipmentStats(run),worn=Object.values(run.equipment).filter(Boolean).map(g=>gearCard(g,true)).join(''),stored=run.gearBag.map(g=>gearCard(g)).join('');
-    if(modern()){dialog('旅人背包 · 暫停中','生存補給','裝備、技能與隊員切換請開啟隊伍管理。','<div class="tower-grid">'+cards+'</div>',action('隊伍與逐人裝備','hero-panel',Heroes.state(run).active)+action('查看任務','quest-view')+action('料理','party-kitchen')+action('回到迷宮','close'),{silent:quiet===true,summary:'生存補給。選擇道具，或開啟隊伍管理。'});return;}
+    if(modern()){
+      // One place to see what the party carries; usable supplies first and the
+      // rest folded away, so the first screen is never a wall of empty cards.
+      const owned=supplies.filter(([id])=>run.bag[id]>0),missing=supplies.filter(([id])=>!(run.bag[id]>0)),sum=list=>Object.values(list||{}).reduce((a,b)=>a+(Number(b)||0),0);
+      const chip=(icon,label,value)=>'<span class="bag-chip">'+icon+'<span>'+text(label)+'</span><b>'+text(value)+'</b></span>';
+      const overview='<section class="bag-overview" aria-label="隊伍持有資源">'+chip(window.TowerResourceIcons?.svg('coin')||'','銅幣',run.coins)+chip(window.TowerResourceIcons?.svg('scrap')||'','零件',run.party.journey.scrap+'／99')+chip(window.TowerPartyRuntime?.foodArt?.('herb')||'','食材',sum(run.party.ingredients)+' 份')+chip(window.TowerResourceIcons?.svg('ironore')||'','鍛造素材',sum(run.party.journey.materials)+' 份')+chip('','裝備行囊',run.gearBag.length+'／'+(C.isUnderworld(run)?28:24))+'</section>';
+      const body=overview+'<h3 class="bag-section-title">可以使用 · '+owned.length+' 種</h3><div class="tower-grid">'+lightCard+(owned.map(supplyCard).join('')||'')+'</div>'+(owned.length?'':'<p class="bag-empty">目前沒有可使用的補給，可向雜貨商購買或在迷宮拾取。</p>')+(missing.length?'<details class="bag-more"><summary>還沒有的補給 · '+missing.length+' 種</summary><div class="tower-grid">'+missing.map(supplyCard).join('')+'</div></details>':'');
+      dialog('旅人背包 · 暫停中','生存補給','',body,action('隊伍裝備','hero-panel',Heroes.state(run).active)+action('料理','party-kitchen')+action('生物誌','party-bestiary')+(run.party.boss&&!inDungeon()?action('機關說明','party-boss-help'):'')+action('任務','quest-view')+returnAction()+action('回到迷宮','close'),{silent:quiet===true,summary:'生存補給。選擇道具，或開啟隊伍管理。'});return;}
     if(run.party){
       const body='<section class="tower-guard-summary"><h3>防禦 '+stats.defense+' · 強化 +'+stats.bonus+'</h3><p>武器可直接討伐怪物，命中消耗一點耐久；短暫暈眩後，怪物會有四秒抗暈期。三件防具受擊各消耗一點耐久。武器損壞後仍可徒手攻擊。</p></section><h3>穿戴中</h3><div class="tower-grid">'+(worn||'<p>尚未穿戴裝備。</p>')+'</div><h3>裝備行囊 '+run.gearBag.length+'/24</h3><div class="tower-grid">'+stored+'</div><h3>生存補給</h3><div class="tower-grid">'+cards+'</div>';
       dialog('旅人背包 · 暫停中','裝備與補給','生命 '+Math.ceil(run.hp)+' / '+C.MAX_HP+' · 飽足 '+Math.ceil(run.hunger)+'% · 銅幣 '+run.coins,body,action('隊伍','party-team')+action('食材與料理','party-kitchen')+action('鍛匠工坊','party-forge')+(run.party.boss&&!inDungeon()?action('本層機關說明','party-boss-help'):'')+action('生物誌','party-bestiary')+action('故事日誌','journal')+action('任務日誌','quest')+(inDungeon()?action('副本目標','dungeon-brief'):'')+action('回到迷宮','close')+action('保存並離開','quit'),{silent:quiet===true,summary:'裝備與補給。可以更換裝備、使用道具，或查看隊伍、料理與鍛匠工坊。'});return;
     }
     dialog('旅人背包 · 暫停中','裝備與補給','生命 '+Math.ceil(run.hp)+' / '+C.MAX_HP+' · 飽足 '+Math.ceil(run.hunger)+'% · 銅幣 '+run.coins,'<section class="tower-guard-summary"><h3>防禦 '+stats.defense+' · 強化 +'+stats.bonus+' · 擊暈 '+stats.stunSeconds+' 秒</h3><p>每次命中，三件已穿防具各減 1 耐久；武器命中減 1。每點已穿裝備強化增加 10 秒擊暈，耐久耗盡即損壞。</p></section><h3>穿戴中</h3><div class="tower-grid">'+(worn||'<p>尚未穿戴裝備。</p>')+'</div><h3 class="tower-section-title">裝備行囊 '+run.gearBag.length+'/24</h3><div class="tower-grid">'+(stored||'<p>商人與寶箱取得的裝備會放在這裡。</p>')+'</div><h3 class="tower-section-title">生存補給</h3><div class="tower-grid">'+cards+'</div><section class="tower-guard-summary"><h3>'+text(warriorStatus())+'</h3></section>'+warriorRules(),(N?action('故事日誌','journal'):'')+action('任務日誌','quest')+(inDungeon()?action('副本目標','dungeon-brief'):'')+action('回到迷宮','close')+action('保存並離開','quit'),{silent:quiet===true,summary:'裝備與補給。穿戴中：'+(Object.values(run.equipment).filter(Boolean).map(gearSpeech).join('、')||'尚未穿戴裝備')+'。可以更換裝備或使用補給。'});
   }
-  function trade(quiet=false) {
+  function trade(quiet=false,direct=false) {
     if(!active||G.shifting||run.status!=='playing')return;
+    // "回到商店" goes straight back to the stall instead of re-resolving the nearest interaction.
+    if(!direct){
     if(nearbyAdventure&&!quiet){adventureDialog();return;}
     if(partyUI?.interact())return;
     if(nearbyJourney){if(nearbyJourney===mainClue)mainClueDialog();else if(nearbyJourney===rift)riftDialog();else dungeonObjectDialog(nearbyJourney.index);return;}
     if(nearbyEncounter){if(nearbyEncounter===chest)chestDialog();else questDialog();return;}
     if(nearestWarrior){warriorDialog();return;}
     if(!nearest&&canObserveLandmark()&&!quiet){observeLandmark();return;}
+    }
     if(!active||G.shifting||!nearest||run.status!=='playing')return;
-    syncEngine();
+    syncEngine();menuReturn={kind:'trade',merchant:nearest.id};
     const grocer=nearest.id===E.GROCERY.merchantId,ingredients=grocer&&run.party?E.groceryOffers(run):[],scrollTop=quiet?(el('towerDialog').querySelector('.tower-dialog-content')?.scrollTop||0):0;
     if(!quiet||tradeMerchant!==nearest.id){tradeCategory='supplies';tradeMerchant=nearest.id;}
     if(!ingredients.length)tradeCategory='supplies';
     const heading=(art,name,stat)=>art+'<div><h3>'+text(name)+'</h3><small>'+text(stat)+'</small></div><span class="trade-detail-indicator" aria-hidden="true">⌄</span>';
-    const cards=(lightingUI?.merchantCard(nearest.id)||'')+nearest.offer.supplies.map(id=>{
+    const scrap=grocer&&run.party?window.TowerExpedition?.scrapOffer?.(run):null;
+    const scrapMost=scrap?Math.min(scrap.remaining,scrap.room):0,scrapBlocked=!scrap?'':!scrap.remaining?'本層已售完':!scrap.room?'零件袋已滿':'';
+    const scrapButtons=!scrap?'':scrapBlocked?action(scrapBlocked,'buy-scrap','1',true):[...new Set([1,scrapMost])].map(n=>action(run.coins<scrap.price*n?'銅幣不足 · '+scrap.price*n+' 幣':'買 '+n+' 份 · '+scrap.price*n+' 幣','buy-scrap',String(n),run.coins<scrap.price*n)).join('');
+    const scrapCard=scrap?'<article class="tower-item grocery-supply grocery-scrap"><details class="trade-item-details"><summary>'+heading(window.TowerResourceIcons?.svg('scrap')||'','金屬零件','持有 '+scrap.owned+'／99 · 本層剩 '+scrap.remaining+'/'+scrap.stock)+'</summary><p>修理、鍛造、機器人機件與部分技能都會用到；拆解裝備也能回收。每層限購 '+scrap.stock+' 份。</p></details><div class="trade-card-actions">'+scrapButtons+'</div></article>':'';
+    const cards=(lightingUI?.merchantCard(nearest.id)||'')+scrapCard+nearest.offer.supplies.map(id=>{
       const item=C.ITEMS[id],quantity=id==='arrow'?Math.max(0,Math.min(10,C.itemLimit('arrow',run)-run.bag.arrow)):1,cost=C.supplyPrice(id,quantity),full=run.bag[id]>=C.itemLimit(id,run);
-      return '<article class="tower-item grocery-supply"><details class="trade-item-details"><summary>'+heading(window.TowerHeroIcons?.svg(Heroes?.ROBOT?.FUEL_ITEMS[id]?id:'item_'+id)||'',item.name,'持有 '+run.bag[id]+'／'+C.itemLimit(id,run))+'</summary><p>'+text(item.description)+'</p></details><div class="trade-card-actions">'+action(full?(id==='arrow'?'箭袋已滿':'已達上限'):(id==='arrow'&&quantity<10?'補滿'+' '+quantity+' 支':'買'+(id==='arrow'?' '+quantity+' 支':''))+' · '+cost+' 幣','buy',id,full||quantity===0||run.coins<cost)+(item.sellPrice>0?action('賣 '+item.sellPrice+' 幣','sell',id,!run.bag[id]):'')+'</div></article>';
+      return '<article class="tower-item grocery-supply"><details class="trade-item-details"><summary>'+heading(window.TowerHeroIcons?.svg(Heroes?.ROBOT?.FUEL_ITEMS[id]?id:'item_'+id)||'',item.name,'持有 '+run.bag[id]+'／'+C.itemLimit(id,run))+'</summary><p>'+text(item.description)+'</p></details><div class="trade-card-actions">'+action(full?(id==='arrow'?'箭袋已滿':'已達上限'):run.coins<cost?'銅幣不足 · '+cost+' 幣':(id==='arrow'&&quantity<10?'補滿'+' '+quantity+' 支':'買'+(id==='arrow'?' '+quantity+' 支':''))+' · '+cost+' 幣','buy',id,full||quantity===0||run.coins<cost)+(item.sellPrice>0?action('賣 '+item.sellPrice+' 幣','sell',id,!run.bag[id]):'')+'</div></article>';
     }).join('');
-    const ingredientCards=ingredients.map(offer=>'<article class="tower-item grocery-ingredient'+(offer.specialty?' is-specialty':'')+'" data-grocery-offer="'+text(offer.id)+'"><details class="trade-item-details"><summary>'+heading(window.TowerPartyRuntime?.foodArt(offer.ingredientId)||'',offer.ingredientId==='herb'?offer.name+'（藥草）':offer.name,'持有 '+run.party.ingredients[offer.ingredientId]+' · 剩 '+offer.remaining+'/'+offer.stock)+'</summary><p>'+(offer.specialty?'遠方特產 · '+text(floorLabel(offer.sourceFloor)+' · '+offer.sourceName):'常用食材')+'；本層限量，不會補貨。</p></details><div class="trade-card-actions">'+action(offer.remaining?'買 1 份 · '+offer.price+' 幣':'本層已售完','buy-ingredient',offer.id,!offer.remaining||run.party.ingredients[offer.ingredientId]>=99||run.coins<offer.price)+'</div></article>').join('');
-    const gear=nearest.offer.gear.map(({kind,gear,price})=>'<article class="tower-item tower-gear-card"><details class="trade-item-details"><summary>'+heading(window.TowerHeroIcons?.svg(kind)||'',gear.name,'耐久 '+gear.durability+'/'+gear.maxDurability)+'</summary><p>'+text(gearDescription(gear))+'</p></details><div class="trade-card-actions">'+action(run.adventure.claimed.includes('stock:'+run.floor+':'+nearest.id+':'+kind)?'本層已售出':'購買 '+price+' 幣','buy-gear',kind,run.adventure.claimed.includes('stock:'+run.floor+':'+nearest.id+':'+kind)||run.coins<price)+'</div></article>').join('');
+    const ingredientCards=ingredients.map(offer=>'<article class="tower-item grocery-ingredient'+(offer.specialty?' is-specialty':'')+'" data-grocery-offer="'+text(offer.id)+'"><details class="trade-item-details"><summary>'+heading(window.TowerPartyRuntime?.foodArt(offer.ingredientId)||'',offer.ingredientId==='herb'?offer.name+'（藥草）':offer.name,'持有 '+run.party.ingredients[offer.ingredientId]+' · 剩 '+offer.remaining+'/'+offer.stock)+'</summary><p>'+(offer.specialty?'遠方特產 · '+text(floorLabel(offer.sourceFloor)+' · '+offer.sourceName):'常用食材')+'；本層限量，不會補貨。</p></details><div class="trade-card-actions">'+action(!offer.remaining?'本層已售完':run.party.ingredients[offer.ingredientId]>=99?'食材袋已滿':run.coins<offer.price?'銅幣不足 · '+offer.price+' 幣':'買 1 份 · '+offer.price+' 幣','buy-ingredient',offer.id,!offer.remaining||run.party.ingredients[offer.ingredientId]>=99||run.coins<offer.price)+'</div></article>').join('');
+    // Gear is grouped by body slot and tells who in the party can use it and
+    // how it compares, so a long late-floor stock reads at a glance.
+    const fit=gear=>{if(!modern()||!Heroes?.GEAR?.[gear.kind])return '';const users=Heroes.ids(run).filter(id=>Heroes.canEquip?.(run,id,gear));if(!users.length)return '<small class="trade-fit is-muted">隊伍目前無人可用 · '+text(Heroes.GEAR[gear.kind].jobs.map(j=>Heroes.JOBS[j]?.name||j).join('、'))+'</small>';
+      // Compare against every member who could wear it and show the biggest upgrade.
+      let best=null;for(const id of users){const gains=(window.TowerEquipmentCompare?.compare(Heroes,run,id,gear)?.deltas||[]).filter(d=>d.delta&&d.good),score=gains.reduce((sum,d)=>sum+Math.abs(d.delta)*(d.key==='interval'||d.key==='heal'?10:1),0);if(gains.length&&(!best||score>best.score))best={id,gains,score};}
+      const gain=best?.gains.slice(0,2).map(d=>d.label+' '+(d.delta>0?'+':'')+d.delta+d.unit).join('、'),jobs=users.map(id=>Heroes.JOBS[Heroes.job(run,id)]?.name).filter((n,i,a)=>a.indexOf(n)===i).join('、');
+      return '<small class="trade-fit'+(gain?' is-good':'')+'">'+text(jobs)+' 可用'+(gain?' · '+text((users.length>1?Heroes.JOBS[Heroes.job(run,best.id)]?.name+' ':'')+gain):'')+'</small>';};
+    const gearCardHtml=({kind,gear,price})=>{const sold=run.adventure.claimed.includes('stock:'+run.floor+':'+nearest.id+':'+kind);return '<article class="tower-item tower-gear-card"><details class="trade-item-details"><summary>'+heading(window.TowerHeroIcons?.svg(kind)||'',gear.name,'耐久 '+gear.durability+'/'+gear.maxDurability)+'</summary><p>'+text(gearDescription(gear))+'</p></details>'+fit(gear)+'<div class="trade-card-actions">'+action(sold?'本層已售出':run.coins<price?'銅幣不足 · '+price+' 幣':'購買 '+price+' 幣','buy-gear',kind,sold||run.coins<price)+'</div></article>';};
+    const SLOT_GROUPS=[['weapon','武器'],['helmet','頭部'],['armor','身體'],['shield','盾牌']],slotOf=entry=>entry.gear.slot;
+    const groups=[...SLOT_GROUPS,['','其他']].map(([slot,label])=>[label,nearest.offer.gear.filter(entry=>slot?slotOf(entry)===slot:!SLOT_GROUPS.some(([s])=>s===slotOf(entry)))]).filter(([,list])=>list.length);
+    const gear=groups.length>1?groups.map(([label,list])=>'<h3 class="trade-group-title">'+text(label)+' <small>'+list.length+' 件</small></h3><div class="tower-grid trade-stock-grid">'+list.map(gearCardHtml).join('')+'</div>').join(''):'<div class="tower-grid trade-stock-grid">'+nearest.offer.gear.map(gearCardHtml).join('')+'</div>';
     const stockVoice=grocer?'這裡可以買藥品、道具與限量食材，也可以委託料理。':('出售：'+nearest.offer.gear.map(g=>gearSpeech(g.gear)).join('、')+'。也可以維護與強化裝備。');
     const voiceSummary=nearest.name+'。'+stockVoice;
     const tabs=grocer&&ingredients.length?'<nav class="trade-categories" aria-label="商品分類">'+['supplies','ingredients'].map(id=>'<button class="tower-btn" data-tower="trade-tab" data-item="'+id+'" aria-pressed="'+(tradeCategory===id)+'">'+(id==='supplies'?'藥品與道具':'限量食材')+'</button>').join('')+'</nav>':'';
     const notes='<p>'+text(nearest.offer.greeting||'')+'</p><p>'+(grocer?'藥品、食材與道具可在這裡購買；限量食材本層售完不補貨。已解鎖菜色也能自備材料委託料理。':'裝備放入背包後可更換穿戴；每件本層限一件。'+(run.party?'本店維護及強化費比隊內鍛匠多 20%，材料不加價。':'')+'藥品、食材與道具請向雜貨商購買。')+'</p>';
     const help=window.TowerCompactHelp?.render(grocer?'雜貨與委託說明':'購買與維護說明',notes)||notes;
-    const stock=help+(grocer?tabs+'<section class="grocery-stock" data-trade-category="supplies"'+(tradeCategory!=='supplies'?' hidden':'')+'><div class="tower-grid trade-stock-grid">'+cards+'</div></section><section class="grocery-stock" data-trade-category="ingredients"'+(tradeCategory!=='ingredients'?' hidden':'')+'><div class="tower-grid trade-stock-grid">'+ingredientCards+'</div></section>':'<div class="tower-grid trade-stock-grid">'+gear+'</div>');
-    dialog(nearest.name+' · 行商營地',grocer?'旅行雜貨與遠方食材':'專門裝備與維護','',stock,(run.party?(grocer?action('委託料理','commission-cooking'):action('維護與強化','party-merchant-forge',nearest.id)):'')+action('整理背包','bag')+action('結束交易','close'),{silent:quiet===true,commerce:grocer?'grocery':'merchant',wallet:run.coins,summary:voiceSummary,asset:'merchant.'+nearest.id,afterText:stockVoice+'。整理背包。結束交易。'});
+    const stock=help+(grocer?tabs+'<section class="grocery-stock" data-trade-category="supplies"'+(tradeCategory!=='supplies'?' hidden':'')+'><div class="tower-grid trade-stock-grid">'+cards+'</div></section><section class="grocery-stock" data-trade-category="ingredients"'+(tradeCategory!=='ingredients'?' hidden':'')+'><div class="tower-grid trade-stock-grid">'+ingredientCards+'</div></section>':gear);
+    dialog(nearest.name+' · 行商營地',grocer?'旅行雜貨與遠方食材':'專門裝備與維護','',stock,(run.party?(grocer?action('委託料理','commission-cooking'):action('維護與強化','party-merchant-forge',nearest.id)):'')+(modern()&&!grocer?action('隊伍裝備','hero-panel',Heroes.state(run).active):action('背包','bag'))+action('結束交易','close'),{silent:quiet===true,commerce:grocer?'grocery':'merchant',wallet:run.coins,summary:voiceSummary,asset:'merchant.'+nearest.id,afterText:stockVoice+'。'+(modern()&&!grocer?'隊伍裝備':'背包')+'。結束交易。'});
     if(quiet)el('towerDialog').querySelector('.tower-dialog-content').scrollTop=scrollTop;
   }
   function cookingServiceReady(){
@@ -1682,7 +1787,7 @@
   }
   function cookingMaterials(recipe){return '<div class="party-costs" aria-label="原配方材料">'+Object.entries(recipe.cost).map(([id,need])=>{const have=run.party.ingredients[id];return '<span class="party-cost'+(have<need?' missing':'')+'">'+window.TowerPartyRuntime.foodArt(id)+'<span>'+text(P.INGREDIENTS[id])+' <b>'+have+'/'+need+'</b>'+(have<need?'<small>缺 '+(need-have)+'</small>':'')+'</span></span>';}).join('')+'</div>';}
   function commissionCooking(quiet=false){
-    pendingCooking=null;if(!cookingServiceReady()){showToast('請靠近雜貨商蘇禾，再委託料理。');return;}
+    pendingCooking=null;if(!cookingServiceReady()){showToast('請靠近雜貨商蘇禾，再委託料理。');return;}menuReturn={kind:'trade',merchant:nearest.id};
     const cards=Cooking.recipes(run,nearest.id).map(q=>{const recipe=P.RECIPES[q.recipeId],reason=!q.allowed?q.reason:run.coins<q.fee?'代煮費不足':q.missing.length?'材料不足':'';
       return '<article class="tower-item grocery-supply" data-commission-recipe="'+text(q.recipeId)+'"><details class="trade-item-details"><summary>'+window.TowerPartyRuntime.dishArt(q.recipeId)+'<div><h3>'+text(recipe.name)+'</h3><small>'+text(q.categoryName)+' · 代煮 '+q.fee+' 幣 · 備好 '+q.owned+' 份</small></div><span class="trade-detail-indicator" aria-hidden="true">⌄</span></summary>'+cookingMaterials(recipe)+'<p>生命 +'+recipe.hp+' · 飽食 +'+recipe.hunger+(recipe.team?' · 全隊 +'+recipe.team:'')+(recipe.buff?' · '+text(P.BUFFS[recipe.buff]):'')+'</p></details><div class="trade-card-actions">'+action(reason||'委託一份 · '+q.fee+' 幣','commission-cook-ask',q.recipeId,!q.allowed||!q.affordable)+'</div></article>';}).join('');
     const notes='<p>自備原配方材料，依難度付費；每次一份。基本2幣、精製5幣、盛宴8幣、地下12幣。沒有廚師也可委託已解鎖菜色，地下仍有深度限制。不套用廚師雙份與省料效果。確認後才扣材料與費用，取消不消耗。</p>';
@@ -1771,7 +1876,7 @@
     G.running=false;run.status='dead';run.hp=0;
     if(inDungeon()){const result=D.finish(run,'abandoned',run.revision);if(result.ok)run=result.run;}
     save();
-    dialog('高塔仍在等待','這次旅程暫時停下','冒險者把你帶回本層入口。可以付出最多 12 枚銅幣重整行裝；已拾取的補給不會重複出現，未結案委託會解除。', '',action('重整後再挑戰','retry')+action('回首頁','home'));
+    dialog('高塔仍在等待','這次旅程暫時停下','冒險者把你帶回本層入口。可以付出最多 12 枚銅幣重整行裝：'+(modern()&&run.party?.members?.length?'全隊回到主角身邊並恢復體力；':'恢復體力；')+'已拾取的補給不會重複出現，未結案委託會解除。', '',action('重整後再挑戰','retry')+action('回首頁','home'));
   }
   function pauseMenu() { dialog('旅程已暫停','隨時可以繼續','切回遊戲後按繼續，牆壁倒數與怪物都會等待你。選擇保存回首頁會解除本層未結案委託。','',action('繼續探索','close')+action('保存並回首頁','home')); }
   function requestQuit() {
@@ -1793,9 +1898,9 @@
     active=false;floorStarted=false;paused=false;campDialog=false;bossEncounterHold=0;encounterAlert?.clearVisual();
     objectiveHint?.stop();
     partyUI?.reset();
-    lightingUI?.reset();
+    lightingUI?.reset();window.TowerCreatureArt?.release?.();
     environmentLife?.destroy();environmentLife=null;
-    clearBolts();
+    clearBolts();clearTagTextures();
     clearHurtFeedback();hurtLeft=0;guardClashAt=0;
     document.body.classList.remove('story-active','tower-danger');el('towerOverlay').hidden=true;
     AudioEng.stopMusic();AudioEng.stopItemLoop();switchScreen('titleScreen');
@@ -1810,7 +1915,7 @@
     if(key==='profession'&&pendingProfession){pendingProfession.name=(document.getElementById('heroNameInput')?.value||pendingProfession.name).trim().slice(0,24)||'冒險者';let result=P.enable(pendingProfession,id,pendingSex);if(result.ok&&(!upgradingProfession||['archer','robot'].includes(id)))result=Heroes.enable(result.run);if(!result.ok){showToast(result.message);return;}pendingHero=result.run;revealHero();return;}
     if(key==='hero-create-start'&&pendingHero){
       if(upgradingProfession){try{localStorage.setItem(SAVE+'_before_party',JSON.stringify(pendingProfession));}catch(_){showToast('無法保存升級前的備份，尚未改動舊旅程。請先騰出瀏覽器儲存空間。');return;}}
-      if(!upgradingProfession){try{const old=localStorage.getItem(SAVE);if(old)localStorage.setItem(SAVE+'_before_heroes_'+Date.now(),old);}catch(_){showToast('無法備份舊存檔，尚未開始新旅程。');return;}}
+      if(!upgradingProfession){try{const old=localStorage.getItem(SAVE);if(old){pruneHeroBackups(2);localStorage.setItem(SAVE+'_before_heroes_'+Date.now(),old);}}catch(_){showToast('無法備份舊存檔，尚未開始新旅程。');return;}}
       const previous=run;run=pendingHero;floorStarted=false;if(!save()){run=previous;return;}pendingProfession=pendingHero=null;upgradingProfession=false;enter();return;}
     if(key==='battle-settings'){openBattleSettings();return;}
     if(key==='battle-auto-aim'&&modern()){autoAim=!autoAim;try{localStorage.setItem(AUTO_AIM_SETTING,autoAim?'on':'off');}catch(_){showToast('此裝置無法保存操作設定，本次遊戲仍可使用。',1800,false);}openBattleSettings(true);return;}
@@ -1828,6 +1933,7 @@
     if(key==='adventure-abandon-confirm'){if(transact(AdventureEvents.settle(run,true))){refreshAdventureWorld();closeDialog();}return;}
     if(key==='trade-tab'&&['supplies','ingredients'].includes(id)){tradeCategory=id;trade(true);el('towerDialog').querySelector('.tower-dialog-content').scrollTop=0;return;}
     if(key==='commission-cooking'){commissionCooking();return;}
+    if(key==='trade-back'){if(returnAction())trade(false,true);else closeDialog();return;}
     if(key==='commission-cook-back'){pendingCooking=null;if(cookingServiceReady())trade(true);else closeDialog();return;}
     if(key==='commission-cook-ask'){confirmCooking(id);return;}
     if(key==='commission-cook-confirm'){
@@ -1838,7 +1944,7 @@
     if(partyUI?.handle(key,id))return;
     if(lightingUI?.handle(key,id))return;
     if(key==='close'){closeDialog();return;}
-    if(key==='new'){if(readSave()){dialog('重新開始確認','展開另一段高塔旅程？','選好職業後會先備份目前故事，再建立新技能與裝備旅程。其他模式與設定不變。','',action('保留目前進度','menu')+action('重新建立主角','new-confirm'));}else handleAction('new-confirm');return;}
+    if(key==='new'){if(readSave()){dialog('重新開始確認','展開另一段高塔旅程？','選好職業後會先備份目前故事，再建立新技能與裝備旅程。其他模式與設定不變。','',action('保留目前進度','menu')+action('重新建立主角','new-confirm'));}else if(unreadableSave()){dialog('存檔無法讀取','要建立新的旅程嗎？','目前的存檔無法讀取。選好職業後會先把原始資料另存備份，再建立新旅程；若剛更新過遊戲，建議先重新整理網頁再試一次。','',action('先不要','menu')+action('備份後建立新主角','new-confirm'));}else handleAction('new-confirm');return;}
     if(key==='menu'){open();return;}
     if(key==='underworld-intro'){underworldIntro();return;}
     if(key==='underworld-cancel'){pendingUnderworld=null;open();return;}
@@ -1849,7 +1955,9 @@
     if(key==='descend'){loadFloor(false);return;}
     if(key==='home'){stop();return;}
     if(key==='quit'){requestQuit();return;}
-    if(key==='retry'){run.status='playing';run.hp=modern()?Heroes.maxHp(run):C.MAX_HP;if(modern())Heroes.sync(run);run.hunger=Math.max(65,run.hunger);run.coins=Math.max(0,run.coins-12);cancelFloorQuest();enter();return;}
+    // Regrouping brings the whole party back on its feet under the hero's control,
+    // instead of reviving only whoever happened to fall last.
+    if(key==='retry'){run.status='playing';if(modern()){Heroes.returnToHero(run);for(const m of run.party.members)Heroes.setHp(run,m.id,Heroes.maxHp(run,m.id));}run.hp=modern()?Heroes.maxHp(run):C.MAX_HP;if(modern())Heroes.sync(run);run.hunger=Math.max(65,run.hunger);run.coins=Math.max(0,run.coins-12);cancelFloorQuest();enter();return;}
     if(key==='bag'){inventory();return;}
     if(key==='journal'){journal();return;}
     if(key==='story-archive'){const saved=readSave();if(N&&saved?.status==='won'){run=saved;journal();}return;}
@@ -1872,8 +1980,9 @@
     if(key==='dungeon-abandon'){finishDungeon('abandoned');return;}
     if(key==='dungeon-settle'){finishDungeon(id);return;}
     if(key==='equip'){const gear=run.gearBag.find(g=>g.id===id);if(transact(C.equipGear(run,id,run.revision))){inventory(true);window.GameVoice?.announce('裝備 '+(gear?gearSpeech(gear):'裝備'),true);}return;}
-    if(key==='discard-ask'){const gear=[...run.gearBag,...Object.values(run.equipment)].find(g=>g&&g.id===id);if(gear)dialog('捨棄裝備確認','捨棄'+gear.name+'？','捨棄後不能取回，若這是最後一把武器，你會暫時無法擊暈怪物。','',action('保留裝備','bag')+action('確認捨棄','discard',id));return;}
-    if(key==='discard'){if(transact(C.discardGear(run,id,run.revision)))inventory();return;}
+    if(key==='discard-ask'){const gear=[...run.gearBag,...Object.values(run.equipment)].find(g=>g&&g.id===id);discardFrom=el('towerDialog').classList?.contains('hero-management')?'hero':'bag';if(gear)dialog('捨棄裝備確認','捨棄'+gear.name+'？','捨棄後不能取回，若這是最後一把武器，你會暫時無法擊暈怪物。','',action('保留裝備',discardFrom==='hero'?'hero-panel':'bag',discardFrom==='hero'?partyUI?.heroes?.selected?.()||Heroes.state(run).active:undefined)+action('確認捨棄','discard',id));return;}
+    // Discarding from team management returns there, not to the supplies page.
+    if(key==='discard'){if(transact(C.discardGear(run,id,run.revision))){if(discardFrom==='hero'&&modern()&&partyUI?.heroes)partyUI.heroes.panel(partyUI.heroes.selected?.(),true);else inventory();}return;}
     if(key==='quest'){questDialog();return;}
     if(key==='quest-accept'){if(nearExplorer()&&transact(E.acceptQuest(run,id,run.revision))){if(relic)relic.model.visible=run.adventure.quest.type==='relic';closeDialog();showToast('委託已接受，背包可查看進度。');}return;}
     if(key==='quest-donate'){if(nearExplorer()&&questEvent('donate',{}))questDialog();return;}
@@ -1885,6 +1994,11 @@
     if(key==='hire'){hireWarrior(id);return;}
     if(key==='rehire-review'){reviewWarriorReplacement(id);return;}
     if(key==='rehire-confirm'){hireWarrior(id,true);return;}
+    if(key==='buy-scrap'){
+      if(!active||!G.running||!nearest||nearest.id!==E.GROCERY.merchantId||Math.hypot(G.px-nearest.x,G.pz-nearest.z)>=2.6||!hasClearPath(G.px,G.pz,nearest.x,nearest.z))return;
+      const quantity=Math.max(1,Math.floor(Number(id)||1));
+      if(transact(window.TowerExpedition.buyScrap(run,nearest.id,quantity,run.revision))){trade(true,true);window.GameVoice?.announce('獲得 金屬零件',true);}return;
+    }
     if(key==='buy-ingredient'){
       if(!active||!G.running||!nearest||nearest.id!==E.GROCERY.merchantId||Math.hypot(G.px-nearest.x,G.pz-nearest.z)>=2.6||!hasClearPath(G.px,G.pz,nearest.x,nearest.z))return;
       const offer=E.groceryOffers(run).find(o=>o.id===id);

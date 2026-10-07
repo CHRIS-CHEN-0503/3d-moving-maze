@@ -4,7 +4,7 @@ import {readFileSync} from 'node:fs';
 import {createRequire} from 'node:module';
 import vm from 'node:vm';
 const require=createRequire(import.meta.url),T=require('../lib/three.min.js');
-const source=readFileSync(new URL('../index.html',import.meta.url),'utf8').match(/function makeTextSprite\(text\)\{[\s\S]*?\n\}/)[0];
+const source=readFileSync(new URL('../index.html',import.meta.url),'utf8').match(/function makeTextSprite\(text(?:,shared=false)?\)\{[\s\S]*?\n\}/)[0];
 function fixture(){
   const canvases=[],ctx=vm.createContext({THREE:T,document:{createElement(tag){assert.equal(tag,'canvas');const canvas={width:0,height:0,getContext(){return {font:'',measureText(text){return {width:text.length*Number(this.font.match(/\d+/)[0])};},strokeText(){},fillText(){}};}};canvases.push(canvas);return canvas;}}});
   vm.runInContext(source,ctx);return {create:ctx.makeTextSprite,canvases};

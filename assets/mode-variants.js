@@ -1,12 +1,14 @@
 /* Small opt-in objectives reuse the maze, collision/pathfinding and existing room transport. */
 (function(){
   'use strict';const C=ModeVariantsCore;
-  let state=null,key='',layout=-1,root=null,hud=null,caption=null,fill=null,lastSync=0,lastRev=-1,offset=0,soloSeed=0,gates=[],noticeAt=0,lastLayout=0;
+  let state=null,key='',layout=-1,root=null,hud=null,caption=null,fill=null,lastSync=0,lastRev=-1,lastBeat='',lastTick=0,offset=0,soloSeed=0,gates=[],noticeAt=0,lastLayout=0;
+  // Host adjudication runs at ~10 Hz (one 60 fps frame of slack); dwell timers compare timestamps, so the cadence only bounds precision.
+  const TICK_MS=95,HEARTBEAT_MS=1500;
   const mode=()=>MP.on?MP.mode:'classic',id=()=>MP.on?MP.id:'solo',ids=()=>MP.on?MP.roster.map(r=>r.id):['solo'];
   const active=()=>G.running&&!(window.TowerMode?.active)&&C.enabled(mode(),matchRules())&&(!MP.on||MP.started);
   const authoritative=()=>!MP.on||MP.host;
   function dispose(){if(root){scene.remove(root);disposeSceneObject(root);root=null;}if(hud)hud.hidden=true;gates=[];}
-  function reset(){dispose();state=null;key='';layout=-1;lastSync=lastRev=offset=0;soloSeed=0;}
+  function reset(){dispose();state=null;key='';layout=-1;lastSync=lastRev=lastTick=offset=0;lastBeat='';soloSeed=0;}
   function ensure(){
     if(!active())return false;const epoch=MP.on?[MP.seed,MP.seriesRound,MP.mode].join(':'):'solo:'+G.startTime;
     if(epoch!==key){reset();key=epoch;soloSeed=MP.on?MP.seed:(Math.floor(G.startTime)^0x1a2c93)>>>0;
@@ -37,9 +39,18 @@
     });
     if(!hud){hud=document.createElement('div');hud.id='modeObjective';hud.setAttribute('role','status');hud.style.cssText='position:absolute;right:150px;top:94px;max-width:44vw;font-size:12px;background:#122538dc;color:#ffe6a3;border:1px solid #937b47;border-radius:9px;padding:5px 9px;pointer-events:none;z-index:15';caption=document.createElement('span');fill=document.createElement('div');fill.style.cssText='height:3px;background:#ffd778;transform-origin:left;margin-top:4px';hud.appendChild(caption);hud.appendChild(fill);$('gameScreen').appendChild(hud);}
   }
-  function position(actor){const remote=MP.host&&actor!==MP.id&&!MP.bots?.some(b=>b.id===actor)&&MP.players?.[actor];return remote&&Number.isFinite(remote.tx)&&Number.isFinite(remote.tz)?{x:remote.tx,z:remote.tz}:botPosOf(actor);}
-  function positions(){return Object.fromEntries(ids().map(actor=>[actor,MP.on?position(actor):{x:G.px,z:G.pz}]).filter(([,p])=>p));}
-  function context(){const now=performance.now(),view=window.CaptureFlag?.view?.();return {shifting:G.shifting||G.frozen,ended:MP.on&&MP.ended,holder:MP.treasure?.holder,ghost:MP.taggedId,outs:MP.on?MP.outs||{}:{},teams:Object.fromEntries(Object.entries(view?.members||{}).map(([actor,m])=>[actor,m.team])),stunned:Object.fromEntries(ids().map(actor=>[actor,now<(actor===id()?G.stunnedUntil:MP.bots?.find(b=>b.id===actor)?.stunnedUntil||MP.players[actor]?.stunnedUntil||0)]))};}
+  const botMap=()=>new Map((MP.bots||[]).map(b=>[b.id,b]));
+  function position(actor,bots){const isBot=bots?bots.has(actor):!!MP.bots?.some(b=>b.id===actor),remote=MP.host&&actor!==MP.id&&!isBot&&MP.players?.[actor];return remote&&Number.isFinite(remote.tx)&&Number.isFinite(remote.tz)?{x:remote.tx,z:remote.tz}:botPosOf(actor);}
+  function positions(bots){return Object.fromEntries(ids().map(actor=>[actor,MP.on?position(actor,bots):{x:G.px,z:G.pz}]).filter(([,p])=>p));}
+  function context(bots){const now=performance.now(),view=window.CaptureFlag?.view?.();return {shifting:G.shifting||G.frozen,ended:MP.on&&MP.ended,holder:MP.treasure?.holder,ghost:MP.taggedId,outs:MP.on?MP.outs||{}:{},teams:Object.fromEntries(Object.entries(view?.members||{}).map(([actor,m])=>[actor,m.team])),stunned:Object.fromEntries(ids().map(actor=>[actor,now<(actor===id()?G.stunnedUntil:bots.get(actor)?.stunnedUntil||MP.players[actor]?.stunnedUntil||0)]))};}
+  // Which actors are mid-dwell: guests draw the progress ring from `since`, so a start or stop must reach them without waiting for the heartbeat.
+  const dwellSig=()=>Object.entries(state.progress).map(([actor,p])=>p.channel?actor+p.channel.key+p.channel.since:'').join()+state.shortcut.map(s=>s.channel?s.channel.key+s.channel.since:'').join();
+  function adjudicate(){
+    const bots=botMap(),stamp=Date.now(),events=C.tick(state,positions(bots),stamp,context(bots));
+    for(const event of events)if(event.id===id())showToast(event.kind==='bell'?'安全鐘響了！＋25 分':event.kind==='seal'?'封印解除！前往出口':event.kind==='shortcut'?'側翼捷徑已開啟':'地標完成！前往出口',1600);
+    if(!MP.on||!MP.host)return;const beat=dwellSig();
+    if(state.rev!==lastRev||beat!==lastBeat||stamp-lastSync>=HEARTBEAT_MS){lastRev=state.rev;lastBeat=beat;lastSync=stamp;RoomLifecycle.sendLocal({t:'variantsync',key,state,at:Date.now()});}
+  }
   function permanent(g){return (window.CaptureFlag?.view?.()?.walls||[]).some(w=>w.type===g.type&&w.gx===g.gx&&w.gy===g.gy);}
   function applyGates(now){
     if(mode()!=='ctf'||G.shifting)return;let close=false;
@@ -60,13 +71,12 @@
     case 'tag':return id()===MP.taggedId?'鬼不能啟動安全鐘':'下一站：安全鐘'+(p.bell%2?'乙':'甲')+' · '+p.score+'分'+(Date.now()+offset<p.cool?'（稍候再啟動）':'');
     case 'ctf':return '側翼符文站定 → 十秒捷徑';default:return '';
   }}
-  function frame(){
+  function frame(dt){
     if(!ensure()){if(hud)hud.hidden=true;if(root)root.visible=false;return;}
     if(root)root.visible=true;const now=Date.now()+offset;
     if(authoritative()){
-      const events=C.tick(state,positions(),Date.now(),context());
-      for(const event of events)if(event.id===id())showToast(event.kind==='bell'?'安全鐘響了！＋25 分':event.kind==='seal'?'封印解除！前往出口':event.kind==='shortcut'?'側翼捷徑已開啟':'地標完成！前往出口',1600);
-      if(MP.on&&MP.host&&(state.rev!==lastRev||Date.now()-lastSync>=700)){lastRev=state.rev;lastSync=Date.now();RoomLifecycle.sendLocal({t:'variantsync',key,state,at:Date.now()});}
+      // The per-frame call carries dt; the 250 ms background timer calls without it and is never throttled.
+      const wall=Date.now(),elapsed=wall-lastTick;if(dt===undefined||elapsed>=TICK_MS||elapsed<0){lastTick=wall;adjudicate();}
     }
     applyGates(now);if(hud){hud.hidden=mode()==='shop'||MP.ended;const label=text();if(caption.textContent!==label)caption.textContent=label;const fraction=C.progress(state,id(),now);fill.style.transform='scaleX('+fraction+')';fill.hidden=!fraction;
       if(performance.now()-lastLayout>250){lastLayout=performance.now();const mini=$('minimapWrap').getBoundingClientRect?.();if(mini)hud.style.right=(Math.max(90,window.innerWidth-mini.left+8))+'px';}
@@ -94,7 +104,7 @@
     if(m.t==='end'&&m.f===MP.roster[0]?.id&&m.sr===MP.seriesRound&&state?.mode==='tag'&&m.bells){for(const actor of ids())state.progress[actor].score=Math.max(0,Math.min(150,Number(m.bells[actor])||0));}
     handle(m);
   };
-  const results=showMPResults;showMPResults=function(title,html,rows){if(state?.mode==='tag'&&C.enabled('tag',matchRules())){rows=rows.map(r=>({...r,points:r.points+(state.progress[r.id]?.score||0)}));html+='<p>安全鐘：'+MP.roster.map(r=>escapeHtml(r.name)+' ＋'+(state.progress[r.id]?.score||0)).join(' · ')+'（不改變逃脫勝負）</p>';}if(hud)hud.hidden=true;if(root)root.visible=false;results(title,html,rows);};
+  const results=showMPResults;showMPResults=function(title,html,rows){if(state?.mode==='tag'&&C.enabled('tag',matchRules())){const bell=id=>Math.max(0,Math.min(150,Math.round(Number(state.progress[id]?.score)||0)));rows=rows.map(r=>({...r,points:(Number(r.points)||0)+bell(r.id)}));html+='<p>安全鐘：'+MP.roster.map(r=>escapeHtml(r.name)+' ＋'+bell(r.id)).join(' · ')+'（不改變逃脫勝負）</p>';}if(hud)hud.hidden=true;if(root)root.visible=false;results(title,html,rows);};
   const leave=mpLeave;mpLeave=function(){reset();leave();};
   window.ModeVariants={frame,canFinish,botGoal,map,reset,state:()=>state};
 })();

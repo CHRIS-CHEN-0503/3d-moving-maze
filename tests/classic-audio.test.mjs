@@ -39,7 +39,7 @@ test('六個迷宮環境與搶購賣場都有不同的完整配樂檔', () => {
   }
   const levelMusic = [...html.matchAll(/\bmusic:(\d),\s*\n?\s*wallTex:/g)].map(match => Number(match[1]));
   assert.deepEqual(levelMusic, [0, 1, 2, 3, 4, 5, 6], '六個關卡與賣場必須逐一對應七首曲目');
-  assert.match(html, /<script src="assets\/classic-audio\.js"><\/script>/, '首頁沒有載入一般版配樂控制器');
+  assert.match(html, /<script src="assets\/classic-audio\.js\?v=1\.58\.0"><\/script>/, '首頁沒有載入一般版配樂控制器');
 });
 
 test('開始一般版時解鎖音訊、延遲載入目前曲目並循環播放', async () => {

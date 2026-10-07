@@ -1,20 +1,32 @@
 /* Ordinary shelf pickups and paid carts use the existing room transport, never a new backend. */
 (function(){
   'use strict';const C=ShopClaimsCore;
-  let ledger=null,epoch='',seen=new Set(),pending=new Map(),cutoffs={},paid=[],paidSeen=new Set(),payNo={},payWaiting=new Map(),checkoutStarts=new Map(),cursor=0,payCursor=0,last=0,cartVersion=0,lastCart=0;
+  let ledger=null,epoch='',seen=new Set(),pending=new Map(),cutoffs={},paid=[],paidSeen=new Set(),payNo={},payWaiting=new Map(),checkoutStarts=new Map(),last=0,cartVersion=0,lastCart=0,cartSig='',cartSentAt=0;
+  // Host broadcasts are event driven: each new receipt/payment is replayed a few times with backoff, and the cart snapshot is re-sent only when it changed or as a heartbeat.
+  const SLOT_MS=350,REPLAYS=3,HEARTBEAT_MS=1500,receiptReplays=[],paymentReplays=[];
+  const later=item=>({item,n:0,due:performance.now()+SLOT_MS});
+  function dueReplays(list,now,limit){
+    const rows=[];for(const e of list)if(rows.length<limit&&now>=e.due){rows.push(e.item);e.n++;e.due=now+SLOT_MS*2**e.n;}
+    for(let i=list.length;i--;)if(list[i].n>=REPLAYS)list.splice(i,1);return rows;
+  }
   const owner=()=>MP.roster?.[0]?.id,on=()=>MP.on&&MP.started&&!MP.ended&&MP.mode==='shop';
   const position=id=>{const p=MP.host&&id!==MP.id&&!MP.bots?.some(b=>b.id===id)&&MP.players?.[id];return p&&Number.isFinite(p.tx)&&Number.isFinite(p.tz)?{x:p.tx,z:p.tz}:botPosOf(id);};
   const stamp=()=>[MP.seed,MP.seriesRound,MP.round].join(':');
-  function ensure(){const key=stamp();if(key===epoch)return;epoch=key;ledger=C.create(key);pending.clear();cursor=last=cartVersion=lastCart=0;}
-  function reset(){ledger=null;epoch='';seen.clear();pending.clear();cutoffs={};paid=[];paidSeen.clear();payNo={};payWaiting.clear();checkoutStarts.clear();cursor=payCursor=last=cartVersion=lastCart=0;}
+  function ensure(){const key=stamp();if(key===epoch)return;epoch=key;ledger=C.create(key);pending.clear();receiptReplays.length=0;cartSig='';last=cartVersion=lastCart=cartSentAt=0;}
+  function reset(){ledger=null;epoch='';seen.clear();pending.clear();cutoffs={};paid=[];paidSeen.clear();payNo={};payWaiting.clear();checkoutStarts.clear();receiptReplays.length=paymentReplays.length=0;cartSig='';last=cartVersion=lastCart=cartSentAt=0;}
   const checkoutMs=()=>typeof CHECKOUT_MS==='number'?CHECKOUT_MS:5000;
   function registerAt(id,tolerance=0){const p=position(id);if(!p)return null;return (G.registers||[]).find(r=>Math.hypot(r.x-p.x,r.z-p.z)<CHECKOUT_RANGE+tolerance&&(!window.GameplayRules||window.GameplayRules.clear(p,r,G.wallBoxes||[])))||null;}
   function cancelStart(id,broadcast=false){checkoutStarts.delete(id);pending.delete('pay:'+id);MP.coUntil[id]=0;if(id===MP.id)G.coUntil=0;const bot=MP.bots?.find(b=>b.id===id);if(bot){bot.coUntil=0;bot.coPending=false;}if(broadcast)baseSend({t:'coend',f:id,sr:MP.seriesRound});}
   function hostStart(message){
-    if(!on()||message.sr!==MP.seriesRound||message.ms!==checkoutMs()||G.shifting||G.frozen||!MP.roster.some(r=>r.id===message.f&&!r.disconnected)||!(MP.carts[message.f]||0)||!registerAt(message.f))return;
+    if(!on()||message.sr!==MP.seriesRound||!MP.roster.some(r=>r.id===message.f&&!r.disconnected))return;
     const id=message.f,bot=MP.bots?.find(b=>b.id===id),stun=id===MP.id?G.stunnedUntil:bot?.stunnedUntil||MP.players[id]?.stunnedUntil||0;
-    if(performance.now()<stun||checkoutStarts.has(id))return;
-    const until=performance.now()+checkoutMs();checkoutStarts.set(id,{epoch:stamp(),until});baseHandle({...message,ms:checkoutMs()});MP.coUntil[id]=until;
+    if(checkoutStarts.has(id))return;
+    // A guest's last position packet trails a running player by up to ~0.75 m.
+    // The same lag allowance holds for the whole checkout (the guest is frozen
+    // in place meanwhile), and any refusal is answered so nobody stays frozen.
+    const lag=id===MP.id||bot?0:.8;
+    if(message.ms!==checkoutMs()||G.shifting||G.frozen||performance.now()<stun||!(MP.carts[id]||0)||!registerAt(id,lag)){cancelStart(id,true);return;}
+    const until=performance.now()+checkoutMs();checkoutStarts.set(id,{epoch:stamp(),until,lag});baseHandle({...message,ms:checkoutMs()});MP.coUntil[id]=until;
   }
   function apply(receipt){
     if(!on())return;ensure();
@@ -27,8 +39,11 @@
   }
   function hostClaim(message){
     ensure();const id=message.f,member=MP.roster.find(r=>r.id===id&&!r.disconnected),b=MP.bots?.find(r=>r.id===id),stun=id===MP.id?G.stunnedUntil:b?.stunnedUntil||MP.players[id]?.stunnedUntil||0;
+    const owned=ledger.claims[C.key(message.epoch,message.slot,message.spawn)],count=ledger.receipts.length;
     const receipt=C.claim(ledger,{epoch:message.epoch,id,slot:message.slot,spawn:message.spawn},G.goods[message.slot],position(id),!!member&&!G.shifting&&!G.frozen&&!isCheckingOut(id)&&performance.now()>=stun);
-    if(receipt)RoomLifecycle.sendLocal({t:'goodreceipt',epoch,rows:[receipt]});return !!receipt;
+    if(receipt&&ledger.receipts.length>count)receiptReplays.push(later(receipt));
+    // A refused claim on an already-owned good tells the asker who owns it, so a lost receipt is repaired on demand instead of replayed forever.
+    const answer=receipt||owned;if(answer)RoomLifecycle.sendLocal({t:'goodreceipt',epoch,rows:[answer]});return !!receipt;
   }
   function request(id,slot){
     if(!on())return false;ensure();const good=G.goods[slot];if(!good||good.taken)return false;
@@ -53,10 +68,10 @@
     if(!MP.roster.some(r=>r.id===id&&!r.disconnected)||!start||start.epoch!==stamp())return;
     // A payment packet can arrive between frames. Recheck cancellation here,
     // rather than waiting for the next frame's ledger cleanup.
-    if(G.shifting||G.frozen||now<stun||!registerAt(id,.3)){cancelStart(id,true);return;}
+    if(G.shifting||G.frozen||now<stun||!registerAt(id,Math.max(.3,start.lag||0))){cancelStart(id,true);return;}
     if(now<start.until)return;
     const packet={t:'goodpaid',key:message.key,epoch:stamp(),id,list:(MP.cartList[id]||[]).slice(),cut:(ledger?.receipts.length||0)-1,payNo:(payNo[id]||0)+1,token:'paid:'+message.key+':'+paid.length,sr:MP.seriesRound};
-    paid.push(packet);checkoutStarts.delete(id);RoomLifecycle.sendLocal(packet);
+    paid.push(packet);paymentReplays.push(later(packet));checkoutStarts.delete(id);RoomLifecycle.sendLocal(packet);
   }
   function cartState(packet){
     if(!on()||MP.host||packet.f!==owner()||packet.sr!==MP.seriesRound||packet.epoch!==stamp()||!Number.isSafeInteger(packet.seq)||!Number.isSafeInteger(packet.cut)||packet.cut< -1)return;
@@ -88,17 +103,21 @@
     // Old direct item declarations cannot bypass the receipt owner.
     if(m.t==='take'&&m.kind==='good'&&on())return;
     if(m.t==='codone'&&on())return;
-    if(m.t==='start')reset();baseHandle(m);
+    // The host re-sends a start for a few seconds after launch; only a start that
+    // can actually begin a round may clear receipts, checkouts and payments.
+    if(m.t==='start'&&!MP.started)reset();baseHandle(m);
   };
   function tick(){if(!on())return;ensure();const now=performance.now();
     window.ShopCollection?.sync?.();
     if(MP.host)for(const [id,start]of checkoutStarts){const bot=MP.bots?.find(b=>b.id===id),stun=id===MP.id?G.stunnedUntil:bot?.stunnedUntil||MP.players[id]?.stunnedUntil||0;
-      if(start.epoch!==stamp()||G.shifting||G.frozen||!registerAt(id,.3)||now<stun||!MP.roster.some(r=>r.id===id&&!r.disconnected))cancelStart(id,true);
+      if(start.epoch!==stamp()||G.shifting||G.frozen||!registerAt(id,Math.max(.3,start.lag||0))||now<stun||!MP.roster.some(r=>r.id===id&&!r.disconnected))cancelStart(id,true);
     }
     for(const [key,p]of pending){if(p.packet.epoch&&p.packet.epoch!==epoch){pending.delete(key);continue;}if(now>=p.at){baseSend(p.packet);p.at=now+700;}}
-    if(!MP.host||now-last<350)return;last=now;const chunk=C.batch(ledger,cursor);cursor=chunk.next;if(chunk.rows.length)RoomLifecycle.sendLocal({t:'goodreceipt',epoch,rows:chunk.rows});
-    if(paid.length){RoomLifecycle.sendLocal(paid[payCursor%paid.length]);payCursor++;}
-    RoomLifecycle.sendLocal({t:'goodcartstate',epoch,seq:++cartVersion,cut:ledger.receipts.length-1,lists:Object.fromEntries(MP.roster.map(r=>[r.id,(MP.cartList[r.id]||[]).slice()])),banked:Object.fromEntries(MP.roster.map(r=>[r.id,MP.banked[r.id]||0])),bonus:MP.shopBonus||{},payNo:Object.fromEntries(MP.roster.map(r=>[r.id,payNo[r.id]||0]))});
+    if(!MP.host||now-last<SLOT_MS)return;last=now;
+    const rows=dueReplays(receiptReplays,now,24);if(rows.length)RoomLifecycle.sendLocal({t:'goodreceipt',epoch,rows});
+    for(const packet of dueReplays(paymentReplays,now,4))RoomLifecycle.sendLocal(packet);
+    const snapshot={cut:ledger.receipts.length-1,lists:Object.fromEntries(MP.roster.map(r=>[r.id,(MP.cartList[r.id]||[]).slice()])),banked:Object.fromEntries(MP.roster.map(r=>[r.id,MP.banked[r.id]||0])),bonus:MP.shopBonus||{},payNo:Object.fromEntries(MP.roster.map(r=>[r.id,payNo[r.id]||0]))},sig=JSON.stringify(snapshot);
+    if(sig!==cartSig||now-cartSentAt>=HEARTBEAT_MS){cartSig=sig;cartSentAt=now;RoomLifecycle.sendLocal({t:'goodcartstate',epoch,seq:++cartVersion,...snapshot});}
   }
   const frame=mpFrame;mpFrame=function(dt){frame(dt);tick();};
   const leave=mpLeave;mpLeave=function(){reset();leave();};

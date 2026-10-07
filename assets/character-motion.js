@@ -36,12 +36,32 @@
     if(authored)weapon.rotation.set(.25+2*reach,kind==='wood_sword'?Math.PI/2:kind==='pan'?Math.PI:0,0);
     else weapon.rotation.set(.25 + 1.35 * reach, .16 * reach, .2 - .38 * reach);
   }
+  // armR.localToWorld only needs the model-to-arm chain; refreshing the whole
+  // character tree (every mesh of every worn item) for one hand grip is waste.
+  const limbChain = [];
+  function syncLimbWorld(model, limb) {
+    limbChain.length = 0;
+    let node = limb;
+    while (node && node !== model) { limbChain.push(node); node = node.parent; }
+    if (!node) { model.updateMatrixWorld(true); return; }
+    limbChain.push(model);
+    for (let i = limbChain.length - 1; i >= 0; i--) {
+      const part = limbChain[i];
+      if (part.matrixAutoUpdate) part.updateMatrix();
+      if (part.matrixWorldAutoUpdate !== false) {
+        if (part.parent === null) part.matrixWorld.copy(part.matrix);
+        else part.matrixWorld.multiplyMatrices(part.parent.matrixWorld, part.matrix);
+      }
+      part.matrixWorldNeedsUpdate = false;
+    }
+    limbChain.length = 0;
+  }
   function worldWeaponPose(weapon, model, progress, firstPerson = false) {
     if (!weapon || !model) return;
     weaponPose(weapon, progress);
     if(!firstPerson&&model.userData.armR){
       // +Z 為正面，人物自己的右側是 -X；握柄固定在真正的右手。
-      model.updateMatrixWorld(true);
+      syncLimbWorld(model, model.userData.armR);
       weapon.position.set(0,-.36,.045);
       model.userData.armR.localToWorld(weapon.position);
     }else weapon.position.applyQuaternion(model.quaternion).add(model.position);
@@ -87,15 +107,23 @@
       data.head.rotation.y = Math.sin((Number.isFinite(time) ? time : 0) * .72) * .055 * (1 - stride) * (1 - strike);
       data.head.rotation.x = -.035 * stride + .045 * strike;
     }
+    // A hidden weapon or reaching hand is posed again on the frame it becomes
+    // visible, so idle frames skip the pose and the matrix refresh entirely.
     if (state.weapon) {
-      state.weapon.visible = state.action === 'attack';
-      if (state.weaponWorld) worldWeaponPose(state.weapon, model, state.progress, firstPerson);
-      else weaponPose(state.weapon, state.progress);
+      const swinging = state.action === 'attack';
+      state.weapon.visible = swinging;
+      if (swinging) {
+        if (state.weaponWorld) worldWeaponPose(state.weapon, model, state.progress, firstPerson);
+        else weaponPose(state.weapon, state.progress);
+      }
     }
     if (state.grabHand) {
-      state.grabHand.visible = state.action === 'grab' && firstPerson;
-      worldWeaponPose(state.grabHand, model, state.progress);
-      state.grabHand.position.y += .26;
+      const reaching = state.action === 'grab' && firstPerson;
+      state.grabHand.visible = reaching;
+      if (reaching) {
+        worldWeaponPose(state.grabHand, model, state.progress);
+        state.grabHand.position.y += .26;
+      }
     }
     return state;
   }

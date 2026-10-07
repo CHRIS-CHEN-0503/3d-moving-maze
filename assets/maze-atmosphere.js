@@ -344,6 +344,8 @@
         for (const entry of walls.get(inst)) { entry.mesh.setMatrixAt(entry.index, matrix); entry.mesh.instanceMatrix.needsUpdate = true; }
         walls.delete(inst); return true;
       },
+      // Leave the scene now; the caller frees GPU resources after the replacement has drawn.
+      detach() { wallRoot.parent?.remove(wallRoot); floorRoot.parent?.remove(floorRoot); },
       dispose() {
         if (disposed) return; disposed = true;
         wallRoot.parent?.remove(wallRoot); floorRoot.parent?.remove(floorRoot);

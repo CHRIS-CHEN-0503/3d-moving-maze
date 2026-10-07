@@ -64,11 +64,13 @@
   }
   function create(ctx){
     const P=root.TowerPartyCore,X=root.TowerExpedition,T=ctx.THREE,V=root.TowerCharacters,H=root.TowerHeroes;
-    const modern=()=>!!r()?.party?.loadouts,records=()=>modern()?H.followerRecords(r()):r().party.members;
+    // The follower list is built once per frame (and again after each state transaction), not once per monster and companion.
+    const modern=()=>!!r()?.party?.loadouts,records=()=>{const run=r();if(!recordsOf||recordsOf.run!==run)recordsOf={run,list:modern()?H.followerRecords(run):run.party.members};return recordsOf.list;};
     const heroes=root.TowerHeroesRuntime?.create({...ctx,actors:()=>actors,safeCamp,assemble,robotService:()=>{const service=root.TowerEncounters.serviceContext(r(),'tieLing');return service&&workshopSafe(service)?{service}:{safe:safeCamp()};},syncActors,hit:applyHit,portrait,walkClear:(a,b)=>walkClear(a,b)});
-    let actors=[],queue=[],queueClock=0,stations=[],near=null,offer=null,group=null,pulse=0,uiClock=0,skillLeft=0,guardVoiceLeft=0,worldFloor=null,worldSeed=null,working=null,pendingForge=null,pendingDismantle=null,pendingRepair=null,pendingAffix=null,forgeSelected=null,forgeService,forgePage='list';
+    let actors=[],queue=[],queueClock=0,stations=[],near=null,offer=null,group=null,pulse=0,uiClock=0,ailmentLeft=0,recordsOf=null,skillLeft=0,guardVoiceLeft=0,worldFloor=null,worldSeed=null,working=null,pendingForge=null,pendingDismantle=null,pendingRepair=null,pendingAffix=null,forgeSelected=null,forgeService,forgePage='list';
     const r=()=>ctx.run(), enabled=()=>!!r()?.party, live=()=>enabled()&&(modern()||!ctx.inDungeon())&&worldFloor===r().floor&&worldSeed===r().seed;
     const esc=ctx.text,act=ctx.action;
+    const dressActor=a=>root.TowerHeroVisuals.dress(T,a.model,H.equipment(r(),a.id),ctx.dispose,{showHelmet:H.actor(r(),a.id).showHelmet});
     const distance=p=>Math.hypot(ctx.G.px-p.x,ctx.G.pz-p.z);
     const clear=p=>ctx.clear(ctx.G.px,ctx.G.pz,p.x,p.z);
     const QUEUE_GAP=1.8,BODY_GAP=1.15;
@@ -158,6 +160,8 @@
       for(const s of [-1,1])ball(body,.08,0x223549,s*.2,0,.43);
       model.userData.body=body;model.userData.ring=ring(model,.92,0xe28476);model.userData.ring.material.transparent=true;model.userData.tag=label(model,def.name+' · '+strength+'/5');return model;
     }
+    // Boss mechanisms are looked up once at build time instead of searching their children every frame.
+    function bossParts(model){const seal=model.children.find(x=>x.name==='seal'),sealMaterials=[];seal?.traverse(o=>{if(o.isMesh)sealMaterials.push(o.material);});return {seal,sealMaterials,arms:model.children.filter(x=>x.name==='boss-arm'),warning:model.children.find(x=>x.name==='boss-warning'),water:model.children.find(x=>x.name==='boss-water'),color:null};}
     function stationModel(kind,index){const model=new T.Group();
       if(kind==='camp'){part(model,new T.CylinderGeometry(.6,.8,.16,8),0x657785,0,.08,0);for(let i=0;i<3;i++){const log=box(model,.9,.12,.12,0xc3a27b,0,.2,0);log.rotation.y=i*2;}const pot=part(model,new T.SphereGeometry(.44,10,7,0,Math.PI*2,0,Math.PI/2),0x859da8,0,.65,0);pot.rotation.z=Math.PI;label(model,'旅人營地',1.7);return model;}
       const d=X.BOSSES[r().floor],type=d.kind;
@@ -241,7 +245,7 @@
       view.done=done;view.pending.visible=!done;view.resolved.visible=done;view.marker.material.color.setHex(done?0x79bba0:P.PROFESSIONS[view.job].color);view.marker.material.opacity=done?.35:1;
     }
     function refreshSiteVisuals(){if(!live())return;const done=!!r().party.journey.site.done;for(const s of stations)if(s.kind==='site')setSiteVisual(s.model,done);}
-    function reset(){heroes?.reset();actors=[];queue=[];queueClock=0;stations=[];near=null;offer=null;group=null;pulse=0;skillLeft=0;guardVoiceLeft=0;worldFloor=null;worldSeed=null;working=null;pendingForge=pendingDismantle=pendingRepair=pendingAffix=null;forgeService=undefined;forgePage='list';workHud();}
+    function reset(){heroes?.reset();actors=[];queue=[];queueClock=0;stations=[];near=null;offer=null;group=null;pulse=0;ailmentLeft=0;recordsOf=null;skillLeft=0;guardVoiceLeft=0;worldFloor=null;worldSeed=null;working=null;pendingForge=pendingDismantle=pendingRepair=pendingAffix=null;forgeService=undefined;forgePage='list';workHud();}
     function recruitAvailable(candidate){
       const party=r()?.party;
       return !!candidate&&!!party&&(candidate.returning||!party.joined.includes(candidate.id))&&!party.members.some(m=>m.id===candidate.id||m.profession===candidate.profession);
@@ -264,8 +268,9 @@
       for(const old of stale)if(old.parent){old.parent.remove(old);ctx.dispose(old);}
       reset();worldFloor=r()?.floor;worldSeed=r()?.seed;if(!live())return;group=new T.Group();group.name='tower-party-scene';ctx.world().add(group);if(ctx.inDungeon()){syncActors();return;}
       const p=ctx.cell(0,0),camp={...p,kind:'camp',model:stationModel('camp')};camp.model.position.set(p.x,0,p.z);group.add(camp.model);stations.push(camp);
-      offer=P.recruitOffer(r());if(recruitAvailable(offer)){const p=ctx.chooseCell(random,used),model=memberModel(offer.profession,offer.level,offer.id,offer.sex);if(modern())root.TowerHeroVisuals.dress(T,model,H.preview(r(),offer).equipment,ctx.dispose);model.position.set(p.x,0,p.z);label(model,P.person(offer.profession,offer.sex)+' · '+P.PROFESSIONS[offer.profession].name);group.add(model);stations.push({...p,kind:'recruit',offer,model});}
-      if(r().party.boss)for(let index=0;index<r().party.boss.seals.length;index++){const p=ctx.chooseCell(random,used,4),model=stationModel('boss',index);model.position.set(p.x,0,p.z);group.add(model);stations.push({...p,kind:'boss',index,model});}
+      // The recruit's cell stays reserved after they join, keeping later stations in place.
+      offer=P.recruitOffer(r());const recruitPoint=offer?ctx.chooseCell(random,used):null;if(recruitAvailable(offer)){const p=recruitPoint,model=memberModel(offer.profession,offer.level,offer.id,offer.sex);if(modern())root.TowerHeroVisuals.dress(T,model,H.preview(r(),offer).equipment,ctx.dispose);model.position.set(p.x,0,p.z);label(model,P.person(offer.profession,offer.sex)+' · '+P.PROFESSIONS[offer.profession].name);group.add(model);stations.push({...p,kind:'recruit',offer,model});}
+      if(r().party.boss)for(let index=0;index<r().party.boss.seals.length;index++){const p=ctx.chooseCell(random,used,4),model=stationModel('boss',index);model.position.set(p.x,0,p.z);group.add(model);stations.push({...p,kind:'boss',index,model,parts:bossParts(model)});}
       const site=X.siteOffer(r());if(site){let p=ctx.chooseCell(random,used);if(['swordsman','scout'].includes(site.job)&&ctx.passage)for(let i=0;i<8&&!ctx.passage(p,true);i++)p=ctx.chooseCell(random,used);const model=siteModel(site.job);model.position.set(p.x,0,p.z);group.add(model);const station={...p,kind:'site',offer:site,model};stations.push(station);if(r().party.journey.site.done&&['swordsman','scout'].includes(site.job))ctx.passage?.(station);}
       syncActors();refreshMonsters();
     }
@@ -279,12 +284,18 @@
       }
       return origin;
     }
-    function syncActors(){if(!live()||!group)return;pruneRecruits();for(const a of actors)if(!records().some(m=>m.id===a.id)){group.remove(a.model);ctx.dispose(a.model);}actors=actors.filter(a=>records().some(m=>m.id===a.id));
-      for(const m of records())if(!actors.some(a=>a.id===m.id)){const model=memberModel(m.profession,m.level,m.id,m.sex||P.sex(r(),m.id)),p=companionSpawn();model.position.set(p.x,0,p.z);model.userData.companionId=m.id;label(model,P.PROFESSIONS[m.profession].name+' · '+(m.id==='hero'?(r().name||'主角'):P.person(m.profession,m.sex)));healthBar(model,0x8cd2bd,2.35);group.add(model);actors.push({id:m.id,model,path:[],pathLeft:0});}
-      if(modern())for(const a of actors)root.TowerHeroVisuals.dress(T,a.model,H.equipment(r(),a.id),ctx.dispose,{showHelmet:H.actor(r(),a.id).showHelmet});
+    // Re-place every follower beside the player after a teleport (rift return):
+    // building the floor spawned them at the entrance, a whole maze away.
+    function regroup(){if(!live())return;const placed=[];for(const a of actors){const p=companionSpawn({x:ctx.G.px,z:ctx.G.pz},placed,placed.length);a.model.position.set(p.x,0,p.z);a.path=[];a.pathLeft=0;placed.push(a);}queueClock=0;}
+    function syncActors(){if(!live()||!group)return;pruneRecruits();recordsOf=null;const list=records(),known=new Set(list.map(m=>m.id));for(const a of actors)if(!known.has(a.id)){group.remove(a.model);ctx.dispose(a.model);}actors=actors.filter(a=>known.has(a.id));
+      for(const m of list)if(!actors.some(a=>a.id===m.id)){const model=memberModel(m.profession,m.level,m.id,m.sex||P.sex(r(),m.id)),p=companionSpawn();model.position.set(p.x,0,p.z);model.userData.companionId=m.id;label(model,P.PROFESSIONS[m.profession].name+' · '+(m.id==='hero'?(r().name||'主角'):P.person(m.profession,m.sex)));healthBar(model,0x8cd2bd,2.35);group.add(model);actors.push({id:m.id,model,path:[],pathLeft:0});}
+      if(modern())for(const a of actors)dressActor(a);
       queue=queue.filter(a=>actors.includes(a));for(const a of actors)if(!queue.includes(a))queue.push(a);queueClock=0;
     }
     function refreshMonsters(){const specs=P.monsterSpecs(r());for(const m of ctx.monsters()){if(!m.model.userData.partyHp)healthBar(m.model,0xef9e81,m.lord?2.75:2.15);m.partyMaxHp=specs.find(s=>s.id===m.id)?.maxHp||m.maxHp||1;}}
+    const wingsOf=model=>{const data=model.userData;if(data.partyWings)return data.partyWings;const wings=(data.body?.children||[]).filter(x=>x.name==='party-wing');if(data.body)data.partyWings=wings;return wings;};
+    // Visible monsters within `range` of a point, nearest first (each distance is measured once).
+    function enemiesAround(at,range){const sight=root.MazeSight?.active(),found=[];for(const e of ctx.monsters()){if(!e.alive)continue;const p=e.model.position,gap=Math.hypot(p.x-at.x,p.z-at.z);if(gap<range&&ctx.clear(at.x,at.z,p.x,p.z)&&(!sight||root.MazeSight.visible(p.x,p.z)))found.push({e,gap});}return found.sort((x,y)=>x.gap-y.gap).map(v=>v.e);}
     const peaceful=()=>!ctx.monsters().some(m=>m.alive&&distance(m.model.position)<4&&clear(m.model.position));
     function safeCamp(){return live()&&stations.some(s=>s.kind==='camp'&&distance(s)<2.8&&clear(s))&&peaceful();}
     function workshopSafe(service=forgeService){
@@ -324,7 +335,7 @@
       const overview=merchant?[['全部修理',all,'party-mend-all-ask'],['優先修理 · 低於70%',priority,'party-mend-priority-ask'],['小耗損合批保養',maintenance,'party-mend-maintenance-ask']].map(([title,q,key])=>'<section class="camp-service-strip"><div><b>'+title+'</b><small>'+q.entries.length+' 件'+(key==='party-mend-maintenance-ask'?' · 耐久70%以上':'')+'</small></div>'+act(q.allowed?q.coins+' 幣／'+q.parts+' 零件':'無可處理裝備',key,null,!safe||!q.allowed||!q.affordable)+'</section>').join(''):'';
       const support='<div class="forge-overview forge-overview-notes" data-forge-page="'+forgePage+'">'+stockPanel(run.party.journey.materials,root.TowerMaterials?.MATERIALS||{},true)+'</div>';
       const body=help('維護與強化規則','<p>'+esc(rules)+'</p>')+'<p class="tower-resource-line forge-resources">'+(root.TowerResourceIcons?.svg('scrap')||'')+'零件 '+run.party.journey.scrap+'／99 '+(root.TowerResourceIcons?.svg('coin')||'')+'銅幣 '+run.coins+'</p><div class="forge-overview" data-forge-page="'+forgePage+'">'+overview+'</div><div class="forge-workspace" data-forge-page="'+forgePage+'">'+list+detail+'</div>'+support;
-      ctx.dialog((vendor?vendor.name+' · 專門維護':'營地工坊')+' · 暫停中',vendor?'商人維護與強化':'鍛匠工坊',!safe?merchant?'請先靠近這位商人，確認附近安全。':!P.has(run,'smith')?'隊伍沒有能行動的鍛匠。':'請先回到安全營地。':'',body,act('營地料理','party-kitchen')+act('裝備背包','bag')+act('回到迷宮','close'),{silent:quiet,workshop:true,commerce:'workshop',summary:(vendor?vendor.name+'的專門維護。':'鍛匠工坊。')+'先選裝備，再選修理、鍛造或拆解。'});
+      ctx.dialog((vendor?vendor.name+' · 專門維護':'營地工坊')+' · 暫停中',vendor?'商人維護與強化':'鍛匠工坊',!safe?merchant?'請先靠近這位商人，確認附近安全。':!P.has(run,'smith')?'隊伍沒有能行動的鍛匠。':'請先回到安全營地。':'',body,(merchant?(ctx.returnAction?.()||''):act('營地料理','party-kitchen'))+act('裝備背包','bag')+act('回到迷宮','close'),{silent:quiet,workshop:true,commerce:'workshop',summary:(vendor?vendor.name+'的專門維護。':'鍛匠工坊。')+'先選裝備，再選修理、鍛造或拆解。'});
     }
     function workMarkup(label,progress,state){return '<div class="tower-work-heading"><span data-work-name>'+esc(label)+'</span><small data-work-state>'+esc(state)+'</small></div><progress class="tower-work-track" max="100" value="'+Math.max(0,Math.min(100,progress/12*100))+'" aria-label="'+esc(label)+'進度"></progress>';}
     function workHud(){
@@ -353,7 +364,11 @@
         copy=(safeCamp()?'營地安全 · ':'需回到安全營地 · ')+(P.has(run,'chef')?'廚師已開放高階菜譜':'基本菜譜；廚師同行可開放高階料理');
         const recipes=P.availableRecipes(run),prepared=Object.keys(p.meals).filter(id=>p.meals[id]>0&&!recipes[id]&&P.recipeUnlocked(run,id)),maintenance=P.campMaintenanceQuote(run),maintenancePercent=Math.round(maintenance.ratio*100),robot=modern()?H.ids(run).find(id=>H.job(run,id)==='robot'&&H.hp(run,id)>0):null;
         const notes='<p>不同環境與怪物提供不同食材，庫存會保留；料理隨時可吃。有一料雙份被動，才可能多做一份。商人身旁不能烹飪。</p><p>保養恢復全隊穿戴中、未損壞裝備最大耐久的'+maintenancePercent+'%；每層一次，變形與讀檔不重置。完整修復、破損重建與強化：需鍛匠同行或找對應專門商人。</p>';
-        body=stockPanel(p.ingredients,P.INGREDIENTS)+'<section class="camp-service-strip"><div><b>營地保養</b><small>每層一次 · 耐久 +'+maintenancePercent+'%</small>'+(!maintenance.allowed&&!maintenance.used?'<small class="forge-trait-warning">'+esc(maintenance.reason)+'</small>':'')+'</div>'+act(maintenance.used?'本層已保養':'保養 · '+maintenance.cost+' 幣','party-repair',null,!safeCamp()||!maintenance.allowed||!maintenance.affordable)+(P.has(run,'smith')?act('鍛匠工坊','party-forge'):'')+(robot?act('製作核心','hero-core-craft',robot,!safeCamp()):'')+'</section>'+(ctx.help?.('料理與保養規則',notes)||notes)+'<div class="tower-grid">'+Object.entries(recipes).map(([id,recipe])=>mealCard(id,recipe,true)).join('')+'</div>'+(prepared.length?'<h3>已做好的料理</h3><div class="tower-grid">'+prepared.map(id=>mealCard(id,P.RECIPES[id],false)).join('')+'</div>':'');
+        body=stockPanel(p.ingredients,P.INGREDIENTS)+'<section class="camp-service-strip"><div><b>營地保養</b><small>每層一次 · 耐久 +'+maintenancePercent+'%</small>'+(!maintenance.allowed&&!maintenance.used?'<small class="forge-trait-warning">'+esc(maintenance.reason)+'</small>':'')+'</div>'+act(maintenance.used?'本層已保養':'保養 · '+maintenance.cost+' 幣','party-repair',null,!safeCamp()||!maintenance.allowed||!maintenance.affordable)+(P.has(run,'smith')?act('鍛匠工坊','party-forge'):'')+(robot?act('製作核心','hero-core-craft',robot,!safeCamp()):'')+'</section>'+(ctx.help?.('料理與保養規則',notes)||notes)+(()=>{
+          // Dishes the party can cook right now come first; the rest stay one tap away.
+          const entries=Object.entries(recipes),ready=([,recipe])=>Object.entries(recipe.cost).every(([k,v])=>p.ingredients[k]>=v),now=entries.filter(ready),later=entries.filter(entry=>!ready(entry));
+          return '<h3 class="camp-section-title">'+(safeCamp()?'現在可以做':'材料已齊')+' · '+now.length+' 道</h3><div class="tower-grid">'+(now.map(([id,recipe])=>mealCard(id,recipe,true)).join('')||'<p class="bag-empty">食材還不夠任何一道料理；展開下方查看缺少的材料。</p>')+'</div>'+(later.length?'<details class="camp-more-recipes"><summary>材料不足的料理 · '+later.length+' 道</summary><div class="tower-grid">'+later.map(([id,recipe])=>mealCard(id,recipe,true)).join('')+'</div></details>':'');
+        })()+(prepared.length?'<h3>已做好的料理</h3><div class="tower-grid">'+prepared.map(id=>mealCard(id,P.RECIPES[id],false)).join('')+'</div>':'');
       }else if(kind==='bestiary'){
         copy='點開怪物，查看前兆、應對與可能掉落。';
         const dropNotes='<p>被選為討伐候選後，普通20%（四種常用食材'+(root.TowerLoot?.chance({type:'ingredient',key:'herb',rarity:'common'})??25)+'%）、少見12%、稀有6%、珍稀3%，不是每次都會掉落；落地需靠近拾取。</p>';
@@ -371,7 +386,7 @@
       }else{
         body='<div class="tower-grid"><article class="tower-item">'+portrait(p.profession)+'<h3>'+esc(P.PROFESSIONS[p.profession].name)+' · 你</h3><p>'+esc(P.PROFESSIONS[p.profession].description)+'</p></article>'+p.members.map(m=>'<article class="tower-item">'+portrait(m.profession)+'<h3>'+esc(P.person(m.profession,P.sex(r(),m.id)))+' · '+esc(P.PROFESSIONS[m.profession].name)+'</h3><p>強度 '+m.level+'/5 · 生命 '+Math.ceil(m.hp)+'/'+P.memberMax(m)+(m.hp<=0?' · 需要料理或營地休息':'')+'</p>'+act('與他道別','party-dismiss-ask',m.id)+'</article>').join('')+'</div><p class="tower-copy">'+(p.buffs.length?p.buffs.map(b=>P.BUFFS[b.id]+'（'+b.floors+' 層）').join(' · '):'烹飪料理可獲得增益；最多同時保留兩種。')+'</p>';
       }
-      const footer=kind==='cook'?act('裝備與道具','bag')+act('回到迷宮','close'):act('隊伍','party-team')+act('料理','party-kitchen')+(P.has(run,'smith')?act('鍛匠工坊','party-forge'):'')+act('生物誌','party-bestiary')+(run.party.boss?act('本層機關說明','party-boss-help'):'')+act('裝備與道具','bag')+act('回到迷宮','close');
+      const footer=kind==='cook'?act('背包','bag')+(modern()?act('隊伍裝備','hero-panel',H.state(run).active):'')+(ctx.returnAction?.()||'')+act('回到迷宮','close'):act('隊伍','party-team')+act('料理','party-kitchen')+(P.has(run,'smith')?act('鍛匠工坊','party-forge'):'')+act('生物誌','party-bestiary')+(run.party.boss?act('本層機關說明','party-boss-help'):'')+act('裝備與道具','bag')+act('回到迷宮','close');
       ctx.dialog('高塔遠征 · 暫停中',{team:'冒險隊伍',cook:'旅人廚房',bestiary:'迷宮生物誌'}[kind],copy,body,footer,{silent:quiet,commerce:kind==='cook'?'camp':'',summary:{team:run.floor<0?'冒險隊伍。主角加四名同伴。':'冒險隊伍。主角加三名同伴。',cook:'旅人廚房。選擇烹飪，或享用料理。',bestiary:'迷宮生物誌。了解怪物，收集材料。'}[kind]});
     }
     function commit(result,speak=true){if(!ctx.transact(result))return false;if(speak&&result.message)ctx.toast(result.message,2300,result.message);return true;}
@@ -435,7 +450,8 @@
     }
     function applyHit(m,memberId=null,skillId=null,shot=false){
       if(ctx.paused()||ctx.beforeMonsterHit?.(m)===false)return;
-      if(!shot&&modern()&&heroes.preparing(memberId||H.state(r()).active))return;
+      // Only a fresh swing is refused while preparing; a skill projectile was paid for at cast time and must still land.
+      if(!shot&&!skillId&&modern()&&heroes.preparing(memberId||H.state(r()).active))return;
       const source=memberId?actors.find(a=>a.id===memberId)?.model.position:{x:ctx.G.px,z:ctx.G.pz};if(!source)return;
       const dx=source.x-m.model.position.x,dz=source.z-m.model.position.z,front=Math.cos(Math.atan2(dx,dz)-m.model.rotation.y)>.45;
       const result=P.strike(r(),m.id,{memberId,front,skillId,shot,lootCell:ctx.worldToCell(m.model.position.x,m.model.position.z)},r().revision);if(!commit(result,false))return;
@@ -460,8 +476,11 @@
       if(m.windup>0){m.windup-=dt;if(m.windup<=0){if(modern())H.setBuff(r(),a.id,'intercept',.1,1);const status=modern()?H.state(r()).enemy[m.id]:null,weak=Math.max(status?.weak||0,status?.relayWeak>0?.25:0);if(status)status.weak=0;const hit=P.hurtMember(r(),a.id,m.def.damage*(1-weak)*(root.TowerAffixes?.offense(r(),m.id,true)??1),r().revision,m.id);if(commit(hit,false)){m.cueRelease=(m.cueRelease||0)+1;ctx.audio.sfxGuardBlock?.();if(hit.effect.down)ctx.toast(hit.message,2500,hit.message);}m.cooldown=2.4;}}
       else if(m.cooldown<=0){m.windup=.9;m.windupTotal=.9;}return true;
     }
+    // The core rejects a strike from an unpowered robot or a shocked fighter;
+    // an AI swing that is certain to fail would retry (and toast) every frame.
+    function strikeReady(id){return !modern()||!((H.job(r(),id)==='robot'&&!H.ROBOT?.powered(r(),id))||root.TowerAffixes?.attackBlocked(r(),id));}
     function shift(){
-      pruneRecruits();working=null;queueClock=0;if(modern()){const seconds=H.teamPassive(r(),'intuition');if(seconds)r().effects.reveal=seconds;}heroes?.reset();workHud();if(modern())root.TowerHeroGrowth.state(r()).route=null;const placed=[];
+      pruneRecruits();working=null;queueClock=0;if(modern()){const seconds=H.teamPassive(r(),'intuition');if(seconds)r().effects.reveal=Math.max(r().effects.reveal||0,seconds);}heroes?.reset();workHud();if(modern())root.TowerHeroGrowth.state(r()).route=null;const placed=[];
       for(const a of actors){
         const c=ctx.worldToCell(a.model.position.x,a.model.position.z),centre=ctx.cell(c.x,c.y),p=companionSpawn(centre,placed,placed.length);
         a.model.position.set(p.x,0,p.z);a.path=[];a.pathLeft=0;a.safeTurn=false;a.queueLeader=null;a.assembly=null;a.retreating=false;placed.push(a);
@@ -514,19 +533,21 @@
       if(model.userData.partyOccludes!==occludes){model.userData.partyOccludes=occludes;model.traverse(o=>{if(o.isMesh&&o.material)for(const mat of Array.isArray(o.material)?o.material:[o.material]){const base=mat.userData.partyVisibility||(mat.userData.partyVisibility={transparent:mat.transparent,opacity:mat.opacity,depthWrite:mat.depthWrite});mat.transparent=occludes||base.transparent;mat.opacity=base.opacity*(occludes?.16:1);mat.depthWrite=occludes?false:base.depthWrite;}});}
       for(const key of ['partyTag','partyHp','partyHpBack'])if(model.userData[key])model.userData[key].visible=!occludes&&cameraDistance>2.8;
     }
-    function syncAilments(){if(!modern())return;const F=root.TowerAffixes;let changed=false;for(const m of ctx.monsters()){
-      if(m.alive&&r().defeatedMonsters.includes(m.id)){m.alive=false;m.model.visible=false;const drops=(r().party.loot?.entries||[]).filter(e=>e.source===m.id),at=ctx.worldToCell(m.model.position.x,m.model.position.z);for(const d of drops){d.cx=at.x;d.cy=at.y;}ctx.quest('defeat',{monsterId:m.id});ctx.monsterDefeated?.(m,{dead:true,lord:!!m.lord,drops});ctx.audio.sfxGuardDefeat?.();changed=true;}
+    // Defeats are noticed every frame; the floating status text is rebuilt a few times a second.
+    function syncAilments(dt){if(!modern())return;const F=root.TowerAffixes;let changed=false;ailmentLeft-=dt;const due=ailmentLeft<=0;if(due)ailmentLeft=.25;for(const m of ctx.monsters()){
+      let defeated=false;if(m.alive&&r().defeatedMonsters.includes(m.id)){m.alive=false;m.model.visible=false;const drops=(r().party.loot?.entries||[]).filter(e=>e.source===m.id),at=ctx.worldToCell(m.model.position.x,m.model.position.z);for(const d of drops){d.cx=at.x;d.cy=at.y;}ctx.quest('defeat',{monsterId:m.id});ctx.monsterDefeated?.(m,{dead:true,lord:!!m.lord,drops});ctx.audio.sfxGuardDefeat?.();changed=true;defeated=true;}
+      if(!due&&!defeated)continue;
       const text=m.alive?(F?.list(r(),m.id,true)||[]).map(s=>F.EFFECTS[s.id].name).join(' · '):'';if(m.model.userData.affixText!==text){const old=m.model.userData.affixTag;if(old){old.parent?.remove(old);ctx.dispose(old);}m.model.userData.affixText=text;m.model.userData.affixTag=null;if(text){const tag=ctx.makeText(text);tag.position.y=m.lord?3.05:2.48;tag.scale.set(1.35,.2,1);m.model.add(tag);m.model.userData.affixTag=tag;}}
     }if(changed){ctx.save();hud();}}
-    function tick(dt,now){if(!live()||!ctx.G.running||r().status!=='playing'||document.hidden){workHud();return;}pruneRecruits();if(ctx.G.shifting){if(working){working=null;ctx.save();}workHud();return;}if(ctx.paused()){workHud();return;}syncAilments();skillLeft=Math.max(0,skillLeft-dt);guardVoiceLeft=Math.max(0,guardVoiceLeft-dt);pulse+=dt;
-      near=stations.filter(s=>s.model.visible&&distance(s)<2.6&&clear(s)).sort((a,b)=>distance(a)-distance(b))[0]||null;
+    function tick(dt,now){if(!live()||!ctx.G.running||r().status!=='playing'||document.hidden){workHud();return;}pruneRecruits();if(ctx.G.shifting){if(working){working=null;ctx.save();}workHud();return;}if(ctx.paused()){workHud();return;}recordsOf=null;syncAilments(dt);skillLeft=Math.max(0,skillLeft-dt);guardVoiceLeft=Math.max(0,guardVoiceLeft-dt);pulse+=dt;
+      {let best=null,bestGap=Infinity;for(const s of stations){if(!s.model.visible)continue;const gap=distance(s);if(gap<2.6&&gap<bestGap&&clear(s)){best=s;bestGap=gap;}}near=best;}
       if(working){if(distance(working)>2.6||!clear(working)||ctx.hurt?.()){working=null;ctx.save();ctx.toast('先避開危險，稍後可以接著處理。',1400,false);}else{const site=r().party.journey.site;site.progress=Math.min(12,site.progress+dt);if(site.progress>=12)finishSite(working,'work');}}
       refreshSiteVisuals();workHud();
       for(const s of stations)if(s.kind==='recruit')friendlyVisibility(s.model);
       orderQueue(dt);
       let leader={x:ctx.G.px,z:ctx.G.pz},leaderId='player';
-      for(const a of queue){if(ctx.paused())return;const m=records().find(m=>m.id===a.id);if(!m)continue;friendlyVisibility(a.model);a.model.userData.partyHp.scale.x=.94*Math.max(.001,m.hp/(modern()?H.maxHp(r(),m.id):P.memberMax(m)));a.model.rotation.z=m.hp<=0?.2:0;if(m.hp<=0)continue;
-        const focus=modern()?heroes.engagement(a.id):null,localEnemies=ctx.monsters().filter(e=>e.alive&&Math.hypot(e.model.position.x-a.model.position.x,e.model.position.z-a.model.position.z)<8&&ctx.clear(a.model.position.x,a.model.position.z,e.model.position.x,e.model.position.z)&&(!root.MazeSight?.active()||root.MazeSight.visible(e.model.position.x,e.model.position.z))).sort((x,y)=>Math.hypot(x.model.position.x-a.model.position.x,x.model.position.z-a.model.position.z)-Math.hypot(y.model.position.x-a.model.position.x,y.model.position.z-a.model.position.z)),local=localEnemies[0];
+      for(const a of queue){if(ctx.paused())return;const m=records().find(m=>m.id===a.id);if(!m)continue;a.model.userData.partyHp.scale.x=.94*Math.max(.001,m.hp/(modern()?H.maxHp(r(),m.id):P.memberMax(m)));a.model.rotation.z=m.hp<=0?.2:0;if(m.hp<=0){friendlyVisibility(a.model);continue;}
+        const focus=modern()?heroes.engagement(a.id):null,localEnemies=enemiesAround(a.model.position,8),local=localEnemies[0];
         const enemy=focus&&ctx.clear(a.model.position.x,a.model.position.z,focus.model.position.x,focus.model.position.z)?focus:local,combatEnemy=focus||enemy;
         if(a.assembly){a.assembly.left-=dt;if(a.assembly.left<=0||H.actor(r(),a.id).hurt>0||a.assembly.active!==H.state(r()).active)a.assembly=null;}
         const assembling=!!a.assembly,fighting=!assembling&&!!(combatEnemy&&(focus||(modern()?root.TowerHeroGrowth.state(r()).policies[a.id].strategy!=='survive'&&H.pv(r(),'guard_instinct',a.id)>0:m.profession==='swordsman'))),target=assembling?a.assembly:fighting?combatEnemy.model.position:leader,targetId=assembling?'assembly':fighting?'enemy:'+combatEnemy.id:leaderId;
@@ -542,24 +563,24 @@
         for(const key of ['legL','legR'])if(a.model.userData[key])a.model.userData[key].rotation.x=moving?Math.sin(now*.01)*(key==='legL'?1:-1)*.35:0;
         if(a.model.userData.armR){const elapsed=(m.profession==='mage'?3:1.8)-m.cooldown;a.model.userData.armR.rotation.x=m.cooldown>0&&elapsed<.45?-Math.sin(elapsed/.45*Math.PI)*1.1:0;}
         if(!modern()&&m.profession==='healer'&&m.cooldown<=0&&r().hp<30&&r().party.ingredients.herb&&distance(a.model.position)<5){const result=ctx.core.transaction(r(),r().revision,n=>{n.party.ingredients.herb--;n.hp=Math.min(ctx.core.MAX_HP,n.hp+16);n.party.members.find(x=>x.id===m.id).cooldown=20;return {ok:true,message:'澄音用香草替你包紮了傷口。'};});commit(result);}
-        if(enemy&&m.cooldown<=0&&!(modern()&&heroes.wantsSkill(m.id))&&(modern()||['swordsman','mage','scout'].includes(m.profession))&&Math.hypot(a.model.position.x-enemy.model.position.x,a.model.position.z-enemy.model.position.z)<(modern()?H.stats(r(),m.id).reach:m.profession==='mage'?6:2.4)){
+        if(enemy&&m.cooldown<=0&&strikeReady(m.id)&&(modern()||['swordsman','mage','scout'].includes(m.profession))&&Math.hypot(a.model.position.x-enemy.model.position.x,a.model.position.z-enemy.model.position.z)<(modern()?H.stats(r(),m.id).reach:m.profession==='mage'?6:2.4)&&!(modern()&&heroes.wantsSkill(m.id,enemy))){
           a.model.rotation.y=Math.atan2(enemy.model.position.x-a.model.position.x,enemy.model.position.z-a.model.position.z);const ranged=modern()&&H.ranged(r(),m.id),result=ranged?{ok:heroes.shoot(enemy,m.id)}:applyHit(enemy,m.id);if(result?.ok&&!ranged){root.CharacterMotion?.beginAction(a.model,'attack',.5);if(modern())root.TowerCombatMotion?.begin(a.model,'attack',H.stats(r(),m.id).interval);}
         }
       }
       if(ctx.paused())return;
-      if(modern()){for(const a of actors){root.TowerHeroVisuals.dress(T,a.model,H.equipment(r(),a.id),ctx.dispose,{showHelmet:H.actor(r(),a.id).showHelmet});if(H.hp(r(),a.id)<=0){root.TowerCombatMotion?.cancel(a.model);continue;}root.TowerHeroVisuals.pose(a.model,H.actor(r(),a.id).attack,H.stats(r(),a.id).interval,false,dt);}heroes.tick(dt);}
+      if(modern()){for(const a of actors){if(H.job(r(),a.id)==='robot')dressActor(a);if(H.hp(r(),a.id)<=0){root.TowerCombatMotion?.cancel(a.model);continue;}root.TowerHeroVisuals.pose(a.model,H.actor(r(),a.id).attack,H.stats(r(),a.id).interval,false,dt);}heroes.tick(dt);}
       if(ctx.paused())return;
       for(const m of ctx.monsters()){if(!m.alive)continue;if(m.model.userData.partyHp)m.model.userData.partyHp.scale.x=.94*Math.max(.001,(r().party.health[m.id]??m.partyMaxHp)/m.partyMaxHp);
         if(ctx.camera?.()&&m.model.userData.tag)m.model.userData.tag.visible=m.model.position.distanceTo(ctx.camera().position)>3.4;
-        if(m.kind==='moth'){(m.model.userData.body?.children||[]).filter(x=>x.name==='party-wing').forEach((w,i)=>w.rotation.z=Math.sin(now*.012)*(i?1:-1)*.5);if(m.windup>0)for(const other of ctx.monsters())if(other.alive&&other!==m&&Math.hypot(other.model.position.x-m.model.position.x,other.model.position.z-m.model.position.z)<6)other.alertLeft=4;}
+        if(m.kind==='moth'){wingsOf(m.model).forEach((w,i)=>w.rotation.z=Math.sin(now*.012)*(i?1:-1)*.5);if(m.windup>0)for(const other of ctx.monsters())if(other.alive&&other!==m&&Math.hypot(other.model.position.x-m.model.position.x,other.model.position.z-m.model.position.z)<6)other.alertLeft=4;}
         if(m.kind==='mushroom'&&m.windup>0&&m.windup<=dt&&distance(m.model.position)<2.8&&clear(m.model.position)){if(modern())H.inflict(r(),H.state(r()).active,'slow',3,.6);else r().party.slowLeft=3;}
       }
-      const b=r().party.boss;if(b){const phase=P.bossPhase(r()),d=X.BOSSES[r().floor];for(const s of stations.filter(s=>s.kind==='boss')){
-        const hazard=X.danger(r(),s.index),seal=s.model.children.find(x=>x.name==='seal'),solved=b.seals[s.index],color=solved?0x83ccac:phase==='warning'?0xffc273:hazard.active?0xf28975:d.kind==='pulse'&&X.cycle(r())%3===s.index?0xffffff:d.color;
-        if(seal){seal.rotation.y=b.angles[s.index]*Math.PI/2;seal.position.y=1.2+(phase==='strike'?.16:Math.sin(pulse*2)*.06);seal.traverse(o=>{if(o.isMesh)o.material.color.setHex(color);});}
-        for(const arm of s.model.children.filter(x=>x.name==='boss-arm')){arm.scale.y=hazard.active?1:!solved&&phase==='warning'?.22+Math.sin(pulse*10)*.04:.08;const angle=arm.userData.angle;arm.position.set(Math.sin(angle)*hazard.radius*.82,0,Math.cos(angle)*hazard.radius*.82);}
-        const warning=s.model.children.find(x=>x.name==='boss-warning');warning.scale.set(hazard.radius,hazard.radius,1);warning.material.color.setHex(color);
-        const water=s.model.children.find(x=>x.name==='boss-water');if(water){water.scale.set(hazard.radius,1,hazard.radius);water.position.y=hazard.active?.5:.05;water.visible=!solved;}
+      const b=r().party.boss;if(b){const phase=P.bossPhase(r()),d=X.BOSSES[r().floor];for(const s of stations){if(s.kind!=='boss')continue;
+        const hazard=X.danger(r(),s.index),parts=s.parts,solved=b.seals[s.index],color=solved?0x83ccac:phase==='warning'?0xffc273:hazard.active?0xf28975:d.kind==='pulse'&&X.cycle(r())%3===s.index?0xffffff:d.color,recolor=parts.color!==color;parts.color=color;
+        if(parts.seal){parts.seal.rotation.y=b.angles[s.index]*Math.PI/2;parts.seal.position.y=1.2+(phase==='strike'?.16:Math.sin(pulse*2)*.06);if(recolor)for(const material of parts.sealMaterials)material.color.setHex(color);}
+        for(const arm of parts.arms){arm.scale.y=hazard.active?1:!solved&&phase==='warning'?.22+Math.sin(pulse*10)*.04:.08;const angle=arm.userData.angle;arm.position.set(Math.sin(angle)*hazard.radius*.82,0,Math.cos(angle)*hazard.radius*.82);}
+        parts.warning.scale.set(hazard.radius,hazard.radius,1);if(recolor)parts.warning.material.color.setHex(color);
+        const water=parts.water;if(water){water.scale.set(hazard.radius,1,hazard.radius);water.position.y=hazard.active?.5:.05;water.visible=!solved;}
         if(hazard.active&&distance(s)<hazard.radius&&clear(s)&&s.hitCycle!==hazard.cycle){s.hitCycle=hazard.cycle;ctx.damage(hazard.damage,'trap','機關動起來了，快退到警戒圈外！');if(ctx.paused()||r().status!=='playing')break;}
       }}
       uiClock+=dt;if(uiClock>.15){uiClock=0;hud();}
@@ -572,13 +593,13 @@ const attack=document.getElementById('towerAttackBtn');if(attack&&live()&&!ctx.i
       const talk=document.getElementById('towerTalkBtn');if(near&&live()&&talk){talk.disabled=false;talk.hidden=ctx.paused();talk.ariaLabel=near.kind==='camp'?'營地料理（R）':near.kind==='boss'?'操作機關（R）':near.kind==='site'?'探索機關（R）':'邀請同伴（R）';}
       const objective=document.getElementById('towerObjective');if(objective&&live()){
         if(working)objective.textContent=working.offer.verb+' · 進度條填滿即可完成';
-        else if(near)objective.textContent=near.kind==='camp'?'旅人營地 · 料理、鍛造與休息':near.kind==='recruit'?'旅人正在招募同行者 · 靠近對話':near.kind==='site'?near.offer.name+' · '+(r().party.journey.site.done?'已完成':'對話可選職業專長或一般處理'):X.BOSSES[r().floor].name+' · '+({idle:'對話開始；背包可讀機關說明',warning:'黃光預警，先退開！',strike:'機關啟動，避開警戒圈',rest:X.hint(r()),done:'封印已解除'}[P.bossPhase(r())]);
+        else if(near)objective.textContent=near.kind==='camp'?'旅人營地 · 料理、保養'+(P.has(r(),'smith')?'與鍛造':'')+'（R）':near.kind==='recruit'?'旅人正在招募同行者 · 靠近對話':near.kind==='site'?near.offer.name+' · '+(r().party.journey.site.done?'已完成':'對話可選職業專長或一般處理'):X.BOSSES[r().floor].name+' · '+({idle:'對話開始；背包可讀機關說明',warning:'黃光預警，先退開！',strike:'機關啟動，避開警戒圈',rest:X.hint(r()),done:'封印已解除'}[P.bossPhase(r())]);
         else if(r().party.boss&&!r().party.boss.done)objective.textContent=X.BOSSES[r().floor].name+' · 機關 '+r().party.boss.seals.filter(Boolean).length+'/'+r().party.boss.seals.length+' · 背包內有說明';
       }
     }
     function install(){heroes?.install();const left=document.getElementById('towerLeftHud');if(left&&!document.getElementById('towerWorkProgress')){const work=document.createElement('section');work.id='towerWorkProgress';work.hidden=true;work.setAttribute('aria-label','現場探索進度');work.innerHTML=workMarkup('現場探索',0,'處理中');left.appendChild(work);}const rail=document.getElementById('towerActionRail');if(!rail)return;const b=document.createElement('button');b.id='towerProfessionBtn';b.className='tower-btn';b.hidden=true;ctx.bind(b,skill);rail.prepend(b);}
     function switchControl(from,to){const target=actors.find(a=>a.id===to),old={x:ctx.G.px,z:ctx.G.pz};if(!target)return;const next={x:target.model.position.x,z:target.model.position.z};syncActors();const previous=actors.find(a=>a.id===from);if(previous)previous.model.position.set(old.x,0,old.z);ctx.G.px=next.x;ctx.G.pz=next.z;ctx.player().position.set(next.x,0,next.z);}
-    return {enabled,live,portrait,switchControl,heroes,movementLocked:()=>modern()&&!!heroes?.movementLocked(),refreshActors:syncActors,refreshMonsters,refreshWorkProgress:workHud,ingredientModel,materialModel,monsterModel,build,tick,hud,attack,skill,guard,shift,interact,handle,panel,install,reset,safeCamp,get nearby(){pruneRecruits();return live()?near:null;},reserved:()=>{pruneRecruits();return live()?stations:[];},markers:()=>{pruneRecruits();return live()?stations.filter(s=>s.model.visible).map(s=>({cx:s.cx,cy:s.cy,color:s.kind==='boss'?'#efc977':'#a0dcc2',label:s.kind==='boss'?String(s.index+1):s.kind==='camp'?'營':s.kind==='site'?'探':'友'})):[];}};
+    return {enabled,live,portrait,switchControl,heroes,movementLocked:()=>modern()&&!!heroes?.movementLocked(),refreshActors:syncActors,regroup,refreshMonsters,refreshWorkProgress:workHud,ingredientModel,materialModel,monsterModel,build,tick,hud,attack,skill,guard,shift,interact,handle,panel,install,reset,safeCamp,get nearby(){pruneRecruits();return live()?near:null;},reserved:()=>{pruneRecruits();return live()?stations:[];},markers:()=>{pruneRecruits();return live()?stations.filter(s=>s.model.visible).map(s=>({cx:s.cx,cy:s.cy,color:s.kind==='boss'?'#efc977':'#a0dcc2',label:s.kind==='boss'?String(s.index+1):s.kind==='camp'?'營':s.kind==='site'?'探':'友'})):[];}};
   }
   root.TowerPartyRuntime={create,portrait,foodArt,dishArt};
 })(typeof globalThis!=='undefined'?globalThis:this);

@@ -1,6 +1,7 @@
 /* Authored silhouettes with compact static batches; reuse the game's lights.
-   Each gear owns one optional 128px original atlas. No extra lights, post
-   effects, texture downloads or per-frame geometry allocation. */
+   Each gear owns one texture object over an optional shared 128px original atlas
+   (one image per grade and job). No extra lights, post effects, texture downloads
+   or per-frame geometry allocation. */
 (function(root){'use strict';const H=root.TowerHeroes;
   const MASTERWORK=Object.freeze({
     4:Object.freeze({metal:0xbfc5df,trim:0xe3dcec,wood:0x493953,dark:0x342b48,gem:0xc6a4f1,cloth:0x5c527f}),
@@ -20,7 +21,7 @@
   // can retire a changed fist or shell without invalidating another joint.
   function robotParts(T,sex,tier=1){
     const look={...ROBOT_LOOKS[sex==='female'?'female':'male']},master=MASTERWORK[tier];if(tier===2)look.metal=sex==='female'?0xe5dcc5:0x8b9da5;if(tier===3){look.metal=sex==='female'?0xe6e5d4:0xa3bbc5;look.trim=0xe3c18a;}if(master){look.metal=master.metal;look.trim=master.trim;}
-    const group=new T.Group(),materials=new Map();
+    const group=new T.Group(),materials=new Map();group.userData.robotPart=true;
     const mesh=(geometry,color,x=0,y=0,z=0,name='robot-plated-surface')=>{if(!materials.has(color)){const energy=color===look.core,material=new T.MeshPhongMaterial({color,emissive:energy?color:0,emissiveIntensity:energy?.74:0,specular:0x82949a,shininess:42});material.userData.surface=energy?'robot-energy':'metal';material.userData.robotEnergy=energy;materials.set(color,material);}const part=new T.Mesh(geometry,materials.get(color));part.position.set(x,y,z);part.name=name;group.add(part);return part;};
     const soft=(w,h,d,c,x=0,y=0,z=0,name)=>{const geometry=new T.SphereGeometry(1,12,8);geometry.scale(w/2,h/2,d/2);return mesh(geometry,c,x,y,z,name);};
     const bevel=(w,h,d,c,x=0,y=0,z=0,name)=>mesh(root.CharacterSculpt?root.CharacterSculpt.roundedBox(T,w,h,d):new T.SphereGeometry(.15,8,6),c,x,y,z,name);
@@ -131,13 +132,13 @@
     for(const y of [.77,.84,.91]){const r=chassis.ring(female?.2:.245,.025,c.trim,0,y);r.rotation.x=Math.PI/2;r.scale.y=.72;}
     chassis.soft(female?.48:.57,.23,.29,c.dark,0,.69,-.005,'robot-round-base-pelvis');
     const bareCore=new T.SphereGeometry(1,8,6);bareCore.scale(.083,.083,.036);chassis.mesh(bareCore,c.core,0,1.09,.224,'robot-innate-core');const bareBezel=chassis.mesh(new T.TorusGeometry(.093,.017,4,8),c.trim,0,1.09,.223,'robot-innate-core-bezel');bareBezel.scale.z=.65;
-    const body=chassis.finish();robotHalo(T,body,[[0,1.09,.272,.34]],ROBOT_CORE_COLORS[0]);m.add(body);
+    chassis.group.userData.keepShapedPart=true;const body=chassis.finish();robotHalo(T,body,[[0,1.09,.272,.34]],ROBOT_CORE_COLORS[0]);m.add(body);
     const head=new T.Group();head.position.y=female?1.60:1.655;m.add(head);
     const scalp=robotParts(T,sex),headPlate=scalp.soft(female?.53:.56,female?.58:.54,.5,c.metal,0,0,-.015,'robot-seamless-cranium');
     scalp.soft(female?.438:.46,.41,.107,c.face,0,-.025,.205,'robot-rounded-faceplate');
     scalp.scroll([[-.18,.16,-.015],[0,.25,-.02],[.18,.16,-.015]],0,.035,.183,.012);
     for(const side of [-1,1]){const ear=scalp.mesh(new T.CylinderGeometry(.13,.13,.065,12),c.trim,side*.273,0,-.025,'robot-ear-joint');ear.rotation.z=Math.PI/2;const inset=scalp.mesh(new T.CylinderGeometry(.08,.08,.071,12),c.dark,side*.273,0,-.025,'robot-ear-inset');inset.rotation.z=Math.PI/2;}
-    head.add(scalp.finish());
+    scalp.group.userData.keepShapedPart=true;head.add(scalp.finish());
     // Seat the head closer to the shoulder housing, keeping the short joint
     // overlapping both the chin and chassis instead of leaving a long stalk.
     const neck=robotParts(T,sex),neckJoint=new T.CylinderGeometry(.12,.12,.095,12);
@@ -164,14 +165,17 @@
   }
   function batchGear(T,g){
     const parts=g.children.filter(o=>o.isMesh),buckets=new Map(),kept=new Set();
-    // Keep the shaped body/cap and nocked arrow independently addressable.
-    for(const type of ['LatheGeometry','SphereGeometry']){const p=parts.find(o=>o.geometry.type===type);if(p&&!g.userData.bookSide)kept.add(p);}
+    // Keep the shaped body/cap and nocked arrow independently addressable. A robot part has nothing to
+    // address by shape: its first sphere joins the batch (colour unshaded, as before), saving a draw per
+    // group. Only the chassis and cranium stay separate, because userData.body / headMesh point at them.
+    const exact=new Set();
+    for(const type of ['LatheGeometry','SphereGeometry']){const p=parts.find(o=>o.geometry.type===type);if(p&&!g.userData.bookSide){if(g.userData.robotPart&&!g.userData.keepShapedPart)exact.add(p);else kept.add(p);}}
     for(const p of parts)if(p.name==='bow-nocked-arrow')kept.add(p);
     for(const p of parts){if(kept.has(p))continue;const key=(p.material.userData.surface||'fabric')+'-'+p.material.side;if(!buckets.has(key))buckets.set(key,[]);buckets.get(key).push(p);}
     const retiredGeometry=new Set(),retiredMaterial=new Set();g.userData.authoredParts=parts.map(p=>p.name).filter(Boolean);g.userData.sourceParts=parts.length;
     for(const [surface,list]of buckets){if(list.length<2)continue;const position=[],normal=[],color=[],uv=[];
       for(const p of list){p.updateMatrix();const geo=p.geometry.index?p.geometry.toNonIndexed():p.geometry.clone();geo.applyMatrix4(p.matrix);const xyz=geo.attributes.position,norm=geo.attributes.normal,c=p.material.color;
-        for(let i=0;i<xyz.count;i++){position.push(xyz.getX(i),xyz.getY(i),xyz.getZ(i));normal.push(norm.getX(i),norm.getY(i),norm.getZ(i));uv.push(geo.attributes.uv?.getX(i)||0,geo.attributes.uv?.getY(i)||0);const energy=p.material.userData.robotEnergy,shade=.96+.04*Math.max(-1,Math.min(1,norm.getY(i)));color.push(energy?1:c.r*shade,energy?1:c.g*shade,energy?1:c.b*shade);}
+        for(let i=0;i<xyz.count;i++){position.push(xyz.getX(i),xyz.getY(i),xyz.getZ(i));normal.push(norm.getX(i),norm.getY(i),norm.getZ(i));uv.push(geo.attributes.uv?.getX(i)||0,geo.attributes.uv?.getY(i)||0);const energy=p.material.userData.robotEnergy,shade=exact.has(p)?1:.96+.04*Math.max(-1,Math.min(1,norm.getY(i)));color.push(energy?1:c.r*shade,energy?1:c.g*shade,energy?1:c.b*shade);}
         geo.dispose();g.remove(p);retiredGeometry.add(p.geometry);retiredMaterial.add(p.material);
       }
       const geo=new T.BufferGeometry();geo.setAttribute('position',new T.Float32BufferAttribute(position,3));geo.setAttribute('normal',new T.Float32BufferAttribute(normal,3));geo.setAttribute('color',new T.Float32BufferAttribute(color,3));geo.setAttribute('uv',new T.Float32BufferAttribute(uv,2));geo.computeBoundingSphere();
@@ -549,7 +553,25 @@
     head.add(piece);
   }
   function poseRobotLegArmor(model){if(model.userData.heroJob!=='robot')return;for(const shell of model.userData.heroPieces||[])if(shell.userData.baseKind==='robot_shell')for(const plate of shell.children){const joint=model.userData[plate.userData.robotJoint];if(joint){plate.position.copy(joint.position);plate.quaternion.copy(joint.quaternion);plate.scale.copy(joint.scale);}}}
-  function dress(T,model,equipment,dispose,{showHelmet=true}={}){const appearance={job:model.userData.heroJob,sex:model.userData.heroSex},info=appearance.job==='robot'?robotLight(equipment):null;equipment=Object.fromEntries(Object.entries(equipment).filter(([slot,g])=>!['core1','core2'].includes(slot)&&g?.slot!=='core').map(([slot,g])=>[slot,g?.durability===0?null:g]));const geometrySignature=(appearance.job||'')+'|'+(appearance.sex||'male')+'|'+showHelmet+'|'+Object.values(equipment).map(g=>g?.kind||'-').join('|'),signature=geometrySignature+(info?'|core:'+info.tier:'');if(model.userData.heroDress===signature)return;if(model.userData.heroDressGeometry===geometrySignature){if(info)colorRobotEnergy(model,info);model.userData.heroDress=signature;return;}
+  // dress() runs for every actor on every frame. Equipment rarely changes, so first compare the
+  // inputs of the signature slot by slot against a remembered copy, without building any string.
+  const wornSlot=(slot,g)=>slot==='core1'||slot==='core2'||g?.slot==='core'?null:g&&g.durability!==0?g.kind||'-':'-';
+  function unchangedDress(data,equipment,showHelmet){
+    const fast=data.heroDressFast;
+    if(!fast||fast.signature!==data.heroDress||fast.showHelmet!==showHelmet||fast.job!==data.heroJob||fast.sex!==data.heroSex)return false;
+    let n=0;
+    for(const slot in equipment){const token=wornSlot(slot,equipment[slot]);if(token===null)continue;if(fast.tokens[n++]!==token)return false;}
+    if(n!==fast.tokens.length)return false;
+    if(fast.job==='robot'){const a=equipment.core1,b=equipment.core2;if(a?.kind!==fast.cores[0]||(a?.durability>0)!==fast.cores[1]||b?.kind!==fast.cores[2]||(b?.durability>0)!==fast.cores[3])return false;}
+    return true;
+  }
+  function rememberDress(data,equipment,showHelmet,signature){
+    const fast=data.heroDressFast||(data.heroDressFast={tokens:[],cores:[],signature:'',showHelmet:true,job:null,sex:null});
+    fast.signature=signature;fast.showHelmet=showHelmet;fast.job=data.heroJob;fast.sex=data.heroSex;fast.tokens.length=0;
+    for(const slot in equipment){const token=wornSlot(slot,equipment[slot]);if(token!==null)fast.tokens.push(token);}
+    fast.cores[0]=equipment.core1?.kind;fast.cores[1]=equipment.core1?.durability>0;fast.cores[2]=equipment.core2?.kind;fast.cores[3]=equipment.core2?.durability>0;
+  }
+  function dress(T,model,equipment,dispose,{showHelmet=true}={}){if(equipment&&unchangedDress(model.userData,equipment,showHelmet))return;const worn=equipment,appearance={job:model.userData.heroJob,sex:model.userData.heroSex},info=appearance.job==='robot'?robotLight(equipment):null;equipment=Object.fromEntries(Object.entries(equipment).filter(([slot,g])=>!['core1','core2'].includes(slot)&&g?.slot!=='core').map(([slot,g])=>[slot,g?.durability===0?null:g]));const geometrySignature=(appearance.job||'')+'|'+(appearance.sex||'male')+'|'+showHelmet+'|'+Object.values(equipment).map(g=>g?.kind||'-').join('|'),signature=geometrySignature+(info?'|core:'+info.tier:'');if(model.userData.heroDress===signature){rememberDress(model.userData,worn,showHelmet,signature);return;}if(model.userData.heroDressGeometry===geometrySignature){if(info)colorRobotEnergy(model,info);model.userData.heroDress=signature;rememberDress(model.userData,worn,showHelmet,signature);return;}
     for(const p of model.userData.heroPieces||[]){p.parent?.remove(p);dispose(p);}const pieces=[];
     if(model.userData.knightSculpt)swordSupportRig(T,model,H.GEAR[equipment.weapon?.kind]?.baseKind==='greatsword');
     for(const item of Object.values(equipment).filter(g=>g&&(g.slot!=='helmet'||showHelmet))){const piece=gear(T,item.kind,appearance),slot=item.slot;pieces.push(piece);
@@ -566,7 +588,7 @@
     // Equipment owns the torso/waist silhouette; old uniform trim must never
     // protrude from a slimmer robe or female armor. Broken/removed armor restores it.
     for(const p of model.userData.baseClothing||[])p.visible=!equipment.armor;
-    Object.assign(model.userData,{heroDress:signature,heroDressGeometry:geometrySignature,heroPieces:pieces,heroWeapon:H.GEAR[equipment.weapon?.kind]?.baseKind,heroWeaponKind:equipment.weapon?.kind,hasWeapon:!!equipment.weapon,hasShield:!!equipment.shield});
+    rememberDress(model.userData,worn,showHelmet,signature);Object.assign(model.userData,{heroDress:signature,heroDressGeometry:geometrySignature,heroPieces:pieces,heroWeapon:H.GEAR[equipment.weapon?.kind]?.baseKind,heroWeaponKind:equipment.weapon?.kind,hasWeapon:!!equipment.weapon,hasShield:!!equipment.shield});
     if(appearance.job==='robot'){model.userData.heroWeapon='robot_fists';model.userData.hasShield=false;for(const side of ['armR','armL'])if(model.userData[side+'BareFist'])model.userData[side+'BareFist'].visible=!equipment.weapon;poseRobotLegArmor(model);colorRobotEnergy(model,info);}
     if(['spellbook','twin_daggers'].includes(model.userData.heroWeapon))pose(model,0,1,false,0);
   }

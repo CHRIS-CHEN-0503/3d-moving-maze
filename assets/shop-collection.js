@@ -1,6 +1,7 @@
 (function(){
   'use strict';
-  let mission=null,signature='',priorityCursor=0,revision=0,lastSync=0,pendingChoice=null,layoutPending=false;
+  let mission=null,signature='',priorityCursor=0,revision=0,lastSync=0,lastSent=0,lastSig='',pendingChoice=null,layoutPending=false;
+  const HEARTBEAT_MS=1500;
   function layout(){
     const screen=$('gameScreen'),hud=$('hudTop'),panel=$('shopMission');if(!isShop()||!MP.started||!screen.classList.contains('active'))return;
     const origin=screen.getBoundingClientRect().top,top=Math.ceil(hud.getBoundingClientRect().bottom-origin)+6,missionHeight=panel.hidden?0:panel.getBoundingClientRect().height;
@@ -8,7 +9,7 @@
     for(const [property,value]of Object.entries(values))if(screen.style.getPropertyValue(property)!==value)screen.style.setProperty(property,value);
   }
   function scheduleLayout(){if(layoutPending)return;layoutPending=true;const run=()=>{layoutPending=false;layout();};if(typeof requestAnimationFrame==='function')requestAnimationFrame(run);else run();}
-  function reset(){mission=null;signature='';priorityCursor=revision=lastSync=0;pendingChoice=null;$('shopMission').hidden=true;MP.shopBonus={};}
+  function reset(){mission=null;signature='';priorityCursor=revision=lastSync=lastSent=0;lastSig='';pendingChoice=null;$('shopMission').hidden=true;MP.shopBonus={};}
   function start(){reset();if(!isShop())return;mission=ShopCollectionCore.create(MP.seed,GOODS.length,matchRules().shopCollect!==0);}
   function progress(id){return mission?ShopCollectionCore.progress(mission,id):{paid:[],awarded:false};}
   function checkout(id,list){
@@ -27,7 +28,10 @@
   function sync(){
     if(!mission||!isShop()||!MP.started||MP.ended)return;const now=performance.now();
     if(pendingChoice&&now>=pendingChoice.at){mpSend({t:'orderrequest',index:pendingChoice.index,seed:MP.seed});pendingChoice.at=now+700;}
-    if(MP.host&&now-lastSync>=500){lastSync=now;RoomLifecycle.sendLocal({t:'orderstate',seed:MP.seed,revision,players:mission.players,bonus:MP.shopBonus});}
+    // The order board is sent when it changed (checked every 500 ms) and otherwise only as a heartbeat.
+    if(MP.host&&now-lastSync>=500){lastSync=now;const sig=JSON.stringify([revision,mission.players,MP.shopBonus]);
+      if(sig!==lastSig||now-lastSent>=HEARTBEAT_MS){lastSig=sig;lastSent=now;RoomLifecycle.sendLocal({t:'orderstate',seed:MP.seed,revision,players:mission.players,bonus:MP.shopBonus});}
+    }
   }
   function draw(){
     for(const canvas of $('shopMissionItems').querySelectorAll('canvas')){
@@ -66,10 +70,12 @@
       if(MP.host||!mission||m.f!==MP.roster[0]?.id||m.sr!==MP.seriesRound||m.seed!==MP.seed||!Number.isSafeInteger(m.revision)||m.revision<revision||!m.players||Object.keys(m.players).some(actor=>!MP.roster.some(r=>r.id===actor)))return;
       const validList=a=>Array.isArray(a)&&a.length<=5&&a.every(i=>Number.isInteger(i)&&!!GOODS[i]);
       if(Object.values(m.players).some(p=>!validList(p.paid)||!validList(p.orderPaid)||!Number.isSafeInteger(p.orders)||p.orders<0||p.orders>3||(p.order&&(!validList(p.order.targets)||![80,150].includes(p.order.bonus)||p.order.number!==p.orders+1))))return;
-      revision=m.revision;mission.players=JSON.parse(JSON.stringify(m.players));
+      // Heartbeats repeat the same board: only a newer revision or different content repaints the panel.
+      const incoming=JSON.stringify(m.players),changed=m.revision>revision||incoming!==JSON.stringify(mission.players);
+      revision=m.revision;if(changed)mission.players=JSON.parse(incoming);
       for(const actor of MP.roster.map(r=>r.id))MP.shopBonus[actor]=Math.max(0,Math.min(750,Number(m.bonus?.[actor])||0));
       if(progress(MP.id).order||!ShopCollectionCore.offers(mission,MP.id).length)pendingChoice=null;
-      signature='';render();return;
+      if(changed){signature='';render();}return;
     }
     handle(m);
   };

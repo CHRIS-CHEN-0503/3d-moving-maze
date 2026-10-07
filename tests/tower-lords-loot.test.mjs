@@ -69,7 +69,7 @@ test('every lord has three distinct recorded lines, no missing audio and no auto
   assert.equal(Object.keys(B.tracks).length,30);const voice=require('../assets/voice-pack.js');for(const [id,track]of Object.entries(B.tracks)){assert.equal(track.category,'character-bark');assert.ok(track.text);assert.ok(statSync(new URL('../'+track.src,import.meta.url)).size>3000,id);assert.equal(voice.tracks[id].text,track.text);}assert.equal(new Set(Object.values(B.tracks).map(t=>t.text)).size,30);
 });
 test('long character and lord names fit the original nameplate texture instead of clipping',()=>{
-  const source=readFileSync(new URL('../index.html',import.meta.url),'utf8'),start=source.indexOf('function makeTextSprite(text)'),end=source.indexOf('\n}',start)+2;
+  const source=readFileSync(new URL('../index.html',import.meta.url),'utf8'),start=source.indexOf('function makeTextSprite(text'),end=source.indexOf('\n}',start)+2;
   let font='',paint=[];const ctx={set font(v){font=v;},get font(){return font;},measureText(text){return {width:text.length*parseInt(font.slice(5))};},strokeText(...args){paint.push(args);},fillText(...args){paint.push(args);}};
   const e=vm.createContext({THREE:T,document:{createElement:()=>({getContext:()=>ctx})}});vm.runInContext(source.slice(start,end),e);for(const name of ['劍士',...Object.values(B.LORDS).map(d=>d.name+' · '+d.strength+'/5')]){paint=[];vm.runInContext('makeTextSprite('+JSON.stringify(name)+')',e);assert.equal(paint.length,2);assert.equal(paint[0][0],name);assert.equal(paint[0][3],240);assert.ok(ctx.measureText(name).width<=240||parseInt(font.slice(5))===14);}
 });

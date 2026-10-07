@@ -22,22 +22,26 @@
   const DEFINITIONS=freeze(definitions),byId=Object.freeze(Object.assign(Object.create(null),Object.fromEntries(DEFINITIONS.map(d=>[d.id,d])))),point=p=>p&&Number.isFinite(p.x)&&Number.isFinite(p.z)&&Math.abs(p.x)<=1000&&Math.abs(p.z)<=1000;
   const distance=(a,b)=>Math.hypot(a.x-b.x,a.z-b.z),fail=message=>({ok:false,message});
   function line(space,a,b){if(!point(a)||!point(b)||typeof space.clear!=='function')return false;try{return space.clear(a,b)===true;}catch{return false;}}
+  // One evaluate/available/hints call shares its monster id set and the unobstructed-line answers
+  // (keyed by the two point objects), instead of recomputing them for each of the eleven definitions.
+  function share(run){let specIds=null;const seen=new Map();return {specIds:()=>specIds||(specIds=new Set(rootSpecs(run))),line(space,a,b){if(!point(a)||!point(b)||typeof space.clear!=='function')return false;let row=seen.get(a);if(!row)seen.set(a,row=new Map());if(!row.has(b)){let ok=false;try{ok=space.clear(a,b)===true;}catch{}row.set(b,ok);}return row.get(b);}};}
   const repairable=(run,id)=>Object.values(H().equipment(run,id)||{}).some(g=>g&&!H().ROBOT.isCore(g)&&g.durability>0&&g.durability<g.maxDurability);
   function validTarget(run,d,id,nearby,members){const h=H();return d.participants.every((p,i)=>{const kind=h.SKILLS[p.skill].effect;if(kind==='heal')return h.organicHealable(run,id)&&h.hp(run,id)<h.maxHp(run,id);if(kind==='repair')return repairable(run,id);if(kind==='polish')return !!h.stats(run,id).weapon;if(kind==='robot_restore')return h.hp(run,members[i])<h.maxHp(run,members[i]);if(kind==='soup'||kind==='sanctuary')return nearby.some(other=>h.organicHealable(run,other)&&h.hp(run,other)<h.maxHp(run,other));return true;});}
-  function evaluate(run,key,space={}){
-    const h=H(),d=byId[key];if(!d||!h.enabled(run)||run.status!=='playing'||space.ready!==true)return fail('現在無法發動合作技能。');
+  const evaluate=(run,key,space={})=>evaluateWith(run,key,space,share(run));
+  function evaluateWith(run,key,space,shared){
+    const look=(a,b)=>shared.line(space,a,b),h=H(),d=byId[key];if(!d||!h.enabled(run)||run.status!=='playing'||space.ready!==true)return fail('現在無法發動合作技能。');
     if(d.underground&&!C().isUnderworld(run))return fail('這項合作技在地下篇開放。');
     const positions=space.positions||{},active=h.state(run).active,origin=positions[active];if(!point(origin))return fail('先集合隊伍。');
-    const candidates=d.participants.map(p=>h.ids(run).filter(id=>h.job(run,id)===p.job&&h.hp(run,id)>0&&(p.job!=='robot'||h.ROBOT.powered(run,id))&&h.actor(run,id)?.skills.includes(p.skill)&&point(positions[id])&&!space.blocked?.includes(id)&&!h.actor(run,id).pending&&!h.actor(run,id).shot&&h.actor(run,id).attack<=0&&h.actor(run,id).hurt<=0&&h.actor(run,id).cooldowns[p.skill]<=0&&distance(origin,positions[id])<=6&&line(space,origin,positions[id])&&(!h.SKILLS[p.skill].attack||h.stats(run,id).weapon)));
+    const candidates=d.participants.map(p=>h.ids(run).filter(id=>h.job(run,id)===p.job&&h.hp(run,id)>0&&(p.job!=='robot'||h.ROBOT.powered(run,id))&&h.actor(run,id)?.skills.includes(p.skill)&&point(positions[id])&&!space.blocked?.includes(id)&&!h.actor(run,id).pending&&!h.actor(run,id).shot&&h.actor(run,id).attack<=0&&h.actor(run,id).hurt<=0&&h.actor(run,id).cooldowns[p.skill]<=0&&distance(origin,positions[id])<=6&&look(origin,positions[id])&&(!h.SKILLS[p.skill].attack||h.stats(run,id).weapon)));
     if(candidates.some(ids=>!ids.length))return fail('需要靠近、能行動、技能與武器就緒且中間無牆的不同隊員。');
     if(Object.entries(d.costs.ingredients).some(([k,v])=>(run.party.ingredients[k]||0)<v)||(run.bag.arrow||0)<d.costs.arrows||(run.party.journey.scrap||0)<d.costs.scrap)return fail('合作所需的食材、零件或箭矢不足。');
-    const specIds=new Set(rootSpecs(run)),monsters=(space.monsters||[]).filter(m=>m.alive!==false&&point(m)&&specIds.has(m.id)&&!run.defeatedMonsters.includes(m.id)&&line(space,origin,m));
+    const specIds=shared.specIds(),monsters=(space.monsters||[]).filter(m=>m.alive!==false&&point(m)&&specIds.has(m.id)&&!run.defeatedMonsters.includes(m.id)&&look(origin,m));
     const combinations=candidates.reduce((sets,ids)=>sets.flatMap(list=>ids.filter(id=>!list.includes(id)).map(id=>[...list,id])),[[]]);
     for(const members of combinations){
-      if(members.some((id,i)=>members.slice(i+1).some(other=>distance(positions[id],positions[other])>d.formation.distance||!line(space,positions[id],positions[other]))))continue;
-      const nearby=h.ids(run).filter(id=>h.hp(run,id)>0&&point(positions[id])&&members.every(m=>distance(positions[m],positions[id])<=6&&line(space,positions[m],positions[id]))),choices=d.effect.targetMember!==undefined?[members[d.effect.targetMember]]:nearby,target=choices.filter(id=>nearby.includes(id)&&validTarget(run,d,id,nearby,members)).sort((a,b)=>h.hp(run,a)/h.maxHp(run,a)-h.hp(run,b)/h.maxHp(run,b))[0];
+      if(members.some((id,i)=>members.slice(i+1).some(other=>distance(positions[id],positions[other])>d.formation.distance||!look(positions[id],positions[other]))))continue;
+      const nearby=h.ids(run).filter(id=>h.hp(run,id)>0&&point(positions[id])&&members.every(m=>distance(positions[m],positions[id])<=6&&look(positions[m],positions[id]))),choices=d.effect.targetMember!==undefined?[members[d.effect.targetMember]]:nearby,target=choices.filter(id=>nearby.includes(id)&&validTarget(run,d,id,nearby,members)).sort((a,b)=>h.hp(run,a)/h.maxHp(run,a)-h.hp(run,b)/h.maxHp(run,b))[0];
       if(!target||nearby.filter(id=>h.hp(run,id)<h.maxHp(run,id)).length<(d.effect.injured||0))continue;
-      let targets=monsters.filter(m=>d.participants.every((p,i)=>!p.range||(distance(positions[members[i]],m)<=p.range&&line(space,positions[members[i]],m))));
+      let targets=monsters.filter(m=>d.participants.every((p,i)=>!p.range||(distance(positions[members[i]],m)<=p.range&&look(positions[members[i]],m))));
       if(d.formation.kind==='front')targets=targets.filter(m=>{const front=distance(positions[members[d.formation.front]],m);return members.every((id,i)=>i===d.formation.front||distance(positions[id],m)>=front+.6);});
       if(d.formation.kind==='pincer')targets=targets.filter(m=>{const a=positions[members[0]],b=positions[members[1]],den=distance(a,m)*distance(b,m);return den>.01&&((a.x-m.x)*(b.x-m.x)+(a.z-m.z)*(b.z-m.z))/den<=.34;});
       targets=targets.sort((a,b)=>distance(origin,a)-distance(origin,b)).slice(0,d.effect.targets||3);
@@ -47,14 +51,14 @@
     return fail(d.effect.injured?'請集合受傷的隊友，並保持陣形。':'目前沒有符合距離、視線與陣形的怪物或隊伍。');
   }
   function rootSpecs(run){const p=typeof module==='object'&&module.exports?require('./tower-party-core.js'):globalThis.TowerPartyCore;return p.monsterSpecs(run).map(m=>m.id);}
-  function available(run,space){return DEFINITIONS.map(d=>evaluate(run,d.id,space)).filter(v=>v.ok);}
+  function available(run,space){const shared=share(run);return DEFINITIONS.map(d=>evaluateWith(run,d.id,space,shared)).filter(v=>v.ok);}
   function hints(run,space){
     const h=H();if(!h.enabled(run)||run.status!=='playing'||space.ready!==true||typeof space.clear!=='function')return [];
     const positions=space.positions||{},active=h.state(run).active,all=h.ids(run).filter(id=>h.hp(run,id)>0&&point(positions[id]));if(!all.includes(active))return [];
-    const affixes=typeof module==='object'&&module.exports?require('./tower-affixes.js'):globalThis.TowerAffixes;
+    const affixes=typeof module==='object'&&module.exports?require('./tower-affixes.js'):globalThis.TowerAffixes,shared=share(run);
     return DEFINITIONS.flatMap(d=>{
       if(d.underground&&!C().isUnderworld(run))return [];
-      const result=evaluate(run,d.id,space);if(result.ok)return [];
+      const result=evaluateWith(run,d.id,space,shared);if(result.ok)return [];
       if(Object.entries(d.costs.ingredients).some(([k,v])=>(run.party.ingredients[k]||0)<v)||(run.bag.arrow||0)<d.costs.arrows||(run.party.journey.scrap||0)<d.costs.scrap)return [];
       // Regrouping can fix geometry, not missing skills, resources or readiness.
       // Keep the same non-spatial requirements as evaluate, including alternates.
@@ -62,7 +66,7 @@
         const a=h.actor(run,id);return h.job(run,id)===p.job&&a?.skills.includes(p.skill)&&(p.job!=='robot'||h.ROBOT.powered(run,id))&&!space.blocked?.includes(id)&&!affixes?.attackBlocked(run,id)&&!a.pending&&!a.shot&&a.attack<=0&&a.hurt<=0&&a.cooldowns[p.skill]<=0&&(!h.SKILLS[p.skill].attack||h.stats(run,id).weapon);
       }));
       if(candidates.some(ids=>!ids.length)||all.filter(id=>h.hp(run,id)<h.maxHp(run,id)).length<(d.effect.injured||0))return [];
-      if(d.effect.attack){const known=new Set(rootSpecs(run));if(!(space.monsters||[]).some(m=>m.alive!==false&&point(m)&&known.has(m.id)&&!run.defeatedMonsters.includes(m.id)))return [];}
+      if(d.effect.attack){const known=shared.specIds();if(!(space.monsters||[]).some(m=>m.alive!==false&&point(m)&&known.has(m.id)&&!run.defeatedMonsters.includes(m.id)))return [];}
       const combinations=candidates.reduce((sets,ids)=>sets.flatMap(list=>ids.filter(id=>!list.includes(id)).map(id=>[...list,id])),[[]]);
       const members=combinations.find(members=>{
         const targets=d.effect.targetMember!==undefined?[members[d.effect.targetMember]]:all;

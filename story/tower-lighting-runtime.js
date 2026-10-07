@@ -12,40 +12,65 @@
     const ready=()=>enabled()&&r().status==='playing'&&G.running&&!G.shifting;
     const distance=p=>Math.hypot(G.px-p.x,G.pz-p.z);
     const clear=p=>ctx.clear(G.px,G.pz,p.x,p.z);
-    function part(parent,geo,color,x,y,z,glow=false){const mesh=new T.Mesh(geo,glow?new T.MeshBasicMaterial({color}):new T.MeshLambertMaterial({color}));mesh.position.set(x,y,z);parent.add(mesh);return mesh;}
-    const box=(g,w,h,d,c,x,y,z,glow=false)=>part(g,new T.BoxGeometry(w,h,d),c,x,y,z,glow);
-    function torchModel(){const g=new T.Group();g.name='traveller-torch';part(g,new T.CylinderGeometry(.045,.065,.8,6),0x805338,0,.4,0);part(g,new T.CylinderGeometry(.095,.07,.23,7),0xdfca9a,0,.87,0);const flame=part(g,new T.OctahedronGeometry(.16),0xffb547,0,1.1,0,true);flame.scale.y=1.65;part(g,new T.OctahedronGeometry(.085),0xffecaa,0,1.08,.06,true);g.userData.flame=flame;return g;}
-    function sourceModel(style,color){
-      const g=new T.Group();g.name='light-'+style;
-      if(style==='crystal'||style==='rune'){
-        part(g,new T.CylinderGeometry(.4,.53,.3,6),0x596674,0,.15,0);
-        const crystal=part(g,new T.OctahedronGeometry(.36),color,0,1.05,0,true);crystal.scale.y=style==='rune'?1:1.8;
-        if(style==='rune'){const ring=part(g,new T.TorusGeometry(.51,.035,4,12),0xaaa087,0,1.05,0);ring.rotation.x=.5;}
-        else for(const x of [-.35,.35]){const c=part(g,new T.OctahedronGeometry(.2),color,x,.45,0,true);c.scale.y=1.7;c.rotation.z=-x;}
-      }else if(style==='fungus'){
-        for(const [x,z,h]of [[0,0,1.1],[-.35,.1,.6],[.28,.2,.75]]){part(g,new T.CylinderGeometry(.05,.1,h,5),0x9aae88,x,h/2,z);part(g,new T.SphereGeometry(h*.36,8,4,0,Math.PI*2,0,Math.PI/2),color,x,h,z,true);}
-      }else if(style==='brazier'){
-        part(g,new T.CylinderGeometry(.45,.3,.35,8),0x615651,0,.3,0);
-        for(const x of [-.2,0,.2]){const f=part(g,new T.OctahedronGeometry(.2),color,x,.65,0,true);f.scale.y=1.8;}
-      }else{
-        box(g,.14,1.35,.14,0x6d5640,0,.675,0);box(g,.6,.1,.1,0x6d5640,.23,1.35,0);
-        part(g,new T.CylinderGeometry(.23,.23,.46,6),color,.43,1.12,0,true);
-        for(const y of [.86,1.4])part(g,new T.CylinderGeometry(.3,.24,.09,6),0x57636a,.43,y,0);
-        for(const x of [.22,.64])box(g,.035,.5,.04,0x57636a,x,1.12,0);
+    // Every lamp is authored as small primitives, then baked once into at most two vertex-coloured
+    // meshes: a lit one (Lambert) and a self-lit one (Basic). Identical lamps share one baked geometry
+    // and both materials for the floor; the whole lot is released with the lighting group.
+    let materials=null;const baked=new Map();
+    const surface=glow=>{materials=materials||{};return glow?materials.glow||(materials.glow=new T.MeshBasicMaterial({vertexColors:true})):materials.lit||(materials.lit=new T.MeshLambertMaterial({vertexColors:true}));};
+    function authored(){
+      const list=[],add=(geo,color,x,y,z,glow=false,pose={})=>{list.push({geo,color,x,y,z,glow,pose});};
+      return {list,add,box:(w,h,d,c,x,y,z,glow,pose)=>add(new T.BoxGeometry(w,h,d),c,x,y,z,glow,pose)};
+    }
+    function bake(list){
+      const buckets=[{p:[],n:[],c:[]},{p:[],n:[],c:[]}],matrix=new T.Matrix4(),quaternion=new T.Quaternion(),euler=new T.Euler(),position=new T.Vector3(),scale=new T.Vector3(),color=new T.Color();
+      for(const item of list){
+        const {rx=0,ry=0,rz=0,sx=1,sy=1,sz=1}=item.pose,geo=item.geo.index?item.geo.toNonIndexed():item.geo,bucket=buckets[item.glow?1:0];
+        geo.applyMatrix4(matrix.compose(position.set(item.x,item.y,item.z),quaternion.setFromEuler(euler.set(rx,ry,rz)),scale.set(sx,sy,sz)));color.setHex(item.color);
+        const xyz=geo.attributes.position,normal=geo.attributes.normal;
+        for(let i=0;i<xyz.count;i++){bucket.p.push(xyz.getX(i),xyz.getY(i),xyz.getZ(i));bucket.n.push(normal.getX(i),normal.getY(i),normal.getZ(i));bucket.c.push(color.r,color.g,color.b);}
+        if(geo!==item.geo)geo.dispose();item.geo.dispose();
       }
+      return buckets.map(b=>{if(!b.p.length)return null;const g=new T.BufferGeometry();g.setAttribute('position',new T.Float32BufferAttribute(b.p,3));g.setAttribute('normal',new T.Float32BufferAttribute(b.n,3));g.setAttribute('color',new T.Float32BufferAttribute(b.c,3));g.computeBoundingSphere();return g;});
+    }
+    function bakedModel(name,key,compose){
+      if(!baked.has(key)){const a=authored();compose(a);baked.set(key,bake(a.list));}
+      const g=new T.Group();g.name=name;
+      for(const [index,geometry]of baked.get(key).entries())if(geometry){const mesh=new T.Mesh(geometry,surface(index===1));mesh.name=index?'lamp-glow-batch':'lamp-lit-batch';g.add(mesh);}
       return g;
     }
+    function torchModel(){const g=bakedModel('traveller-torch','torch',a=>{a.add(new T.CylinderGeometry(.045,.065,.8,6),0x805338,0,.4,0);a.add(new T.CylinderGeometry(.095,.07,.23,7),0xdfca9a,0,.87,0);a.add(new T.OctahedronGeometry(.16),0xffb547,0,1.1,0,true,{sy:1.65});a.add(new T.OctahedronGeometry(.085),0xffecaa,0,1.08,.06,true);});g.userData.flame=g.getObjectByName('lamp-glow-batch');return g;}
+    function sourceModel(style,color){
+      return bakedModel('light-'+style,style+':'+color,a=>{
+        if(style==='crystal'||style==='rune'){
+          a.add(new T.CylinderGeometry(.4,.53,.3,6),0x596674,0,.15,0);
+          a.add(new T.OctahedronGeometry(.36),color,0,1.05,0,true,{sy:style==='rune'?1:1.8});
+          if(style==='rune')a.add(new T.TorusGeometry(.51,.035,4,12),0xaaa087,0,1.05,0,false,{rx:.5});
+          else for(const x of [-.35,.35])a.add(new T.OctahedronGeometry(.2),color,x,.45,0,true,{sy:1.7,rz:-x});
+        }else if(style==='fungus'){
+          for(const [x,z,h]of [[0,0,1.1],[-.35,.1,.6],[.28,.2,.75]]){a.add(new T.CylinderGeometry(.05,.1,h,5),0x9aae88,x,h/2,z);a.add(new T.SphereGeometry(h*.36,8,4,0,Math.PI*2,0,Math.PI/2),color,x,h,z,true);}
+        }else if(style==='brazier'){
+          a.add(new T.CylinderGeometry(.45,.3,.35,8),0x615651,0,.3,0);
+          for(const x of [-.2,0,.2])a.add(new T.OctahedronGeometry(.2),color,x,.65,0,true,{sy:1.8});
+        }else{
+          a.box(.14,1.35,.14,0x6d5640,0,.675,0);a.box(.6,.1,.1,0x6d5640,.23,1.35,0);
+          a.add(new T.CylinderGeometry(.23,.23,.46,6),color,.43,1.12,0,true);
+          for(const y of [.86,1.4])a.add(new T.CylinderGeometry(.3,.24,.09,6),0x57636a,.43,y,0);
+          for(const x of [.22,.64])a.box(.035,.5,.04,0x57636a,x,1.12,0);
+        }
+      });
+    }
     function supplyModel(){
-      const g=new T.Group();g.name='torch-materials';
-      for(const z of [-.12,0,.12]){const stick=part(g,new T.CylinderGeometry(.045,.06,.65,5),0xbc9066,0,.64,z);stick.rotation.z=Math.PI/2;}
-      box(g,.14,.19,.4,0xd8c9a4,0,.66,0);box(g,.35,.06,.32,0xe8ddbe,.24,.55,.07);
+      const g=bakedModel('torch-materials','supply',a=>{
+        for(const z of [-.12,0,.12])a.add(new T.CylinderGeometry(.045,.06,.65,5),0xbc9066,0,.64,z,false,{rz:Math.PI/2});
+        a.box(.14,.19,.4,0xd8c9a4,0,.66,0);a.box(.35,.06,.32,0xe8ddbe,.24,.55,.07);
+      });
       g.add(ctx.marker(0xffcd85,'木枝與布條'));return g;
     }
     function addSource(point,style,color,name){
       const model=sourceModel(style,color);model.position.set(point.x,0,point.z);group.add(model);
       sources.push({...point,model,color,name});
     }
-    function reset(){if(group){group.parent?.remove(group);ctx.dispose(group);}group=rig=carried=orb=profile=null;sources=[];supplies=[];lamps=[];nearSources=[];nearClock=0;panelRevision=null;}
+    function reset(){if(group){group.parent?.remove(group);ctx.dispose(group);}group=rig=carried=orb=profile=materials=null;baked.clear();sources=[];supplies=[];lamps=[];nearSources=[];nearClock=0;panelRevision=null;}
     function build(random,used){
       reset();if(!enabled())return;
       profile=L.profile(ctx.environment().id,ctx.environment().underworld===true);rig=ctx.environment().rig;
@@ -53,7 +78,7 @@
       // Keep a constant light count (no shader recompilation when walking past lamps).
       for(let i=0;i<3;i++){const light=new T.PointLight(0xffd19a,0,i===0?14:10.5,1.4);light.name='tower-light-slot-'+i;light.castShadow=false;group.add(light);lamps.push(light);}
       carried=torchModel();carried.scale.setScalar(.8);group.add(carried);
-      orb=new T.Group();orb.name='daylight-orb';part(orb,new T.IcosahedronGeometry(.14,0),0xfff4cb,0,0,0,true);const ring=part(orb,new T.TorusGeometry(.26,.018,4,16),0xffe2a1,0,0,0,true);ring.rotation.x=Math.PI/2;group.add(orb);
+      orb=bakedModel('daylight-orb','orb',a=>{a.add(new T.IcosahedronGeometry(.14,0),0xfff4cb,0,0,0,true);a.add(new T.TorusGeometry(.26,.018,4,16),0xffe2a1,0,0,0,true,{rx:Math.PI/2});});group.add(orb);
       const entry=ctx.cell(0,0);
       // Entrance camp and every travelling merchant have a permanent lamp.
       addSource({...entry,x:entry.x+.8,z:entry.z+.65},'lantern',0xffd28b,ctx.inDungeon()?'裂隙引路燈':'旅人營地');
@@ -71,15 +96,27 @@
       ctx.bind(button,quickUse);
       const status=document.createElement('div');status.id='towerLightStatus';status.hidden=true;document.getElementById('towerHudDetails').appendChild(status);
     }
-    function status(){const light=L.portableInfo(r()),l=r().party.light;return light.mode==='daylight'?'日光術 '+time(l.daylight):light.mode==='torch'?'火把 '+time(l.fuel):light.mode==='core'?(light.cores===2?'雙核心':light.cores===1?'單核心':'內建微光')+'動力光源 · 永久照明':'未點燈 · 火把 '+l.torches+' 支'+(l.fuel>0?'，餘火 '+time(l.fuel):'');}
+    function status(light=L.portableInfo(r())){const l=r().party.light;return light.mode==='daylight'?'日光術 '+time(l.daylight):light.mode==='torch'?'火把 '+time(l.fuel):light.mode==='core'?(light.cores===2?'雙核心':light.cores===1?'單核心':'內建微光')+'動力光源 · 永久照明':'未點燈 · 火把 '+l.torches+' 支'+(l.fuel>0?'，餘火 '+time(l.fuel):'');}
+    // The HUD refreshes at a fixed cadence, but its nodes change rarely (the label only each second).
+    // Remember what was last written to these two nodes and touch the DOM only for a difference.
+    let shown=null;
     function hud(){
       const button=document.getElementById('towerLightBtn'),line=document.getElementById('towerLightStatus');if(!button)return;
-      button.hidden=!enabled();line.hidden=!enabled();if(!enabled())return;
-      const mode=L.portable(r());button.dataset.light=mode;button.disabled=G.shifting||!G.running;
+      if(!shown||shown.button!==button||shown.line!==line)shown={button,line,hidden:null,light:null,disabled:null,symbol:null,color:null,title:null,label:null,text:null};
+      const on=enabled();
+      if(shown.hidden!==!on){button.hidden=!on;line.hidden=!on;shown.hidden=!on;}
+      if(!on)return;
+      const info=L.portableInfo(r()),mode=info.mode,disabled=!!(G.shifting||!G.running);
+      if(shown.light!==mode){button.dataset.light=mode;shown.light=mode;}
+      if(shown.disabled!==disabled){button.disabled=disabled;shown.disabled=disabled;}
       const power=L.robotLight(r()),symbol=L.canCast(r())?'daylight':power?'core':'torch';
-      if(button.dataset.icon!==symbol){button.dataset.icon=symbol;button.innerHTML=icon(symbol);}
-      button.style.color=symbol==='core'?'#'+power.color.toString(16).padStart(6,'0'):'';
-      button.title=status()+' · '+(symbol==='daylight'?'點擊施放日光術':'點擊使用火把；核心請從背包管理')+'（L）';button.setAttribute('aria-label',symbol==='daylight'?'施放日光術':'使用火把');line.textContent=status();
+      if(shown.symbol!==symbol||button.dataset.icon!==symbol){button.dataset.icon=symbol;button.innerHTML=icon(symbol);shown.symbol=symbol;}
+      const color=symbol==='core'?'#'+power.color.toString(16).padStart(6,'0'):'';
+      if(shown.color!==color){button.style.color=color;shown.color=color;}
+      const text=status(info),title=text+' · '+(symbol==='daylight'?'點擊施放日光術':'點擊使用火把；核心請從背包管理')+'（L）',label=symbol==='daylight'?'施放日光術':'使用火把';
+      if(shown.title!==title){button.title=title;shown.title=title;}
+      if(shown.label!==label){button.setAttribute('aria-label',label);shown.label=label;}
+      if(shown.text!==text){line.textContent=text;shown.text=text;}
     }
     function quickUse(){if(!ready()||ctx.paused?.())return false;if(L.canCast(r())&&r().party.light.daylight>0){ctx.toast('日光術仍在照明。',1500,false);return false;}
       const mage=L.canCast(r()),result=mage?L.daylight(r(),r().revision):L.torch(r(),r().revision);if(!ctx.transact(result)){if(result.message)ctx.toast(result.message,2000,result.message);return false;}if(mage){if(!ctx.daylightCast?.())ctx.audio.sfxAction?.('magic');}else ctx.audio.sfxAction?.('smoke');updateVisual(0,true);hud();ctx.toast(result.message,1800,mage?false:result.message);return true;

@@ -7,7 +7,8 @@
   'use strict';
   const ENVIRONMENTS = new Set(['summoning', 'garden', 'roots', 'echo', 'library', 'mist', 'frost', 'clockwork', 'furnace', 'heart',
     'underworld-roots', 'underworld-mist', 'underworld-library', 'underworld-furnace', 'underworld-heart']);
-  const FADE_SECONDS = 1, VOLUME = 0.78, CACHE_LIMIT = 3;
+  // A decoded loop is about 20 MB; touch devices keep one fewer to stay clear of the tab memory ceiling.
+  const FADE_SECONDS = 1, VOLUME = 0.78, CACHE_LIMIT = 3, COARSE_CACHE_LIMIT = 2;
   // Formal loop files omit the audition's four-second fading room tail.
   const TRACKS = Object.freeze({
     'orchestra-summit': Object.freeze({ loopStart: 0, loopEnd: 50.526326530612245, sha256: 'd0973461fce0cf30ad55974ac59a8893877793ceb4d41fccdf6d1adde16182e2' }),
@@ -29,7 +30,7 @@
     'orchestra-underworld-heart': Object.freeze({ loopStart: 0, loopEnd: 46.666666666666664, sha256: '2249005f037a64f9bdd460f2dc8d42ec11c82e2d0b1e7cbace67ebe277e3fc48' }),
   });
   let context = null, output = null, environment = null, encounter = false, bossEncounter = false, camp = false, paused = false, muted = false;
-  let epoch = 0, current = null;
+  let epoch = 0, current = null, lowMemory = false;
   const cache = new Map(), requests = new Map(), voices = new Set(), warned = new Set();
 
   function warnOnce(id, error) {
@@ -57,11 +58,12 @@
 
   function environmentTrack() { return environment === 'summoning' ? 'orchestra-summit' : 'orchestra-' + environment; }
   function targetTrack() { return camp ? 'orchestra-camp' : bossEncounter ? 'orchestra-boss' : encounter ? 'combat' : environmentTrack(); }
+  function cacheLimit() { return lowMemory ? COARSE_CACHE_LIMIT : CACHE_LIMIT; }
   function pruneCache() {
     const allowed = new Set([environmentTrack(), 'combat', 'orchestra-boss', 'orchestra-camp']);
     for (const id of cache.keys()) if (!allowed.has(id)) cache.delete(id);
     for (const id of cache.keys()) {
-      if (cache.size <= CACHE_LIMIT) break;
+      if (cache.size <= cacheLimit()) break;
       if (id !== targetTrack() && id !== current?.id) cache.delete(id);
     }
   }
@@ -91,7 +93,7 @@
       const buffer = cache.get(id); cache.delete(id); cache.set(id, buffer);
       return buffer;
     }
-    const controller = new root.AbortController();
+    const decoder = context, controller = new root.AbortController();
     const request = { controller };
     requests.set(id, request);
     try {
@@ -100,11 +102,14 @@
       if (!response.ok) throw new Error('HTTP ' + response.status);
       const bytes = await response.arrayBuffer();
       if (controller.signal.aborted || epoch !== requestEpoch) return null;
-      const buffer = await context.decodeAudioData(bytes);
-      if (controller.signal.aborted || epoch !== requestEpoch || requests.get(id) !== request) return null;
-      if (id !== targetTrack()) return null;
+      const buffer = await decoder.decodeAudioData(bytes);
+      const wanted = !controller.signal.aborted && epoch === requestEpoch && requests.get(id) === request && id === targetTrack();
+      // Decoding cannot be cancelled. When the scene moved on while it ran, keep the buffer for the
+      // tracks that recur (the current environment and ordinary combat) instead of downloading it again.
+      const recurring = decoder === context && environment !== null && (id === 'combat' || id === environmentTrack());
+      if (!wanted && !recurring) return null;
       cache.set(id, buffer); pruneCache();
-      return buffer;
+      return wanted ? buffer : null;
     } finally {
       if (requests.get(id) === request) requests.delete(id);
     }
@@ -157,6 +162,8 @@
       warnOnce('configuration', new Error('需要遊戲既有的音訊 context 與 output。'));
       return false;
     }
+    lowMemory = typeof options.lowMemory === 'boolean' ? options.lowMemory
+      : Boolean(typeof root.matchMedia === 'function' && root.matchMedia('(pointer:coarse)').matches);
     if (context === options.context && output === options.output) return true;
     cancelRequests(); silence(); cache.clear();
     context = options.context; output = options.output;
@@ -211,7 +218,7 @@
     }));
     return Object.freeze({ environment, encounter, bossEncounter, camp, paused, muted,
       target: environment ? targetTrack() : null, current: current && !current.disposed ? current.id : null,
-      activeCount: live.length, voices: Object.freeze(live), cacheIDs: Object.freeze([...cache.keys()]),
+      activeCount: live.length, voices: Object.freeze(live), cacheIDs: Object.freeze([...cache.keys()]), cacheLimit: cacheLimit(),
       requestIDs: Object.freeze([...requests.keys()]),
       expectedSha256: current && !current.disposed ? TRACKS[current.id]?.sha256 || null : null,
       loopStart: current && !current.disposed ? current.source.loopStart || 0 : null,

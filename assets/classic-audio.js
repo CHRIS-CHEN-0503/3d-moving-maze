@@ -70,7 +70,8 @@
     if (current && current.id === id) return true;
     const requestEpoch = epoch;
     // 必須在點擊事件仍有效時立刻要求解鎖；檔案下載完成後才建立循環音源。
-    const ready = context.state === 'suspended' && typeof context.resume === 'function' ? context.resume() : Promise.resolve();
+    // 'interrupted' (iOS after a call or app switch) needs the same gesture-time resume as 'suspended'.
+    const ready = context.state !== 'running' && context.state !== 'closed' && typeof context.resume === 'function' ? Promise.resolve(context.resume()).catch(() => {}) : Promise.resolve();
     try {
       const [buffer] = await Promise.all([load(id, requestEpoch), ready]);
       if (!buffer || requestEpoch !== epoch || target !== id) return false;

@@ -41,12 +41,20 @@
   }
   const heroes=()=>typeof module==='object'&&module.exports?require('./tower-heroes-core.js'):globalThis.TowerHeroes;
   function robotLight(run,id){const h=heroes();if(!h?.enabled(run))return null;id=id||h.state(run).active;return h.job(run,id)==='robot'&&h.hp(run,id)>0?h.ROBOT?.lightInfo(run,id)||null:null;}
-  function partyRobotLight(run){const h=heroes();if(!h?.enabled(run))return null;return h.ids(run).map(id=>{const power=robotLight(run,id);return power?{...power,actorId:id}:null;}).filter(Boolean).sort((a,b)=>b.radius-a.radius||b.tier-a.tier)[0]||null;}
+  // Called several times per frame: one pass, no map/filter/sort chain, and a single copy for the winner.
+  // Strict comparisons keep the earliest actor on ties, exactly as the former stable sort did.
+  function partyRobotLight(run){
+    const h=heroes();if(!h?.enabled(run))return null;
+    let best=null,actorId=null;
+    for(const id of h.ids(run)){const power=robotLight(run,id);if(power&&(!best||power.radius>best.radius||power.radius===best.radius&&power.tier>best.tier)){best=power;actorId=id;}}
+    return best?{...best,actorId}:null;
+  }
   // Portable lighting is shared by the travelling party. Changing the leader
   // must not downgrade an already lit torch, a companion core, or daylight.
   function portableInfo(run){
-    const l=run?.party?.light,power=partyRobotLight(run);
+    const l=run?.party?.light;
     if(l?.daylight>0)return {mode:'daylight',radius:DAYLIGHT_RADIUS,color:0xfff2d1};
+    const power=partyRobotLight(run);
     if(l?.lit&&l.fuel>0&&(!power||power.radius<TORCH_RADIUS))return {mode:'torch',radius:TORCH_RADIUS,color:0xffc07a};
     return power||{mode:'none',radius:0,color:0xffc07a};
   }
@@ -83,7 +91,7 @@
   });}
   function tick(next,dt){
     const l=next.party?.light;if(!l||!Number.isFinite(dt)||dt<0)return;
-    const burn=(partyRobotLight(next)?.radius||0)>TORCH_RADIUS?0:Math.max(0,dt-l.daylight);
+    const burn=l.lit&&(partyRobotLight(next)?.radius||0)<=TORCH_RADIUS?Math.max(0,dt-l.daylight):0;
     l.daylight=Math.max(0,l.daylight-dt);l.cooldown=Math.max(0,l.cooldown-dt);
     if(l.lit){l.fuel=Math.max(0,l.fuel-burn);if(!l.fuel)l.lit=false;}
   }

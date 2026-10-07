@@ -41,7 +41,7 @@
     for(const eye of eyes){if(model.userData.sculpted&&!robot)eye.position.z=surface(eye.position.x,eye.position.y-headY);const sclera=new T.Mesh(whiteGeo,white);sclera.name='eye-white';sclera.position.copy(eye.position);sclera.position.z-=.008;rig.add(sclera);face.whites.push(sclera);eye.scale.set(.73,.72,.65);}
     if(!robot){const lidMaterial=new T.MeshLambertMaterial({color:0x795447}),lidGeometry=new T.TorusGeometry(.044,.0035,4,12,Math.PI);for(const eye of eyes){const lid=new T.Mesh(lidGeometry,lidMaterial);lid.name='upper-eyelid';lid.position.copy(eye.position);lid.position.z+=.006;lid.scale.set(1.09,.61,.65);rig.add(lid);face.lids.push(lid);}const lipMaterial=new T.MeshLambertMaterial({color:0xb78274});for(const [y,w]of [[-.111,.10],[-.136,.105]]){const lip=detail(w,.008,.009,0,y,.26);lip.name='sculpted-lip';lip.material=lipMaterial;face.lips.push(lip);}}
     const teeth=detail(.08,.009,.006,0,-.116,.267);teeth.material=white;teeth.visible=false;face.teeth=teeth;
-    const blush=new T.MeshLambertMaterial({color:0xce8877,transparent:true,opacity:.12});face.cheeks=[-1,1].map(side=>{const cheek=detail(.057,.025,.007,side*.173,-.06,.216);cheek.material=blush;return cheek;});
+    const blush=new T.MeshLambertMaterial({color:0xce8877,transparent:true,opacity:.12});face.cheeks=[-1,1].map(side=>{const cheek=detail(.057,.025,.007,side*.173,-.06,.216);cheek.material=blush;if(robot)cheek.visible=false;return cheek;});
     model.userData.face=face;
     const sex=appearance.heroSex||appearance.sex||(appearance.type==='girl'?'female':'male'),job=appearance.heroJob||appearance.job||'classic';
     if(appearance.type==='cat')refineCat(T,model,appearance);else if(!robot)refine(T,model,{...appearance,job,sex});
@@ -116,7 +116,7 @@
     f.mouth.scale.set(pose.mouthWidth,talk?1.5+Math.sin(time*15)*.8:pose.mouthHeight,1);
     for(let i=0;i<f.lids.length;i++){f.lids[i].scale.y=f.eyes[i].scale.y*.82;f.lids[i].rotation.z=focus?(i?-.12:.12):0;}
     for(let i=0;i<f.lips.length;i++){f.lips[i].scale.x=f.mouth.scale.x;f.lips[i].position.y=f.mouth.position.y+(i?-.006:.006)*f.mouth.scale.y;}
-    f.teeth.position.z=f.mouth.position.z+.003;f.teeth.visible=happy;for(const c of f.cheeks)c.visible=!f.cat&&!hurt&&!tired;
+    f.teeth.position.z=f.mouth.position.z+.003;f.teeth.visible=happy;for(const c of f.cheeks)c.visible=!f.robot&&!f.cat&&!hurt&&!tired;
     for(const corner of f.corners)corner.visible=happy;
   }
   return Object.freeze({attach,refine,refineCat,skinSurface,update,react,moods,MAP_SIZE});

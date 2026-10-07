@@ -34,9 +34,12 @@ function harness({ enabled = true, coarse = false, towerStyle = null } = {}) {
   context.window = context;
   const worldStart = html.indexOf('function cellToWorld('), worldEnd = html.indexOf('/* =====================================================', worldStart);
   assert.ok(worldStart > 0 && worldEnd > worldStart);
-  vm.runInContext(['let mazeAtmosphere=null;', html.slice(worldStart, worldEnd),
-    ...['disposeSceneObject', 'clearMazeAtmosphere', 'buildMazeAtmosphere', 'buildWalls', 'removeWallBox'].map(engineFunction)].join('\n'), context);
-  return { context, texture, run: source => vm.runInContext(source, context), get atmosphere() { return vm.runInContext('mazeAtmosphere', context); } };
+  vm.runInContext(['let mazeAtmosphere=null;const retiredAfterRender=[];', html.slice(worldStart, worldEnd),
+    ...['retireAfterRender', 'flushRetiredAfterRender', 'disposeSceneObject', 'clearMazeAtmosphere', 'buildMazeAtmosphere', 'buildWalls', 'removeWallBox'].map(engineFunction)].join('\n'), context);
+  // Replaced walls and decorations are freed after the next drawn frames; each
+  // engine call here is followed by those frames before resources are inspected.
+  const frames = () => vm.runInContext('flushRetiredAfterRender();flushRetiredAfterRender();', context);
+  return { context, texture, frames, run: source => { const result = vm.runInContext(source, context); frames(); return result; }, get atmosphere() { return vm.runInContext('mazeAtmosphere', context); } };
 }
 function matrices(mesh) {
   const matrix = new THREE.Matrix4();
@@ -201,4 +204,18 @@ test('高塔公開目前章節與副本的裝飾風格，主樓層與副本種�
   assert.equal(call().style, 'books');
   assert.match(tower, /window\.TowerMode\s*=\s*\{[^\n]*\batmosphereStyle\b/);
   assert.ok(tower.indexOf('floorConfig = C.floorConfig(run.floor)') < tower.indexOf('try { startGame(); }'), '初始建牆前已有章節設定');
+});
+
+test('a wall rebuild keeps the previous walls and decorations alive until two frames have drawn, then frees them once', () => {
+  const h = harness({ enabled: true });
+  vm.runInContext('buildWalls(theme)', h.context);
+  const first = vm.runInContext('wallMesh', h.context), decorations = h.atmosphere;
+  let freed = 0; first.material.addEventListener('dispose', () => freed++);
+  vm.runInContext('buildWalls(theme)', h.context);
+  assert.equal(first.parent, null, 'the old walls leave the scene at once');
+  assert.notEqual(h.atmosphere, decorations);
+  assert.equal(freed, 0, 'still alive so the new walls reuse its compiled program');
+  vm.runInContext('flushRetiredAfterRender()', h.context); assert.equal(freed, 0);
+  vm.runInContext('flushRetiredAfterRender()', h.context); assert.equal(freed, 1);
+  vm.runInContext('flushRetiredAfterRender();flushRetiredAfterRender()', h.context); assert.equal(freed, 1, 'never twice');
 });

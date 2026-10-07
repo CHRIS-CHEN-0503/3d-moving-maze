@@ -162,7 +162,7 @@ test('authored story beats cover the entire narration with distinct, non-looping
 });
 test('all story gesture names have readable safe joint poses without root motion, new resources or detached equipment',()=>{
   const f=model(),attachment=new T.Group();f.arms[1].add(attachment);attachment.position.set(.01,-.35,.12);const before=snapshot(f.actor),resourceSet=resources(f.actor),poses=[];
-  for(const gesture of ['wake','inspect','point','warn','offer','receive','palm','recollect','turn','listen','settle']){
+  for(const gesture of ['wake','inspect','point','warn','offer','receive','palm','recollect','turn','listen','settle','nod','lookaround','wave','cheer','hug','shiver']){
     const session=Actors.create({actor:f.actor,beats:[{at:0,duration:4,mood:'thoughtful',gesture,gaze:'front'}],speechAnimation:false});session.sample(1.8,{speaking:true});
     poses.push([f.head.rotation.x,f.head.rotation.y,f.arms[0].rotation.x,f.arms[1].rotation.x,f.arms[1].rotation.z]);
     assert.equal(attachment.parent,f.arms[1]);assert.deepEqual(attachment.position.toArray(),[.01,-.35,.12]);assert.deepEqual(resources(f.actor),resourceSet);
@@ -170,7 +170,7 @@ test('all story gesture names have readable safe joint poses without root motion
     for(const arm of f.arms){assert.ok(Math.abs(arm.rotation.x)<1.15);assert.ok(Math.abs(arm.rotation.y)<.1);assert.ok(Math.abs(arm.rotation.z)<.3);}
     session.restore();assertSnapshot(before);
   }
-  assert.equal(new Set(poses.map(JSON.stringify)).size,11);
+  assert.equal(new Set(poses.map(JSON.stringify)).size,17,'every story gesture is a distinct readable pose');
 });
 test('surprise transitions into recollection with a genuinely closed neutral mouth and lowered smile corners, not fake narration speech',()=>{
   const f=model();f.mouth.visible=true;f.mouth.scale.y=1.6;f.teeth.visible=true;const before=snapshot(f.actor),session=Actors.create({actor:f.actor,speechAnimation:false,beats:[
@@ -226,4 +226,30 @@ test('two independent actor timelines share an absolute story clock and restore 
     for(const time of [0,1,2,3.9,4,5.5,8.9,9,24.24]){session.sample(time,{speaking:true});assert.deepEqual(resources(actor),before);assert.deepEqual(actor.position.toArray(),base[0].p);assert.deepEqual(actor.quaternion.toArray(),base[0].q);}
     session.restore();assertSnapshot(base);before.forEach(resource=>resource.dispose());
   }
+});
+
+test('secondary gesture motion lives inside its beat envelope: continuous at every edge, bounded, deterministic and softened for reduced motion',()=>{
+  const f=model(),before=snapshot(f.actor),beats=[{at:0,duration:3,mood:'farewell',gesture:'wave',gaze:'front'},{at:3,duration:3,mood:'thoughtful',gesture:'lookaround',gaze:'front'},{at:6,duration:3,mood:'excited',gesture:'cheer',gaze:'front'},{at:9,duration:3,mood:'hurt',gesture:'shiver',gaze:'down'},{at:12,duration:3,mood:'thoughtful',gesture:'nod',gaze:'front'}];
+  const session=Actors.create({actor:f.actor,beats,speechAnimation:false}),read=()=>[...f.head.rotation.toArray().slice(0,3),...f.body.rotation.toArray().slice(0,3),...f.arms[1].rotation.toArray().slice(0,3)];
+  for(const at of [0,3,6,9,12,15]){session.sample(Math.max(0,at-.0001),{speaking:false});const left=read();session.sample(at+.0001,{speaking:false});const right=read();for(let n=0;n<left.length;n++)assert.ok(Math.abs(left[n]-right[n])<.002,'edge '+at+' joint '+n);}
+  const waves=new Set(),looks=new Set();for(let n=0;n<120;n++){session.sample(.8+n*.01,{speaking:false});waves.add(f.arms[1].rotation.z.toFixed(3));assert.ok(Math.abs(f.arms[1].rotation.z)<.3&&Math.abs(f.arms[1].rotation.x)<1.15);session.sample(3.8+n*.012,{speaking:false});looks.add(f.head.rotation.y.toFixed(3));}
+  assert.ok(waves.size>20,'a wave actually waves');assert.ok(looks.size>20,'looking around sweeps the head');
+  session.sample(7.4,{speaking:false});const once=read();session.sample(2,{speaking:false});session.sample(7.4,{speaking:false});assert.deepEqual(read(),once);
+  session.restore();assertSnapshot(before);
+  const mild=Actors.create({actor:f.actor,beats,speechAnimation:false},{reduced:true}),full=Actors.create({actor:model().actor,beats,speechAnimation:false});
+  let calm=0;for(let n=0;n<60;n++){mild.sample(.8+n*.03,{speaking:false});calm=Math.max(calm,Math.abs(f.arms[1].rotation.z));}assert.ok(calm<.12,'reduced wave is small');mild.restore();full.restore();assertSnapshot(before);
+});
+test('eye saccades glide between deterministic targets, never snap, stay tiny and are disabled for reduced motion',()=>{
+  const f=model(),before=snapshot(f.actor),beats=[{at:0,duration:30,mood:'thoughtful',gesture:'listen',gaze:'front'}],session=Actors.create({actor:f.actor,beats,speechAnimation:false}),base=before.find(row=>row.node===f.pupils[0]).p;
+  let previous=null,moves=new Set();for(let n=0;n<1200;n++){session.sample(n/60,{speaking:false});const x=f.pupils[0].position.x-base[0],y=f.pupils[0].position.y-base[1];assert.ok(Math.abs(x)<.006&&Math.abs(y)<.006);if(previous)assert.ok(Math.hypot(x-previous[0],y-previous[1])<.0012,'no pupil jump at '+n);previous=[x,y];moves.add(x.toFixed(4));}
+  assert.ok(moves.size>10,'eyes do move');session.restore();assertSnapshot(before);
+  const still=Actors.create({actor:f.actor,beats,speechAnimation:false},{reduced:true}),values=new Set();for(let n=0;n<300;n++){still.sample(2+n/30,{speaking:false});values.add(f.pupils[0].position.x.toFixed(6));}assert.equal(values.size,1);still.restore();assertSnapshot(before);
+});
+test('hand-timed scenes can opt out of idle life: no weight shift or saccade, while the default keeps both',()=>{
+  const read=(f)=>[f.body.rotation.z,f.pupils[0].position.x,f.pupils[0].position.y,f.legs[0].rotation.x];
+  const beats=[{at:0,duration:20,mood:'thoughtful',gesture:'listen',gaze:'front'}];
+  const quiet=model(),q=Actors.create({actor:quiet.actor,beats,speechAnimation:false,idleLife:false});q.sample(6,{speaking:false});const a=read(quiet);q.sample(9.3,{speaking:false});const b=read(quiet);
+  assert.equal(a[0],b[0],'no slow sway in a held pose');assert.equal(a[1],b[1]);assert.equal(a[2],b[2],'pupils hold the authored gaze');q.restore();
+  const lively=model(),l=Actors.create({actor:lively.actor,beats,speechAnimation:false});l.sample(6,{speaking:false});const c=read(lively);l.sample(9.3,{speaking:false});const d=read(lively);
+  assert.ok(c[0]!==d[0]||c[1]!==d[1],'default story beats keep their idle life');l.restore();
 });

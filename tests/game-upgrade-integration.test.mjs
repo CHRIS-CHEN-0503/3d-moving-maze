@@ -6,7 +6,8 @@ const root=new URL('../',import.meta.url),html=readFileSync(new URL('index.html'
 const tag=path=>html.indexOf('src="'+path+'?v=');
 test('new read-only insight and environment providers load once before gameplay; tactics after mode variants',()=>{
   for(const path of ['story/tower-story-insights.js','story/tower-environment-life.js','assets/classic-tactics-core.js','assets/classic-tactics.js']){
-    assert.equal(html.split('src="'+path+'?v=1.57.0"').length,2,path);
+    // The environment life provider changed again in the v1.58.0 performance round.
+    assert.equal(html.split('src="'+path+'?v='+(path==='story/tower-environment-life.js'?'1.58.0':'1.57.0')+'"').length,2,path);
   }
   assert.ok(tag('story/tower-narrative.js')<tag('story/tower-story-insights.js'));
   assert.ok(tag('story/tower-adventure-events.js')<tag('story/tower-story-insights.js'));

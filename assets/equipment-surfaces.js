@@ -1,5 +1,7 @@
-/* Original, model-owned 128px surface atlas. Drawn once on equipment creation,
-   never during animation; no download, shared texture cache or extra lights. */
+/* Original 128px surface atlas. The artwork depends only on grade and job, so it is drawn once per
+   (tier|job) and shared as one image source: every worn piece still owns its own texture object, but
+   the renderer keeps a single GPU copy, freed when the last such texture is disposed. Never drawn
+   during animation; no download or extra lights. */
 (function(root,factory){const api=factory();if(typeof module==='object'&&module.exports)module.exports=api;root.EquipmentSurfaces=api;})(globalThis,function(){
   'use strict';
   const SIZE=128,REGIONS=Object.freeze({metal:[2/128,66/128,60/128,60/128],leather:[66/128,66/128,60/128,60/128],fabric:[2/128,2/128,60/128,60/128],paper:[66/128,2/128,60/128,60/128]});
@@ -44,11 +46,21 @@
     for(let row=0;row<6;row++){const y=77+row*6;for(let col=0;col<5;col++){const x=76+col*8;path(ctx,[[x,y],[x+1,y-2],[x+3,y+1],[x+5,y-1]]);}}
     if(tier>=3)emblem(ctx,job,111,113,6);ctx.strokeStyle='#ebe2d0';for(const y of [67,125])path(ctx,[[65,y],[127,y]]);
   }
+  // document -> 'tier|job' -> {canvas, source, refs}; an entry lives while at least one texture uses it.
+  const drawn=new WeakMap();
   function create(T,{tier=1,job='swordsman',kind='',sex='male'}={},documentObject=typeof document==='object'?document:null){
     if(!documentObject?.createElement||!T?.CanvasTexture)return null;
-    const canvas=documentObject.createElement('canvas');canvas.width=canvas.height=SIZE;const ctx=canvas.getContext?.('2d');if(!ctx)return null;
-    metal(ctx,tier,job);leather(ctx,tier);fabric(ctx,tier,job);paper(ctx,tier,job);
-    const texture=new T.CanvasTexture(canvas);if(T.SRGBColorSpace)texture.colorSpace=T.SRGBColorSpace;else texture.encoding=T.sRGBEncoding;texture.anisotropy=1;texture.name='original-equipment-'+kind+'-'+job+'-'+sex;
+    const key=tier+'|'+job;let atlases=drawn.get(documentObject);if(!atlases)drawn.set(documentObject,atlases=new Map());
+    let entry=atlases.get(key);
+    if(!entry){
+      const canvas=documentObject.createElement('canvas');canvas.width=canvas.height=SIZE;const ctx=canvas.getContext?.('2d');if(!ctx)return null;
+      metal(ctx,tier,job);leather(ctx,tier);fabric(ctx,tier,job);paper(ctx,tier,job);
+      entry={canvas,source:null,refs:0};atlases.set(key,entry);
+    }
+    const texture=new T.CanvasTexture(entry.canvas);if(entry.source)texture.source=entry.source;else entry.source=texture.source;
+    entry.refs++;let released=false;
+    texture.addEventListener('dispose',()=>{if(released)return;released=true;if(--entry.refs===0&&atlases.get(key)===entry)atlases.delete(key);});
+    if(T.SRGBColorSpace)texture.colorSpace=T.SRGBColorSpace;else texture.encoding=T.sRGBEncoding;texture.anisotropy=1;texture.name='original-equipment-'+kind+'-'+job+'-'+sex;
     texture.userData={equipmentOwned:true,procedural:true,size:SIZE,tier,job,sex,kind,bytes:SIZE*SIZE*4};return texture;
   }
   function coordinates(T,geometry,surface){

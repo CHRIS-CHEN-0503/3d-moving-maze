@@ -98,3 +98,15 @@ test('命中由房主裁定，隔牆拒絕；接收端位置落後仍套用同�
   r.advance(500);r.flush();assert.equal(r.host.contacts.length,1);assert.equal(r.guest.contacts.length,1);
   r.guest.c.mpHandle({t:'contact',f:'g',sr:1,event:{t:'hit',f:'g',to:'h'}});assert.equal(r.guest.contacts.length,1);
 });
+test('訪客帶寶到出口只是請求：房主依自己裁定的持有者確認後，才以重送的結果結束兩端',()=>{
+  const r=room();for(const p of [r.host,r.guest]){p.c.MP.mode='treasure';p.c.MP.treasure={holder:'g'};}
+  r.start();r.advance(5000);r.flush();
+  // Another guest (or a forged packet) claiming the win is ignored by everyone.
+  for(const p of [r.host,r.guest])p.c.mpHandle({t:'twin',winner:'x',f:'x',sr:1});assert.equal(r.host.ends.length+r.guest.ends.length,0);
+  r.host.c.MP.treasure.holder='h';r.host.c.mpHandle({t:'twin',winner:'g',f:'g',sr:1});assert.equal(r.host.ends.length,0,'the host refuses a claim for a gem it does not see the guest holding');
+  r.host.c.MP.treasure.holder='g';r.guest.c.mpHandle({t:'twin',winner:'g',f:'g',sr:1});assert.equal(r.guest.ends.length,0,'a guest never ends on its own echo');
+  r.packets.length=0;r.host.c.mpHandle({t:'twin',winner:'g',f:'g',sr:1});assert.equal(r.host.ends.length,1);assert.equal(r.host.ends[0].winner,'g');
+  r.packets.length=0;r.advance(1100);r.flush();assert.equal(r.guest.ends.length,1,'the lost verdict arrives with the next heartbeat');assert.equal(r.guest.ends[0].winner,'g');
+  r.advance(1100);r.flush();assert.equal(r.guest.ends.length,1);assert.equal(r.host.ends.length,1);
+  r.host.c.mpHandle({t:'twin',winner:'g',f:'g',sr:1});r.flush();assert.equal(r.host.ends.length,1,'a retried claim after the end is harmless');
+});

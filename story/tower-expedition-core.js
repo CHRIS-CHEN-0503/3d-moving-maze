@@ -94,13 +94,30 @@
     if(!value||typeof value!=='object'||Array.isArray(value)||Object.keys(value).length!==Object.keys(Materials().MATERIALS).length||!Object.keys(Materials().MATERIALS).every(k=>own(value,k)&&integer(value[k],0,99)))return null;
     return {...value};
   }
+  // 雜貨商蘇禾 sells a few metal parts per floor. The optional per-floor counter
+  // lives on the journey (absent means none bought) and resets on every descent.
+  const SCRAP_SHOP=Object.freeze({merchantId:'suHe',price:5,stock:5});
   function newJourney(floor){return {version:1,scrap:0,materials:emptyMaterials(),maintenance:[],site:{floor,progress:0,done:false,method:null,catalogVersion:2}};}
   function validateJourney(value,floor){if(value===undefined)return newJourney(floor);const v=value,s=v?.site;
     if(!v||v.version!==1||!integer(v.scrap,0,99)||!s||s.floor!==floor||!number(s.progress,0,12)||typeof s.done!=='boolean'||![null,'profession','work'].includes(s.method)||s.done!==(s.method!==null)||s.done&&s.progress!==12)return null;
     const materials=materialStock(v.materials),maintenance=v.maintenance===undefined?[]:v.maintenance;if(!materials||!Array.isArray(maintenance)||maintenance.length>149||new Set(maintenance).size!==maintenance.length||!maintenance.every(f=>integer(f,1,99)||integer(f,-50,-1)))return null;
     const catalogVersion=s.catalogVersion===undefined?1:s.catalogVersion;if(![1,2].includes(catalogVersion))return null;
-    return {version:1,scrap:v.scrap,materials,maintenance:[...maintenance],site:{floor,progress:s.progress,done:s.done,method:s.method,catalogVersion}};
+    const bought=v.scrapBought===undefined?0:v.scrapBought;if(!integer(bought,0,SCRAP_SHOP.stock))return null;
+    return {version:1,scrap:v.scrap,materials,maintenance:[...maintenance],site:{floor,progress:s.progress,done:s.done,method:s.method,catalogVersion},...(bought?{scrapBought:bought}:{})};
   }
+  function scrapOffer(run){
+    const p=run?.party;if(!p?.journey||run.expedition?.active||!E()?.merchantOffers?.(run.floor,run.seed,!!p.loadouts)?.some(m=>m.id===SCRAP_SHOP.merchantId))return null;
+    const bought=p.journey.scrapBought||0;return {merchantId:SCRAP_SHOP.merchantId,price:SCRAP_SHOP.price,stock:SCRAP_SHOP.stock,bought,remaining:Math.max(0,SCRAP_SHOP.stock-bought),owned:p.journey.scrap,room:Math.max(0,99-p.journey.scrap)};
+  }
+  function buyScrap(run,merchantId,quantity=1,revision=run?.revision){return C().transaction(run,revision,n=>{
+    const offer=scrapOffer(n);if(!offer||merchantId!==offer.merchantId)return {ok:false,message:'這位商人沒有出售金屬零件。'};
+    if(!integer(quantity,1,SCRAP_SHOP.stock))return {ok:false,message:'購買數量無效，請重新選擇。'};
+    if(quantity>offer.remaining)return {ok:false,message:offer.remaining?'本層只剩 '+offer.remaining+' 份金屬零件。':'本層的金屬零件已經賣完了，下一層再來看看。'};
+    if(n.party.journey.scrap+quantity>99)return {ok:false,message:'零件袋放不下（最多 99 份）。'};
+    const cost=offer.price*quantity;if(n.coins<cost)return {ok:false,message:'銅幣不足。'};
+    n.coins-=cost;n.party.journey.scrap+=quantity;n.party.journey.scrapBought=offer.bought+quantity;
+    return {ok:true,message:'向蘇禾購買金屬零件 × '+quantity+'。',effect:{scrap:quantity,cost}};
+  });}
   function siteOffer(run){if(!run.party||BOSSES[run.floor])return null;const jobs=Object.keys(SITES),count=run.party.journey?.site?.catalogVersion===2?jobs.length:6,job=jobs[hash(run.seed,`site:${run.floor}`)%count];return {id:`site:${run.floor}:${run.seed}`,job,...SITES[job],...(job==='chef'?{reward:'取得兩份'+Materials().INGREDIENTS[Materials().signature(run)]+'。'}:{})};}
   function explore(run,id,method,revision){return C().transaction(run,revision,n=>{
     const offer=siteOffer(n),s=n.party?.journey.site;if(n.expedition.active||!offer||id!==offer.id||s.done)return {ok:false,message:'這處探索已完成，或不在當前樓層。'};
@@ -201,5 +218,5 @@
   function wear(run,g){if(g.durability<=0)return;if(g.forge?.reserve>0){g.forge.reserve--;return;}if(g.forge?.trait==='durable'){g.forge.wearCredit=(g.forge.wearCredit||0)+g.forge.level;if(g.forge.wearCredit>=10){g.forge.wearCredit-=10;return;}}g.durability--;if(g.durability===0&&run.party&&!run.party.loadouts)run.party.journey.scrap=Math.min(99,run.party.journey.scrap+1);}
   function traits(run){let light=0,grip=0;for(const g of Object.values(run.equipment||{}).filter(g=>g&&g.durability>0&&g.slot!=='weapon')){if(g.forge?.trait==='light')light+=g.forge.level;if(g.forge?.trait==='grip')grip+=g.forge.level;}return {speed:1+Math.min(2,light)*.03,grip:Math.min(4,grip)};}
   function attackInterval(run){const f=run.equipment.weapon?.forge;return .8-(f?.trait==='light'?f.level*.08:0);}
-  return Object.freeze({BOSSES,SITES,TRAITS,newBoss,validateBoss,phase,cycle,target,hint,bossAction,danger,newJourney,validateJourney,siteOffer,explore,validateForge,traitFits,traitPower,allGear,salvageValue,dismantle,repairQuote,repair,repairAllQuote,repairAll,maintenanceAllQuote,maintenanceAll,emergencyRepairAmount,forgeQuote,forgeOptions,forge,wear,traits,attackInterval});
+  return Object.freeze({BOSSES,SITES,TRAITS,newBoss,validateBoss,phase,cycle,target,hint,bossAction,danger,SCRAP_SHOP,newJourney,validateJourney,scrapOffer,buyScrap,siteOffer,explore,validateForge,traitFits,traitPower,allGear,salvageValue,dismantle,repairQuote,repair,repairAllQuote,repairAll,maintenanceAllQuote,maintenanceAll,emergencyRepairAmount,forgeQuote,forgeOptions,forge,wear,traits,attackInterval});
 });

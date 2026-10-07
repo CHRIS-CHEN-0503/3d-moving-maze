@@ -195,19 +195,19 @@ test('多人主機先過關仍會廣播變形，變形後保持已完成者凍�
   assert.equal(h.calls.build, 1);
 });
 
-test('粒子逐顆消失時釋放材質，共用幾何等最後一顆消失才釋放', () => {
-  const geometry = { count: 0, dispose() { this.count++; } };
-  const batch = { geometry, remaining: 2 };
-  const material = () => ({ count: 0, dispose() { this.count++; } });
-  const a = material(), b = material();
-  const mesh = mat => ({ material: mat, userData: { v: { y: 1 } }, position: { y: 1, addScaledVector() {} }, rotation: { x: 0, z: 0 } });
-  const context = vm.createContext({ particles: [{ life: .1, batch, m: mesh(a) }, { life: 1, batch, m: mesh(b) }], scene: { remove() {} } });
-  vm.runInContext(slice('function updateParticles(dt)', '/* =====================================================\n   玩家移動'), context);
-  vm.runInContext('updateParticles(.2)', context);
-  assert.equal(a.count, 1); assert.equal(b.count, 0); assert.equal(geometry.count, 0);
-  vm.runInContext('updateParticles(1)', context);
-  assert.equal(b.count, 1); assert.equal(geometry.count, 1);
-  assert.equal(context.particles.length, 0);
+test('碎屑粒子共用同一份幾何與材質：逐顆移出場景、不配置新陣列，換層清理也不釋放共用資源', () => {
+  const removed = [], scene = { add() {}, remove(m) { removed.push(m); } };
+  const context = vm.createContext({ THREE, V3: THREE.Vector3, particles: [], scene });
+  vm.runInContext(slice('function burstParticles(x,z)', '/* =====================================================\n   玩家移動'), context);
+  vm.runInContext('burstParticles(0,0);burstParticles(4,4);', context);
+  const list = context.particles, meshes = list.map(p => p.m);
+  assert.equal(list.length, 20); assert.ok(meshes.every(m => m.geometry === meshes[0].geometry && m.material === meshes[0].material), 'one geometry and one material for every burst');
+  let freed = 0; meshes[0].geometry.addEventListener('dispose', () => freed++); meshes[0].material.addEventListener('dispose', () => freed++);
+  assert.equal(meshes[0].geometry.userData.sharedResource, true); assert.equal(meshes[0].material.userData.sharedResource, true);
+  list[0].life = .1; vm.runInContext('updateParticles(.2)', context);
+  assert.equal(context.particles, list, 'the live list is compacted in place'); assert.equal(list.length, 19); assert.deepEqual(removed, [meshes[0]]);
+  vm.runInContext('updateParticles(2)', context); assert.equal(list.length, 0); assert.equal(removed.length, 20); assert.equal(freed, 0);
+  assert.match(html, /resource\.userData\?\.sharedResource/, 'scene disposal skips flagged shared resources');
 });
 
 test('揮擊模型同層重用、換層完整釋放，沒有舊動畫跨場景回呼', () => {

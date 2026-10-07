@@ -620,10 +620,10 @@ button:focus-visible,input:focus-visible{outline:3px solid #fff;outline-offset:3
 <link rel="stylesheet" href="assets/game-polish.css?v=1.39.3">
 <link rel="stylesheet" href="assets/play-controls.css?v=1.55.0">
 <link rel="stylesheet" href="story/tower-party.css?v=1.57.0">
-<link rel="stylesheet" href="story/tower-cinematics.css?v=1.57.0">
+<link rel="stylesheet" href="story/tower-cinematics.css?v=1.58.0">
 <link rel="stylesheet" href="story/tower-cooperation.css?v=1.47.0">
 <link rel="stylesheet" href="story/tower-heroes.css?v=1.51.0">
-<link rel="stylesheet" href="story/tower-mobile.css?v=1.55.0">
+<link rel="stylesheet" href="story/tower-mobile.css?v=1.58.0">
 <link rel="stylesheet" href="story/tower-growth.css?v=1.42.0">
 <link rel="stylesheet" href="assets/battle-dock.css?v=1.43.3">
 <link rel="stylesheet" href="assets/adventure-polish.css?v=1.46.0">
@@ -838,10 +838,10 @@ button:focus-visible,input:focus-visible{outline:3px solid #fff;outline-offset:3
       <div id="mpPlayers" style="margin:10px 0;"></div>
       <label id="mpBotOptions" class="mp-bot-option" hidden><input type="checkbox" id="mpFillBots">空位加入電腦玩家</label>
       <p id="mpBotSummary" role="status" style="color:#475569;font-size:.9rem;"></p>
-      <div id="mpStatus" style="font-size:.85rem;color:#999;min-height:20px;"></div>
       <button class="start-btn" id="mpReady" style="display:none;">準備完成</button>
       <button class="start-btn button-with-icon" id="mpStart" style="display:none;"><span class="ui-icon icon-compass" aria-hidden="true"></span>開始五秒倒數</button>
     </div>
+    <div id="mpStatus" role="status" aria-live="polite" style="font-size:.9rem;color:#5b6b78;min-height:20px;margin:6px 0;"></div>
     <button class="m-close" id="mpClose" style="background:#90a4ae;">離開</button>
   </div>
 </div>
@@ -982,16 +982,16 @@ button:focus-visible,input:focus-visible{outline:3px solid #fff;outline-offset:3
 
 <script src="./lib/three.min.js"></script>
 <script src="./assets/character-sculpt.js?v=1.57.2"></script>
-<script src="./assets/character-face.js?v=1.57.0"></script>
-<script src="./assets/character-motion.js?v=1.51.0"></script>
-<script src="./assets/maze-atmosphere.js?v=1.44.0"></script>
+<script src="./assets/character-face.js?v=1.58.0"></script>
+<script src="./assets/character-motion.js?v=1.58.0"></script>
+<script src="./assets/maze-atmosphere.js?v=1.58.0"></script>
 <script src="./assets/pickup-objects.js"></script>
 <script src="./assets/native-symbols.js"></script>
 <script src="./assets/game-rules.js?v=1.55.0"></script>
 <script src="./assets/gameplay-rules.js?v=1.36.0"></script>
 <script src="./assets/magic-map.js?v=1.42.0"></script>
 <script src="./assets/maze-sight-core.js?v=1.42.0"></script>
-<script src="./assets/maze-sight.js?v=1.44.0"></script>
+<script src="./assets/maze-sight.js?v=1.58.0"></script>
 <script src="./assets/maze-materials.js?v=1.44.0"></script>
 <script src="./assets/render-quality.js?v=1.44.0"></script>
 <script src="./assets/camera-comfort.js?v=1.45.0"></script>
@@ -1004,14 +1004,14 @@ button:focus-visible,input:focus-visible{outline:3px solid #fff;outline-offset:3
 <script src="./assets/audio-settings.js?v=1.43.3"></script>
 <script src="./assets/game-voice.js?v=1.57.0"></script>
 <script src="./assets/maze-stone-audio.js?v=1.34.2"></script>
-<script src="./assets/combat-audio.js?v=1.57.5"></script>
+<script src="./assets/combat-audio.js?v=1.58.0"></script>
 <script>
 'use strict';
 /* =====================================================
    3D移動迷宮 — 給小朋友的變形迷宮冒險
    ===================================================== */
 const $=id=>document.getElementById(id);
-const GAME_VERSION='1.57.9';
+const GAME_VERSION='1.58.0';
 
 /* ---------- 設定（後台可調） ---------- */
 const DEFAULT_CFG={teamSize:2,shiftMin:3,itemCount:6,foodCount:4,hungerMin:3,stunSec:3,pingSec:3,smellCells:3,mazeSize:13,magicMap:0,duelMin:5,unpaidRate:100,musicOn:1,speechOn:1,speechVoice:'',apiUrl:'',roomMax:3,rounds:3,goodsCount:16,shopCollect:1,shopMin:2.5,cartFull:400,views:{fp:1,tp:1,top:1},broker:'wss://broker.emqx.io:8084/mqtt'};
@@ -1025,7 +1025,10 @@ function zoomCamera(delta){
   if(G.view==='tp'){CFG.cameraDistance=cameraDistance(CFG.cameraDistance+delta*.12);}
   else if(G.view==='top')G.topZoom=Math.max(10,Math.min(48,G.topZoom+delta));
 }
-const runtimeConfigReady=fetch('/api/runtime-config',{signal:AbortSignal.timeout(5000)}).then(r=>r.ok?r.json():null).then(config=>{if(config){CFG.broker=config.broker||DEFAULT_CFG.broker;CFG.apiUrl=config.apiUrl||'';}}).catch(()=>{});
+// AbortSignal.timeout is missing before Safari 16; a top-level TypeError here
+// would abort this whole script block and leave every later global undefined.
+function timeoutSignal(ms){if(typeof AbortSignal!=='undefined'&&typeof AbortSignal.timeout==='function')return AbortSignal.timeout(ms);if(typeof AbortController!=='function')return undefined;const controller=new AbortController();setTimeout(()=>controller.abort(),ms);return controller.signal;}
+const runtimeConfigReady=fetch('/api/runtime-config',{signal:timeoutSignal(5000)}).then(r=>r.ok?r.json():null).then(config=>{if(config){CFG.broker=config.broker||DEFAULT_CFG.broker;CFG.apiUrl=config.apiUrl||'';}}).catch(()=>{});
 function matchRules(){return MP.on&&MP.started&&MP.rules?MP.rules:CFG;}
 
 /* ---------- 角色資料 ---------- */
@@ -1137,7 +1140,9 @@ function jobPerk(key){ return isShop()||window.TowerMode?.partyActive?undefined:
 /* 把第 i 個商品放到某格（補貨也共用；房主決定位置後廣播，大家畫面一致） */
 function placeGood(i,gi,cx,cy){
   const old=G.goods[i];
-  if(old){ itemGroup.remove(old.sprite); itemGroup.remove(old.tag); itemGroup.remove(old.marker); }
+  // Restocks happen hundreds of times a round: free the replaced price label and
+  // sprite material (cached emoji textures and shared marker parts are protected).
+  if(old){ for(const o of [old.sprite,old.tag,old.marker]){ itemGroup.remove(o); disposeSceneObject(o); } }
   const g=GOODS[gi]||GOODS[0], p=cellToWorld(cx,cy);
   const sp=makeEmojiSprite(g.emoji,1.5); sp.position.set(p.x,1.0,p.z);
   const tag=makeTextSprite('$'+g.price); tag.position.set(p.x,1.85,p.z); tag.scale.set(1.5,0.38,1);
@@ -1217,7 +1222,7 @@ function rankedSeriesStats(){
   return Object.values(SERIES.stats).sort((a,b)=>b.wins-a.wins||b.points-a.points||a.name.localeCompare(b.name,'zh-Hant'));
 }
 function seriesSummaryHtml(){
-  return rankedSeriesStats().map((r,i)=>`<div class="series-row"><span class="ui-icon ${i<3?'icon-medal':'icon-score'} score-medal" aria-hidden="true"></span><strong>${CHARS[r.charIdx||0].emoji} ${escapeHtml(r.name)}</strong><span>${r.wins} 勝</span><span>${r.points} 分</span></div>`).join('');
+  return rankedSeriesStats().map((r,i)=>`<div class="series-row"><span class="ui-icon ${i<3?'icon-medal':'icon-score'} score-medal" aria-hidden="true"></span><strong>${CHARS[safeCharIdx(r.charIdx)].emoji} ${escapeHtml(r.name)}</strong><span>${escapeHtml(r.wins)} 勝</span><span>${escapeHtml(r.points)} 分</span></div>`).join('');
 }
 function renderSingleSeriesResult(won){
   const prefix=won?'win':'fail', final=SERIES.current>=SERIES.total;
@@ -1244,8 +1249,13 @@ const AudioEng={
    this.shiftSound=window.MazeStoneAudio?.create(this.ctx,this.fxGain);
    this.combatSound=window.CombatAudio?.create(this.ctx,this.fxGain);
    window.MazeAudioSettings?.connect(this);
+   // iOS parks a context in 'interrupted' after app switches, locks or calls and
+   // only a user gesture can resume it; retry on the next touch, click or key.
+   const wake=()=>{if(!document.hidden)this.resume();};
+   for(const type of ['touchend','pointerdown','keydown'])document.addEventListener(type,wake,{capture:true,passive:true});
+   document.addEventListener('visibilitychange',wake);
  },
- resume(){ if(this.ctx&&this.ctx.state==='suspended') this.ctx.resume(); },
+ resume(){ const state=this.ctx?.state; if(state&&state!=='running'&&state!=='closed') this.ctx.resume()?.catch?.(()=>{}); },
  tone(freq,dur,type,gainNode,vol=0.5,slide=0){
    if(!this.ctx||(gainNode===this.musicGain&&G.muted)) return;
    const t=this.ctx.currentTime, o=this.ctx.createOscillator(), g=this.ctx.createGain();
@@ -1388,6 +1398,12 @@ let towerStairReveal=null;
 let previewRenderer,previewScene,previewCam,previewChar;
 const V3=THREE.Vector3;
 
+// A replaced floor, wall set or decoration layer is freed only after the next
+// frames have drawn its replacement: the replacement then reuses the compiled
+// shader programs instead of recompiling all of them on the spot.
+const retiredAfterRender=[];
+function retireAfterRender(release){retiredAfterRender.push({release,frames:2});}
+function flushRetiredAfterRender(){for(let i=retiredAfterRender.length-1;i>=0;i--){const item=retiredAfterRender[i];if(--item.frames>0)continue;retiredAfterRender.splice(i,1);try{item.release();}catch(e){}}}
 /* 重建關卡只釋放該場景持有的資源；道具圖集與標記仍由所有樓層共用。 */
 function disposeSceneObject(root){
   if(!root)return;
@@ -1395,8 +1411,10 @@ function disposeSceneObject(root){
   shared.add(makePickupMarker.ringGeom); shared.add(makePickupMarker.beamGeom);
   for(const mats of Object.values(makePickupMarker.materials||{}))for(const mat of Object.values(mats))shared.add(mat);
   const disposed=new Set();
+  // Managers that outlive a floor (skill-effect textures and shaders) flag their
+  // resources as shared; tearing down the old scene must not destroy them.
   const release=resource=>{
-    if(!resource||shared.has(resource)||disposed.has(resource)||typeof resource.dispose!=='function')return;
+    if(!resource||shared.has(resource)||resource.userData?.sharedResource||disposed.has(resource)||typeof resource.dispose!=='function')return;
     disposed.add(resource); resource.dispose();
   };
   root.traverse(object=>{
@@ -1406,7 +1424,7 @@ function disposeSceneObject(root){
     if(!object.isSprite)release(object.geometry);
     const materials=Array.isArray(object.material)?object.material:[object.material];
     for(const material of materials){
-      if(!material||shared.has(material))continue;
+      if(!material||shared.has(material)||material.userData?.sharedResource)continue;
       for(const value of Object.values(material))if(value&&value.isTexture)release(value);
       release(material);
     }
@@ -1512,7 +1530,8 @@ function worldToCell(x,z){const c=G.cell;return{
    ===================================================== */
 let mazeAtmosphere=null;
 function clearMazeAtmosphere(){
-  if(mazeAtmosphere){mazeAtmosphere.dispose();mazeAtmosphere=null;}
+  if(!mazeAtmosphere)return;const old=mazeAtmosphere;mazeAtmosphere=null;
+  if(typeof old.detach==='function'){old.detach();retireAfterRender(()=>old.dispose());}else old.dispose();
 }
 function buildMazeAtmosphere(theme){
   if(!window.MazeAtmosphere)return;
@@ -1530,7 +1549,7 @@ function buildMazeAtmosphere(theme){
 }
 function buildWalls(theme){
   clearMazeAtmosphere();
-  if(wallMesh){disposeSceneObject(wallMesh);scene.remove(wallMesh);}
+  if(wallMesh){const old=wallMesh;scene.remove(old);retireAfterRender(()=>disposeSceneObject(old));}
   G.wallBoxes=[];
   const W=G.mazeW,H=G.mazeH,c=G.cell,t=G.wallT,h=G.wallH;
   const mats=[]; // 收集每面牆的變換
@@ -1805,7 +1824,8 @@ function makePickupMarker(color,label){
   const mats=makePickupMarker.materials[color],group=new THREE.Group();
   const ring=new THREE.Mesh(makePickupMarker.ringGeom,mats.ring);ring.rotation.x=Math.PI/2;ring.position.y=.22;group.add(ring);
   const beam=new THREE.Mesh(makePickupMarker.beamGeom,mats.beam);beam.position.y=1.05;group.add(beam);
-  if(label){const tag=makeTextSprite(label);tag.position.y=2.25;tag.scale.set(1.45,.36,1);group.add(tag);}
+  // The fixed classic captions share textures; story loot names stay per marker.
+  if(label){const tag=makeTextSprite(label,['可拾取','關卡道具','食物','魔法地圖','寶藏'].includes(label));tag.position.y=2.25;tag.scale.set(1.45,.36,1);group.add(tag);}
   group.userData.phase=Math.random()*Math.PI*2;
   return group;
 }
@@ -2267,7 +2287,7 @@ function updateSatietyBar(){
   if($('satietyPct').textContent!==caption)$('satietyPct').textContent=caption;
   const foodIcon=$('satietyPct').parentElement.querySelector('.inline-ui-icon');
   if(foodIcon&&foodIcon.dataset.energy!==String(!!energy)){foodIcon.dataset.energy=String(!!energy);foodIcon.classList.toggle('icon-food',!energy);foodIcon.innerHTML=energy?(window.TowerHeroIcons?.svg('power_glimmer')||''):'';}
-  $('satietyWrap').setAttribute('aria-label',(energy?'機器人能源':'飽足感')+' '+Math.ceil(v)+'%');
+  const label=(energy?'機器人能源':'飽足感')+' '+Math.ceil(v)+'%';if(updateSatietyBar.label!==label){$('satietyWrap').setAttribute('aria-label',label);updateSatietyBar.label=label;}
 }
 function applyFood(f){
   AudioEng.sfxEat();
@@ -2440,14 +2460,21 @@ function useWhistle(){
   G.whistles--; updateWhistleBtn();
   mpSend({t:'gather',x:+G.px.toFixed(2),z:+G.pz.toFixed(2)});
 }
+// A whistle offset from an off-centre caller can land inside a wall, where
+// every later step collides. Every device derives the same open spot from the
+// shared maze: the offset spot, the offset from the caller's cell centre, then the centre.
+function gatherSpot(x,z,o){
+  const cell=worldToCell(x,z),centre=cellToWorld(cell.x,cell.y);
+  for(const [tx,tz] of [[x+o[0],z+o[1]],[centre.x+o[0],centre.z+o[1]]])if(!playerInWall(tx,tz))return {x:tx,z:tz};
+  return centre;
+}
 function applyGather(x,z,fromId){
   const spread=[[0,0],[1.1,0],[-1.1,0],[0,1.1],[0,-1.1],[0.8,0.8],[-0.8,-0.8]];
   const ids=participantIds();
   ids.forEach((id,i)=>{
-    const o=spread[i%spread.length];
-    const tx=x+o[0], tz=z+o[1];
-    if(id===MP.id){ if(id!==fromId)teleportSelfTo(tx,tz); }
-    else teleportOtherTo(id,tx,tz);
+    const spot=gatherSpot(x,z,spread[i%spread.length]);
+    if(id===MP.id){ if(id!==fromId)teleportSelfTo(spot.x,spot.z); }
+    else teleportOtherTo(id,spot.x,spot.z);
   });
   AudioEng.sfxWhistle();
   showToast('📣 '+(fromId===MP.id?'你':mpName(fromId))+'吹了集合口哨！大家都被叫過來了',2800,fromId===MP.id?'使用 集合口哨':'有人使用集合口哨');
@@ -2462,8 +2489,19 @@ function updateKiteBtn(){
   $('kiteBtn').style.display=G.kites>0?'block':'none';
   $('kiteCnt').textContent=G.kites;
 }
+// Fade the player for cloak/invisibility and restore every material's own
+// transparency afterwards (contact shadow, blush and head sprites are translucent).
+function fadePlayer(opacity){
+  playerGroup.traverse(o=>{for(const mat of Array.isArray(o.material)?o.material:o.material?[o.material]:[]){
+    const base=mat.userData.lookBase;
+    if(opacity==null){if(base){mat.transparent=base.transparent;mat.opacity=base.opacity;delete mat.userData.lookBase;}continue;}
+    if(!base)mat.userData.lookBase={transparent:mat.transparent,opacity:mat.opacity};
+    mat.transparent=true;mat.opacity=Math.min(mat.userData.lookBase.opacity,opacity);
+  }});
+}
 function setGhostLook(on){
-  playerGroup.traverse(o=>{ if(o.material){o.material.transparent=on;o.material.opacity=on?0.45:1;} });
+  fadePlayer(on?0.45:null);
+  if(!on&&performance.now()<G.invisUntil)fadePlayer(0.35);
 }
 function updateShovelBtn(){
   if(isShop()){$('shovelBtn').style.display='none';return;}
@@ -2475,8 +2513,10 @@ function updateShovelBtn(){
   $('shovelBtn').style.opacity=G.shovels>0?'1':'0.5';
 }
 /* 找面前 2.4 單位內最近的內牆（鐵鍬 / 風箏共用） */
+// First person never turns the hidden body, so aim where the camera looks.
 function findWallAhead(){
-  const dx=Math.sin(G.heading), dz=Math.cos(G.heading);
+  const heading=G.view==='fp'?G.camYaw+Math.PI:G.heading;
+  const dx=Math.sin(heading), dz=Math.cos(heading);
   let best=null,bestD=1e9;
   for(let d=0.6;d<=2.4;d+=0.3){
     const sx=G.px+dx*d, sz=G.pz+dz*d;
@@ -2542,27 +2582,26 @@ function useShovel(){
 }
 let particles=[];
 function burstParticles(x,z){
-  const geo=new THREE.BoxGeometry(0.25,0.25,0.25);
-  const batch={geometry:geo,remaining:10};
+  // Every burst shares one geometry and material for the session; scene teardown skips them.
+  if(!burstParticles.parts){burstParticles.parts={geometry:new THREE.BoxGeometry(0.25,0.25,0.25),material:new THREE.MeshBasicMaterial({color:0xbcaaa4})};for(const part of Object.values(burstParticles.parts))part.userData.sharedResource=true;}
+  const {geometry,material}=burstParticles.parts;
   for(let i=0;i<10;i++){
-    const m=new THREE.Mesh(geo,new THREE.MeshBasicMaterial({color:0xbcaaa4}));
+    const m=new THREE.Mesh(geometry,material);
     m.position.set(x,1.4,z);
     m.userData.v=new V3((Math.random()-0.5)*6,Math.random()*6+2,(Math.random()-0.5)*6);
-    scene.add(m); particles.push({m,life:1,batch});
+    scene.add(m); particles.push({m,life:1});
   }
 }
 function updateParticles(dt){
-  particles=particles.filter(p=>{
+  let kept=0;
+  for(const p of particles){
     p.life-=dt; p.m.userData.v.y-=14*dt;
     p.m.position.addScaledVector(p.m.userData.v,dt);
     p.m.rotation.x+=dt*6; p.m.rotation.z+=dt*4;
-    if(p.life<=0||p.m.position.y<0){
-      scene.remove(p.m); p.m.material.dispose();
-      if(--p.batch.remaining===0)p.batch.geometry.dispose();
-      return false;
-    }
-    return true;
-  });
+    if(p.life<=0||p.m.position.y<0){scene.remove(p.m);continue;}
+    particles[kept++]=p;
+  }
+  particles.length=kept;
 }
 
 /* =====================================================
@@ -2725,7 +2764,7 @@ function updatePlayer(dt,t){
   // 撿寶藏（尋寶模式）
   if(MP.on&&MP.mode==='treasure'&&MP.treasure&&!MP.treasure.holder){
     const tp=cellToWorld(MP.treasure.cell.x,MP.treasure.cell.y);
-    if((tp.x-G.px)**2+(tp.z-G.pz)**2<1.5)mpSend({t:'tres',holder:MP.id});
+    if((tp.x-G.px)**2+(tp.z-G.pz)**2<1.5&&performance.now()>(G.tresClaimAt||0)){G.tresClaimAt=performance.now()+500;mpSend({t:'tres',holder:MP.id});}
   }
   // 到出口了嗎？（鬼抓人模式沒有終點）
   const md=MP.on?MP.mode:'classic';
@@ -2733,7 +2772,8 @@ function updatePlayer(dt,t){
     const ep=cellToWorld(G.exitCell.x,G.exitCell.y);
     if((ep.x-G.px)**2+(ep.z-G.pz)**2<2.2){
       if(md==='treasure'){
-        if(MP.treasure&&MP.treasure.holder===MP.id&&!MP.twinSent&&!MP.ended&&(!globalThis.ModeVariants||ModeVariants.canFinish(MP.id))){MP.twinSent=true;mpSend({t:'twin',winner:MP.id});}
+        // 訪客的抵達是請求：房主確認前每秒重送一次，直到收到房主的結果。
+        if(MP.treasure&&MP.treasure.holder===MP.id&&!MP.ended&&performance.now()>=(MP.twinSent||0)&&(!globalThis.ModeVariants||ModeVariants.canFinish(MP.id))){MP.twinSent=performance.now()+1000;mpSend({t:'twin',winner:MP.id});}
       }
       else if(MP.on)mpReach(); else winGame();
     }
@@ -2790,8 +2830,7 @@ function useSkill(){
   G.skillCoolUntil=now+30000; // 30 秒冷卻
   G.invisUntil=now+secs*1000;
   mpSend({t:'inv',ms:secs*1000});
-  playerGroup.traverse(o=>{if(o.material){o.material.transparent=true;o.material.opacity=0.35;}});
-  setTimeout(()=>{if(performance.now()>=G.invisUntil)playerGroup.traverse(o=>{if(o.material){o.material.opacity=1;}});},secs*1000);
+  fadePlayer(0.35);G.invisFaded=true; // restored by the main loop, which also honours paused/background time
   AudioEng.sfxUse();
   showToast('🫥 隱身 '+secs+' 秒！別人看不到你');
   updateSkillBtn();
@@ -2821,8 +2860,28 @@ function applyStun(id,ms){
     if(MP.host&&MP.bots){const b=MP.bots.find(x=>x.id===id);if(b)b.stunnedUntil=now+ms;}
   }
 }
+// The host returns the gem to the maze at its holder's last known cell when
+// that holder leaves or stops sending positions, instead of freezing the round.
+function dropTreasure(id){
+  if(!MP.host||!MP.treasure||MP.treasure.holder!==id)return;
+  const at=botPosOf(id)||cellToWorld(MP.treasure.cell.x,MP.treasure.cell.y),cell=worldToCell(at.x,at.z);
+  mpSend({t:'tresdrop',x:Math.max(0,Math.min(G.mazeW-1,cell.x)),y:Math.max(0,Math.min(G.mazeH-1,cell.y)),from:id});
+}
+// A guest that missed a verdict (reconnect, lost packet, background tab) adopts the
+// host's newer treasure state from the room pulse instead of diverging until the round ends.
+function syncTreasure(s){
+  if(MP.host||!MP.started||MP.ended||MP.mode!=='treasure'||!MP.treasure||!s||!Number.isSafeInteger(s.v)||s.v<=(MP.treasure.syncV??-1))return false;
+  if(s.holder!==null&&!MP.roster.some(r=>r.id===s.holder))return false;
+  if(!Number.isInteger(s.x)||!Number.isInteger(s.y)||s.x<0||s.y<0||s.x>=G.mazeW||s.y>=G.mazeH)return false;
+  MP.treasure.syncV=s.v;
+  if(MP.treasure.cell.x!==s.x||MP.treasure.cell.y!==s.y){MP.treasure.cell={x:s.x,y:s.y};const tp=cellToWorld(s.x,s.y);if(G.treasureMesh)G.treasureMesh.position.set(tp.x,0,tp.z);}
+  if(MP.treasure.holder!==s.holder)setTreasureHolder(s.holder);
+  return true;
+}
 function setTreasureHolder(id){
   if(!MP.treasure)return;
+  // The host versions every verdict; its once-a-second room pulse carries the latest one.
+  if(MP.host&&MP.treasure.holder!==id)MP.treasure.v=(MP.treasure.v||0)+1;
   MP.treasure.holder=id;
   MP.treasure.lastPing=null; MP.treasure.nextPingAt=0;
   if(G.treasureMesh)G.treasureMesh.visible=!id;
@@ -2848,7 +2907,7 @@ function updateCamera(dt){
     // 後面有牆就拉近，不穿牆；賣場的貨架比鏡頭矮，鏡頭直接從上面掠過就好
     const d=(G.wallH<hh-0.3)?dist:cameraClearDist(dx,dz,dist);
     const tx=G.px+dx*d, tz=G.pz+dz*d;
-    camera.position.lerp(new V3(tx,hh,tz),Math.min(1,dt*10));
+    camera.position.lerp(cameraGoal(tx,hh,tz),Math.min(1,dt*10));
     // 從高空俯視切回第三人稱時，立即回到室內，避免平滑過渡穿過屋頂。
     const ceiling=envGroup&&envGroup.userData.cameraCeiling;
     if(Number.isFinite(ceiling))camera.position.y=Math.min(camera.position.y,ceiling);
@@ -2864,7 +2923,7 @@ function updateCamera(dt){
   }else{ // top（滾輪 / 雙指 / ＋－按鈕可拉近拉遠）
     const owl=performance.now()<G.owlUntil;
     const h=owl?58:G.topZoom;
-    camera.position.lerp(new V3(G.px,h,G.pz+h*0.16),Math.min(1,dt*5));
+    camera.position.lerp(cameraGoal(G.px,h,G.pz+h*0.16),Math.min(1,dt*5));
     camera.lookAt(G.px,0,G.pz);
   }
   // 火把跟著玩家（山洞）
@@ -2881,6 +2940,8 @@ function updateCamera(dt){
   }
   updateTopMask(); // 俯視公平化：只看得到玩家腳邊一圈
 }
+// The follow cameras ease toward one reused target vector instead of a new one per frame.
+function cameraGoal(x,y,z){return (cameraGoal.v||(cameraGoal.v=new V3())).set(x,y,z);}
 </script>
 <script>
 'use strict';
@@ -2920,10 +2981,11 @@ function setupTouch(){
     joy.dx=dx/max; joy.dy=dy/max; setStick(ox,oy,ox+dx,oy+dy);
   };
   const end=()=>{joy.active=false;joy.dx=0;joy.dy=0;joy.id=null;base.style.display='none';stick.style.display='none';};
-  zone.addEventListener('touchstart',e=>{e.preventDefault();const t=e.changedTouches[0];start(t.clientX,t.clientY,t.identifier);},{passive:false});
+  // A second finger landing on the left half must not steal the stick from the thumb.
+  zone.addEventListener('touchstart',e=>{e.preventDefault();if(joy.active&&[...e.touches].some(t=>t.identifier===joy.id))return;const t=e.changedTouches[0];start(t.clientX,t.clientY,t.identifier);},{passive:false});
   zone.addEventListener('touchmove',e=>{e.preventDefault();for(const t of e.changedTouches)if(t.identifier===joy.id)move(t.clientX,t.clientY);},{passive:false});
   zone.addEventListener('touchend',e=>{for(const t of e.changedTouches)if(t.identifier===joy.id)end();});
-  zone.addEventListener('touchcancel',end);
+  zone.addEventListener('touchcancel',e=>{if(!e.changedTouches||[...e.changedTouches].some(t=>t.identifier===joy.id))end();});
   // 滑鼠也能玩（電腦）
   zone.addEventListener('mousedown',e=>{start(e.clientX,e.clientY,'m');
     const mm=ev=>move(ev.clientX,ev.clientY);
@@ -2978,13 +3040,24 @@ function drawMap(cv,big){
   ctx.clearRect(0,0,cv.width,cv.height);
   ctx.fillStyle=big?'#141031':'rgba(10,8,30,0)'; if(big)ctx.fillRect(0,0,cv.width,cv.height);
   const gx=x=>pad+x*cw, gy=y=>pad+y*ch;
-  // 牆
+  // 牆：畫在離屏圖層，只有牆壁改變（變形、敲牆、換尺寸）時才重畫，每次只貼上一次。
+  let key=cv.width*7919+cv.height*31+(big?1:0)+W*131+H*137;
+  for(let y=0;y<H-1;y++)for(let x=0;x<W;x++)key=Math.imul(key^(G.hWalls[y][x]?(y*W+x+1):0),16777619)>>>0;
+  for(let y=0;y<H;y++)for(let x=0;x<W-1;x++)key=Math.imul(key^(G.vWalls[y][x]?(y*W+x+1)*3:0),16777619)>>>0;
+  const layer=cv._wallLayer||(cv._wallLayer={key:null,canvas:document.createElement('canvas')});
+  if(layer.key!==key){
+    layer.key=key;layer.canvas.width=cv.width;layer.canvas.height=cv.height;
+    const wctx=layer.canvas.getContext('2d');wctx.clearRect(0,0,cv.width,cv.height);
+    wctx.strokeStyle=big?'#b39ddb':'rgba(255,255,255,.85)'; wctx.lineWidth=big?4:2; wctx.lineCap='round';
+    wctx.beginPath();
+    wctx.rect(gx(0),gy(0),W*cw,H*ch);
+    for(let y=0;y<H-1;y++)for(let x=0;x<W;x++) if(G.hWalls[y][x]){wctx.moveTo(gx(x),gy(y+1));wctx.lineTo(gx(x+1),gy(y+1));}
+    for(let y=0;y<H;y++)for(let x=0;x<W-1;x++) if(G.vWalls[y][x]){wctx.moveTo(gx(x+1),gy(y));wctx.lineTo(gx(x+1),gy(y+1));}
+    wctx.stroke();
+  }
+  ctx.drawImage(layer.canvas,0,0);
+  // Later overlays (fog memory walls, the magic route) inherit the wall pen, as when walls were stroked here.
   ctx.strokeStyle=big?'#b39ddb':'rgba(255,255,255,.85)'; ctx.lineWidth=big?4:2; ctx.lineCap='round';
-  ctx.beginPath();
-  ctx.rect(gx(0),gy(0),W*cw,H*ch);
-  for(let y=0;y<H-1;y++)for(let x=0;x<W;x++) if(G.hWalls[y][x]){ctx.moveTo(gx(x),gy(y+1));ctx.lineTo(gx(x+1),gy(y+1));}
-  for(let y=0;y<H;y++)for(let x=0;x<W-1;x++) if(G.vWalls[y][x]){ctx.moveTo(gx(x+1),gy(y));ctx.lineTo(gx(x+1),gy(y+1));}
-  ctx.stroke();
   // 魔法地圖：金色路線
   if(performance.now()<G.mapUntil&&G.solutionPath&&G.solutionPath.length){
     if(!window.TowerMode?.active||towerStairReveal?.unlocked){
@@ -3221,7 +3294,7 @@ function updateCheckoutBtn(){
   if(isCheckingOut(MP.id)){
     const left=Math.ceil((G.coUntil-performance.now())/1000);
     btn.style.display='block'; btn.classList.add('busy'); btn.classList.remove('ready');
-    $('coCnt').textContent=left;
+    if($('coCnt').textContent!==String(left))$('coCnt').textContent=left;
     return;
   }
   btn.classList.remove('busy');
@@ -3229,7 +3302,7 @@ function updateCheckoutBtn(){
   const can=near&&near.dist<CHECKOUT_RANGE&&(MP.carts[MP.id]||0)>0;
   btn.style.display=can?'block':'none';
   btn.classList.toggle('ready',!!can);
-  $('coCnt').textContent='$'+(MP.carts[MP.id]||0);
+  const cart='$'+(MP.carts[MP.id]||0);if($('coCnt').textContent!==cart)$('coCnt').textContent=cart;
 }
 function startCheckout(){
   if(!isShop()||!MP.started||MP.ended||G.frozen||G.shifting||performance.now()<G.stunnedUntil)return;
@@ -3390,12 +3463,12 @@ function updateSmell(now){
     sp.visible=true;
   }
   // HUD：方向箭頭 + 距離幾格
-  const hud=$('smellHud'); hud.style.display='block';
-  const dist=Math.sqrt(bd), cells=Math.max(1,Math.round(dist/G.cell));
-  $('smellTxt').textContent='👃 聞到味道！約 '+cells+' 格';
+  const hud=$('smellHud'); if(hud.style.display!=='block')hud.style.display='block';
+  const dist=Math.sqrt(bd), cells=Math.max(1,Math.round(dist/G.cell)),smell='👃 聞到味道！約 '+cells+' 格';
+  if($('smellTxt').textContent!==smell)$('smellTxt').textContent=smell;
   const worldAng=Math.atan2(bpos.x-G.px,bpos.z-G.pz);
   const camF=(G.view==='top')?Math.PI:G.camYaw+Math.PI;
-  $('smellArrow').style.transform='rotate('+(-(worldAng-camF)*180/Math.PI).toFixed(1)+'deg)';
+  const turn='rotate('+(-(worldAng-camF)*180/Math.PI).toFixed(1)+'deg)';if(updateSmell.turn!==turn){$('smellArrow').style.transform=turn;updateSmell.turn=turn;}
 }
 
 /* =====================================================
@@ -3435,7 +3508,7 @@ function updateShiftTimer(){
   if(window.TowerMode&&TowerMode.active){TowerMode.updateShift();return;}
   if(!G.running||G.shifting||(G.frozen&&!MP.on))return;
   const left=(G.nextShiftAt-performance.now())/1000;
-  $('shiftCountdown').textContent=left>60?Math.ceil(left/60)+'分':Math.ceil(Math.max(0,left))+'秒';
+  const countdown=left>60?Math.ceil(left/60)+'分':Math.ceil(Math.max(0,left))+'秒';if($('shiftCountdown').textContent!==countdown)$('shiftCountdown').textContent=countdown;
   if(left<=3.5&&!G.preWarned){
     G.preWarned=true; $('preWarn').style.display='block';
     let n=3; $('preWarnSec').textContent=n; AudioEng.sfxTick();
@@ -3577,9 +3650,14 @@ function winGame(){
   renderSingleSeriesResult(true);
   const rec={name:getPlayerName(),char:CHARS[G.charIdx].emoji,level:LEVELS[G.lvlIdx].id,
     timeSec:Math.round(timeSec),score,date:new Date().toISOString().slice(0,10)};
+  // Clear the previous round's rank now; a slow or late reply from an older
+  // round must not overwrite this one.
+  const rankToken=winGame.rankToken=(winGame.rankToken||0)+1,levelName=LEVELS[G.lvlIdx].name;
+  $('winRank').textContent='';
   saveRecord(rec).then(rank=>{
-    $('winRank').textContent=rank?`你是「${LEVELS[G.lvlIdx].name}」第 ${rank} 名！`:'';
-  });
+    if(rankToken!==winGame.rankToken)return;
+    $('winRank').textContent=rank?`你是「${levelName}」第 ${rank} 名！`:'';
+  }).catch(()=>{});
   switchScreen('winScreen');
   window.GameVoice?.announce('恭喜過關！',true);
 }
@@ -3597,7 +3675,7 @@ function scoreApiUrl(){ return CFG.apiUrl||'/api/scores'; } // 沒填就試同�
 async function fetchRemoteRecords(){
   await runtimeConfigReady;
   try{
-    const r=await fetch(scoreApiUrl(),{method:'GET'});
+    const r=await fetch(scoreApiUrl(),{method:'GET',signal:timeoutSignal(8000)});
     if(!r.ok){G._remoteOk=false;return null;}
     const j=await r.json();
     const arr=Array.isArray(j)?j:(Array.isArray(j.records)?j.records:null);
@@ -3611,7 +3689,7 @@ async function saveRecord(rec){
   local.sort((a,b)=>a.timeSec-b.timeSec);
   localStorage.setItem('maze3d_lb',JSON.stringify(local.slice(0,200)));
   try{
-    await fetch(scoreApiUrl(),{method:'POST',headers:{'Content-Type':'text/plain'},body:JSON.stringify(rec)});
+    await fetch(scoreApiUrl(),{method:'POST',headers:{'Content-Type':'text/plain'},body:JSON.stringify(rec),signal:timeoutSignal(8000)});
   }catch(e){/* 沒有雲端 API 或離線也沒關係，本機有存 */}
   const all=(await getAllRecords()).filter(r=>r.level===rec.level).sort((a,b)=>a.timeSec-b.timeSec);
   const idx=all.findIndex(r=>r.name===rec.name&&r.timeSec===rec.timeSec&&r.date===rec.date);
@@ -3651,7 +3729,7 @@ async function renderLeaderboard(){
     if(r.name===myName)tr.className='me';
     const medal=i+1;
     const lv=LEVELS.find(l=>l.id===r.level);
-    tr.innerHTML=`<td>${medal}</td><td>${escapeHtml(r.name)}</td><td>${r.char||''}${lbFilter==='all'&&lv?' '+lv.emoji:''}</td><td>${fmtTime(r.timeSec)}</td><td>${r.score}</td>`;
+    tr.innerHTML=`<td>${medal}</td><td>${escapeHtml(r.name)}</td><td>${escapeHtml(r.char||'')}${lbFilter==='all'&&lv?' '+lv.emoji:''}</td><td>${fmtTime(r.timeSec)}</td><td>${escapeHtml(Math.round(Number(r.score)||0))}</td>`;
     body.appendChild(tr);
   });
 }
@@ -3788,7 +3866,7 @@ function startGame(){
   clearMazeAtmosphere();
   towerStairReveal?.dispose();towerStairReveal=null;
   if(!scene)scene=new THREE.Scene();
-  else{disposeSceneObject(scene);while(scene.children.length)scene.remove(scene.children[0]);}
+  else{const retired=new THREE.Group();retired.name='retired-floor';while(scene.children.length)retired.add(scene.children[0]);retireAfterRender(()=>disposeSceneObject(retired));}
   particles=[];
   wallMesh=null; floorMesh=null; exitGroup=null; envGroup=null; itemGroup=null;
   // 起點 & 出口（對角）
@@ -3816,8 +3894,9 @@ function startGame(){
   scene.add(playerGroup);
   // 3D 指南針箭頭
   compass3D=new THREE.Mesh(new THREE.ConeGeometry(0.22,0.7,8),new THREE.MeshBasicMaterial({color:0xffd54f}));
-  compass3D.rotation.x=Math.PI/2; compass3D.visible=false;
-  const cGroup=new THREE.Group(); cGroup.add(compass3D); compass3D.position.z=0.35;
+  compass3D.rotation.x=Math.PI/2;
+  // Only the outer group toggles; hiding the cone itself kept the arrow invisible forever.
+  const cGroup=new THREE.Group(); cGroup.add(compass3D); compass3D.position.z=0.35; cGroup.visible=false;
   scene.add(cGroup); compass3D=cGroup;
   // 狀態重設
   G.items=[]; G.foods=[]; G.goods=[]; G.registers=[]; G.coUntil=0; G.effects={}; G.shovels=jobPerk('startShovels')||0; G.starBonus=0; G.timeOffset=0;
@@ -3827,9 +3906,11 @@ function startGame(){
   G.starvedNoted=false;
   G.drainPerSec=100/((MP.on?MP.hungerMin:CFG.hungerMin)*60); updateSatietyBar();
   $('satietyPct').parentElement.style.display=G.hungerOn?'':'none';
+  // An owl flight that outlived the previous round must not force the next one into top view.
+  if(G.viewBefore)G.view=G.viewBefore;
   G.kites=0; G.whistles=0; G.visionUntil=0; G.owlUntil=0; G.viewBefore=null; updateKiteBtn(); updateWhistleBtn();
   G.stunnedUntil=0; G.atkCoolUntil=0; MP.twinSent=false;
-  G.shovelRechargeAt=0; G.skillCoolUntil=0; G.invisUntil=0; G.radarNextAt=0; G.radarPings=null;
+  G.shovelRechargeAt=0; G.skillCoolUntil=0; G.invisUntil=0; G.invisFaded=false; G.radarNextAt=0; G.radarPings=null;
   G.smellMarks=null; G.smellTarget=null; G.smellPath=null; G.smellPathAt=0; $('smellHud').style.display='none';
   $('stunOverlay').style.display='none';
   if(MP.on&&MP.mode==='treasure'){
@@ -3879,12 +3960,15 @@ function startGame(){
    主迴圈
    ===================================================== */
 let lastT=0,mapAcc=0,chipAcc=0,lastPausedRender=0;
-function sightFrame(){return {T:THREE,g:G,scene,wall:wallMesh,atmosphere:mazeAtmosphere,fullVision:isShop(),radius:Math.max(.8,(window.TowerMode?.lightRadius?.()||G.cell*5)/G.cell),objects:()=>{
-  const list=[],containers=new Set([itemGroup,window.TowerMode?.sightRoot?.()]);
-  const visit=o=>{if(!o||o===wallMesh||o===floorMesh||o===playerGroup||o===compass3D||o===camera||o===mazeAtmosphere?.floorRoot||o.name==='maze-sight-layer'||o.isLight)return;if(containers.has(o)||['tower-party-scene','tower-lighting','mode-variant-markers'].includes(o.name)){o.children.forEach(visit);return;}list.push(o);};
-  for(const o of scene.children)if(o===envGroup)o.children.forEach(visit);else visit(o);return list;
-}};}
-function renderMaze(){const draw=()=>MazeCameraComfort.render(playerGroup,camera,window.TowerMode?.cinematicActive?'tp':G.view,()=>{if(window.MazeSight&&wallMesh)MazeSight.render(sightFrame(),renderer,camera);else renderer.render(scene,camera);});return window.TowerMode?.cinematicActive?TowerMode.cinematicRender(draw):draw();}
+// One reused sight frame and object list: the fog pass runs every frame.
+const SIGHT_GROUPS=new Set(['tower-party-scene','tower-lighting','mode-variant-markers']),sightList=[];let sightState=null,sightRoot=null;
+function sightVisit(o){if(!o||o===wallMesh||o===floorMesh||o===playerGroup||o===compass3D||o===camera||o===mazeAtmosphere?.floorRoot||o.name==='maze-sight-layer'||o.isLight)return;if(o===itemGroup||o===sightRoot||SIGHT_GROUPS.has(o.name)){for(const c of o.children)sightVisit(c);return;}sightList.push(o);}
+function sightObjects(){sightList.length=0;sightRoot=window.TowerMode?.sightRoot?.()||null;for(const o of scene.children)if(o===envGroup){for(const c of o.children)sightVisit(c);}else sightVisit(o);return sightList;}
+function sightFrame(){
+  const f=sightState||={T:THREE,g:G,objects:sightObjects};
+  f.scene=scene;f.wall=wallMesh;f.atmosphere=mazeAtmosphere;f.fullVision=isShop();f.overview=performance.now()<G.owlUntil;f.radius=Math.max(.8,(window.TowerMode?.lightRadius?.()||G.cell*5)/G.cell);return f;
+}
+function renderMaze(){const draw=()=>MazeCameraComfort.render(playerGroup,camera,window.TowerMode?.cinematicActive?'tp':G.view,()=>{if(window.MazeSight&&wallMesh)MazeSight.render(sightFrame(),renderer,camera);else renderer.render(scene,camera);});try{return window.TowerMode?.cinematicActive?TowerMode.cinematicRender(draw):draw();}finally{flushRetiredAfterRender();}}
 function loop(tms){
   requestAnimationFrame(loop);
   if(!renderer)return;
@@ -3896,8 +3980,10 @@ function loop(tms){
   if(window.TowerMode?.cinematicActive){TowerMode.cinematicFrame(dt);renderMaze();return;}
   if(storyPaused){if(tms-lastPausedRender>=80){lastPausedRender=tms;renderMaze();}return;}
   if(G.running&&!G.shifting){
-    G.elapsed=(performance.now()-G.startTime)/1000-G.timeOffset;
-    const clockText=fmtTime(G.elapsed);if($('hudTime').textContent!==clockText)$('hudTime').textContent=clockText;
+    // Time gems subtract seconds; a run can never finish in negative time.
+    G.elapsed=Math.max(0,(performance.now()-G.startTime)/1000-G.timeOffset);
+    // Timed rooms (shop, tag, treasure, capture-the-flag) show their own countdown in this element.
+    const clockText=fmtTime(G.elapsed),roomClock=MP.on&&MP.started&&(MP.mode==='tag'||['shop','treasure'].includes(MP.mode)&&!MP.ended||MP.mode==='ctf'&&Number.isFinite(window.CaptureFlag?.view?.()?.deadline));if(!roomClock&&$('hudTime').textContent!==clockText)$('hudTime').textContent=clockText;
   }
   if(G.running&&!G.frozen&&G.hungerOn){
     G.satiety=Math.max(0,G.satiety-G.drainPerSec*(jobPerk('drainMul')||1)*dt); // 耐力王餓得慢
@@ -3928,6 +4014,7 @@ function loop(tms){
   // 效果到期檢查
   chipAcc+=dt; if(chipAcc>0.5){chipAcc=0;renderChips();
     if(G.ghostUntil&&performance.now()>G.ghostUntil){G.ghostUntil=0;setGhostLook(false);unstuckPlayer();}
+    if(G.invisFaded&&performance.now()>=G.invisUntil){G.invisFaded=false;fadePlayer(null);if(performance.now()<G.ghostUntil)fadePlayer(0.45);}
     if(G.owlUntil&&performance.now()>G.owlUntil){G.owlUntil=0;
       G.view=(G.viewBefore&&allowedViews().includes(G.viewBefore))?G.viewBefore:allowedViews()[0];}
     fitRenderer(); // 轉向/尺寸自我修復
@@ -4059,13 +4146,16 @@ function wireUI(){
   // 雙指縮放（俯視）
   let pinchDist=0;
   $('gameScreen').addEventListener('touchmove',e=>{
-    if(G.view!=='top'||e.touches.length<2)return;
-    for(const t of e.touches)if(t.target&&t.target.closest&&t.target.closest('button'))return; // 手指在按鈕上不算縮放
-    const d=Math.hypot(e.touches[0].clientX-e.touches[1].clientX,e.touches[0].clientY-e.touches[1].clientY);
+    // The joystick thumb is never half of a pinch: moving while looking must not zoom.
+    const fingers=[...e.touches].filter(t=>!(joy.active&&t.identifier===joy.id));
+    if(G.view!=='top'||fingers.length<2){pinchDist=0;return;}
+    for(const t of fingers)if(t.target&&t.target.closest&&t.target.closest('button'))return; // 手指在按鈕上不算縮放
+    const d=Math.hypot(fingers[0].clientX-fingers[1].clientX,fingers[0].clientY-fingers[1].clientY);
     if(pinchDist)zoomBy((pinchDist-d)*0.08);
     pinchDist=d;
   },{passive:true});
   $('gameScreen').addEventListener('touchend',()=>{pinchDist=0;});
+  $('gameScreen').addEventListener('touchcancel',()=>{pinchDist=0;});
   $('minimapWrap').onclick=()=>{$('bigMapOverlay').style.display='flex';sizeBigMap();drawMap($('bigMap'),true);};
   $('mapSizeBtn').onclick=e=>{e.stopPropagation();$('minimapWrap').classList.toggle('big');};
   $('bigMapClose').onclick=()=>$('bigMapOverlay').style.display='none';
@@ -4176,20 +4266,28 @@ class MiniMQTT{
       try{this.onmsg&&this.onmsg(new TextDecoder().decode(body.slice(2+tl)));}catch(e){}
     }
   }
-  close(){try{clearInterval(this._ping);this.ws&&this.ws.close();}catch(e){}}
+  close(){this.closed=true;this.onmsg=this.onready=this.onfail=null;try{clearInterval(this._ping);this.ws&&this.ws.close();}catch(e){}}
 }
 
 /* ---- 名牌貼圖 ---- */
-function makeTextSprite(text){
+// shared=true keeps one texture per caption for labels rebuilt on every maze
+// shift (pickup markers); scene disposal skips it like the emoji sprites.
+function makeTextSprite(text,shared=false){
   text=String(text).replace(/[\p{Extended_Pictographic}\uFE0F\u200D\u20E3]/gu,'').trim();
-  const cv=document.createElement('canvas');cv.width=256;cv.height=64;
-  const c=cv.getContext('2d');
-  let fontSize=38;c.font='bold '+fontSize+'px sans-serif';
-  while(fontSize>14&&c.measureText(text).width>240)c.font='bold '+(--fontSize)+'px sans-serif';
-  c.textAlign='center';c.textBaseline='middle';
-  c.strokeStyle='rgba(0,0,0,.75)';c.lineWidth=7;c.strokeText(text,128,34,240);
-  c.fillStyle='#fff';c.fillText(text,128,34,240);
-  const sp=new THREE.Sprite(new THREE.SpriteMaterial({map:new THREE.CanvasTexture(cv),transparent:true,depthWrite:false}));
+  const cache=makeTextSprite.shared||(makeTextSprite.shared=new Map());
+  let texture=shared?cache.get(text):null;
+  if(!texture){
+    const cv=document.createElement('canvas');cv.width=256;cv.height=64;
+    const c=cv.getContext('2d');
+    let fontSize=38;c.font='bold '+fontSize+'px sans-serif';
+    while(fontSize>14&&c.measureText(text).width>240)c.font='bold '+(--fontSize)+'px sans-serif';
+    c.textAlign='center';c.textBaseline='middle';
+    c.strokeStyle='rgba(0,0,0,.75)';c.lineWidth=7;c.strokeText(text,128,34,240);
+    c.fillStyle='#fff';c.fillText(text,128,34,240);
+    texture=new THREE.CanvasTexture(cv);
+    if(shared){texture.userData.sharedResource=true;cache.set(text,texture);}
+  }
+  const sp=new THREE.Sprite(new THREE.SpriteMaterial({map:texture,transparent:true,depthWrite:false}));
   // Keep authored world scale and sight visibility. Only the GPU billboard
   // shrinks near the lens; one reusable viewport record serves every label.
   const guard=makeTextSprite.screenGuard||(makeTextSprite.screenGuard={size:new THREE.Vector2(),limits:new THREE.Vector2(1,1)});
@@ -4233,7 +4331,7 @@ const MP={
 };
 buildTitleUI(); wireUI(); initRenderer(); initPreview(); setupTouch();
 requestAnimationFrame(loop);
-const MP_ROUND_EVENTS=new Set(['pos','take','shift','reach','out','tag','hit','end','tres','prank','rob','costart','coend','codone','restock','shopend','wget','gather','inv','twin','ctfstate','ctfattack','ctfpass','ctfwall','ctfpos','goodclaim','goodreceipt','goodpay','goodpaid','goodcartstate','orderrequest','orderchoice','orderstate','variantsync']);
+const MP_ROUND_EVENTS=new Set(['pos','take','shift','reach','out','tag','hit','end','tres','tresok','tresdrop','prank','rob','costart','coend','codone','restock','shopend','wget','gather','inv','twin','ctfstate','ctfattack','ctfpass','ctfwall','ctfpos','goodclaim','goodreceipt','goodpay','goodpaid','goodcartstate','orderrequest','orderchoice','orderstate','variantsync']);
 function mpTopic(){return 'ziwei-maze3d/'+MP.room;}
 function modeLabel(m){return m==='ctf'?'合作奪旗':m==='race'?'比賽搶終點':(m==='tag'?'鬼抓人':(m==='shop'?'搶購大作戰':'尋寶大作戰'));}
 const MP_MODE_DESCS={
@@ -4309,17 +4407,34 @@ function mpSend(obj){
   else if(MP.on)mpHandle(JSON.parse(JSON.stringify(obj))); // 單機尋寶：本機迴路，重用多人邏輯
 }
 function mpName(id){ const p=MP.roster.find(r=>r.id===id); return p?p.name:'玩家'; }
+// A racer who reached the exit and then left counts once, not as both finished and out.
+function raceSettledCount(){ return new Set([...MP.finishers.map(f=>f.id),...Object.keys(MP.outs)]).size; }
 
 /* ---- 連線 ---- */
-async function mpConnect(cb){
-  $('mpStatus').textContent='連線中…';
+// One live connection per room attempt. A dropped socket retries with backoff
+// (re-subscribing the same room) instead of silently swallowing every send.
+async function mpConnect(cb,attempt=0){
+  $('mpStatus').textContent=attempt?'連線中斷，正在重新連線…（第 '+attempt+' 次）':'連線中…';
   await runtimeConfigReady;
   if(!MP.on)return;
-  MP.net=new MiniMQTT(CFG.broker);
-  MP.net.onready=()=>{ MP.net.subscribe(mpTopic()); $('mpStatus').textContent=''; cb&&cb(); };
-  MP.net.onfail=()=>{ $('mpStatus').textContent='暫時連不上房間服務，請檢查網路或聯絡主辦人'; };
-  MP.net.onmsg=raw=>{ try{ const m=JSON.parse(raw); if(m&&m.t)mpHandle(m); }catch(e){} };
-  MP.net.connect();
+  if(MP.net){MP.net.close();MP.net=null;}
+  const net=new MiniMQTT(CFG.broker),room=MP.room;let ready=false,failed=false;
+  MP.net=net;
+  net.onready=()=>{ if(MP.net!==net)return; ready=true; net.subscribe(mpTopic()); $('mpStatus').textContent=''; $('mpJoin').disabled=false; if(attempt&&G.running)showToast('已重新連上房間',1600); cb&&cb(); };
+  net.onfail=()=>{
+    if(failed||MP.net!==net)return; failed=true;
+    $('mpJoin').disabled=false;
+    const tries=ready?0:attempt; // a connection that worked before starts a fresh retry series
+    if(MP.on&&MP.room===room&&tries<5){
+      if(G.running)showToast('房間連線中斷，正在重新連線…',2400);
+      setTimeout(()=>{ if(MP.on&&MP.net===net&&MP.room===room)mpConnect(ready?null:cb,tries+1); },Math.min(8000,1000*2**tries));
+      return;
+    }
+    $('mpStatus').textContent='暫時連不上房間服務，請檢查網路或聯絡主辦人';
+    if(G.running)showToast('無法重新連上房間，請檢查網路',3000);
+  };
+  net.onmsg=raw=>{ if(MP.net!==net)return; try{ const m=JSON.parse(raw); if(m&&m.t)mpHandle(m); }catch(e){} };
+  net.connect();
 }
 
 /* ---- 訊息處理 ---- */
@@ -4338,9 +4453,14 @@ function mpHandle(m){
     case 'ctfstate':case 'ctfattack':case 'ctfpass':case 'ctfwall':CaptureFlag.handle(m);break;
     case 'hello':
       if(!MP.host||MP.started)break;
+      // Rooms only mix one release: packet rules (treasure verdicts, finish requests, bot poses) change between versions.
+      if(m.ver!==GAME_VERSION){mpSend({t:'full',to:m.f,reason:'version',ver:GAME_VERSION});break;}
       if(!MP.roster.find(r=>r.id===m.f)){
+        // Last round's computer players and dropped guests are not seats: the next
+        // start re-plans bots, so only connected people count toward a full room.
+        MP.roster=MP.roster.filter(r=>!r.bot&&!r.disconnected);
         if(MP.roster.length>=MP.maxPlayers){ mpSend({t:'full',to:m.f}); break; }
-        MP.roster.push({id:m.f,name:m.name,charIdx:m.charIdx||0});
+        MP.roster.push({id:m.f,name:String(m.name??''),charIdx:safeCharIdx(m.charIdx)});
       }
       mpBroadcastLobby();
       mpRenderLobby();
@@ -4348,11 +4468,13 @@ function mpHandle(m){
     case 'full':
       if(m.to!==MP.id||MP.host||MP.started)break;
       clearInterval(MP.helloTimer); MP.helloTimer=null;
+      if(m.reason==='version'){mpVersionMismatch('房主是 v'+String(m.ver||'?').slice(0,16)+'，你的是 v'+GAME_VERSION+'。');break;}
       $('mpStatus').textContent='😅 這個房間人數已經滿了';
       break;
     case 'lobby':
       if(MP.host||m.f===MP.id)break;
-      MP.roster=m.players; MP.mode=m.mode; MP.maxPlayers=m.max||MP.maxPlayers;
+      if(m.ver!==GAME_VERSION){if(!MP.started)mpVersionMismatch('房主的遊戲版本與你不同。');break;}
+      MP.roster=safeRoster(m.players,MP.roster); MP.mode=m.mode; MP.maxPlayers=m.max||MP.maxPlayers;
       MP.fillBots=m.fillBots===true;
       MP.plannedRounds=Math.max(1,Math.min(10,parseInt(m.rounds)||1));
       clearInterval(MP.helloTimer); MP.helloTimer=null;
@@ -4381,7 +4503,7 @@ function mpHandle(m){
       MP.seed=m.seed; MP.mode=m.mode; MP.size=m.size; MP.shiftMs=m.shiftMs;
       MP.hungerMin=m.hungerMin; MP.roundMs=m.roundMs; MP.tagCatches={}; MP.duelOvertime=false;
       if(['treasure','ctf'].includes(MP.mode))G.roundEndsAt=now+Math.max(120000,Math.min(600000,Number(m.roundMs)||300000));
-      MP.order=m.order; MP.roster=m.players; MP.round=0;
+      MP.order=m.order; MP.roster=safeRoster(m.players,MP.roster); MP.round=0;
       MP.fillBots=m.fillBots===true;
       MP.taggedId=m.it||null; MP.itPower=m.itpw||null; MP.tagImmuneUntil=0;
       MP.hp={}; MP.itRegenAt=performance.now()+15000; MP.whistleHolder=null;
@@ -4428,6 +4550,12 @@ function mpHandle(m){
       if(m.f===MP.id)break;
       const p=MP.players[m.f];
       if(p){p.tx=m.x;p.tz=m.z;p.th=m.h;p.lastSeen=now;if(p.mesh)p.mesh.visible=true;}
+      // 只有房主能替電腦報位置（與 ctfpos 相同的檢查）。
+      if(Array.isArray(m.bots)&&m.bots.length<=10&&m.f===MP.order[0])for(const pose of m.bots){
+        const r=MP.roster.find(r=>r.id===pose?.id),q=MP.players[pose?.id];
+        if(!r?.bot||!q||![pose.x,pose.z,pose.h].every(Number.isFinite)||Math.abs(pose.x)>G.mazeW*G.cell/2||Math.abs(pose.z)>G.mazeH*G.cell/2)continue;
+        q.tx=pose.x;q.tz=pose.z;q.th=pose.h;q.lastSeen=now;if(q.mesh)q.mesh.visible=true;
+      }
       break;}
     case 'take':{
       if(MP.mode==='ctf')CaptureFlag.collect(m);
@@ -4455,7 +4583,7 @@ function mpHandle(m){
         MP.finishers.push({id:m.f,tm:m.tm});
         showToast('🏁 '+mpName(m.f)+' 抵達終點！');
         if(MP.finishers.length===1)MP.raceEndAt=performance.now()+20000;
-        if(MP.finishers.length+Object.keys(MP.outs).length>=MP.roster.length)mpEndRace();
+        if(raceSettledCount()>=MP.roster.length)mpEndRace();
       }
       break;
     case 'out':
@@ -4463,7 +4591,7 @@ function mpHandle(m){
       MP.outs[m.f]=1;
       if(m.f!==MP.id)showToast('😵 '+mpName(m.f)+' 餓昏了');
       if(MP.mode==='race'&&MP.started&&!MP.ended&&
-         MP.finishers.length+Object.keys(MP.outs).length>=MP.roster.length)mpEndRace();
+         raceSettledCount()>=MP.roster.length)mpEndRace();
       break;
     case 'tag':
       if(MP.mode!=='tag'||MP.ended)break;
@@ -4501,12 +4629,25 @@ function mpHandle(m){
       if(MP.mode==='tag'&&MP.started&&!MP.ended)mpTagEnd(m.loser,m.catches);
       break;
     case 'tres':
-      if(!MP.started||MP.mode!=='treasure')break;
-      if(MP.treasure&&MP.treasure.holder!==m.holder){
-        setTreasureHolder(m.holder);
-        AudioEng.sfxUse();
-        showToast('💎 '+mpName(m.holder)+' 拿到寶藏了！');
-      }
+      // A pickup is only a claim. The host alone decides who reached the gem
+      // first and broadcasts that verdict, so every device agrees on one holder.
+      if(!MP.started||MP.mode!=='treasure'||!MP.host||!MP.treasure||MP.treasure.holder)break;
+      if(!MP.roster.some(r=>r.id===m.holder&&!r.disconnected))break;
+      {const tp=cellToWorld(MP.treasure.cell.x,MP.treasure.cell.y),at=botPosOf(m.holder);if(!at||(tp.x-at.x)**2+(tp.z-at.z)**2>6)break;}
+      mpSend({t:'tresok',holder:m.holder});
+      break;
+    case 'tresok':
+      if(!MP.started||MP.mode!=='treasure'||!MP.treasure||MP.treasure.holder)break;
+      setTreasureHolder(m.holder);
+      AudioEng.sfxUse();
+      showToast('💎 '+mpName(m.holder)+' 拿到寶藏了！');
+      break;
+    case 'tresdrop':
+      if(!MP.started||MP.mode!=='treasure'||!MP.treasure||!Number.isInteger(m.x)||!Number.isInteger(m.y)||m.x<0||m.y<0||m.x>=G.mazeW||m.y>=G.mazeH)break;
+      MP.treasure.cell={x:m.x,y:m.y};
+      {const tp=cellToWorld(m.x,m.y);if(G.treasureMesh)G.treasureMesh.position.set(tp.x,0,tp.z);}
+      setTreasureHolder(null);
+      showToast('💎 寶藏掉在 '+mpName(m.from)+' 最後的位置！',2400);
       break;
     case 'hit':{
       if(!MP.started||MP.ended||(MP.mode!=='treasure'&&MP.mode!=='tag'))break;
@@ -4592,9 +4733,9 @@ function mpHandle(m){
       if(!MP.started||MP.mode!=='shop'||MP.ended)break;
       MP.ended=true; G.frozen=true;
       AudioEng.stopMusic(); AudioEng.stopItemLoop();
-      if(m.carts)MP.carts=m.carts;
-      if(m.banked)MP.banked=m.banked;
-      if(m.shopBonus)MP.shopBonus=m.shopBonus;
+      if(m.carts)MP.carts=moneyMap(m.carts);
+      if(m.banked)MP.banked=moneyMap(m.banked);
+      if(m.shopBonus)MP.shopBonus=moneyMap(m.shopBonus);
       const rows=MP.roster.map(r=>({name:r.name,id:r.id,charIdx:r.charIdx||0,v:shopTotal(r.id),b:MP.banked[r.id]||0})).sort((a,b)=>b.v-a.v||a.name.localeCompare(b.name,'zh-Hant'));
       const win=rows[0],topScore=win?.v||0,winners=rows.filter(r=>r.v===topScore&&topScore>0);
       if(winners.some(r=>r.id===MP.id))AudioEng.sfxWin(); else AudioEng.sfxLose();
@@ -4603,8 +4744,8 @@ function mpHandle(m){
       if(winners.length>1)html+='<p>最高分相同，共同獲勝！</p>';else if(!topScore)html+='<p>本輪沒有得分，平手。</p>';
       rows.forEach((r,i)=>{
         const rank=rows.filter(p=>p.v>r.v).length+1;
-        html+=`<div>第 ${rank} 名 · ${escapeHtml(r.name)} — <b>$${r.v}</b>`
-          +`<span style="font-size:.8rem;color:#8be9fd;">（已結帳 $${r.b} · 蒐集 +${MP.shopBonus?.[r.id]||0}）</span>`
+        html+=`<div>第 ${rank} 名 · ${escapeHtml(r.name)} — <b>$${escapeHtml(r.v)}</b>`
+          +`<span style="font-size:.8rem;color:#8be9fd;">（已結帳 $${escapeHtml(r.b)} · 蒐集 +${escapeHtml(MP.shopBonus?.[r.id]||0)}）</span>`
           +`${r.id===MP.id?'（你）':''}</div>`;
       });
       $('cartWrap').style.display='none';
@@ -4650,18 +4791,24 @@ function mpHandle(m){
         mpRenderLobby();
       }else{
         if(MP.whistleHolder===m.f)MP.whistleHolder=null; // 持有者離線→口哨釋放
+        if(MP.host&&MP.mode==='treasure'&&MP.treasure?.holder===m.f)dropTreasure(m.f);
         const p=MP.players[m.f];
         if(p&&p.mesh)p.mesh.visible=false;
         MP.outs[m.f]=1;
         const departed=MP.roster.find(r=>r.id===m.f);if(departed)departed.disconnected=true;
         showToast('👋 '+mpName(m.f)+' 離開了');
         if(MP.mode==='race'&&!MP.ended&&
-           MP.finishers.length+Object.keys(MP.outs).length>=MP.roster.length)mpEndRace();
+           raceSettledCount()>=MP.roster.length)mpEndRace();
       }
       break;
   }
 }
 
+// The public broker cannot authenticate a host, so every field another device
+// sends is data: clamp roster avatars and money maps before they reach HTML.
+function safeCharIdx(value){return Number.isInteger(value)&&value>=0&&value<CHARS.length?value:0;}
+function safeRoster(list,fallback){return Array.isArray(list)?list.filter(r=>r&&typeof r.id==='string'&&r.id.length<=40).slice(0,10).map(r=>({...r,name:String(r.name??''),charIdx:safeCharIdx(r.charIdx)})):fallback;}
+function moneyMap(value){const out={};if(value&&typeof value==='object')for(const [id,amount] of Object.entries(value)){const n=Number(amount);if(id!=='__proto__'&&id.length<=40&&Number.isFinite(n))out[id]=Math.max(0,Math.min(1e7,Math.round(n)));}return out;}
 /* ---- 開場後：建立其他玩家的角色、開始傳位置 ---- */
 function mpAfterStart(){
   MP.players={};
@@ -4684,6 +4831,7 @@ function mpAfterStart(){
     MP.players[r.id]={name:r.name,charIdx:r.charIdx,bot:!!r.bot,mesh,oni,ring,gem,dizzy,cart,tx:cp.x,tz:cp.z,th:0,lastSeen:performance.now(),stunnedUntil:0};
   });
   clearInterval(MP.posTimer);
+  let lastPose='',lastPoseAt=0;
   MP.posTimer=setInterval(()=>{
     if(MP.started&&!MP.ended){
       if(MP.mode==='ctf'){
@@ -4691,17 +4839,22 @@ function mpAfterStart(){
         if(MP.host)for(const b of MP.bots||[])poses.push({id:b.id,x:+b.x.toFixed(2),z:+b.z.toFixed(2),h:+b.h.toFixed(2)});
         mpSend({t:'ctfpos',poses});return;
       }
-      mpSend({t:'pos',x:+G.px.toFixed(2),z:+G.pz.toFixed(2),h:+G.heading.toFixed(2)});
-      if(MP.host&&MP.bots)for(const b of MP.bots) // 房主幫電腦報位置
-        mpSend({t:'pos',f:b.id,x:+b.x.toFixed(2),z:+b.z.toFixed(2),h:+b.h.toFixed(2)});
+      // 房主把電腦位置併進自己的同一則封包；位置沒變時改為每秒一次心跳。
+      const pose={t:'pos',x:+G.px.toFixed(2),z:+G.pz.toFixed(2),h:+G.heading.toFixed(2)};
+      if(MP.host&&MP.bots?.length)pose.bots=MP.bots.map(b=>({id:b.id,x:+b.x.toFixed(2),z:+b.z.toFixed(2),h:+b.h.toFixed(2)}));
+      const key=JSON.stringify(pose),at=performance.now();
+      if(key===lastPose&&at-lastPoseAt<1000)return;
+      lastPose=key;lastPoseAt=at;mpSend(pose);
     }
   },MP.mode==='ctf'?200:120);
   mpUpdateTagVisuals();
 }
 
 /* ---- 每一幀：移動其他玩家、鬼抓人判定、比賽收尾 ---- */
+function setHudClock(text){const clock=$('hudTime');if(clock.textContent!==text)clock.textContent=text;}
 function mpFrame(dt){
   const now=performance.now();
+  if(MP.host&&MP.started&&!MP.ended&&MP.mode==='treasure'&&MP.treasure?.holder&&MP.treasure.holder!==MP.id){const holder=MP.treasure.holder,p=MP.players[holder];if(p&&!p.bot&&now-p.lastSeen>12000)dropTreasure(holder);}
   for(const id in MP.players){
     const p=MP.players[id];
     if(!p.mesh)continue;
@@ -4768,7 +4921,7 @@ function mpFrame(dt){
   // 🛒 搶購模式：倒數、電腦搶購 AI、時間到結算
   if(MP.mode==='shop'&&MP.started&&!MP.ended){
     const left=Math.max(0,(G.roundEndsAt-now)/1000);
-    $('hudTime').textContent='⏳'+fmtTime(left);
+    setHudClock('⏳'+fmtTime(left));
     if(MP.host&&MP.bots&&!G.frozen)botSimShop(dt,now);
     if(MP.host&&!G.frozen)shopRestock(now); // 補貨：架上永遠有東西可以搶
     if(MP.host&&!MP.shopEndSent&&left<=0){
@@ -4777,12 +4930,12 @@ function mpFrame(dt){
     }
   }
   // 鬼抓人：電腦 AI（房主端模擬）
-  if(MP.mode==='treasure'&&MP.started&&!MP.ended)$('hudTime').textContent=(MP.duelOvertime?'延長 ':'')+fmtTime(Math.max(0,(G.roundEndsAt-now)/1000));
+  if(MP.mode==='treasure'&&MP.started&&!MP.ended)setHudClock((MP.duelOvertime?'延長 ':'')+fmtTime(Math.max(0,(G.roundEndsAt-now)/1000)));
   if(MP.mode==='tag'&&MP.started&&MP.host&&MP.bots&&!G.frozen)botSimTag(dt,now);
   // 鬼抓人倒數 + 時間到（房主宣布結果）
   if(MP.mode==='tag'&&MP.started){
     const left=Math.max(0,(G.roundEndsAt-now)/1000);
-    $('hudTime').textContent='⏳'+fmtTime(left);
+    setHudClock('⏳'+fmtTime(left));
     if(MP.host&&left<=0&&!MP.endSent){MP.endSent=true;mpSend({t:'end',loser:MP.taggedId,catches:MP.tagCatches});}
   }
   // 比賽：第一名抵達後 20 秒收場
@@ -4981,7 +5134,7 @@ function botSim(dt,now){
     botWalk(b,goal,goalKey,dt,now,1);
     if(!hid){ // 撿寶藏
       const tp=cellToWorld(MP.treasure.cell.x,MP.treasure.cell.y);
-      if((tp.x-b.x)**2+(tp.z-b.z)**2<1.5)mpSend({t:'tres',holder:b.id});
+      if((tp.x-b.x)**2+(tp.z-b.z)**2<1.5&&now>(b.tresClaimAt||0)){b.tresClaimAt=now+500;mpSend({t:'tres',holder:b.id});}
     }else if(hid===b.id){ // 帶去出口
       const ep=cellToWorld(G.exitCell.x,G.exitCell.y);
       if((ep.x-b.x)**2+(ep.z-b.z)**2<2.0&&(!globalThis.ModeVariants||ModeVariants.canFinish(b.id)))mpSend({t:'twin',winner:b.id});
@@ -5089,7 +5242,16 @@ function mpLobbyPlan(){
   return {humans,bots,ready,reason};
 }
 function mpBroadcastLobby(){
-  if(MP.host)mpSend({t:'lobby',players:MP.roster,mode:MP.mode,max:MP.maxPlayers,rounds:MP.plannedRounds,fillBots:MP.fillBots});
+  if(MP.host)mpSend({t:'lobby',players:MP.roster,mode:MP.mode,max:MP.maxPlayers,rounds:MP.plannedRounds,fillBots:MP.fillBots,ver:GAME_VERSION});
+}
+// Leave a room of another release without closing the join screen, so the advice stays visible.
+function mpVersionMismatch(detail){
+  try{mpSend({t:'bye'});}catch(e){}
+  clearInterval(MP.helloTimer);MP.helloTimer=null;
+  if(MP.net){MP.net.close();MP.net=null;}
+  MP.on=false;MP.roster=[];$('mpJoin').disabled=false;
+  $('mpLobby').style.display='none';$('mpSetup').style.display='block';
+  $('mpStatus').textContent='⚠️ '+detail+'請雙方重新整理網頁更新到同一版後再加入。';
 }
 function mpRoundPlayers(){
   const plan=mpLobbyPlan();
@@ -5206,10 +5368,13 @@ $('mpCreate').onclick=()=>{
 $('mpJoin').onclick=()=>{
   const code=($('mpCodeInput').value||'').trim();
   if(!/^\d{4}$/.test(code)){ $('mpStatus').textContent='要輸入4位數房號喔'; return; }
+  // Pressing join again (or with another code) must not leave a second live connection.
+  if(MP.on&&MP.net){clearInterval(MP.helloTimer);MP.helloTimer=null;MP.net.close();MP.net=null;MP.roster=[];}
+  $('mpJoin').disabled=true;
   MP.on=true; MP.host=false; MP.room=code;
   mpConnect(()=>{
     $('mpStatus').textContent='找房主中…';
-    const hello=()=>mpSend({t:'hello',name:getPlayerName(),charIdx:G.charIdx});
+    const hello=()=>mpSend({t:'hello',name:getPlayerName(),charIdx:G.charIdx,ver:GAME_VERSION});
     hello();
     clearInterval(MP.helloTimer);
     MP.helloTimer=setInterval(hello,1200);
@@ -5225,43 +5390,55 @@ window.addEventListener('beforeunload',e=>{
   if(G.running||MP.started){e.preventDefault();e.returnValue='';}
 });
 window.addEventListener('pagehide',()=>{ if(MP.on)try{mpSend({t:'bye'});}catch(e){} });
-document.addEventListener('visibilitychange',()=>{if(document.hidden){AudioEng.shiftSound?.stop();AudioEng.combatSound?.stop();}});
+// A hidden tab pauses a solo classic round: every absolute deadline moves by the
+// hidden time on return. Rooms and computer-opponent rounds keep the host clock.
+const SOLO_DEADLINES=['nextShiftAt','shovelRechargeAt','skillCoolUntil','invisUntil','ghostUntil','mapUntil','compassUntil','visionUntil','owlUntil','stunnedUntil','atkCoolUntil','radarNextAt','coUntil'];
+let soloHiddenAt=0;
+document.addEventListener('visibilitychange',()=>{if(document.hidden){AudioEng.shiftSound?.stop();AudioEng.combatSound?.stop();AudioEng.stopItemLoop();if(G.running&&!MP.on&&!window.TowerMode?.active)soloHiddenAt=performance.now();return;}
+  const hiddenAt=soloHiddenAt;soloHiddenAt=0;
+  if(hiddenAt&&G.running&&!MP.on&&!window.TowerMode?.active){
+    const duration=performance.now()-hiddenAt;G.startTime+=duration;
+    for(const key of SOLO_DEADLINES)if(G[key]>hiddenAt)G[key]+=duration;
+    Object.values(G.effects).forEach(effect=>{if(effect.until>hiddenAt)effect.until+=duration;});
+  }
+  if(G.running&&Object.keys(G.effects).length)AudioEng.startItemLoop();
+});
 window.addEventListener('pagehide',()=>{AudioEng.shiftSound?.stop();AudioEng.combatSound?.stop();});
 </script>
-<script src="assets/classic-audio.js"></script>
+<script src="assets/classic-audio.js?v=1.58.0"></script>
 <script src="assets/setup-controls.js?v=1.55.0"></script>
 <script src="assets/voice-settings.js?v=1.43.3"></script>
 <script src="assets/capture-core.js?v=1.36.0"></script>
-<script src="assets/capture-mode.js?v=1.55.0"></script>
-<script src="story/tower-robot-core.js?v=1.55.0"></script>
+<script src="assets/capture-mode.js?v=1.58.0"></script>
+<script src="story/tower-robot-core.js?v=1.58.0"></script>
 <script src="story/tower-ascension-catalog.js?v=1.57.2"></script>
 <script src="story/tower-gear-tiers.js?v=1.54.0"></script>
-<script src="story/tower-hero-growth.js?v=1.57.2"></script>
-<script src="story/tower-heroes-core.js?v=1.57.4"></script>
+<script src="story/tower-hero-growth.js?v=1.58.0"></script>
+<script src="story/tower-heroes-core.js?v=1.58.0"></script>
 <script src="story/tower-heroes-icons.js?v=1.54.0"></script>
 <script src="story/tower-combat-motion.js?v=1.57.4"></script>
 <script src="story/tower-menu-voice.js?v=1.42.4"></script>
-<script src="assets/equipment-surfaces.js?v=1.51.0"></script>
-<script src="story/tower-heroes-visuals.js?v=1.57.6"></script>
-<script src="story/tower-skill-effects.js?v=1.57.5"></script>
-<script src="story/tower-growth-runtime.js?v=1.57.2"></script>
+<script src="assets/equipment-surfaces.js?v=1.58.0"></script>
+<script src="story/tower-heroes-visuals.js?v=1.58.0"></script>
+<script src="story/tower-skill-effects.js?v=1.58.0"></script>
+<script src="story/tower-growth-runtime.js?v=1.58.0"></script>
 <script src="story/tower-team-tactics.js?v=1.57.1"></script>
 <script src="story/tower-combat-intent.js?v=1.43.3"></script>
 <script src="story/tower-equipment-compare.js?v=1.44.0"></script>
-<script src="story/tower-heroes-runtime.js?v=1.57.1"></script>
-<script src="story/tower-cooperation-core.js?v=1.57.4"></script>
-<script src="story/tower-cooperation-runtime.js?v=1.57.1"></script>
-<script src="story/story-core.js?v=1.55.0"></script>
+<script src="story/tower-heroes-runtime.js?v=1.58.0"></script>
+<script src="story/tower-cooperation-core.js?v=1.58.0"></script>
+<script src="story/tower-cooperation-runtime.js?v=1.58.0"></script>
+<script src="story/story-core.js?v=1.58.0"></script>
 <script src="story/tower-narrative.js?v=1.45.0"></script>
 <script src="story/tower-side-stories.js?v=1.45.0"></script>
 <script src="story/tower-dungeons.js?v=1.55.0"></script>
 <script src="story/tower-hazards.js?v=1.49.0"></script>
 <script src="story/tower-encounters.js?v=1.55.0"></script>
 <script src="story/tower-characters.js?v=1.51.0"></script>
-<script src="story/tower-audio.js?v=1.57.9"></script>
+<script src="story/tower-audio.js?v=1.58.0"></script>
 <script src="story/tower-materials.js?v=1.48.0"></script>
-<script src="story/tower-expedition-core.js?v=1.57.4"></script>
-<script src="story/tower-lighting-core.js?v=1.54.2"></script>
+<script src="story/tower-expedition-core.js?v=1.58.0"></script>
+<script src="story/tower-lighting-core.js?v=1.58.0"></script>
 <script src="story/tower-loot.js?v=1.55.0"></script>
 <script src="story/tower-foraging.js?v=1.55.0"></script>
 <script src="story/tower-reinforcements.js?v=1.48.0"></script>
@@ -5273,33 +5450,33 @@ window.addEventListener('pagehide',()=>{AudioEng.shiftSound?.stop();AudioEng.com
 <script src="story/tower-resource-icons.js?v=1.48.0"></script>
 <script src="story/tower-forge-icons.js?v=1.47.0"></script>
 <script src="story/tower-compact-help.js?v=1.54.0"></script>
-<script src="story/tower-party-runtime.js?v=1.57.1"></script>
-<script src="story/tower-lighting-runtime.js?v=1.54.2"></script>
+<script src="story/tower-party-runtime.js?v=1.58.0"></script>
+<script src="story/tower-lighting-runtime.js?v=1.58.0"></script>
 <script src="story/tower-encounter-alert.js?v=1.42.5"></script>
 <script src="story/tower-combat-readability.js?v=1.57.0"></script>
 <script src="story/tower-field-guide.js?v=1.57.4"></script>
-<script src="story/tower-creature-art.js?v=1.44.0"></script>
-<script src="story/tower-cinematic-actors.js?v=1.57.0"></script>
+<script src="story/tower-creature-art.js?v=1.58.0"></script>
+<script src="story/tower-cinematic-actors.js?v=1.58.0"></script>
 <script src="story/tower-cinematic-look.js?v=1.57.0"></script>
-<script src="story/tower-story-direction.js?v=1.57.5"></script>
-<script src="story/tower-story-theater.js?v=1.57.5"></script>
-<script src="story/tower-cinematics.js?v=1.57.0"></script>
+<script src="story/tower-story-direction.js?v=1.58.0"></script>
+<script src="story/tower-story-theater.js?v=1.58.0"></script>
+<script src="story/tower-cinematics.js?v=1.58.0"></script>
 <script src="story/tower-affixes.js?v=1.55.0"></script>
 <script src="story/tower-landmarks.js?v=1.55.0"></script>
 <script src="story/tower-adventure-events.js?v=1.57.0"></script>
 <script src="story/tower-story-insights.js?v=1.57.0"></script>
-<script src="story/tower-environment-life.js?v=1.57.0"></script>
-<script src="story/tower-mode.js?v=1.57.9"></script>
-<script src="assets/room-lifecycle.js?v=1.55.0"></script>
+<script src="story/tower-environment-life.js?v=1.58.0"></script>
+<script src="story/tower-mode.js?v=1.58.0"></script>
+<script src="assets/room-lifecycle.js?v=1.58.0"></script>
 <script src="assets/shop-collection-core.js?v=1.55.0"></script>
-<script src="assets/shop-collection.js?v=1.55.0"></script>
+<script src="assets/shop-collection.js?v=1.58.0"></script>
 <script src="assets/shop-chaos.js?v=1.34.0"></script>
 <script src="assets/shop-sale.js?v=1.33.0"></script>
-<script src="assets/tag-rage.js"></script>
+<script src="assets/tag-rage.js?v=1.58.0"></script>
 <script src="assets/shop-claims-core.js?v=1.55.0"></script>
-<script src="assets/shop-claims.js?v=1.57.0"></script>
+<script src="assets/shop-claims.js?v=1.58.0"></script>
 <script src="assets/mode-variants-core.js?v=1.55.0"></script>
-<script src="assets/mode-variants.js?v=1.57.0"></script>
+<script src="assets/mode-variants.js?v=1.58.0"></script>
 <script src="assets/classic-tactics-core.js?v=1.57.0"></script>
 <script src="assets/classic-tactics.js?v=1.57.0"></script>
 <script src="assets/battle-dock.js?v=1.44.0"></script>

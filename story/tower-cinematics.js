@@ -15,7 +15,7 @@
       if(cut.goal.distanceToSquared(cut.focus)<.0001||(cut.goalTo||cut.goal).distanceToSquared(cut.focusTo||cut.focus)<.0001)return null;
       const focus=cut.focus.clone(),focusTo=(cut.focusTo||cut.focus).clone();focus.y+=bias;focusTo.y+=bias;
       cuts.push({id:String(cut.id||'shot-'+cuts.length).slice(0,64),at:cut.at,duration:clamp(cut.duration||4,.5,24),
-        goal:cut.goal.clone(),goalTo:(cut.goalTo||cut.goal).clone(),focus,focusTo,fov:clamp(cut.fov||50,38,64),
+        goal:cut.goal.clone(),goalTo:(cut.goalTo||cut.goal).clone(),focus,focusTo,fov:clamp(cut.fov||50,38,64),sway:Number.isFinite(cut.sway)?clamp(cut.sway,0,.05):0,
         subjects:Array.isArray(cut.subjects)?cut.subjects.filter(name=>typeof name==='string'&&name.length<=40).slice(0,2).join(','):''});previous=cut.at;
     }
     return cuts[0].at===0?cuts:null;
@@ -105,7 +105,9 @@
             if(s.cutIndex!==index){s.cutIndex=index;overlay.setAttribute('data-shot',cut.id);overlay.setAttribute('data-shot-index',String(index));overlay.setAttribute('data-shot-subjects',cut.subjects);}
             c.position.copy(cut.goal);s.framing.copy(cut.focus);
             if(c.fov!==cut.fov){c.fov=cut.fov;c.updateProjectionMatrix();}
-            if(!reduced){const progress=clamp((s.shotAge-cut.at)/cut.duration,0,1),ease=progress*progress*(3-2*progress);c.position.lerp(cut.goalTo,ease);s.framing.lerp(cut.focusTo,ease);}
+            if(!reduced){const progress=clamp((s.shotAge-cut.at)/cut.duration,0,1),ease=progress*progress*(3-2*progress);c.position.lerp(cut.goalTo,ease);s.framing.lerp(cut.focusTo,ease);
+              // Authored handheld breathing: a few centimetres, never for reduced motion.
+              if(cut.sway){const a=s.shotAge+index*1.7;c.position.x+=Math.sin(a*.83)*cut.sway;c.position.y+=Math.sin(a*1.17+.6)*cut.sway*.6;s.framing.x+=Math.sin(a*.61+1.1)*cut.sway*.35;}}
           }else{
             if(c.fov!==s.lens){c.fov=s.lens;c.updateProjectionMatrix();}
             if(!reduced){const progress=clamp((s.age-intro)/s.shotSeconds,0,1),ease=progress*progress*(3-2*progress);c.position.lerp(s.goalTo,ease);s.framing.lerp(s.lookTo,ease);}

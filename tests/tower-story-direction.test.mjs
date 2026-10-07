@@ -99,3 +99,41 @@ test('silent reading never auto-completes; reduced motion freezes the establishi
   const f=playback();f.director.start(f.spec);f.tick(.5);f.voice({loading:false,playing:true});f.tick(.1);f.tick(3);assert.notEqual(f.nodes.get('overlay').attrs['data-shot'],'story-establish');
   f.doc.hidden=true;f.events.visibilitychange();f.tick(99);assert.equal(f.complete,0);assert.equal(f.director.suspended,true);f.doc.hidden=false;f.nodes.get('[data-cinema="resume"]').onclick();f.tick(.5);assert.equal(f.nodes.get('overlay').attrs['data-shot'],'story-establish');assert.equal(f.records.length,2);f.director.cancel();assert.equal(f.held,0);
 });
+
+test('story gestures span listening nods, farewell waves, hopeful cheers, hurt hugs and a frost shiver, all playable by the actor rig',()=>{
+  const f=cast(),gestures=p=>p.actorTracks.flatMap(t=>t.beats.map(b=>b.gesture));
+  const farewell=Direction.plan({THREE:T,...f,text:'伊芙告別，準備回家。',name:'伊芙'});assert.ok(gestures(farewell).includes('wave'));assert.ok(!gestures(farewell).includes('warn'));
+  const hope=Direction.plan({THREE:T,...f,text:'這次終於成功了，希望就在前方。'});assert.ok(gestures(hope).includes('cheer'));
+  const hurt=Direction.plan({THREE:T,...f,text:'傷口疼痛，手也在發抖。'});assert.ok(gestures(hurt).includes('hug'));
+  const cold=Direction.plan({THREE:T,...f,text:'傷口疼痛，手也在發抖。',environment:'frost'});assert.ok(gestures(cold).includes('shiver'));assert.ok(!gestures(cold).includes('hug'));
+  const look=Direction.plan({THREE:T,...f,text:'尚未找到回聲銅扣，石門靜靜等待，你環顧四周仍沒有線索，只好再走一圈。'});assert.ok(gestures(look).includes('lookaround'));
+  const long=Direction.plan({THREE:T,...f,text:'伊芙提醒你先觀察召喚台。你想起剛到高塔時聽見的聲音，走到石柱旁才發現銅扣微微發光。她指向刻著舊符號的石門，告訴你繼續前往下一層，也許就能找到聲音的來源。',name:'伊芙'});
+  assert.equal(long.actorTracks[0].beats[3].gesture,'nod');assert.equal(long.actorTracks[1].beats[2].gesture,'listen');
+  for(const plan of [farewell,hope,hurt,cold,look,long])for(const track of plan.actorTracks){const session=Actors.create(track);assert.equal(session.beatCount,track.beats.length,'every planned gesture is a real rig pose');session.restore();}
+});
+
+test('coverage follows emotion and page: closer for memories, a low look-up at danger, mirrored establishing on alternate pages, bounded sway',()=>{
+  const f=cast(),plain=Direction.plan({THREE:T,...f,text:BRIEF}),close=Direction.plan({THREE:T,...f,text:'你想起那一年的承諾。'}),danger=Direction.plan({THREE:T,...f,text:'守衛逼近，不准再向前。'});
+  const head=f.hero.userData.head.getWorldPosition(new T.Vector3());
+  assert.equal(plain.actionPlan.coverage,'plain');assert.equal(close.actionPlan.coverage,'close');assert.equal(danger.actionPlan.coverage,'danger');
+  assert.ok(close.shot.cuts[1].goal.distanceTo(head)<plain.shot.cuts[1].goal.distanceTo(head)-.3,'memories move in');
+  assert.ok(danger.shot.cuts[1].goal.y<head.y&&danger.shot.cuts[1].focus.y>danger.shot.cuts[1].goal.y,'threat is seen from below');
+  const odd=Direction.plan({THREE:T,...f,text:BRIEF,page:1});assert.ok(Math.sign(odd.shot.cuts[0].goal.x)===-Math.sign(plain.shot.cuts[0].goal.x));
+  const cave=Direction.plan({THREE:T,...f,text:BRIEF,environment:'echo'});assert.ok(cave.shot.cuts[0].goal.y<plain.shot.cuts[0].goal.y,'enclosed sets keep a lower establishing view');
+  for(const plan of [plain,close,danger,odd,cave])for(const cut of plan.shot.cuts){assert.ok(cut.sway>0&&cut.sway<=.05);assert.ok(Object.isFrozen(cut));}
+});
+
+test('every region, page and emotion keeps both actors framed above phone captions at both ends of each move, including sway',()=>{
+  const texts=[BRIEF,'你想起那一年的承諾。','守衛逼近，不准再向前。','伊芙提醒你注意危險。你回憶沿途聽到的聲音，發現石柱上的符號與銅扣相同，決定繼續前往下一層。','伊芙告別，準備回家，希望就在前方。'];
+  for(const environment of ['cloud','garden','roots','echo','library','mist','frost','clockwork','furnace','heart'])for(const page of [0,1])for(const text of texts)for(const height of [1.3,1.9,2.5]){
+    const f=cast();f.hero.userData.head.position.y=height;f.npc.userData.head.position.y=height-.18;const plan=Direction.plan({THREE:T,...f,text,environment,page,name:'伊芙'});
+    const heads=new Map([['hero',f.hero.userData.head.getWorldPosition(new T.Vector3())],['伊芙',f.npc.userData.head.getWorldPosition(new T.Vector3())]]);
+    for(const cut of plan.shot.cuts){assert.ok(cut.goal.z>1.9&&cut.goalTo.z>1.9);assert.ok(cut.fov>=42&&cut.fov<=56);
+      for(const [width,pixels]of [[1440,900],[844,390],[568,320]])for(const endpoint of [false,true])for(const wobble of [-1,1]){
+        const camera=new T.PerspectiveCamera(cut.fov,width/pixels,.1,100),focus=(endpoint?cut.focusTo:cut.focus).clone();focus.y+=pixels<=340?-.24:pixels<=420?-.13:0;focus.x+=wobble*cut.sway*.35;
+        camera.position.copy(endpoint?cut.goalTo:cut.goal);camera.position.x+=wobble*cut.sway;camera.position.y+=wobble*cut.sway*.6;camera.lookAt(focus);camera.updateMatrixWorld(true);
+        for(const subject of cut.subjects){const p=heads.get(subject).clone().project(camera);assert.ok(p.z<1&&p.y>-.1&&p.y<.94&&Math.abs(p.x)<.9,`${environment}/${page}/${height}/${cut.id}/${subject}/${width}: ${p.x.toFixed(2)},${p.y.toFixed(2)}`);}
+      }
+    }
+  }
+});

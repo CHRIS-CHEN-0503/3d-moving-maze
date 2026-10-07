@@ -68,5 +68,19 @@ test('兩端奪旗超時平手只結算一次，換牆期間也準時收尾',()=
   const r=room();r.host.c.G.shifting=true;r.tick(300000);
   assert.equal(r.host.results.length,1);assert.equal(r.client.results.length,1);
   assert.match(r.host.results[0].title,/平手/);assert.ok(r.host.results[0].rows.every(p=>!p.win));
-  assert.equal(r.host.intervals.size,0);r.tick(1000);assert.equal(r.client.results.length,1);
+  // Only the bounded final-result repeat remains; it stops by itself after a minute.
+  assert.equal(r.host.intervals.size,1);for(let i=0;i<61;i++){r.advance(1000);r.host.intervals.get(1)?.();}assert.equal(r.host.intervals.size,0);
+  r.tick(1000);assert.equal(r.client.results.length,1);
+});
+test('a guest that lost the winning snapshot still ends from the host’s repeated final state',()=>{
+  const r=room();r.host.c.G.shifting=true;r.advance(300000);r.host.api.frame(.1,r.now());
+  assert.equal(r.host.results.length,1);const lost=r.queue.splice(0);assert.ok(lost.some(m=>m.t==='ctfstate'&&m.state.winner!==null));assert.equal(r.client.results.length,0);
+  r.advance(1000);r.host.intervals.get(1)();r.flush();assert.equal(r.client.results.length,1,'the next repeat delivers the result');assert.match(r.client.results[0].title,/平手/);
+  r.advance(1000);r.host.intervals.get(1)();r.flush();assert.equal(r.client.results.length,1,'repeats never settle twice');assert.equal(r.host.results.length,1);
+});
+
+test('a guest whose host is still pulsing waits for the repeated result instead of aborting after 12 seconds',()=>{
+  const r=room();let seen=r.now();r.client.c.window.RoomLifecycle={hostSeenAt:()=>seen};
+  r.advance(13000);seen=r.now();r.client.api.frame(.1,r.now());assert.equal(r.client.nodes.get('mpResultTitle')?.textContent??'','','a live host pulse keeps the round');
+  r.advance(13000);r.client.api.frame(.1,r.now());assert.equal(r.client.nodes.get('mpResultTitle').textContent,'合作賽中止','silence on both channels still aborts');
 });

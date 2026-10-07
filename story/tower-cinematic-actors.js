@@ -30,7 +30,25 @@
     recollect:Object.freeze([.075,-.04,.018,.021,0,0,-.12,0,.035,-.34,.015,-.08]),
     turn:Object.freeze([0,.105,0,0,.115,0,-.09,0,.025,-.11,0,-.025]),
     listen:Object.freeze([.022,0,0,0,0,0,-.055,0,.016,-.065,0,-.016]),
-    settle:Object.freeze([0,0,0,0,0,0,-.03,0,.01,-.035,0,-.01])
+    settle:Object.freeze([0,0,0,0,0,0,-.03,0,.01,-.035,0,-.01]),
+    // Story vocabulary beyond the summit: each held pose may carry a small
+    // secondary motion (see SECONDARY), always scaled by the beat envelope.
+    nod:Object.freeze([.05,0,0,.018,0,0,-.05,0,.015,-.06,0,-.015]),
+    lookaround:Object.freeze([-.02,0,0,0,.03,0,-.07,0,.03,-.08,0,-.03]),
+    wave:Object.freeze([-.03,.07,.02,-.02,.04,-.015,-.08,0,.03,-1.08,.04,-.2]),
+    cheer:Object.freeze([-.09,0,0,-.04,0,0,-.62,-.02,.12,-1.1,.03,-.12]),
+    hug:Object.freeze([.12,0,.03,.07,0,0,-.62,-.05,-.24,-.62,.05,.24]),
+    shiver:Object.freeze([.09,0,0,.06,0,0,-.58,-.04,-.22,-.58,.04,.22])
+  });
+  // Secondary motion inside a held gesture: [head x, head y, head z, torso x,
+  // torso z, right-arm z] amplitudes and a rate. Applied as sin(local*rate),
+  // multiplied by the same rise/hold/fall weight, so entry and exit stay exact.
+  const SECONDARY=Object.freeze({
+    nod:Object.freeze({rate:5.4,amp:Object.freeze([.045,0,0,.006,0,0])}),
+    lookaround:Object.freeze({rate:1.35,amp:Object.freeze([0,.3,0,0,0,0])}),
+    wave:Object.freeze({rate:7.2,amp:Object.freeze([0,0,.015,0,0,.06])}),
+    cheer:Object.freeze({rate:4.6,amp:Object.freeze([-.02,0,0,-.012,0,0])}),
+    shiver:Object.freeze({rate:29,amp:Object.freeze([0,0,.012,0,.01,0])})
   });
   const GAZES=Object.freeze({front:Object.freeze([0,0,0]),down:Object.freeze([.16,0,0]),palm:Object.freeze([.18,-.12,0]),altar:Object.freeze([.06,.23,0]),'partner-left':Object.freeze([.015,-.3,0]),'partner-right':Object.freeze([.015,.3,0])});
   // Brow tilt, eye alertness, withdrawn smile, lowered eyelid. Emotions are
@@ -112,9 +130,18 @@
     const headBase=bone(head),torsoBase=bone(torso),leftBase=bone(arms[0]),rightBase=bone(arms[1]),leftLeg=bone(legs[0]),rightLeg=bone(legs[1]),mouthBase=bone(mouth);
     const eyeBases=eyes.map(bone),whiteBases=whites.map(bone),lidBases=lids.map(bone),browBases=brows.map(bone),lipBases=lips.map(bone),pupilBases=pupils.map(bone),cornerBases=corners.map(bone),teethBase=bone(face.teeth);
     const kind=performance(spec),profile=PROFILES[kind],character=temperament(spec),amount=reduced?.26:1,force=character.force*amount,speechAllowed=spec.speechAnimation!==false;
+    // Approved, hand-timed scenes opt out of the generic idle life (weight shift and saccades).
+    const idleLife=spec.idleLife!==false;
     const beats=prepareBeats(spec.beats,kind);
     const phaseOffset=(Number(actor.id)||0)%17*.17;
-    let active=true,lastReflection=0;
+    let active=true,lastReflection=0,saccadeX=0,saccadeY=0;
+    // Deterministic saccade targets (no per-frame randomness or objects): the
+    // pupils glide from the previous target to the next in 0.12 s, then hold.
+    function dart(n){const v=Math.sin(n*12.9898+phaseOffset*78.233)*43758.5453;return (v-Math.floor(v))*2-1;}
+    function saccade(t){
+      const period=1.9+phaseOffset*.13,k=Math.floor((t+phaseOffset)/period),e=smooth(((t+phaseOffset)-k*period)/.12);
+      saccadeX=dart(k-1)+(dart(k)-dart(k-1))*e;saccadeY=(dart(k+100)+(dart(k+101)-dart(k+100))*e)*.6;return 1;
+    }
     function closeMouth(reflection=0){
       if(mouthBase){mouth.scale.set(mouthBase.sx,mouthBase.sy,mouthBase.sz);mouth.visible=mouthBase.visible;}
       for(const s of lipBases)if(s){s.node.scale.set(s.sx,s.sy,s.sz);s.node.position.set(s.px,s.py,s.pz);s.node.visible=s.visible;}
@@ -148,17 +175,25 @@
       // A wake-up lifts the chin during the held pose; the following action
       // starts from rest rather than replaying the same periodic arm gesture.
       const waking=beat?.gesture==='wake',standing=waking?smooth((time-beat.at)/(beat.rise+beat.duration*.27)):0,turnSign=gy<0?-1:1;
-      joint(headBase,clamp((pose[0]-(waking?.27*standing:0))*gesture+gx*faceForce,-.3,.3),clamp(pose[1]*gesture+gy*faceForce,-.48,.48),clamp(pose[2]*gesture+gz*faceForce,-.1,.1));
-      joint(torsoBase,pose[3]*gesture*(waking?1-.92*standing:1)+breathe*.004*breathForce,pose[4]*gesture*(beat?.gesture==='turn'?turnSign:1),pose[5]*gesture);
+      // Secondary motion lives inside the beat envelope (weight is 0 at both
+      // edges), so it adds life to a held pose without a discontinuity.
+      const extra=moving?SECONDARY[beat.gesture]:null,wiggle=extra?Math.sin((time-beat.at)*extra.rate)*gesture:0,amp=extra?.amp;
+      // A slow, grounded weight shift keeps a listening actor from freezing.
+      const shift=idleLife?Math.sin(t*.42+phaseOffset*1.9)*breathForce:0;
+      joint(headBase,clamp((pose[0]-(waking?.27*standing:0))*gesture+gx*faceForce+(amp?amp[0]*wiggle:0),-.3,.3),clamp(pose[1]*gesture+gy*faceForce+(amp?amp[1]*wiggle:0),-.48,.48),clamp(pose[2]*gesture+gz*faceForce+(amp?amp[2]*wiggle:0)+shift*.008,-.1,.1));
+      joint(torsoBase,pose[3]*gesture*(waking?1-.92*standing:1)+breathe*.004*breathForce+(amp?amp[3]*wiggle:0),pose[4]*gesture*(beat?.gesture==='turn'?turnSign:1),pose[5]*gesture+(amp?amp[4]*wiggle:0)+shift*.012);
       if(torsoBase)torso.scale.y=torsoBase.sy*(1+breathe*.006*breathForce);
       const brace=waking?1-.8*standing:1;
-      joint(leftBase,clamp(pose[6]*gesture*brace,-1.14,1.14),pose[7]*gesture,pose[8]*gesture);joint(rightBase,clamp(pose[9]*gesture*brace,-1.14,1.14),pose[10]*gesture,pose[11]*gesture);
-      joint(leftLeg,.005*breathe*breathForce,0,.004*breathForce);joint(rightLeg,-.005*breathe*breathForce,0,-.004*breathForce);
+      joint(leftBase,clamp(pose[6]*gesture*brace,-1.14,1.14),pose[7]*gesture,pose[8]*gesture);joint(rightBase,clamp(pose[9]*gesture*brace,-1.14,1.14),pose[10]*gesture,clamp(pose[11]*gesture+(amp?amp[5]*wiggle:0),-.29,.29));
+      joint(leftLeg,.005*breathe*breathForce+shift*.006,0,.004*breathForce);joint(rightLeg,-.005*breathe*breathForce-shift*.006,0,-.004*breathForce);
       const blinkAt=(t+phaseOffset)%(5.25+phaseOffset*.31),blink=reduced?1:1-.91*pulse(blinkAt,1.42,.055,.035,.115),alert=1+eyeAlert*faceForce;
       for(const s of eyeBases)if(s)s.node.scale.y=s.sy*blink*alert;
       for(const s of whiteBases)if(s)s.node.scale.y=s.sy*blink*alert;
       for(const s of lidBases)if(s)s.node.scale.y=s.sy*(.45+.55*blink)*(1-lidLower*faceForce);
-      for(const s of pupilBases)if(s){s.node.position.x=s.px+gy*.005*faceForce;s.node.position.y=s.py-gx*.009*faceForce;}
+      // Small eye saccades every couple of seconds, eased so pupils glide
+      // between deterministic targets; reduced motion keeps the gaze steady.
+      const still=reduced||!idleLife,glance=still?0:saccade(t),dartX=still?0:saccadeX,dartY=still?0:saccadeY;
+      for(const s of pupilBases)if(s){s.node.position.x=s.px+(gy*.005+dartX*glance*.0016)*faceForce;s.node.position.y=s.py+(-gx*.009+dartY*glance*.0011)*faceForce;}
       for(let n=0;n<browBases.length;n++)joint(browBases[n],0,0,(n%2?-1:1)*brow*faceForce);
       lastReflection=reflection*faceForce;speech(t,talking,lastReflection);
       return true;

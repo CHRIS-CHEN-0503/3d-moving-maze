@@ -184,3 +184,13 @@ test('invalid shot timelines fall back safely and other environments ignore prev
   const f=fixture({enabled:false,reduced:true}),spec=film(f,cuts());delete spec.shot.edition;f.director.start(spec);f.advance(20);assert.equal(f.camera.fov,f.original.f);assert.deepEqual(f.camera.position.toArray(),[0,2,6]);assert.equal(f.nodes.get('overlay').getAttribute('data-shot-index'),'-1');f.director.cancel();
   const code=readFileSync(new URL('../story/tower-cinematics.js',import.meta.url),'utf8');assert.doesNotMatch(code.slice(code.indexOf('    function frame(dt)'),code.indexOf('    function render(draw)')),/\bnew\s|\.map\(|\.filter\(/,'shot sampling has no allocations');
 });
+test('authored handheld sway breathes only within polished cuts, stays within a few centimetres, is off for reduced motion and restores exactly',()=>{
+  const swaying=()=>cuts().map(cut=>({...cut,sway:.03})),reference=fixture({enabled:false}),steady=fixture({enabled:false}),calm=fixture({enabled:false,reduced:true});
+  reference.director.start(film(reference,swaying()));steady.director.start(film(steady,cuts()));calm.director.start(film(calm,swaying()));
+  let largest=0,moved=false;
+  for(let n=0;n<60;n++){for(const f of [reference,steady,calm])f.advance(.2);const offset=reference.camera.position.distanceTo(steady.camera.position);largest=Math.max(largest,offset);if(offset>.005)moved=true;assert.equal(reference.nodes.get('overlay').getAttribute('data-shot'),steady.nodes.get('overlay').getAttribute('data-shot'));}
+  assert.ok(moved,'the lens breathes');assert.ok(largest<=.03*Math.hypot(1,.6)+1e-9,'sway is bounded: '+largest);
+  const still=calm.camera.position.clone();calm.advance(3);assert.deepEqual(calm.camera.position.toArray(),still.toArray(),'reduced motion stays locked');
+  const invalid=fixture({enabled:false});invalid.director.start(film(invalid,cuts().map(cut=>({...cut,sway:Infinity}))));invalid.advance(.5);for(let n=0;n<20;n++)invalid.advance(.2);assert.ok(invalid.camera.position.toArray().every(Number.isFinite));
+  for(const f of [reference,steady,calm,invalid]){f.director.cancel();assert.deepEqual(f.camera.position.toArray(),f.original.p.toArray());assert.deepEqual(f.camera.quaternion.toArray(),f.original.q.toArray());assert.equal(f.camera.fov,f.original.f);}
+});

@@ -66,7 +66,7 @@ test('every profession and active skill has batched particles, bounded draws, an
   }assert.equal(jobs.size,Object.keys(H.JOBS).length);
 });
 
-test('spell visibility, frozen time, eviction, reset and destruction dispose owned particles without harming shared sprites',()=>{
+test('spell visibility, frozen time, eviction, reset and destruction dispose owned particles and recycled materials without harming shared sprites',()=>{
   const e=environment(),world=new T.Group();let visible=false;const fx=e.TowerSkillEffects.create(T,{world:()=>world,limit:2,visible:()=>visible}),skill=H.SKILLS.guard_stance;
   assert.equal(fx.emit(skill,{x:0,z:0}),null);visible=true;
   const f=fx.emit(skill,{x:0,z:0}),resources=new Map(),textures=new Map();let spriteDisposals=0;
@@ -74,8 +74,10 @@ test('spell visibility, frozen time, eviction, reset and destruction dispose own
   for(const m of f.mats){resources.set(m,0);m.addEventListener('dispose',()=>resources.set(m,resources.get(m)+1));if(m.map&&!textures.has(m.map)){textures.set(m.map,0);m.map.addEventListener('dispose',()=>textures.set(m.map,textures.get(m.map)+1));}}
   const cloud=f.group.children.find(o=>o.isPoints),left=f.left;for(const dt of [0,-1,NaN,Infinity])fx.tick(dt);assert.equal(f.left,left);assert.equal(cloud.material.uniforms.age.value,0);
   visible=false;fx.tick(.1);assert.equal(f.group.visible,false);visible=true;fx.tick(.1);assert.equal(f.group.visible,true);
-  fx.emit(skill,{x:0,z:0});fx.emit(skill,{x:0,z:0});assert.equal(f.group.parent,null);assert.ok([...resources.values()].every(n=>n===1));
-  fx.cancel(f);fx.reset();assert.equal(world.children.length,0);assert.ok([...textures.values()].every(n=>n===0));fx.destroy();fx.destroy();assert.ok([...textures.values()].every(n=>n===1));assert.equal(spriteDisposals,0);assert.equal(fx.emit(skill,{x:0,z:0}),null);
+  fx.emit(skill,{x:0,z:0});fx.emit(skill,{x:0,z:0});assert.equal(f.group.parent,null);
+  const pooled=[...resources.keys()].filter(r=>r.userData?.sharedResource);assert.ok(pooled.length>0&&pooled.every(r=>r.isMaterial));
+  for(const [r,n] of resources)assert.equal(n,pooled.includes(r)?0:1,'eviction releases the private resources once; recycled materials return to the pool');
+  fx.cancel(f);fx.reset();assert.equal(world.children.length,0);assert.ok([...textures.values()].every(n=>n===0));for(const r of pooled)assert.equal(resources.get(r),0);fx.destroy();fx.destroy();assert.ok([...textures.values()].every(n=>n===1));assert.ok([...resources.values()].every(n=>n===1),'destroy releases each recycled material exactly once');assert.equal(spriteDisposals,0);assert.equal(fx.emit(skill,{x:0,z:0}),null);
 });
 
 test('simultaneous spells upload independent phases to one warm particle program, retained across floor resets',()=>{

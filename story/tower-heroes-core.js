@@ -320,8 +320,13 @@
   function strike(run,monsterId,options={},revision){return C().transaction(run,revision,n=>{
     const id=options.memberId||state(n)?.active,a=actor(n,id),spec=P().monsterSpecs(n).find(m=>m.id===monsterId);
     if(!a||hp(n,id)<=0||!spec||n.defeatedMonsters.includes(monsterId))return {ok:false,message:'前方沒有可攻擊的怪物。'};
-    if(F()?.attackBlocked(n,id))return {ok:false,message:'還在電麻中，稍後再出手。'};
-    if(job(n,id)==='robot'&&!ROBOT.powered(n,id))return {ok:false,message:'能源耗盡，先使用動力石補能。'};
+    // A shot already left the bow (and spent its arrow) when the shooter could act;
+    // a shock that lands during its flight must not cancel the hit.
+    // Likewise an attack skill was checked and paid for when it was cast (its pending
+    // record below); a shock or an empty battery during the flight cannot cancel it.
+    const paid=!!options.skillId&&a.pending?.id===options.skillId&&a.pending.left>0;
+    if(!options.shot&&!paid&&F()?.attackBlocked(n,id))return {ok:false,message:'還在電麻中，稍後再出手。'};
+    if(job(n,id)==='robot'&&!paid&&!ROBOT.powered(n,id))return {ok:false,message:'能源耗盡，先使用動力石補能。'};
     const skill=options.skillId?SKILLS[options.skillId]:null;
     if(options.skillId&&!skill)return {ok:false,message:'不存在的技能。'};
     if(skill&&(!a.skills.includes(skill.id)||!skill.attack))return {ok:false,message:'沒有這個攻擊技能。'};

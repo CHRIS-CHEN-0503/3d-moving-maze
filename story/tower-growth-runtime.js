@@ -1,11 +1,11 @@
 /* UI and spatial decisions for saved hero growth. Uses the existing game tick. */
 (function(root){'use strict';const R=root.TowerHeroGrowth,H=root.TowerHeroes,I=root.TowerHeroIcons;
-  function create(ctx){const r=ctx.run,esc=ctx.text,act=ctx.action,T=ctx.THREE;let selected='hero',progressionSelected='hero',clock=0,lastQuick='',routeMeshes=[],routeKey='';
+  function create(ctx){const r=ctx.run,esc=ctx.text,act=ctx.action,T=ctx.THREE;let selected='hero',progressionSelected='hero',clock=0,lastQuick='',routeMeshes=[],routeKey='',nearby=null,nearbyKey='',nearbyLeft=0;const wants=new Map();
     const ready=()=>H.enabled(r())&&ctx.G.running&&!ctx.paused()&&!ctx.G.shifting;
     const pos=ctx.pos,dist=(a,b)=>Math.hypot(a.x-b.x,a.z-b.z),clear=(a,b)=>ctx.clear(a.x,a.z,b.x,b.z);
     const name=id=>id==='hero'?r().name:root.TowerPartyCore.person(H.job(r(),id),H.sex(r(),id));
     function commit(result,quiet=false){if(!ctx.transact(result))return false;if(result.effect?.item)ctx.audio.sfxAction?.(root.CombatAudio?.itemKind(result.effect.item)||'device');if(result.effect?.item==='map'){root.MagicMap?.reveal();ctx.save();}if(result.message&&!quiet)ctx.toast(result.message,1600,result.message);return true;}
-    function configure(fn){const result=ctx.core.transaction(r(),r().revision,n=>{fn(R.state(n));const safe=R.validate(R.state(n),n.party);if(!safe)return {ok:false,message:'設定值不正確。'};H.state(n).growth=safe;return {ok:true};});commit(result,true);lastQuick='';}
+    function configure(fn){const result=ctx.core.transaction(r(),r().revision,n=>{fn(R.state(n));const safe=R.validate(R.state(n),n.party);if(!safe)return {ok:false,message:'設定值不正確。'};H.state(n).growth=safe;return {ok:true};});commit(result,true);lastQuick='';wants.clear();}
     function checkbox(label,key,value){return '<label class="hero-option"><input type="checkbox" data-growth="'+key+'" '+(value?'checked':'')+'>'+label+'</label>';}
     function number(label,key,value,min,max,step=1){return '<label class="hero-option">'+label+'<input type="number" inputmode="numeric" min="'+min+'" max="'+max+'" step="'+step+'" value="'+value+'" data-growth="'+key+'"></label>';}
     function settings(id=selected){selected=H.ids(r()).includes(id)?id:'hero';const g=R.state(r()),p=g.policies[selected];
@@ -34,28 +34,48 @@
     function startRoute(id){const origin=pos(id),start=ctx.worldToCell(origin.x,origin.z),points=[],visited=new Set([start.x+','+start.y]);let cell=start;
       for(let i=0;i<6;i++){const p=ctx.cell(cell.x,cell.y);if(!p||!Number.isFinite(p.x))break;points.push({x:p.x,z:p.z});const next=[[1,0],[0,1],[-1,0],[0,-1]].map(([x,y])=>({x:cell.x+x,y:cell.y+y})).find(c=>!visited.has(c.x+','+c.y)&&root.MagicMap?.visible(c.x,c.y)&&clear(p,ctx.cell(c.x,c.y))&&ctx.walkClear(p,ctx.cell(c.x,c.y)));if(!next)break;visited.add(next.x+','+next.y);cell=next;}R.state(r()).route={left:12,floor:r().floor,points,power:R.power(r(),id,H.SKILLS.escape_line)};ctx.save();}
     function clearRoute(){routeMeshes.forEach(m=>{m.parent?.remove(m);ctx.dispose(m);});routeMeshes=[];routeKey='';}
-    function reset(){clearRoute();lastQuick='';}
+    function reset(){clearRoute();lastQuick='';nearby=null;wants.clear();}
     const observed=(p,m)=>m.alive&&r().party.health[m.id]!==0&&!r().defeatedMonsters.includes(m.id)&&dist(p,m.model.position)<=12&&clear(p,m.model.position)&&(!root.MazeSight?.active()||root.MazeSight.visible(m.model.position.x,m.model.position.z));
     function decision(id){
       const p=pos(id);if(!ready()||!p||id===H.state(r()).active||H.hp(r(),id)<=0)return null;
       const near=H.ids(r()).filter(k=>pos(k)&&dist(p,pos(k))<=6&&clear(p,pos(k))),focus=ctx.engagement?.(id),enemies=ctx.monsters().filter(m=>observed(p,m)).sort((a,b)=>Number(b.windup>0)-Number(a.windup>0)||Number(b===focus)-Number(a===focus)||dist(p,a.model.position)-dist(p,b.model.position)||String(a.id).localeCompare(String(b.id)));
       const observation=m=>({id:m.id,distance:dist(p,m.model.position),windup:m.windup||0,stationary:m.def?.speed===0,behind:Math.cos(Math.atan2(p.x-m.model.position.x,p.z-m.model.position.z)-(m.model.rotation?.y||0))<0});
       const threatened=near.filter(k=>enemies.some(m=>dist(pos(k),m.model.position)<(m.def?.ranged?7:3)&&clear(pos(k),m.model.position)));
-      for(const enemy of enemies.length?enemies:[null]){const choice=R.aiChoice(r(),id,near,!!enemies.length,{enemy:enemy?observation(enemy):null,enemies:enemies.map(observation),threatened});if(!choice)continue;const skill=H.SKILLS[choice.skill];if(skill.attack&&(!enemy||dist(p,enemy.model.position)>R.skillRange(r(),id,skill)))continue;return {choice,enemy,p};}
+      const aidNear=near.filter(k=>dist(p,pos(k))<=4);
+      for(const enemy of enemies.length?enemies:[null]){const choice=R.aiChoice(r(),id,near,!!enemies.length,{enemy:enemy?observation(enemy):null,enemies:enemies.map(observation),threatened,aidNear});if(!choice)continue;const skill=H.SKILLS[choice.skill];if(skill.attack&&(!enemy||dist(p,enemy.model.position)>R.skillRange(r(),id,skill)))continue;return {choice,enemy,p};}
       return null;
     }
-    function tick(dt){hud();if(!ready())return;const h=H,g=R.state(r()),ids=h.ids(r()),adj={};for(const id of ids){const p=pos(id);adj[id]=p?ids.filter(k=>pos(k)&&dist(p,pos(k))<=6&&clear(p,pos(k))):[];}g.nearby=adj;
+    // A companion's basic attack asks whether a skill is wanted instead. That
+    // answer is reused only while this actor's readiness (strategy, thinking
+    // back-off, attack recovery, which skills are off cooldown), the leader, the
+    // enemy it is about to hit and whether that enemy is inside a ready attack
+    // skill's range all stay the same; a monster stepping out from behind a wall
+    // is a new question. Pause, death and floor changes are never cached.
+    function readiness(id){const a=H.actor(r(),id),p=R.state(r()).policies[id];let key=(p?.strategy||'')+(p?.thinkLeft>0?'t':'')+(a.attack>0?'a':'')+'|'+H.state(r()).active+'|';for(const k of a.skills)key+=a.cooldowns[k]>0?0:1;return key;}
+    function inSkillRange(id,p,enemy){if(!enemy?.model)return false;const a=H.actor(r(),id),d=dist(p,enemy.model.position);return a.skills.some(k=>H.SKILLS[k]?.attack&&!(a.cooldowns[k]>0)&&d<=R.skillRange(r(),id,H.SKILLS[k]));}
+    function wanted(id,enemy=null){
+      const p=pos(id);if(!ready()||!p||id===H.state(r()).active||H.hp(r(),id)<=0)return false;
+      const key=readiness(id)+'|'+(enemy?.id??'')+'|'+(inSkillRange(id,p,enemy)?1:0),hit=wants.get(id);if(hit&&hit.key===key)return hit.value;
+      const value=!!decision(id);wants.set(id,{key,value});return value;
+    }
+    const neighbours=(id,ids)=>{const p=pos(id);return p?ids.filter(k=>pos(k)&&dist(p,pos(k))<=6&&clear(p,pos(k))):[];};
+    function tick(dt){hud();if(!ready())return;const h=H,g=R.state(r()),ids=h.ids(r()),roster=ids.join('|');
+      // The saved adjacency record only needs refreshing a few times a second, or when the roster changes.
+      nearbyLeft-=dt;if(!nearby||roster!==nearbyKey||nearbyLeft<=0){nearby={};for(const id of ids)nearby[id]=neighbours(id,ids);nearbyKey=roster;nearbyLeft=.25;}
+      g.nearby=nearby;
       for(const id of ids){const p=pos(id);if(!p||h.hp(r(),id)<=0)continue;const fortress=h.buff(r(),'fortress',id);if(fortress)h.applyTaunt(r(),id,{monsters:ctx.monsters(),origin:p,clear,seconds:Math.min(.35,fortress.left),retain:true});
-        if(h.buff(r(),'sanctuary',id))adj[id].filter(k=>h.hp(r(),k)>0).forEach(k=>h.heal(r(),k,h.maxHp(r(),k)*R.power(r(),id,h.SKILLS.dawn_sanctuary)/100/10*Math.min(dt,h.buff(r(),'sanctuary',id).left)*(id==='hero'?1+.02*(h.level(r(),id)-1):1)));
+        if(h.buff(r(),'sanctuary',id))neighbours(id,ids).filter(k=>h.hp(r(),k)>0).forEach(k=>h.heal(r(),k,h.maxHp(r(),k)*R.power(r(),id,h.SKILLS.dawn_sanctuary)/100/10*Math.min(dt,h.buff(r(),'sanctuary',id).left)*(id==='hero'?1+.02*(h.level(r(),id)-1):1)));
       }
       const route=g.route;if(route&&route.floor===r().floor){const key=JSON.stringify(route.points);if(key!==routeKey){clearRoute();routeKey=key;for(const p of route.points){const m=new T.Mesh(new T.RingGeometry(.3,.45,12),new T.MeshBasicMaterial({color:0x8fffe2,transparent:true,opacity:.65,depthWrite:false,side:T.DoubleSide}));m.rotation.x=-Math.PI/2;m.position.set(p.x,.04,p.z);ctx.world().add(m);routeMeshes.push(m);}}for(const id of ids){const p=pos(id);if(p&&route.points.some(k=>dist(p,k)<1.8&&clear(p,k)))h.setBuff(r(),id,'escape',Math.min(.3,route.left),route.power??25);}}else if(routeMeshes.length)clearRoute();
       clock+=dt;if(clock<.35)return;clock=0;
       const threats=[];for(const id of ids){const p=pos(id);if(!p||h.hp(r(),id)<=0)continue;const enemy=ctx.monsters().filter(m=>m.alive&&dist(p,m.model.position)<6&&clear(p,m.model.position)).sort((a,b)=>dist(p,a.model.position)-dist(p,b.model.position))[0];if(enemy)threats.push(id);if(id===h.state(r()).active)continue;
-        const intent=decision(id);if(intent){const {choice,enemy,p}=intent,model=ctx.actors().find(a=>a.id===id)?.model;if(enemy&&model&&H.SKILLS[choice.skill].attack)model.rotation.y=Math.atan2(enemy.model.position.x-p.x,enemy.model.position.z-p.z);if(ctx.cast(choice.skill,choice.target,id,false,H.SKILLS[choice.skill].attack?enemy:null))R.state(r()).policies[id].thinkLeft=1;}
+        // The tick's own choice may differ from the enemy a basic attack is aimed at, so it clears the
+        // cached answer instead of storing one under a key the caller would never ask with.
+        const intent=decision(id);wants.delete(id);if(intent){const {choice,enemy,p}=intent,model=ctx.actors().find(a=>a.id===id)?.model;if(enemy&&model&&H.SKILLS[choice.skill].attack)model.rotation.y=Math.atan2(enemy.model.position.x-p.x,enemy.model.position.z-p.z);if(ctx.cast(choice.skill,choice.target,id,false,H.SKILLS[choice.skill].attack?enemy:null))R.state(r()).policies[id].thinkLeft=1;else R.state(r()).policies[id].thinkLeft=Math.max(R.state(r()).policies[id].thinkLeft||0,.3);}
       }
       const item=R.autoItems(r(),threats);if(item)commit(R.use(r(),item.key,item.id,true));
     }
-    return {install,settings,progression,handle,hud,tick,reset,startRoute,wantsSkill:id=>!!decision(id)};
+    return {install,settings,progression,handle,hud,tick,reset,startRoute,wantsSkill:wanted};
   }
   root.TowerGrowthRuntime={create};
 })(globalThis);

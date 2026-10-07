@@ -22,7 +22,9 @@
     const random=()=>{seed=(Math.imul(seed,1664525)+1013904223)>>>0;return seed/4294967296;};
     // Stable offsets do not use gameplay RNG or persist anything in a save.
     const offsets=new Float32Array(count*3);for(let i=0;i<count;i++){const a=random()*Math.PI*2,r=1.1+random()*3.1;offsets[i*3]=Math.sin(a)*r;offsets[i*3+1]=.4+random()*1.9;offsets[i*3+2]=Math.cos(a)*r;seeds[i]=random();}
-    const geometry=new T.BufferGeometry();geometry.setAttribute('position',new T.BufferAttribute(positions,3));geometry.setAttribute('seed',new T.BufferAttribute(seeds,1));geometry.setAttribute('visible',new T.BufferAttribute(visible,1));
+    // Vertices are observer-local and never move: written once, uploaded once. Only the 0/1 gates change.
+    positions.set(offsets);
+    const geometry=new T.BufferGeometry();geometry.setAttribute('position',new T.BufferAttribute(positions,3));geometry.setAttribute('seed',new T.BufferAttribute(seeds,1));geometry.setAttribute('visible',new T.BufferAttribute(visible,1).setUsage(T.DynamicDrawUsage));
     const material=new T.ShaderMaterial({uniforms:{age:{value:0},kind:{value:profile.kind},speed:{value:profile.speed},tint:{value:new T.Color(profile.color)}},vertexShader:VERTEX,fragmentShader:FRAGMENT,transparent:true,depthWrite:false,blending:T.NormalBlending,toneMapped:false});
     const cloud=new T.Points(geometry,material);cloud.name='local-environment-'+ctx.style;cloud.userData.role='scenery';cloud.frustumCulled=false;ctx.world?.()?.add(cloud);cloud.visible=false;
     function tick(dt){
@@ -34,8 +36,9 @@
       // whenever the maze centre is behind a wall.
       cloud.position.set(p.x,0,p.z);age+=Math.min(dt,.25);material.uniforms.age.value=age;sampleLeft-=dt;
       if(sampleLeft>0)return;sampleLeft=.1;
-      for(let i=0;i<count;i++){const x=p.x+offsets[i*3],z=p.z+offsets[i*3+2];positions[i*3]=offsets[i*3];positions[i*3+1]=offsets[i*3+1];positions[i*3+2]=offsets[i*3+2];checks++;visible[i]=i<budget&&(!ctx.visible||ctx.visible(x,z))&&(!ctx.clear||ctx.clear(p.x,p.z,x,z))?1:0;}
-      geometry.attributes.position.needsUpdate=true;geometry.attributes.visible.needsUpdate=true;
+      let changed=false;
+      for(let i=0;i<count;i++){const x=p.x+offsets[i*3],z=p.z+offsets[i*3+2];checks++;const gate=i<budget&&(!ctx.visible||ctx.visible(x,z))&&(!ctx.clear||ctx.clear(p.x,p.z,x,z))?1:0;if(visible[i]!==gate){visible[i]=gate;changed=true;}}
+      if(changed)geometry.attributes.visible.needsUpdate=true;
     }
     function destroy(){if(destroyed)return;destroyed=true;cloud.parent?.remove(cloud);geometry.dispose();material.dispose();}
     return {tick,destroy,cloud,profile,stats:()=>({points:destroyed?0:count,drawCalls:destroyed||!cloud.visible?0:1,checks,textureBytes:0})};

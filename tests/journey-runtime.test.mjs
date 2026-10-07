@@ -377,3 +377,37 @@ for (const outcome of ['completed', 'expired']) {
     assert.equal(h.context.startSettingsHistory.length, buildCount + 1);
   });
 }
+
+test('leaving the tab while the walls shift pauses as soon as they settle and refunds the hidden seconds', () => {
+  const h = harness(runAt(98)); h.start();
+  h.tick(h.state().shiftLeft + 1); h.context.TowerMode.updateShift(); assert.equal(h.context.G.shifting, true); assert.equal(h.context.TowerMode.paused, false);
+  h.document.hidden = true; h.emitDocument('visibilitychange'); assert.equal(h.context.TowerMode.paused, false, 'no dialog can open mid-shift');
+  h.tick(20); h.document.hidden = false; h.emitDocument('visibilitychange');
+  h.context.G.shifting = false; h.tick(.1);
+  assert.equal(h.context.TowerMode.paused, true, 'the journey pauses right after the walls settle');
+  assert.match(h.get('towerDialog').innerHTML, /旅程已暫停/);
+  const before = h.context.G.startTime; h.click('close'); assert.ok(h.context.G.startTime - before >= 20000, 'time spent away is refunded');
+});
+
+test('returning from a rift shows its settlement; an unread chapter opening waits in the journal', () => {
+  let run = findRun(r => !!D.offer(r), 89); run.chronicle.read = N.unlockedScenes(89).map(s => s.id).filter(id => id !== 'scene:89');
+  run = D.discover(run).run; const h = harness(run); h.start();
+  if (h.state().reader?.id === 'scene:89') h.click('close');
+  enterRift(h); h.click('close'); finishObjectives(h); h.exit();
+  assert.equal(h.state().run.expedition.active, null);
+  assert.match(h.get('towerDialog').innerHTML, /回到第 89 層/, 'the settlement summary stays visible');
+  assert.notEqual(h.state().reader?.id, 'scene:89', 'the chapter opening did not take over the dialog');
+  assert.ok(N.availableScenes(h.state().run).some(s => s.id === 'scene:89'), 'it remains readable from the journal');
+});
+
+test('taking the chapter clue or finishing optional encounters never moves the rest of the floor on reload', () => {
+  const run = findRun(r => r.floor <= N.chapterForFloor(r.floor).mid && !!D.offer(r) && !!E.explorerOffer(r), 95);
+  const layout = h => plain((() => { const s = h.state(); return { rift: s.rift && [s.rift.cx, s.rift.cy], explorer: s.explorer && [s.explorer.cx, s.explorer.cy], traders: s.traders.map(t => [t.id, t.cx, t.cy]), loot: s.loot.length }; })());
+  const before = harness(plain(run)); before.start(); assert.ok(before.state().mainClue, 'fixture shows the clue');
+  const taken = plain(run); taken.chronicle.clues = [...taken.chronicle.clues, N.chapterForFloor(95).clueId];
+  const after = harness(taken); after.start(); assert.equal(after.state().mainClue, null);
+  assert.deepEqual(layout(after), layout(before), 'rift, explorer and merchants keep their cells');
+  const noExplorer = plain(run); noExplorer.adventure = { ...noExplorer.adventure, claimed: [...noExplorer.adventure.claimed, E.explorerOffer(run).id] };
+  const third = harness(noExplorer); third.start();
+  if (!third.state().explorer) assert.deepEqual({ ...layout(third), explorer: null }, { ...layout(before), explorer: null }, 'a finished commission frees no cell for others to slide into');
+});

@@ -20,7 +20,7 @@ const SAVE_KEY = 'maze3d_tower_v1';
 // runtime, events, storage and dialog rendering execute unmodified by default.
 // Other runtime suites can explicitly request a test-only closure bridge.
 function harness(initialSave, runtimeBridge = '',preferences = {}) {
-  const elements = new Map(), windowEvents = new Map(), storage = new Map(), toasts = [];
+  const elements = new Map(), windowEvents = new Map(), documentEvents = new Map(), storage = new Map(), toasts = [];
   let now = 10000;
   if (initialSave !== undefined) storage.set(SAVE_KEY, typeof initialSave === 'string' ? initialSave : JSON.stringify(initialSave));
   for(const [key,value] of Object.entries(preferences))storage.set(key,value);
@@ -53,7 +53,7 @@ function harness(initialSave, runtimeBridge = '',preferences = {}) {
     querySelector(selector) { return selector === '.tower-dialog-content' ? (this.content ||= {scrollTop:0}) : null; }
     focus() { document.activeElement = this; }
   }
-  const document = { body: new Element('body'), hidden: false, activeElement: null, getElementById: id => elements.get(id) || null, querySelector: selector=>selector==='#towerHud .tower-hud-summary'?elements.get('towerHud'):null, createElement: tag => new Element(tag), addEventListener() {} };
+  const document = { body: new Element('body'), hidden: false, activeElement: null, getElementById: id => elements.get(id) || null, querySelector: selector=>selector==='#towerHud .tower-hud-summary'?elements.get('towerHud'):null, createElement: tag => new Element(tag), addEventListener(type, fn) { if (!documentEvents.has(type)) documentEvents.set(type, []); documentEvents.get(type).push(fn); } };
   for (const id of ['gameScreen', 'hudRightBtns', 'storyEntryBtn', 'joyBase', 'joyStick', 'playerName', 'profileTitle', 'profileNextBtn', 'hudLvlName', 'hudRound', 'hudRoundControl', 'shiftCountdown', 'preWarn', 'preWarnSec']) { const element = new Element(); element.id = id; }
   const buildCharacter = () => {
     const model = new THREE.Group();
@@ -116,7 +116,7 @@ function harness(initialSave, runtimeBridge = '',preferences = {}) {
   }
   function save() { const stored = storage.get(SAVE_KEY); return stored ? JSON.parse(stored) : null; }
   function tick(seconds) { now += seconds * 1000; context.TowerMode.tick(seconds, now); }
-  return { context, get, click, save, tick, storage, toasts, emit: (type, event = {}) => windowEvents.get(type)?.(event) };
+  return { context, get, click, save, tick, storage, toasts, emit: (type, event = {}) => windowEvents.get(type)?.(event), emitDocument: (type, event = {}) => (documentEvents.get(type) || []).forEach(fn => fn(event)), document };
 }
 
 test('story menu no longer opens the regular character creation flow', () => {
@@ -183,7 +183,11 @@ for (const merchantId of ['tieLing', 'jinHe', 'lanZhou']) {
     assert.deepEqual(buttons.filter(b => b.dataset.tower === 'sell').map(b => b.dataset.item), Array.from(offer.supplies));
     assert.deepEqual(Array.from(offer.supplies),[]);
     assert.equal(buttons.some(b=>['buy-ingredient','light-buy'].includes(b.dataset.tower)),false);
-    assert.deepEqual(buttons.filter(b => b.dataset.tower === 'buy-gear').map(b => b.dataset.item), Array.from(offer.gear, item => item.kind));
+    // Stock is grouped by body slot (weapon, head, body, shield), keeping catalogue order inside each group.
+    const slotRank = slot => { const at = ['weapon', 'helmet', 'armor', 'shield'].indexOf(slot); return at < 0 ? 4 : at; };
+    const grouped = Array.from(offer.gear, (item, index) => ({ item, index })).sort((a, b) => slotRank(a.item.gear.slot) - slotRank(b.item.gear.slot) || a.index - b.index).map(({ item }) => item.kind);
+    assert.deepEqual(buttons.filter(b => b.dataset.tower === 'buy-gear').map(b => b.dataset.item), grouped);
+    assert.equal(new Set(grouped).size, offer.gear.length, 'every offer appears exactly once');
     assert.doesNotMatch(h.get('towerDialog').innerHTML, /data-tower="exchange"/);
     h.emit('pagehide');const before = h.save(); h.tick(5); h.emit('pagehide');
     assert.equal(h.save().elapsed, before.elapsed, 'Time cannot advance while trading'); assert.ok(h.context.TowerCore.validateSave(h.save()));

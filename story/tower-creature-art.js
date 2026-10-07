@@ -1,5 +1,8 @@
 /* Original tower fauna. Vertex-colour surfaces are merged by material so the
  * silhouettes can be sculpted without one draw call per foot, scale or petal.
+ * The merged vertex data of a (kind, colour) is remembered as plain typed arrays, so the second
+ * monster of a kind skips every primitive and merge step. Each monster still owns fresh geometry,
+ * materials and threat ring: nothing the cache holds is a GPU resource or can be disposed.
  * No downloaded art, dynamic light, shared disposable resource or animation loop.
  */
 (function(root,factory){
@@ -9,11 +12,11 @@
   'use strict';
   const COLORS=Object.freeze({clockmite:0xdba65f,wisp:0xa6a0ff,sentinel:0x839cae,hound:0xff9868,shardseer:0x63dbe9,mushroom:0xcf95bc,crab:0xc28c62,moth:0xdfcc79,flower:0x96bb70});
   const mix=(a,b,t)=>{let c=0;for(const s of [16,8,0])c|=Math.round(((a>>>s)&255)*(1-t)+((b>>>s)&255)*t)<<s;return c;};
-  function build(T,kind,def={}){
-    if(!T?.BufferGeometry||!Object.prototype.hasOwnProperty.call(COLORS,kind))return null;
-    const tint=Number.isInteger(def.color)?def.color:COLORS[kind],dark=mix(tint,0x172332,.63),light=mix(tint,0xffedc5,.3),ivory=0xe9dcc0;
-    const model=new T.Group(),body=new T.Group();model.name='tower-creature-'+kind;model.add(body);body.name='creature-body';body.position.y=kind==='clockmite'?.6:1;
-    const material=new T.MeshLambertMaterial({vertexColors:true}),luminous=new T.MeshBasicMaterial({vertexColors:true});
+  // Merged vertex data per (kind, colour), per THREE namespace; least recently used first.
+  const caches=new Map(),LIMIT=24;
+  const cacheFor=T=>{let cache=caches.get(T);if(!cache)caches.set(T,cache=new Map());return cache;};
+  function sculpt(T,kind,tint,body,wings){
+    const dark=mix(tint,0x172332,.63),light=mix(tint,0xffedc5,.3),ivory=0xe9dcc0;
     const buckets=new Map(),tmp=new T.Vector3(),normal=new T.Vector3(),matrix=new T.Matrix4(),normalMatrix=new T.Matrix3(),quaternion=new T.Quaternion(),euler=new T.Euler(),color=new T.Color();
     function add(geometry,tone,pos=[0,0,0],scale=[1,1,1],rotation=[0,0,0],parent=body,glow=false){
       const original=geometry;if(geometry.index)geometry=geometry.toNonIndexed();
@@ -98,7 +101,7 @@
       for(let i=0;i<3;i++)ellipsoid(i%2?dark:tint,[0,-.01,-.22-i*.13],[.17-i*.023,.17-i*.02,.14]);
       for(const s of [-1,1]){
         curve(dark,[[s*.11,.2,.44],[s*.28,.47,.48],[s*.4,.5,.39]],.022);eye(s*.13,.15,.53,.068,0x473728);
-        const wing=new T.Group();wing.name='party-wing';wing.position.set(s*.14,.03,-.03);body.add(wing);
+        const wing=wings[s>0?1:0];
         // Scalloped fore/hind wings share one material batch per animated side.
         const outline=[[0,0],[.27,.59],[.68,.72],[.94,.57],[1.05,.29],[.85,.11],[.99,-.13],[.8,-.43],[.5,-.55],[.22,-.4],[.07,-.19]],positions=[],normals=[];
         for(let i=0;i<outline.length;i++){const a=outline[i],b=outline[(i+1)%outline.length],front=s>0?[a,b]:[b,a];for(const [x,z]of [[.33,0],...front]){positions.push(s*x,0,z);normals.push(0,1,0);}for(const [x,z]of [[.33,0],...front.slice().reverse()]){positions.push(s*x,-.012,z);normals.push(0,-1,0);}}
@@ -115,14 +118,32 @@
       for(let i=0;i<6;i++){const a=i*Math.PI/3;cone(ivory,[Math.cos(a)*.18,.29+Math.sin(a)*.17,.31],.032,.115,[0,0,a+Math.PI/2]);}
       for(const s of [-1,1])eye(s*.13,.51,.29,.05,0xf5d980);
     }
+    const parents=[body,...wings],records=[];
+    for(const [parent,rows]of buckets)for(const [index,data]of rows.entries())if(data.p.length)records.push({parent:parents.indexOf(parent),glow:index===1,p:Float32Array.from(data.p),n:Float32Array.from(data.n),c:Float32Array.from(data.c),sphere:null});
+    return records;
+  }
+  function build(T,kind,def={}){
+    if(!T?.BufferGeometry||!Object.prototype.hasOwnProperty.call(COLORS,kind))return null;
+    const tint=Number.isInteger(def.color)?def.color:COLORS[kind];
+    const model=new T.Group(),body=new T.Group();model.name='tower-creature-'+kind;model.add(body);body.name='creature-body';body.position.y=kind==='clockmite'?.6:1;
+    const material=new T.MeshLambertMaterial({vertexColors:true}),luminous=new T.MeshBasicMaterial({vertexColors:true});
+    // The moth's two flapping wings are separate nodes; every other kind has one body node.
+    const wings=kind==='moth'?[-1,1].map(s=>{const wing=new T.Group();wing.name='party-wing';wing.position.set(s*.14,.03,-.03);body.add(wing);return wing;}):[],parents=[body,...wings];
+    const cache=cacheFor(T),key=kind+':'+tint;let records=cache.get(key);
+    if(records)cache.delete(key);else records=sculpt(T,kind,tint,body,wings);
+    cache.set(key,records);if(cache.size>LIMIT)cache.delete(cache.keys().next().value);
     let triangles=0,drawCalls=0,usesGlow=false;
-    for(const [parent,rows]of buckets)for(const [index,data]of rows.entries())if(data.p.length){
-      const geometry=new T.BufferGeometry();geometry.setAttribute('position',new T.Float32BufferAttribute(data.p,3));geometry.setAttribute('normal',new T.Float32BufferAttribute(data.n,3));geometry.setAttribute('color',new T.Float32BufferAttribute(data.c,3));geometry.computeBoundingSphere();
-      const mesh=new T.Mesh(geometry,index?luminous:material);mesh.name=index?'creature-eye-light':'creature-sculpture';parent.add(mesh);triangles+=data.p.length/9;drawCalls++;if(index)usesGlow=true;
+    for(const record of records){
+      const geometry=new T.BufferGeometry();geometry.setAttribute('position',new T.Float32BufferAttribute(record.p,3));geometry.setAttribute('normal',new T.Float32BufferAttribute(record.n,3));geometry.setAttribute('color',new T.Float32BufferAttribute(record.c,3));
+      if(record.sphere)geometry.boundingSphere=record.sphere.clone();else{geometry.computeBoundingSphere();record.sphere=geometry.boundingSphere.clone();}
+      const mesh=new T.Mesh(geometry,record.glow?luminous:material);mesh.name=record.glow?'creature-eye-light':'creature-sculpture';parents[record.parent].add(mesh);triangles+=record.p.length/9;drawCalls++;if(record.glow)usesGlow=true;
     }
     if(!usesGlow)luminous.dispose();
     const ring=new T.Mesh(new T.TorusGeometry(.83,.045,5,20),new T.MeshBasicMaterial({color:0xe28476,transparent:true,opacity:.35,depthWrite:false}));ring.rotation.x=Math.PI/2;ring.position.y=.065;ring.name='creature-threat-ring';model.add(ring);
     triangles+=ring.geometry.index.count/3;drawCalls++;model.userData.body=body;model.userData.ring=ring;model.userData.art=Object.freeze({kind,triangles,drawCalls});return model;
   }
-  return Object.freeze({build,kinds:Object.freeze(Object.keys(COLORS))});
+  // Forget the remembered vertex data (e.g. when a floor or the tower is left). The next monster of a
+  // kind simply sculpts again; monsters already built are unaffected.
+  function release(){caches.clear();}
+  return Object.freeze({build,release,kinds:Object.freeze(Object.keys(COLORS))});
 });

@@ -10,11 +10,12 @@
     if(readyRequest){button.textContent='準備狀態傳送中…';$('mpStatus').textContent='正在等待房主確認…';}
   }
   const hostId=()=>MP.roster?.[0]?.id;
-  const critical=new Set(['start','end','shopend','shift','raceend','twin','contact']);
+  // Treasure verdicts are host-only results: retried until delivered and processed once.
+  const critical=new Set(['start','end','shopend','shift','raceend','twin','contact','tresok','tresdrop']);
   function ensureTimer(){if(!timer)timer=setInterval(tick,250);}
   function sendLocal(message){
     const m={...message,f:MP.id,sr:MP.seriesRound,mid:MP.id+':'+Date.now()+':'+(++serial)};
-    mpHandle(m);if(MP.net){baseSend(m);if(['chaoseffect','chaosloot','chaosuse','ragewall','salesync','contact'].includes(m.t))outbox.push({m,left:3,at:performance.now()+400});}return m;
+    mpHandle(m);if(MP.net){baseSend(m);if(['chaoseffect','chaosloot','chaosuse','ragewall','salesync','contact','tresok','tresdrop','shift'].includes(m.t))outbox.push({m,left:3,at:performance.now()+400});}return m;
   }
   function abort(reason){
     pending=null;startPacket=null;result=null;$('roomCountdown').hidden=true;
@@ -56,6 +57,8 @@
         if(['shop','tag'].includes(MP.mode)&&now>=G.roundEndsAt){
           mpSend(MP.mode==='shop'?{t:'shopend',carts:MP.carts,banked:MP.banked,shopBonus:MP.shopBonus}:{t:'end',loser:MP.taggedId,catches:MP.tagCatches});
         }
+        // The race grace period also ends while the host's tab is in the background.
+        if(MP.mode==='race'&&MP.raceEndAt&&now>MP.raceEndAt&&typeof mpEndRace==='function')mpEndRace();
         if(MP.mode==='treasure'&&now>=G.roundEndsAt){
           if(!MP.duelOvertime&&MP.treasure?.holder){MP.duelOvertime=true;G.roundEndsAt+=30000;showToast('有人帶著寶藏！最後延長 30 秒，帶到出口才算勝利。',3000);}
           if(now>=G.roundEndsAt)mpSend({t:'twin',timeout:true,winner:null});
@@ -63,7 +66,8 @@
       }
       if(now-lastPulse>1000){lastPulse=now;
         if(result&&MP.net)baseSend(result);
-        else if(MP.started)baseSend({t:'roompulse',sr:MP.seriesRound,left:Math.max(0,G.roundEndsAt-now),overtime:!!MP.duelOvertime});
+        else if(MP.started)baseSend({t:'roompulse',sr:MP.seriesRound,left:Math.max(0,G.roundEndsAt-now),overtime:!!MP.duelOvertime,
+          ...(MP.mode==='treasure'&&MP.treasure?.cell?{tres:{holder:MP.treasure.holder||null,x:MP.treasure.cell.x,y:MP.treasure.cell.y,v:MP.treasure.v||0}}:{})});
         else if(!pending)mpBroadcastLobby();
       }
     }else if((MP.started||pending)&&now-lastHost>15000)abort('房主連線逾時。');
@@ -84,7 +88,7 @@
     const owner=hostId();
     if(m.t==='roompresent'){const p=MP.roster.find(r=>r.id===m.f);if(p)p.seenAt=performance.now();return;}
     if(m.t==='lobby'&&owner&&m.f!==owner)return;
-    if(['start','end','shopend','shift','raceend','roompulse'].includes(m.t)&&owner&&m.f!==owner)return;
+    if(['start','end','shopend','shift','raceend','roompulse','tresok','tresdrop'].includes(m.t)&&owner&&m.f!==owner)return;
     if(m.t==='twin'&&m.timeout&&m.f!==owner)return;
     if(m.t==='roompulse'){
       if(m.sr===MP.seriesRound){
@@ -93,6 +97,7 @@
           if(MP.mode==='treasure'&&m.overtime===true&&!MP.duelOvertime){MP.duelOvertime=true;G.roundEndsAt=performance.now()+Math.min(30000,m.left);showToast('尋寶進入最後 30 秒延長賽！',2400);}
           else G.roundEndsAt=Math.min(G.roundEndsAt,performance.now()+m.left);
         }
+        if(MP.started&&MP.mode==='treasure'&&m.tres&&typeof syncTreasure==='function')syncTreasure(m.tres);
       }
       return;
     }
@@ -110,6 +115,12 @@
     if(m.t==='bye'&&m.f===owner&&!MP.host){abort('房主已離開。');return;}
     if(m.mid){if(seen.has(m.mid))return;seen.add(m.mid);if(seen.size>500)seen.delete(seen.values().next().value);}
     if(m.f===owner)lastHost=performance.now();
+    // A guest's treasure win is a claim. The host checks the holder it arbitrated and republishes
+    // the verdict as a retried result, so a lost packet cannot leave one device still playing.
+    if(m.t==='twin'&&!m.timeout&&owner&&m.f!==owner){
+      if(!MP.host||!MP.started||MP.ended||MP.mode!=='treasure'||Number(m.sr||1)!==MP.seriesRound||m.winner!==m.f||MP.treasure?.holder!==m.f)return;
+      mpSend({t:'twin',winner:m.winner});return;
+    }
     // Only the host checks moving positions. Peers apply that decision, not their later interpolated poses.
     if(window.GameplayRules&&['hit','tag','rob'].includes(m.t)){
       if(!MP.host||!MP.started||MP.ended||G.shifting||Number(m.sr||1)!==MP.seriesRound)return;
@@ -186,5 +197,5 @@
   const connect=mpConnect;
   mpConnect=async function(cb){await connect(cb);ensureTimer();};
   window.addEventListener('visibilitychange',()=>{if(!document.hidden)tick();});
-  window.RoomLifecycle={tick,sendLocal};
+  window.RoomLifecycle={tick,sendLocal,hostSeenAt:()=>lastHost};
 })();

@@ -33,7 +33,8 @@
       if(mesh.userData.motion?.weapon)mesh.userData.motion.weapon.visible=false;
     }
   }
-  function broadcast(){lastBroadcast=Date.now();RoomLifecycle.sendLocal({t:'ragestate',state:{...state}});}
+  // Devices' wall clocks differ: send the time left and let each device anchor it locally.
+  function broadcast(){lastBroadcast=Date.now();RoomLifecycle.sendLocal({t:'ragestate',state:{...state},left:state.until?Math.max(0,state.until-Date.now()):0});}
   function tick(){
     if(MP.mode!=='tag'||!MP.started||MP.ended)return;
     const now=Date.now();
@@ -61,17 +62,18 @@
     if(m.t==='ragestate'){
       if(m.f!==owner()||m.sr!==MP.seriesRound||!MP.started||MP.ended||MP.mode!=='tag')return;
       if(!m.state||m.state.id!==MP.taggedId||!Number.isFinite(m.state.until))return;
-      state={...m.state};render();return;
+      const left=Number(m.left);state={...m.state,until:!m.state.until?0:Number.isFinite(left)?(left>0?Date.now()+Math.min(left,120000):0):m.state.until};render();return;
     }
     if(m.t==='rageswing'){if(m.sr===MP.seriesRound)smash(m.f);return;}
     if(m.t==='ragepose'){
-      if(m.f!==owner()||m.sr!==MP.seriesRound||!raging(m.id))return;
+      if(m.f!==owner()||m.sr!==MP.seriesRound||state.id!==m.id)return;
       const mesh=m.id===MP.id?playerGroup:MP.players[m.id]?.mesh;
       if(mesh&&window.CharacterMotion)CharacterMotion.beginAction(mesh,'attack',.48);
       return;
     }
     if(m.t==='ragewall'){
-      if(m.f!==owner()||m.sr!==MP.seriesRound||m.round!==MP.round||!raging(m.id))return;
+      // The host already judged the rage window; a late packet must still break the same wall everywhere.
+      if(m.f!==owner()||m.sr!==MP.seriesRound||m.round!==MP.round||MP.mode!=='tag'||!MP.started)return;
       const w=G.wallBoxes.find(w=>!w.boundary&&w.type===m.wall?.type&&w.gx===m.wall.gx&&w.gy===m.wall.gy);
       if(w){removeWallBox(w,true);AudioEng.sfxBreak();burstParticles((w.minX+w.maxX)/2,(w.minZ+w.maxZ)/2);}
       return;

@@ -666,9 +666,9 @@
     return transaction(run, undefined, next => applyDamage(next, amount, source, false, monsterId));
   }
 
-  function tickEffects(run, seconds) {
-    return transaction(run, undefined, (next) => {
-      if (!validNumber(seconds, 0, 60)) return { ok: false, message: '無效的時間間隔。' };
+  // Shared per-tick bookkeeping: applied to a validated private copy by
+  // tickEffects, or directly to the engine's live run by tickEffectsLive.
+  function advanceEffects(next, seconds) {
       for (const id of Object.keys(next.effects)) next.effects[id] = Math.max(0, next.effects[id] - seconds);
       if (!next.expedition.active) for (const id of Object.keys(next.monsterStuns)) {
           next.monsterStuns[id] = Math.max(0, next.monsterStuns[id] - seconds);
@@ -686,7 +686,23 @@
         }
       }
       return { ok: true, message: '' };
+  }
+  function tickEffects(run, seconds) {
+    return transaction(run, undefined, (next) => {
+      if (!validNumber(seconds, 0, 60)) return { ok: false, message: '無效的時間間隔。' };
+      return advanceEffects(next, seconds);
     });
+  }
+  // Frame hot path. The live engine already owns a validated run, so validating
+  // and deep-copying it every frame only produces garbage; the engine still
+  // runs the validating tickEffects at least once per second of play.
+  function tickEffectsLive(run, seconds) {
+    if (!run || run.status !== 'playing') return failure(run, '這趟旅程已經結束。');
+    if (!validNumber(seconds, 0, 60)) return failure(run, '無效的時間間隔。');
+    const result = advanceEffects(run, seconds);
+    if (run.party?.loadouts) heroRules().sync(run);
+    run.revision += 1;
+    return { ...result, run };
   }
 
   function startUnderworld(run, expectedRevision) {
@@ -758,5 +774,5 @@
     });
   }
 
-  return Object.freeze({ STATE_VERSION, MAX_HP, MAX_MONSTERS, HASTE_DURATION, HASTE_PERCENT, hasteMultiplier, validMonsterId, isFloor, isUnderworld, ITEMS, itemLimit, itemStorageLimit, GEAR, MONSTERS, CHAPTERS, OPENING, ENDING, EXCHANGES, floorConfig, newRun, validateSave, supplyPrice, buy, sell, exchange, useItem, collect, takeDamage, tickEffects, startUnderworld, descend, monsterStrength, warriorOffer, hireWarrior, interceptMonster, createGear, validateGear, originalDurabilityMultiplier, durabilityMultiplier, durabilityMinimumRoll, durabilityForRoll, DURABILITY_VERSION, gearPrice, equipmentStats, receiveGear, grantGear, equipGear, discardGear, buyGear, effectiveMonsterStrength, hitMonster, resolveHeldMonster, transaction, applyDamage, newAdventure, validateAdventure });
+  return Object.freeze({ STATE_VERSION, MAX_HP, MAX_MONSTERS, HASTE_DURATION, HASTE_PERCENT, hasteMultiplier, validMonsterId, isFloor, isUnderworld, ITEMS, itemLimit, itemStorageLimit, GEAR, MONSTERS, CHAPTERS, OPENING, ENDING, EXCHANGES, floorConfig, newRun, validateSave, supplyPrice, buy, sell, exchange, useItem, collect, takeDamage, tickEffects, tickEffectsLive, startUnderworld, descend, monsterStrength, warriorOffer, hireWarrior, interceptMonster, createGear, validateGear, originalDurabilityMultiplier, durabilityMultiplier, durabilityMinimumRoll, durabilityForRoll, DURABILITY_VERSION, gearPrice, equipmentStats, receiveGear, grantGear, equipGear, discardGear, buyGear, effectiveMonsterStrength, hitMonster, resolveHeldMonster, transaction, applyDamage, newAdventure, validateAdventure });
 });

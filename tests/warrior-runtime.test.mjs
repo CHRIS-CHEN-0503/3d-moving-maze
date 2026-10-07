@@ -312,3 +312,10 @@ test('續讀時重評已恢復強度的怪物，不能留下永久牽制漏洞',
   assert.equal(h.api.state().run.warrior.remaining,120);
   assert.equal(monster.alive,true);
 });
+
+test('crystal bolts share one geometry and material that survive bolt removal',()=>{
+  const h=runtime(core.newRun({seed:123})),m=positionThreat(h,'shardseer','monster-0',6);h.api.replaceMonsters([m]);
+  m.aim={x:0,z:0};h.api.launchBolt(m);h.api.launchBolt(m);const [a,b]=h.api.state().bolts;
+  assert.equal(a.model.geometry,b.model.geometry);assert.equal(a.model.material,b.model.material);assert.equal(a.model.geometry.userData.sharedResource,true);assert.equal(a.model.material.userData.sharedResource,true);
+  h.api.clearBolts();h.api.launchBolt(m);assert.equal(h.api.state().bolts[0].model.geometry,a.model.geometry);
+});

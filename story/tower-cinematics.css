@@ -2,6 +2,11 @@
 #towerCinema{position:fixed;inset:0;z-index:90;isolation:isolate;color:#fff5df;background:linear-gradient(#06111caa,transparent 24%,transparent 63%,#06111cee);touch-action:none}
 #towerCinema[data-polished="true"]{background:radial-gradient(ellipse at 50% 37%,transparent 38%,#02091455 100%),linear-gradient(#030b1544,transparent 20%,transparent 53%,#030c18ed)}
 .cinema-veil{position:absolute;inset:0;background:#050b13;pointer-events:none;opacity:0;z-index:-1}
+/* Film letterbox: two thin bars slide in behind the controls and subtitles. */
+#towerCinema::before,#towerCinema::after{content:'';position:absolute;left:0;right:0;height:clamp(10px,5.5vh,46px);background:#02060b;pointer-events:none;z-index:0;animation:cinema-bar-in .5s cubic-bezier(.2,.7,.2,1) both}
+#towerCinema::before{top:0;transform-origin:top}#towerCinema::after{bottom:0;transform-origin:bottom}
+#towerCinema .cinema-controls,#towerCinema .cinema-caption{z-index:1}
+@keyframes cinema-bar-in{from{transform:scaleY(0)}to{transform:scaleY(1)}}
 .cinema-controls{position:absolute;right:max(18px,env(safe-area-inset-right));top:max(14px,env(safe-area-inset-top));display:flex;gap:10px}
 .cinema-controls button{min-width:72px;min-height:44px;padding:8px 16px;border:1px solid #c8d9df88;border-radius:12px;color:#fff5df;background:#182c3dec;font:inherit;cursor:pointer}
 .cinema-controls button[hidden]{display:none}
@@ -15,4 +20,4 @@ body.tower-cinematic-active #gameScreen :not(#c3d){visibility:hidden!important;o
 @media(max-height:420px){.cinema-caption{bottom:max(10px,env(safe-area-inset-bottom));left:max(18px,env(safe-area-inset-left));right:max(18px,env(safe-area-inset-right))}.cinema-caption h2{margin:3px 0}.cinema-caption p{font-size:16px;max-height:24vh}.cinema-controls{top:8px}}
 @media(max-height:420px){#towerCinema[data-polished="true"] .cinema-caption{padding:7px 12px 6px}#towerCinema[data-polished="true"] .cinema-pages{margin-top:6px}}
 @media(max-height:340px){.cinema-caption{bottom:8px}.cinema-caption p{font-size:14px;max-height:22vh}.cinema-caption h2{font-size:18px;margin:2px 0}.cinema-caption small{font-size:10px}.cinema-pages{margin-top:5px}.cinema-controls{gap:5px}.cinema-controls button{padding:6px 10px;font-size:13px}}
-@media(prefers-reduced-motion:reduce){#towerCinema[data-polished="true"] .cinema-caption{animation:none}}
+@media(prefers-reduced-motion:reduce){#towerCinema[data-polished="true"] .cinema-caption,#towerCinema::before,#towerCinema::after{animation:none}}

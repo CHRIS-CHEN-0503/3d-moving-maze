@@ -63,7 +63,7 @@
     p.travellers=[...archive(run).filter(t=>t.identity!==key),record];return record;
   }
   function restore(run,offer){const t=remembered(run,offer.profession,offer.sex);if(!t||!away(run,t))return null;
-    const m={id:t.id,profession:t.profession,sex:t.sex,level:offer.level,xp:Math.max(t.xp,G().XP[offer.level-1]),hp:28+offer.level*6,cooldown:0,hurtLeft:0};
+    const m={id:t.id,profession:t.profession,sex:t.sex,level:offer.level,xp:Math.max(t.xp,G().XP[offer.level-1]),hp:run.party.loadouts?P().vitalHp(t.profession,offer.level,false):28+offer.level*6,cooldown:0,hurtLeft:0};
     run.party.members.push(m);if(run.party.loadouts)H().restoreMember(run,m,t.loadout);return m;
   }
   function validate(value,party,floor){

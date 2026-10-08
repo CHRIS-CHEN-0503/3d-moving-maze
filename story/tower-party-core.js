@@ -84,6 +84,12 @@
   const emptyStock=keys=>Object.fromEntries(Object.keys(keys).map(k=>[k,0]));
   const has=(run,job)=>run.party&&(run.party.loadouts?H().ids(run).some(id=>H().job(run,id)===job&&H().hp(run,id)>0):run.party.profession===job&&run.hp>0||run.party.members.some(m=>m.profession===job&&m.hp>0));
   const memberMax=m=>m.id==='hero'?60:28+m.level*6;
+  // Hero-journey life: sturdy front-liners carry more, and companions start
+  // closer to the protagonist (a level-10 companion still matches a level-10
+  // hero, as before). Every value is at least the earlier formula (60+3/level
+  // hero, 28+6/level companion, levels 1-10), so no saved health exceeds its cap.
+  const VITALITY=Object.freeze({swordsman:1.35,smith:1.3,robot:1.2,chef:1.15,scout:1.05,archer:1,healer:1,mage:1});
+  const vitalHp=(profession,level,hero)=>Math.round((hero?60+(level-1)*3:40+level*5)*(VITALITY[profession]||1));
   const newBoss=floor=>X().newBoss(floor);
   function enable(run,profession,gender=PROFESSIONS[profession]?.gender){
     const next=C().validateSave(run);if(!next||!own(PROFESSIONS,profession)||next.party||!['male','female'].includes(gender))return {ok:false,run,message:'請選擇有效的冒險職業與外觀。'};
@@ -105,7 +111,7 @@
     if(!Array.isArray(value.joined)||value.joined.length>150||new Set(value.joined).size!==value.joined.length||!value.joined.every(id=>typeof id==='string'&&id.length>0&&id.length<=80))return null;
     if(!Array.isArray(value.members)||value.members.length>(floor<0?4:3)||new Set(value.members.map(m=>m?.id)).size!==value.members.length)return null;
     const members=[];
-    for(const m of value.members){const bonus=m?.profession==='robot'&&value.loadouts?.actors?.[m.id]?.passives?.includes('robot_body')?5*(m.level>=10?6:Math.min(5,m.level)):0;if(!m||!value.joined.includes(m.id)||!own(PROFESSIONS,m.profession)||m.sex!==undefined&&!['male','female'].includes(m.sex)||!num(m.level,1,floor<0&&value.loadouts?10:5,true)||!num(m.hp,0,memberMax(m)+bonus)||!num(m.cooldown,0,30)||!num(m.hurtLeft,0,2))return null;const xp=m.xp??G().XP[m.level-1];if(value.loadouts&&!num(xp,G().XP[m.level-1],G().XP[9],true))return null;members.push({id:m.id,profession:m.profession,sex:m.sex||PROFESSIONS[m.profession].gender,level:m.level,...(value.loadouts?{xp}:{}),hp:m.hp,cooldown:m.cooldown,hurtLeft:m.hurtLeft});}
+    for(const m of value.members){const bonus=m?.profession==='robot'&&value.loadouts?.actors?.[m.id]?.passives?.includes('robot_body')?5*(m.level>=10?6:Math.min(5,m.level)):0;if(!m||!value.joined.includes(m.id)||!own(PROFESSIONS,m.profession)||m.sex!==undefined&&!['male','female'].includes(m.sex)||!num(m.level,1,floor<0&&value.loadouts?10:5,true)||!num(m.hp,0,(value.loadouts?vitalHp(m.profession,m.level,false):memberMax(m))+bonus)||!num(m.cooldown,0,30)||!num(m.hurtLeft,0,2))return null;const xp=m.xp??G().XP[m.level-1];if(value.loadouts&&!num(xp,G().XP[m.level-1],G().XP[9],true))return null;members.push({id:m.id,profession:m.profession,sex:m.sex||PROFESSIONS[m.profession].gender,level:m.level,...(value.loadouts?{xp}:{}),hp:m.hp,cooldown:m.cooldown,hurtLeft:m.hurtLeft});}
     if(!Array.isArray(value.buffs)||value.buffs.length>2||new Set(value.buffs.map(b=>b?.id)).size!==value.buffs.length||!value.buffs.every(b=>b&&own(BUFFS,b.id)&&num(b.floors,1,3,true)))return null;
     for(const k of ['cooldown','guardLeft','trapWard','slowLeft'])if(!num(value[k],0,30))return null;
     const dict=(v,max)=>v&&typeof v==='object'&&!Array.isArray(v)&&Object.keys(v).length<=C().MAX_MONSTERS&&Object.keys(v).every(id=>C().validMonsterId(id,floor)&&!defeated.includes(id)&&num(v[id],0,max));
@@ -141,7 +147,7 @@
     const q=recruitQuote(n,id),offer=q.offer;if(!offer||offer.id!==id)return {ok:false,message:'這位旅人目前不在附近。'};if(!q.affordable)return {ok:false,message:q.reason};
     R().pay(n,q);let member;
     if(offer.returning){member=R().restore(n,offer);if(!member)return {ok:false,message:'這位旅人尚未準備好再次同行。'};}
-    else{member={id,profession:offer.profession,sex:offer.sex,level:offer.level,hp:28+offer.level*6,cooldown:0,hurtLeft:0};p.members.push(member);p.joined.push(id);if(p.loadouts)H().addMember(n,member);}
+    else{member={id,profession:offer.profession,sex:offer.sex,level:offer.level,hp:p.loadouts?vitalHp(offer.profession,offer.level,false):28+offer.level*6,cooldown:0,hurtLeft:0};p.members.push(member);p.joined.push(id);if(p.loadouts)H().addMember(n,member);}
     let learned=null;
     if(p.loadouts&&C().isUnderworld(n)&&!H().actor(n,id).learned){
       // Only a newly paid underground recruit gets this automatic fourth-level
@@ -273,5 +279,5 @@
   function advance(next,options){if(!next.party)return;L()?.advance(next);if(next.party.loadouts)H().advance(next,options);const p=next.party;p.health={};p.poise={};p.loot=Loot().fresh();p.reinforcements=Re().fresh();p.foraging=Foraging().fresh(next);p.boss=newBoss(next.floor);p.journey={...X().newJourney(next.floor),scrap:p.journey?.scrap||0,maintenance:[...(p.journey?.maintenance||[])],...(p.journey?.materials?{materials:{...p.journey.materials}}:{})};p.buffs=p.buffs.map(b=>({...b,floors:b.floors-1})).filter(b=>b.floors>0);p.slowLeft=0;}
   const canDescend=run=>(!run.party?.boss||run.party.boss.done)&&B().defeated(run);
   const bossPhase=run=>X().phase(run),mirrorTarget=(run,index)=>X().target(run,index),bossAction=(run,index,revision)=>X().bossAction(run,index,revision);
-  return Object.freeze({PROFESSIONS,NAMES,person,sex,recruitLimit,INGREDIENTS,RECIPES,BASIC_RECIPES,LEGACY_RECIPES,recipeUnlocked,recipeAvailable,availableRecipes,BUFFS,MONSTERS,BOSS_FLOORS,enable,validate,has,memberMax,recruitOffer,recruitQuote,archiveMember,recruit,dismiss,gather,cook,eat,CAMP_MAINTENANCE_RATIO,campMaintenanceQuote,camp,defs,monsterPower,monsterSpecs,strike,hurtMember,skill,reduceDamage,tick,advance,canDescend,bossPhase,mirrorTarget,bossAction});
+  return Object.freeze({PROFESSIONS,NAMES,person,sex,recruitLimit,INGREDIENTS,RECIPES,BASIC_RECIPES,LEGACY_RECIPES,recipeUnlocked,recipeAvailable,availableRecipes,BUFFS,MONSTERS,BOSS_FLOORS,enable,validate,has,memberMax,VITALITY,vitalHp,recruitOffer,recruitQuote,archiveMember,recruit,dismiss,gather,cook,eat,CAMP_MAINTENANCE_RATIO,campMaintenanceQuote,camp,defs,monsterPower,monsterSpecs,strike,hurtMember,skill,reduceDamage,tick,advance,canDescend,bossPhase,mirrorTarget,bossAction});
 });

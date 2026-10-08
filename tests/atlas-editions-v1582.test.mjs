@@ -9,7 +9,7 @@ const read=path=>readFileSync(new URL('../'+path,import.meta.url),'utf8');
 const html=read('docs/職業裝備圖鑑.html'),renderer=read('docs/story-atlas.js'),css=read('docs/story-atlas.css');
 const block=id=>{const start=html.indexOf('id="'+id+'"');assert.ok(start>0,id);return html.slice(html.lastIndexOf('<',start),html.indexOf('</details>',start));};
 const headings=text=>[...text.matchAll(/<section><h3>([^<]+)<\/h3>/g)].map(m=>m[1]);
-const DETAILED=['職業本領不等於隨機技能','地上與地下成長分開','覺醒與進階路線','武器階級與耐久','人物與裝備外觀','機器人機件','動力核心與能源','靠牆採集資源','物資與照明','隊伍連攜','料理與鍛造','材料附魔與異常','固定景觀與探索事件','把線索連起來','隊友戰術與演出','療癒與自動補血','移動中施放技能','小樓主','討伐裂隙','經驗節奏','樓主半血反制','數值怎麼閱讀','手機操作與說明','重要時刻鏡頭','動畫故事舞台','雲頂電影演出與技能預覽','通關後樓梯浮現'];
+const DETAILED=['職業本領不等於隨機技能','地上與地下成長分開','覺醒與進階路線','武器階級與耐久','人物與裝備外觀','機器人機件','動力核心與能源','靠牆採集資源','物資與照明','隊伍連攜','料理與鍛造','材料附魔與異常','固定景觀與探索事件','把線索連起來','隊友戰術與演出','療癒與自動補血','移動中施放技能','小樓主','討伐裂隙','經驗節奏','生命上限與職業體質','更強裝備提示','繪製迷宮委託','樓主半血反制','數值怎麼閱讀','手機操作與說明','重要時刻鏡頭','動畫故事舞台','雲頂電影演出與技能預覽','通關後樓梯浮現'];
 
 // The page loads with the same script order as the browser, without touching the document.
 function loadPage(){
@@ -35,7 +35,7 @@ test('the player guide is short, plain and covers the essentials; every detailed
   const guide=block('readingRules'),detailed=block('gmRules');
   assert.match(guide,/^<details class="rules" id="readingRules" data-edition-only="player">/);assert.match(detailed,/^<details class="rules" id="gmRules" data-edition-only="gm" open>/);
   assert.deepEqual(headings(guide),['職業與技能','升級與同伴','裝備與修理','機器人','補給、採集與照明','料理、鍛造與附魔','隊友與連攜','戰鬥小技巧','小樓主','討伐裂隙','樓梯、樓主與記憶裂隙','故事與日誌','怎麼使用這本書']);
-  assert.deepEqual(headings(detailed),DETAILED,'the detailed edition keeps all 27 rule sections in order');
+  assert.deepEqual(headings(detailed),DETAILED,'the detailed edition keeps every rule section in order');
   for(const section of guide.split('<section>').slice(1))assert.ok(section.replace(/<[^>]+>/g,'').length<260,'each guide section stays short: '+section.slice(0,30));
   for(const jargon of [/存檔驗證|存檔格式|舊存檔|遷移|程式|著色器|重編譯|編號|種子|決定性|累計進度|世界距離單位|%|×|258|SURFACE/])assert.doesNotMatch(guide.replace(/<[^>]+>/g,''),jargon);
   for(const fact of ['第 10 層前後','「獵」','12 枚銅幣','技能光影預覽.html','本頁不會讀取或改動你的存檔'])assert.ok(guide.includes(fact),fact);
@@ -62,10 +62,12 @@ test('player cards drop only clauses about old saves, internal code or probabili
 
 test('the detailed numbers come straight from the game modules',()=>{
   const c=loadPage(),sections=c.StoryAtlasGm.sections(),by=Object.fromEntries(sections.map(s=>[s.id,s]));
-  assert.deepEqual([...sections.map(s=>s.id)],['levels','kill-xp','lords','minis','hunts']);
+  assert.deepEqual([...sections.map(s=>s.id)],['levels','life','kill-xp','lords','minis','hunts']);
   for(const s of sections)for(const row of s.rows){assert.equal(row.length,s.columns.length,s.id);assert.doesNotMatch(row.join(''),/undefined|NaN|null/,s.id);}
   const G=require('../story/tower-hero-growth.js'),H=require('../story/tower-heroes-core.js'),B=require('../story/tower-floor-lords.js'),M=require('../story/tower-materials.js'),D=require('../story/tower-dungeons.js');
   assert.deepEqual([...by.levels.rows.map(r=>Number(r[1]))],[...G.XP]);
+  const PC=require('../story/tower-party-core.js');assert.equal(by.life.rows.length,Object.keys(PC.VITALITY).length);
+  for(const [job]of Object.entries(PC.VITALITY)){const row=by.life.rows.find(r=>r[0]===H.JOBS[job].name);assert.equal(row[2],[1,10,15].map(l=>PC.vitalHp(job,l,true)).join('／'));assert.equal(row[3],[1,5,10].map(l=>PC.vitalHp(job,l,false)).join('／'));}
   assert.ok(by['kill-xp'].intro.includes('÷ '+H.SURFACE_XP_DEPTH)&&by['kill-xp'].intro.includes('× '+H.HUNT_XP)&&by['kill-xp'].intro.includes('另加 '+B.LORD_XP));
   assert.equal(by['kill-xp'].rows.find(r=>r[0]==='1 F')[1],'× '+(1+98/H.SURFACE_XP_DEPTH).toFixed(2));
   const lords=Object.values(B.allLords());assert.equal(by.lords.rows.length,lords.length);

@@ -12,7 +12,7 @@ function nextOrdinary(r,id){const a=H.actor(r,id);return Object.values({...H.SKI
 test('expanded levels are underground only and first ten XP thresholds stay identical',()=>{
   assert.deepEqual(G.XP.slice(0,10),[0,525,1350,2625,4350,6450,9150,12450,16425,21075]);
   const surface=fresh();add(surface);H.gainXp(surface,100000);assert.equal(H.level(surface,'hero'),10);assert.equal(H.level(surface,'ally'),5);assert.ok(G.record(surface).awakening);assert.equal(G.available(surface,'ally'),1);assert.equal(G.availableUltimate(surface,'ally'),false);valid(surface);
-  const r=underground();add(r);H.gainXp(r,100000);assert.equal(H.level(r,'hero'),15);assert.equal(H.level(r,'ally'),10);assert.equal(H.maxHp(r,'hero'),102);assert.equal(H.maxHp(r,'ally'),88);assert.equal(G.record(r).awakening,null);assert.equal(G.record(r,'ally').awakening,null);assert.equal(G.skillLevel(r,'hero'),6);assert.equal(G.skillLevel(r,'ally'),6);valid(r);
+  const r=underground();add(r);H.gainXp(r,100000);assert.equal(H.level(r,'hero'),15);assert.equal(H.level(r,'ally'),10);assert.equal(H.maxHp(r,'hero'),P.vitalHp(H.job(r,'hero'),15,true));assert.equal(H.maxHp(r,'ally'),P.vitalHp(H.job(r,'ally'),10,false));assert.equal(G.record(r).awakening,null);assert.equal(G.record(r,'ally').awakening,null);assert.equal(G.skillLevel(r,'hero'),6);assert.equal(G.skillLevel(r,'ally'),6);valid(r);
 });
 test('companions preserve their own earned XP and do not inherit hero levels',()=>{
   const r=underground();H.gainXp(r,G.XP[11]);add(r,'chef',2);const before=H.experience(r,'ally');H.gainXp(r,100);assert.equal(H.experience(r,'ally'),before+100);assert.equal(H.level(r,'ally'),2);assert.equal(H.level(r,'hero'),12);valid(r);

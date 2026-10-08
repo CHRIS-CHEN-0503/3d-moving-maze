@@ -37,3 +37,11 @@
   #towerDialog.hero-management .hero-equipped .tower-btn{min-height:32px;padding:5px 10px}
   #towerDialog.hero-management .tower-actions{padding-top:5px}
 }
+
+/* Stronger gear prompt: pulses under the team row until checked or skipped. */
+#heroUpgradeAlert{display:flex;align-items:center;gap:6px;margin-top:6px;padding:4px 10px 4px 6px;min-height:44px;max-width:150px;box-sizing:border-box;border:2px solid #ffd27a;border-radius:12px;background:#3b2c10ee;color:#ffe6a8;font:inherit;font-size:12px;pointer-events:auto;touch-action:manipulation;animation:hero-upgrade-pulse 1.1s ease-in-out infinite}
+#heroUpgradeAlert[hidden],body:not(.story-active) #heroUpgradeAlert{display:none!important}
+#heroUpgradeAlert svg{width:30px;height:30px;flex:none}
+#heroUpgradeAlert span{display:grid;line-height:1.2;text-align:left}#heroUpgradeAlert b{color:#ffd27a}#heroUpgradeAlert small{color:#ead6a6;font-size:10px}
+@keyframes hero-upgrade-pulse{0%,100%{box-shadow:0 0 0 0 rgba(255,210,122,.7);border-color:#ffd27a}50%{box-shadow:0 0 16px 4px rgba(255,210,122,.85);border-color:#fff1c4}}
+@media(prefers-reduced-motion:reduce){#heroUpgradeAlert{animation:none;box-shadow:0 0 10px 2px rgba(255,210,122,.7)}}

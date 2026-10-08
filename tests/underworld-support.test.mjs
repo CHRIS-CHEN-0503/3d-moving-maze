@@ -84,7 +84,7 @@ test('basement explorer tasks can be accepted, completed and paid once, includin
     const original=clone(r);r=E.acceptQuest(r,offer.id).run;assert.deepEqual(original.adventure,E.newAdventure());assert.equal(r.adventure.quest.floor,-41);
     if(offer.type==='escort'){assert.equal(E.questProgress(r,'escort',{atExit:true,distance:3}).ok,false);r=E.questProgress(r,'escort',{atExit:true,distance:1}).run;}
     if(offer.type==='relic')r=E.questProgress(r,'relic',{id:offer.target}).run;
-    if(offer.type==='survey'){assert.equal(E.questProgress(r,'survey',{x:21,y:20}).ok,false);for(const [x,y]of [[20,20],[19,20],[20,19]])r=E.questProgress(r,'survey',{x,y}).run;}
+    if(offer.type==='survey'){assert.equal(E.questProgress(r,'survey',{x:21,y:20}).ok,false);for(const t of E.surveyTargets(r))r=E.questProgress(r,'survey',{x:t.x,y:t.y}).run;}
     if(offer.type==='shift')r=E.questProgress(r,'shift',{id:'shift-basement-1'}).run;
     if(offer.type==='donate')r=E.questProgress(r,'donate').run;
     assert.equal(r.adventure.quest.status,'ready');const result=E.claimQuestReward(r,r.revision);assert.ok(result.ok,result.message);assert.ok(C.validateSave(result.run));assert.equal(E.claimQuestReward(result.run).ok,false);found.add(offer.type);

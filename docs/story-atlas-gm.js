@@ -13,6 +13,11 @@
     return {id:'levels',title:'等級與累計經驗',intro:'主角在地上最高 10 級，地下最高 15 級；同伴地上 5 級、地下 10 級。',
       columns:['等級','累計經驗','升到此級需要'],rows:xp.map((total,i)=>[String(i+1),String(total),i?String(total-xp[i-1]):'—'])};
   }
+  function life(){
+    const p=mod('tower-party-core.js','TowerPartyCore'),h=H(),jobs=Object.entries(p.VITALITY).sort((a,b)=>b[1]-a[1]);
+    return {id:'life',title:'生命上限',intro:'主角 60＋每級 3、同伴 40＋每級 5，再乘職業體質；機器人的「機體強化」被動另加，最多 30。',
+      columns:['職業','體質','主角 1／10／15 級','同伴 1／5／10 級'],rows:jobs.map(([job,v])=>[h.JOBS[job].name,'× '+v.toFixed(2).replace(/0$/,''),[1,10,15].map(l=>p.vitalHp(job,l,true)).join('／'),[1,5,10].map(l=>p.vitalHp(job,l,false)).join('／')])};
+  }
   function killXp(){
     const h=H(),b=B(),depth=h.SURFACE_XP_DEPTH,floors=[99,90,80,70,60,50,40,30,20,10,1];
     return {id:'kill-xp',title:'擊殺經驗公式',
@@ -43,6 +48,6 @@
       intro:'第 99 層與章末樓主樓層以外，每層依旅程種子 '+d.HUNT_CHANCE+'% 出現，種類三選一：'+kinds.map(([,k])=>k.title.replace('討伐裂隙・','')+'（'+k.objective.replace(/。$/,'')+'）').join('；')+'。完成另給療癒藥與乾糧 1；離開、逾時或倒下沒有獎勵，每層一次。',
       columns:['深度','樓層',...kinds.map(([,k])=>k.title.replace('討伐裂隙・','')),'療癒藥'],rows};
   }
-  function sections(){return [levels(),killXp(),lords(),minis(),hunts()];}
+  function sections(){return [levels(),life(),killXp(),lords(),minis(),hunts()];}
   return Object.freeze({sections});
 });

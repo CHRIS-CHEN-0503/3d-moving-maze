@@ -10,7 +10,7 @@ const bridge=`window.__expedition = {
   entities(value) { if('explorer'in value)explorer=value.explorer;if('chest'in value)chest=value.chest;if('relic'in value)relic=value.relic;if('monsters'in value)monsters=value.monsters;if('nearest'in value)nearest=value.nearest; },
   state(){return {run,paused,explorer,chest,relic,exitDeclined};},
   questEvent,questDialog,nearExplorer,updateExplorer,openChest,chestDialog,
-  handleAction,closeDialog,save,readSave,attack,inventory,trade,requestQuit,
+  handleAction,closeDialog,save,readSave,attack,inventory,trade,requestQuit,mapMarkers,
 };`;
 
 function runAt(floor=99,seed=1){const run=C.newRun({seed});run.floor=floor;run.floorsCleared=99-floor;return run;}
@@ -49,10 +49,13 @@ test('任務對話只顯示條件，接受按鈕才建立委託且不能遠距�
   h.context.G.px=0;h.api.questDialog();h.api.handleAction('quest-accept',id);assert.equal(h.api.state().run.adventure.quest.type,'survey');assert.ok(C.validateSave(h.api.state().run));
 });
 
-test('實際走入三個格子更新探索任務，站著不動不重複計算',()=>{
-  const h=harness(accepted('survey'));h.tick(.1);assert.equal(h.api.state().run.adventure.quest.progress,1);
-  h.tick(.1);assert.equal(h.api.state().run.adventure.quest.progress,1);
-  h.context.G.px=4;h.tick(.1);h.context.G.px=8;h.tick(.1);assert.equal(h.api.state().run.adventure.quest.status,'ready');
+test('實際走進標出的區塊更新探索任務，起點附近與站著不動都不計算',()=>{
+  const h=harness(accepted('survey')),targets=E.surveyTargets(h.api.state().run);assert.equal(targets.length,3);
+  assert.equal(JSON.stringify(h.api.mapMarkers().filter(m=>m.label==='測').map(m=>[m.cx,m.cy])),JSON.stringify(targets.map(t=>[t.x,t.y])),'each block shows a beacon');assert.ok(h.api.mapMarkers().filter(m=>m.label==='測').every(m=>m.beacon));
+  h.tick(.1);h.context.G.px=4;h.tick(.1);h.context.G.pz=4;h.tick(.1);assert.equal(h.api.state().run.adventure.quest.progress,0,'cells around the start do not count');
+  const walk=t=>{h.context.G.px=t.x*4;h.context.G.pz=t.y*4;h.tick(.1);};
+  walk(targets[0]);assert.equal(h.api.state().run.adventure.quest.progress,1);h.tick(.1);assert.equal(h.api.state().run.adventure.quest.progress,1);
+  assert.equal(h.api.mapMarkers().filter(m=>m.label==='測').length,2);walk(targets[1]);walk(targets[2]);assert.equal(h.api.state().run.adventure.quest.status,'ready');
   h.api.save();assert.equal(h.api.readSave().adventure.quest.progress,3);
 });
 

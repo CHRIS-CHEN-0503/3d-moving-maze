@@ -94,12 +94,13 @@
     healer:{innate:'法書發射遠程光彈。遇到受污染的泉眼，可用職業本領快速淨化。',examples:['herbalism','rescue']},
     smith:{innate:'矮人族鍛匠，能穿重裝，使用短鎚配盾或重錘。隊中有能行動的鍛匠，營地才可完整修理、重建破損（耐久歸零）與鍛造強化；否則需找專門商人，銅幣另加20%。',examples:['economy','care']},
     archer:{innate:'精靈長弓進行遠程攻擊，使用輕裝與全隊共用箭袋；發射會消耗箭矢。',examples:['steady_aim','nimble_shot']},
-    robot:{innate:'重防禦拳鬥者，移動速度為一般人物九成。自帶一體式機殼與拳臂，不能穿一般防具、配盾或更換普通武器；以銅幣、零件與礦材進階。兩個動力核心自修生命並提供永久照明：單核心小於火把，雙核心大於火把、小於日光術；最高核心階級決定光色。全隊採最強來源，日光術優先，不因切換領隊改變。動力能源滿額十分鐘，耗盡慢行且不能攻擊或施放技能，不損失生命，仍保留光源；以動力石補充。一般料理、療癒藥與療癒魔法不能修復機體。',examples:['robot_body','fist_drive']},
+    // The card face stays as short as the other professions; the full machine rules live in `rules`.
+    robot:{innate:'重防禦拳鬥者，以飛拳與衝撞替隊伍開路。自帶一體式機殼與拳臂，不能穿一般防具或配盾；靠動力核心自修生命與照明。',rules:'移動速度為一般人物九成。不能更換普通武器；以銅幣、零件與礦材進階。兩個動力核心自修生命並提供永久照明：單核心小於火把，雙核心大於火把、小於日光術；最高核心階級決定光色。全隊採最強來源，日光術優先，不因切換領隊改變。動力能源滿額十分鐘，耗盡慢行且不能攻擊或施放技能，不損失生命，仍保留光源；以動力石補充。一般料理、療癒藥與療癒魔法不能修復機體。',examples:['robot_body','fist_drive']},
   });
   function profession(job,run,actorId){
     const h=H();if(!own(PROFESSIONS,job)||!h)return null;const spec=PROFESSIONS[job];
     const id=actorId||run?.party?.loadouts?.active,actor=run?.party?.loadouts&&h.ids(run).includes(id)&&h.job(run,id)===job?h.actor(run,id):null;
-    return {job,name:h.JOBS[job].name,innate:spec.innate,
+    return {job,name:h.JOBS[job].name,innate:spec.innate,...(spec.rules?{rules:spec.rules}:{}),
       random:spec.examples.map(key=>({id:key,name:h.PASSIVES[key].name,description:h.PASSIVES[key].description,learned:actor?actor.passives.includes(key):null})),
       note:'以下效果需要角色實際學會對應被動才會生效。'+(job==='chef'?'多做一份的機率由「一料雙份」等級決定。':job==='smith'?'修理折扣由「節省工料」等級決定。':'')+'倒地隊員的全隊被動會暫停。'};
   }

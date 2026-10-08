@@ -109,7 +109,9 @@ test('robot dual cores mirror the actual five fixed durabilities, defense and ma
     const entry=D.gear(d.kind),craft=D.robotCoreCraft(d.tier),cost=R.CORE_COSTS[d.tier];assert.equal(entry.requiredLevel,d.requiredLevel);assert.equal(entry.rawStats.defense,d.defense);assert.deepEqual(entry.rawStats.normalDurability,[d.maxDurability,d.maxDurability]);assert.match(detail(entry,'內建光源'),/單核心小於火把.*雙核心大於火把且小於日光術.*全隊採最強光源.*已施放日光術優先.*不因切換領隊.*階級只決定光色.*永久.*能源耗盡/);assert.doesNotMatch(detail(entry,'內建光源'),/一至三階.*四五階/);assert.ok(detail(entry,'內建光源').includes('無核／單核／雙核範圍 '+R.CORE_LIGHT_RADII.join('／')),d.kind);assert.match(detail(entry,'恢復方式'),/两顆|兩顆/);assert.match(entry.description,new RegExp('每 '+R.REPAIR_SECONDS+' 秒自我修復 '+d.tier+' 點'));
     assert.equal(craft.underground,d.tier>3);assert.match(detail(craft,'銅幣費用'),new RegExp('^'+cost.coins+' 幣$'));assert.match(detail(craft,'材料'),new RegExp(cost.scrap+' 金屬零件'));for(const[key,n]of Object.entries(cost.materials))assert.ok(detail(craft,'材料').includes(M.MATERIALS[key]+' ×'+n));assert.equal(craft.iconHtml,I.svg(d.kind));
   }
-  assert.match(D.profession('robot').description,/兩個動力核心.*永久照明.*十分鐘.*一般料理.*不能修復/);
+  // The card face is a short summary like every profession; the full machine rules are one detail row.
+  const robotJob=D.profession('robot');assert.ok(robotJob.description.length<70,'short card face');assert.doesNotMatch(robotJob.description,/九成|十分鐘|火把/);
+  assert.match(robotJob.details.find(r=>r.label==='機體規則').value,/九成.*兩個動力核心.*永久照明.*十分鐘.*一般料理.*不能修復/);
 });
 
 test('browser adapter is read-only, needs no DOM or storage, and matches CommonJS output',()=>{

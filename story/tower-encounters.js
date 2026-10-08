@@ -227,11 +227,25 @@
     const id = ['heal', 'ration', 'shield', 'hourglass'][Math.floor(random() * 4)];
     return { coins, items: { [id]: id === 'ration' ? 2 : 1 }, gear: null };
   }
+  // Survey: the maze is split into 3 x 3 blocks; the commission marks three of
+  // them, pairwise far apart and never the starting block, and each must be
+  // entered in person. Older saved surveys (target 'cells') keep three cells.
+  const SURVEY_ZONES = 3;
+  const SURVEY_SETS = (() => { const all = []; for (let y = 0; y < SURVEY_ZONES; y++) for (let x = 0; x < SURVEY_ZONES; x++) if (x || y) all.push([x, y]); const sets = [];
+    for (let a = 0; a < all.length; a++) for (let b = a + 1; b < all.length; b++) for (let c = b + 1; c < all.length; c++) { const set = [all[a], all[b], all[c]]; if (set.every((p, i) => set.every((q, j) => i === j || Math.max(Math.abs(p[0] - q[0]), Math.abs(p[1] - q[1])) >= 2))) sets.push(set); }
+    return Object.freeze(sets.map(Object.freeze)); })();
+  const surveyZones = q => q?.type === 'survey' && typeof q.target === 'string' && q.target.startsWith('zones:') ? q.target.slice(6).split('_').map(z => z.split('-').map(Number)) : null;
+  const zoneOf = (x, y, size) => [Math.min(SURVEY_ZONES - 1, Math.floor(x * SURVEY_ZONES / size)), Math.min(SURVEY_ZONES - 1, Math.floor(y * SURVEY_ZONES / size))];
+  // The centre cell of a block, for the map beacon.
+  const zoneCenter = ([zx, zy], size) => ({ x: Math.min(size - 1, Math.floor((zx + .5) * size / SURVEY_ZONES)), y: Math.min(size - 1, Math.floor((zy + .5) * size / SURVEY_ZONES)) });
+  const surveyKey = ([zx, zy]) => `zone:${zx}-${zy}`;
+  // Blocks still to visit, with their beacon cells (empty for older cell surveys).
+  function surveyTargets(run) { const q = run?.adventure?.quest, zones = surveyZones(q); if (!zones || q.status !== 'active') return []; const size = core().floorConfig(run.floor).size; return zones.filter(z => !q.events.includes(surveyKey(z))).map(z => ({ zone: z, ...zoneCenter(z, size) })); }
   function describeQuest(q, run) {
     const C = core(), types = {
       defeat: ['清除路障', run.party?.loadouts?'與隊友擊敗指定的守路怪物，再回來領取報酬。':'讓護衛擊敗指定的守路怪物，再回來領取報酬。'], escort: ['護送迷途旅人', '帶我到本層出口，在樓梯旁等我跟上。領取報酬後再下樓。'],
       relic: ['遺失的記憶', '找到本層的委託記憶碎片，靠近拾取後回來交件；不是章節主線印記。'], donate: ['旅人的急需', `備齊 ${q.goal} 份${C.ITEMS[q.target]?.name || '補給'}，回到我身旁交付。`],
-      survey: ['繪製迷宮', '接下委託後，走訪三個不同的迷宮格，再回來告訴我。'], shift: ['觀察高塔心跳', '接下委託後，安全經歷一次迷宮變形，再回來領取報酬。'], stun: ['爭取逃脫時間', run.party?.loadouts?'擊敗指定怪物，或用技能擊暈、束縛牠，再回來領取報酬。':'用武器擊暈指定怪物一次，再回來領取報酬。'],
+      survey: ['繪製迷宮', surveyZones(q) ? '接下委託後，走進小地圖上「測」標出的三個區塊，替我畫下那裡的路，再回來告訴我。' : '接下委託後，走訪三個不同的迷宮格，再回來告訴我。'], shift: ['觀察高塔心跳', '接下委託後，安全經歷一次迷宮變形，再回來領取報酬。'], stun: ['爭取逃脫時間', run.party?.loadouts?'擊敗指定怪物，或用技能擊暈、束縛牠，再回來領取報酬。':'用武器擊暈指定怪物一次，再回來領取報酬。'],
     };
     const explorer=explorerIdentity(run.floor,run.seed),nextStep=q.status==='ready'?'到'+explorer.name+'身旁領取報酬。':q.status==='claimed'?'報酬已領取，可以繼續探索。':types[q.type][1];
     return { ...q, title: types[q.type][0], description: types[q.type][1], nextStep,leaveWarning:'委託與尚未領取的報酬，只保留在目前這一層。', reward: questReward(run.floor, run.seed,!!run.party?.loadouts), explorer };
@@ -255,8 +269,9 @@
     if (!run.party?.loadouts && alive.length && run.equipment && run.equipment.weapon) candidates.push('stun');
     const type = candidates[Math.floor(random() * candidates.length)], target = type === 'defeat' ? defeatable.id : type === 'stun' ? alive[0].id : type === 'donate' ? donations[Math.floor(random() * donations.length)] : type === 'relic' ? `relic:${run.floor}:${run.seed}` : type === 'escort' ? 'exit' : type === 'survey' ? 'cells' : 'walls';
     const goal = type === 'donate' ? Math.min(run.bag[target], 1 + Math.floor(random() * 3)) : type === 'survey' ? 3 : 1;
-    const id = `quest:${run.floor}:${run.seed}:${type}:${target}:${goal}`;
-    return describeQuest({ id, floor: run.floor, type, status: 'active', target, goal, progress: 0, events: [] }, run);
+    const marked = type === 'survey' ? 'zones:' + SURVEY_SETS[Math.floor(random() * SURVEY_SETS.length)].map(z => z.join('-')).join('_') : target;
+    const id = `quest:${run.floor}:${run.seed}:${type}:${marked}:${goal}`;
+    return describeQuest({ id, floor: run.floor, type, status: 'active', target: marked, goal, progress: 0, events: [] }, run);
   }
   function acceptQuest(run, offerId, expectedRevision) {
     return transaction(run, expectedRevision, next => {
@@ -289,7 +304,9 @@
       } else if (event === 'survey') {
         const size = core().floorConfig(next.floor).size;
         if (!integer(data.x, 0, size - 1) || !integer(data.y, 0, size - 1)) return { ok: false, message: '無效的探索位置。' };
-        key = `${data.x},${data.y}`;
+        const zones = surveyZones(q);
+        if (zones) { const zone = zoneOf(data.x, data.y, size); if (!zones.some(z => z[0] === zone[0] && z[1] === zone[1])) return { ok: false, message: '這個區塊不在委託標出的範圍。' }; key = surveyKey(zone); }
+        else key = `${data.x},${data.y}`;
       } else if (event === 'shift') {
         if (!validId(data.id)) return { ok: false, message: '沒有新的迷宮變形紀錄。' };
         key = data.id;
@@ -323,5 +340,5 @@
       return { ok: true, message: '已放棄本層委託，尚未領取的報酬不會保留。' };
     });
   }
-  return Object.freeze({ MERCHANTS, MERCHANT_SERVICES, GROCERY, groceryOffers, buyIngredient, validateGroceryPurchases: groceryPurchases, merchantHandles, serviceContext, serviceAvailable, EXPLORERS, QUEST_TYPES, newAdventure, validateAdventure, floorLootCounts, arrowLoot, merchantOffers, buySupply, sellSupply, buyMerchantGear, chestOffer, openChest, questReward, explorerIdentity, explorerOffer, acceptQuest, questProgress, claimQuestReward, abandonQuest });
+  return Object.freeze({ MERCHANTS, MERCHANT_SERVICES, GROCERY, groceryOffers, buyIngredient, validateGroceryPurchases: groceryPurchases, merchantHandles, serviceContext, serviceAvailable, EXPLORERS, QUEST_TYPES, SURVEY_ZONES, SURVEY_SETS, surveyTargets, newAdventure, validateAdventure, floorLootCounts, arrowLoot, merchantOffers, buySupply, sellSupply, buyMerchantGear, chestOffer, openChest, questReward, explorerIdentity, explorerOffer, acceptQuest, questProgress, claimQuestReward, abandonQuest });
 });

@@ -763,7 +763,9 @@
   }
   function mapMarkers() {
     if(!active)return [];
-    return [...[mainClue,rift,huntGate,...dungeonObjects].filter(o=>o&&o.model.visible).map(o=>({cx:o.cx,cy:o.cy,label:o===mainClue?'印':o===rift?'裂':o===huntGate?'獵':String(o.index+1),color:o===mainClue?'#ffe295':o===rift?'#8ee5df':o===huntGate?'#ff9a78':run.expedition.active.progress.includes(o.index)?'#83e7ae':'#edc789'})),...[eventMarker,followupMarker,...counterObjects].filter(o=>o?.model.visible).map(o=>({cx:o.cx,cy:o.cy,label:o===eventMarker?'選':o===followupMarker?'信':run.floor===80?'藤':'晶',color:'#bcd991',beacon:counterObjects.includes(o)})),...(partyUI?.markers()||[])];
+    return [...[mainClue,rift,huntGate,...dungeonObjects].filter(o=>o&&o.model.visible).map(o=>({cx:o.cx,cy:o.cy,label:o===mainClue?'印':o===rift?'裂':o===huntGate?'獵':String(o.index+1),color:o===mainClue?'#ffe295':o===rift?'#8ee5df':o===huntGate?'#ff9a78':run.expedition.active.progress.includes(o.index)?'#83e7ae':'#edc789'})),...[eventMarker,followupMarker,...counterObjects].filter(o=>o?.model.visible).map(o=>({cx:o.cx,cy:o.cy,label:o===eventMarker?'選':o===followupMarker?'信':run.floor===80?'藤':'晶',color:'#bcd991',beacon:counterObjects.includes(o)})),
+      // Survey commission blocks still to visit: beacons, so they show through the fog.
+      ...(inDungeon()?[]:(E.surveyTargets?.(run)||[]).map(t=>({cx:t.x,cy:t.y,label:'測',color:'#ffd27a',beacon:true}))),...(partyUI?.markers()||[])];
   }
   function buildTowerEnvironment() {
     if (envGroup) { disposeSceneObject(envGroup); scene.remove(envGroup); }
@@ -986,6 +988,21 @@
     const group=new THREE.Group(),hex=Heroes.ROBOT.FUEL_ITEMS[key]?.color||'#48a8ff';group.name='power-stone-cluster';
     for(let i=0;i<quantity;i++){const mat=new THREE.MeshLambertMaterial({color:hex,emissive:hex,emissiveIntensity:.6}),stone=new THREE.Mesh(new THREE.OctahedronGeometry(.28,0),mat);stone.position.set((i-1)*.23,.2+(i%2)*.08,(i%2)*.17);stone.scale.set(.8,1.35,.8);stone.rotation.z=(i-1)*.2;group.add(stone);}return group;
   }
+  // The healing draught on the floor: a round red flask with a cork and a white
+  // cross, matching the bag icon. (The 🧴 emoji sprite was the grab mode's
+  // laundry detergent bottle.) Owned meshes, released with the drop.
+  function potionModel(){
+    const group=new THREE.Group();group.name='healing-draught';
+    const glass=new THREE.MeshPhongMaterial({color:0xd8f0ff,transparent:true,opacity:.38,shininess:90,specular:0xffffff,depthWrite:false}),liquid=new THREE.MeshLambertMaterial({color:0xe2384f,emissive:0x8a1424,emissiveIntensity:.45}),cork=new THREE.MeshLambertMaterial({color:0x9a6b43}),mark=new THREE.MeshBasicMaterial({color:0xffffff}),band=new THREE.MeshLambertMaterial({color:0xe8c66a});
+    const body=new THREE.Mesh(new THREE.SphereGeometry(.26,16,12),glass);body.position.y=.26;body.renderOrder=2;
+    const fill=new THREE.Mesh(new THREE.SphereGeometry(.215,14,10,0,Math.PI*2,Math.PI*.32,Math.PI*.68),liquid);fill.position.y=.26;
+    const neck=new THREE.Mesh(new THREE.CylinderGeometry(.075,.09,.18,12,1,true),glass);neck.position.y=.58;neck.renderOrder=2;
+    const ring=new THREE.Mesh(new THREE.TorusGeometry(.085,.018,6,14),band);ring.rotation.x=Math.PI/2;ring.position.y=.5;
+    const stopper=new THREE.Mesh(new THREE.CylinderGeometry(.07,.062,.12,10),cork);stopper.position.y=.71;
+    group.add(fill,body,neck,ring,stopper);
+    for(const [w,h]of [[.15,.045],[.045,.15]]){const bar=new THREE.Mesh(new THREE.BoxGeometry(w,h,.012),mark);bar.position.set(0,.27,.255);group.add(bar);}
+    return group;
+  }
   function repositionForaging(){
     if(!run.party||inDungeon())return;
     const excluded=new Set(occupiedCells(false));
@@ -1012,7 +1029,8 @@
       else if(entry.type==='gear'){const gear=HeroVisual.gear(THREE,entry.gear.kind);gear.scale.setScalar(.48);gear.updateMatrixWorld(true);const box=new THREE.Box3().setFromObject(gear),center=box.getCenter(new THREE.Vector3());gear.position.sub(center);icon.add(gear);}
       else if(entry.type==='fuel'){const wood=new THREE.Mesh(new THREE.CylinderGeometry(.07,.08,.75,6),new THREE.MeshLambertMaterial({color:0xa98a64}));wood.rotation.z=-.5;icon.add(wood);const cloth=new THREE.Mesh(new THREE.BoxGeometry(.35,.26,.18),new THREE.MeshLambertMaterial({color:0xe4d6b4}));cloth.position.set(.16,.12,0);icon.add(cloth);}
       else if(Heroes?.ROBOT?.fuelItemIds.includes(entry.key))icon.add(powerStoneModel(entry.key,entry.quantity));
-      else{const symbols={heal:'🧴',ration:'🍪',shield:'🛡️',hourglass:'⌛',bell:'🔔',map:'🗺️',feather:'🪶',arrow:'🏹'};icon.add(makeEmojiSprite(symbols[entry.key],.9));}
+      else if(entry.type==='item'&&entry.key==='heal')icon.add(potionModel());
+      else{const symbols={ration:'🍪',shield:'🛡️',hourglass:'⌛',bell:'🔔',map:'🗺️',feather:'🪶',arrow:'🏹'};icon.add(makeEmojiSprite(symbols[entry.key],.9));}
       icon.position.y=.65;model.add(icon,makePickupMarker(entry.type==='gear'?0xffd77c:0x84dfbc,Loot.label(entry)));world.add(model);loot.push({...point,id:entry.id,entry,kind:'combat-drop',model,icon,retry:0});
     }
   }
@@ -1402,7 +1420,7 @@
       if(!item.foraging){item.icon.position.y=1+Math.sin(now*.003+item.cx)*.12;item.icon.rotation.y+=dt;}
       if (Math.hypot(G.px-item.x,G.pz-item.z)<1.05&&hasClearPath(G.px,G.pz,item.x,item.z)) {
         if(item.foraging){item.retry=Math.max(0,item.retry-dt);if(item.retry>0)continue;const result=Foraging.claim(run,item.id);if(result.ok){run=result.run;item.model.visible=false;AudioEng.sfxPickup();showToast(result.message,1800,result.message);questEvent('collect',{id:item.id});save();}else{item.retry=3;showToast(result.message,1800,false);}continue;}
-        if(item.entry){item.retry=Math.max(0,item.retry-dt);if(item.retry>0)continue;const result=Loot.claim(run,item.id);if(result.ok){run=result.run;item.model.visible=false;AudioEng.sfxPickup();showToast(result.message,1800,result.message);questEvent('collect',{id:item.id});save();}else{item.retry=3;showToast(result.message,1800,false);}continue;}
+        if(item.entry){item.retry=Math.max(0,item.retry-dt);if(item.retry>0)continue;const result=Loot.claim(run,item.id);if(result.ok){run=result.run;item.model.visible=false;AudioEng.sfxPickup();showToast(result.message,1800,result.message);questEvent('collect',{id:item.id});save();if(result.effect?.pickup?.type==='gear')partyUI?.heroes?.suggestUpgrade?.(result.effect.pickup.gear.id);}else{item.retry=3;showToast(result.message,1800,false);}continue;}
         if(item.kind==='ingredient'){if(hasClearPath(G.px,G.pz,item.x,item.z)&&transact(P.gather(run,item.id,item.ingredient,run.revision))){item.model.visible=false;AudioEng.sfxPickup();showToast('獲得'+P.INGREDIENTS[item.ingredient],1800,'獲得 '+P.INGREDIENTS[item.ingredient]);questEvent('collect',{id:item.id});}continue;}
         const amount=item.kind==='coin'?8:item.quantity||1,result=C.collect(run,item.kind,amount);
         if(result.ok){run=result.run;run.claimed.push(item.id);item.model.visible=false;AudioEng.sfxPickup();showToast('取得 '+C.ITEMS[item.kind].name+(amount>1?' +'+amount:'')+'。'+(C.ITEMS[item.kind].description||''),1800,'獲得 '+C.ITEMS[item.kind].name);save();}
@@ -1745,7 +1763,7 @@
     const q=run?.adventure?.quest;
     if(!q||q.status!=='active'||q.type!==event&&!(modern()&&q.type==='stun'&&['defeat','root'].includes(event)))return false;
     const result=E.questProgress(run,event,data);if(!result.ok)return false;
-    run=result.run;save();if(result.effect?.ready)showToast('委託完成！請找探索者領取報酬。',3000);return true;
+    run=result.run;save();if(result.effect?.ready)showToast('委託完成！請找探索者領取報酬。',3000);else if(event==='survey'&&E.surveyTargets?.(run).length)showToast('已畫下這個區塊 · '+run.adventure.quest.progress+'/'+run.adventure.quest.goal,2200);return true;
   }
   function updateExplorer(dt,now) {
     if(!explorer||run.adventure.quest?.type!=='escort'||run.adventure.quest.status!=='active')return;
@@ -1788,6 +1806,7 @@
     const result=E.openChest(run,id,run.revision,hurtLeft>0);if(!transact(result))return;
     chest.model.visible=false;nearbyEncounter=null;
     if(run.status==='dead'){defeat();return;}
+    if(result.effect.outcome==='gear')partyUI?.heroes?.suggestUpgrade?.(result.effect.gear.id);
     const copy=result.effect.outcome==='gear'?result.effect.gear.name+' · '+gearDescription(result.effect.gear)+'，已放入裝備行囊。':'陷阱造成 '+result.effect.damage+' 點傷害。'+(result.effect.revived?'復甦羽保護了你。':'防具已按命中消耗耐久。');
     dialog('寶箱已開啟',result.effect.outcome==='gear'?'獲得強化裝備':'小心，是陷阱！',copy,'',action('查看裝備','bag')+action('繼續前進','close'),{silent:result.effect.outcome==='gear',summary:result.effect.outcome==='gear'?'獲得 '+gearSpeech(result.effect.gear):'小心，是陷阱！'});
     if(result.effect.outcome==='gear')window.GameVoice?.announce('獲得 '+gearSpeech(result.effect.gear),true);

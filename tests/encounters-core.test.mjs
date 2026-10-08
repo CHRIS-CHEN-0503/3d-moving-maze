@@ -16,7 +16,7 @@ function questRun(type, floor = 99) {
 }
 function completeSimple(run) {
   const q=run.adventure.quest;
-  if(q.type==='survey')for(const [x,y] of [[0,0],[1,0],[2,0]])run=E.questProgress(run,'survey',{x,y}).run;
+  if(q.type==='survey')for(const t of E.surveyTargets(run))run=E.questProgress(run,'survey',{x:t.x,y:t.y}).run;
   else if(q.type==='shift')run=E.questProgress(run,'shift',{id:'shift-1'}).run;
   else if(q.type==='escort')run=E.questProgress(run,'escort',{atExit:true,distance:1}).run;
   else if(q.type==='relic')run=E.questProgress(run,'relic',{id:q.target}).run;
@@ -172,12 +172,15 @@ test('隊伍戰鬥委託只指向實際抽出的存活怪物，清場後不再�
   assert.deepEqual([...seen].sort(),['defeat','stun']);
 });
 
-test('探索三格必須不同且在地圖內，重複事件不能刷進度或領兩次報酬',()=>{
-  let run=questRun('survey');assert.equal(E.claimQuestReward(run).ok,false);
+test('繪製迷宮要走進三個標出的遠方區塊：附近幾格不算，同區塊不重複計算，也不能領兩次報酬',()=>{
+  let run=questRun('survey');assert.equal(E.claimQuestReward(run).ok,false);const size=C.floorConfig(run.floor).size,zones=E.surveyTargets(run).map(t=>t.zone);
+  assert.equal(zones.length,3);assert.ok(zones.every(z=>z[0]||z[1]),'never the starting block');
+  for(const a of zones)for(const b of zones)if(a!==b)assert.ok(Math.max(Math.abs(a[0]-b[0]),Math.abs(a[1]-b[1]))>=2,'marked blocks are far apart');
   assert.equal(E.questProgress(run,'survey',{x:-1,y:0}).ok,false);
-  run=E.questProgress(run,'survey',{x:0,y:0}).run;assert.equal(run.adventure.quest.progress,1);
-  const duplicate=E.questProgress(run,'survey',{x:0,y:0});assert.equal(duplicate.ok,false);assert.equal(duplicate.run.adventure.quest.progress,1);
-  run=E.questProgress(run,'survey',{x:1,y:0}).run;run=E.questProgress(run,'survey',{x:2,y:0}).run;
+  for(const [x,y] of [[0,0],[1,0],[0,1],[1,1]])assert.equal(E.questProgress(run,'survey',{x,y}).ok,false,'three steps around the start no longer complete it');
+  const first=E.surveyTargets(run)[0];run=E.questProgress(run,'survey',{x:first.x,y:first.y}).run;assert.equal(run.adventure.quest.progress,1);
+  const corner={x:Math.min(size-1,Math.ceil(first.zone[0]*size/3)),y:Math.min(size-1,Math.ceil(first.zone[1]*size/3))},duplicate=E.questProgress(run,'survey',corner);assert.equal(duplicate.ok,false,'another cell of the same block');assert.equal(duplicate.run.adventure.quest.progress,1);
+  assert.equal(E.surveyTargets(run).length,2,'the visited block leaves the map');for(const t of E.surveyTargets(run))run=E.questProgress(run,'survey',{x:t.x,y:t.y}).run;
   assert.equal(run.adventure.quest.status,'ready');const before=clone(run),claim=E.claimQuestReward(run);
   assert.equal(claim.ok,true);assert.deepEqual(run,before);assert.equal(claim.run.adventure.quest.status,'claimed');assert.ok(C.validateSave(claim.run));
   assert.equal(E.claimQuestReward(C.validateSave(claim.run)).ok,false);

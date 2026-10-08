@@ -38,7 +38,7 @@ test('every underground floor recruits level-five travellers across seeds and al
       const before=structuredClone(H.actor(run,'hero')),xp=H.experience(run,'hero'),base=H.preview(run,offer),result=P.recruit(run,offer.id,run.revision);assert.ok(result.ok,result.message);
       const member=result.run.party.members.find(m=>m.id===offer.id);
       const bodyBonus=member.profession==='robot'&&H.actor(result.run,member.id).passives.includes('robot_body')?25:0;
-      assert.equal(member.level,5);assert.equal(member.xp,G.XP[4]);assert.equal(member.hp,58+bodyBonus);assert.equal(H.maxHp(result.run,member.id),58+bodyBonus);
+      assert.equal(member.level,5);assert.equal(member.xp,G.XP[4]);assert.equal(member.hp,P.vitalHp(member.profession,5,false)+bodyBonus);assert.equal(H.maxHp(result.run,member.id),P.vitalHp(member.profession,5,false)+bodyBonus);
       assert.equal(H.level(result.run,'hero'),1);assert.equal(H.experience(result.run,'hero'),xp);assert.deepEqual(H.actor(result.run,'hero'),before);
       const a=H.actor(result.run,member.id),all=[...a.skills,...a.passives],reward=H.SKILLS[a.learned]||H.PASSIVES[a.learned];
       assert.equal(all.length,6);assert.equal(new Set(all).size,6);assert.ok([...base.skills,...base.passives].every(k=>all.includes(k)));
@@ -76,7 +76,7 @@ test('fresh recruits advance using their own XP up to ten, never copying a level
   assert.equal(H.level(run,'hero'),15);assert.equal(H.level(run,id),5);assert.equal(H.experience(run,id),G.XP[4]);
   H.gainXp(run,100);assert.equal(H.level(run,id),5);assert.equal(H.experience(run,id),G.XP[4]+100);assert.equal(H.level(run,'hero'),15);
   for(let level=6;level<=10;level++){H.gainXp(run,G.XP[level-1]-H.experience(run,id));assert.equal(H.level(run,id),level);assert.equal(H.experience(run,id),G.XP[level-1]);valid(run);}
-  assert.equal(H.maxHp(run,id),88);assert.equal(G.available(run,id),2);assert.equal(G.availableUltimate(run,id),true);
+  assert.equal(H.maxHp(run,id),P.vitalHp(H.job(run,id),10,false));assert.equal(G.available(run,id),2);assert.equal(G.availableUltimate(run,id),true);
   H.gainXp(run,100000);assert.equal(H.level(run,id),10);assert.equal(H.experience(run,id),G.XP[9]);valid(run);
 });
 
@@ -87,7 +87,7 @@ test('surface recruitment keeps its original floor-based levels one through five
     const expected=Math.min(5,1+Math.floor((99-floor)/22));assert.equal(offer.level,expected);
     const result=P.recruit(run,offer.id,run.revision);assert.ok(result.ok,result.message);const member=result.run.party.members[0];
     const bodyBonus=member.profession==='robot'&&H.actor(result.run,member.id).passives.includes('robot_body')?5*expected:0;
-    assert.equal(member.level,expected);assert.equal(member.xp,G.XP[expected-1]);assert.equal(member.hp,28+expected*6+bodyBonus);assert.equal(H.actor(result.run,member.id).learned,null);assert.deepEqual(G.record(result.run,member.id).choices,[]);assert.equal(G.available(result.run,member.id),expected>=4?1:0);valid(result.run);levels.add(expected);count++;
+    assert.equal(member.level,expected);assert.equal(member.xp,G.XP[expected-1]);assert.equal(member.hp,P.vitalHp(member.profession,expected,false)+bodyBonus);assert.equal(H.actor(result.run,member.id).learned,null);assert.deepEqual(G.record(result.run,member.id).choices,[]);assert.equal(G.available(result.run,member.id),expected>=4?1:0);valid(result.run);levels.add(expected);count++;
   }
   assert.deepEqual([...levels].sort(),[1,2,3,4,5]);t.diagnostic(JSON.stringify({surfaceRecruitments:count}));
 });

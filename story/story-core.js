@@ -296,7 +296,7 @@
     const legacyHealth = run.stateVersion === 1;
     // Broad first-pass bound includes robot_body; the validated actor's exact
     // maximum is checked below, so ordinary professions cannot gain extra HP.
-    if (!isFloor(run.floor) || !validNumber(run.hp, 0, legacyHealth ? 100 : run.party?.loadouts?(isUnderworld(run)?132:117):MAX_HP) || !validNumber(run.hunger, 0, 100) || !validNumber(run.coins, 0, MAX_COINS, true)) return null;
+    if (!isFloor(run.floor) || !validNumber(run.hp, 0, legacyHealth ? 100 : run.party?.loadouts?(heroRules()?.hpCeiling?.(isUnderworld(run))??(isUnderworld(run)?132:117)):MAX_HP) || !validNumber(run.hunger, 0, 100) || !validNumber(run.coins, 0, MAX_COINS, true)) return null;
     let underworld;
     if (run.floor < 0) {
       const u = run.underworld, departed = u?.departed, P = partyRules();

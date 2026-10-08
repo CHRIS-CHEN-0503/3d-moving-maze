@@ -43,7 +43,9 @@ test('generated monsters and shift reinforcements share the new maximum and save
     let r=fresh(floor);const spawned=R.spawn(r,[{x:2,y:2},{x:3,y:3},{x:4,y:4}]);assert.ok(spawned.ok,spawned.message);r=spawned.run;
     const specs=P.monsterSpecs(r);assert.ok(specs.some(m=>m.reinforcement));
     for(const m of specs){
-      if(!m.lord)assert.equal(m.maxHp,Math.round(originalHp(floor,m.strength)*1.15));
+      // Ordinary monsters and reinforcements keep the shared maximum; a mini lord is that maximum x MINI_HP.
+      if(!m.lord&&!m.elite)assert.equal(m.maxHp,Math.round(originalHp(floor,m.strength)*1.15));
+      if(m.elite)assert.equal(m.maxHp,Math.round(P.monsterPower(floor,P.defs()[m.kind],m.strength).maxHp*1.8),'mini lord at '+floor);
       r.party.health[m.id]=m.maxHp;
     }
     const restored=C.validateSave(JSON.stringify(r));assert.ok(restored,'new max HP must not be rejected at '+floor);

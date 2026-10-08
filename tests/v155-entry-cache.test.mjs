@@ -8,9 +8,9 @@ function references(html){return [...html.matchAll(/(?:src|href)="([^"?]+)\?v=([
 test('v1.55.0 gameplay additions have versioned real entrypoints in both game and atlas',()=>{
   for(const name of rules){for(const [html,prefix]of [[game,'story/'],[atlas,'../story/']])assert.equal(references(html).find(r=>r.path===prefix+name+'.js')?.version,['tower-cooperation-core','tower-cooperation-runtime'].includes(name)?'1.58.0':name==='tower-adventure-events'?'1.57.0':'1.55.0',prefix+name);}
   for(const name of ['mode-variants-core','mode-variants','shop-claims-core','shop-claims','shop-collection','shop-collection-core','setup-controls','game-rules','capture-mode'])assert.equal(references(game).find(r=>r.path==='assets/'+name+'.js')?.version,['shop-claims','mode-variants','capture-mode','shop-collection'].includes(name)?'1.58.0':'1.55.0',name);
-  assert.equal(references(game).find(r=>r.path==='story/tower-floor-lords.js')?.version,'1.57.0');
+  assert.equal(references(game).find(r=>r.path==='story/tower-floor-lords.js')?.version,'1.58.2');
   assert.equal(references(atlas).find(r=>r.path==='story-atlas-cooperation.js')?.version,'1.55.0');
-  assert.match(game,/const GAME_VERSION='1\.58\.1'/);assert.match(atlas,/v1\.58\.1 圖鑑/);
+  assert.match(game,/const GAME_VERSION='1\.58\.2'/);assert.match(atlas,/v1\.58\.2 圖鑑/);
 });
 test('changed shared atlas rules reject both stale and absent cache tags',()=>{
   for(const path of [...sharedChangedRules.map(name=>'../story/'+name+'.js'),'story-atlas-cooperation.js']){

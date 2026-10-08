@@ -4,7 +4,7 @@
   const ID='monster-11',UNDERWORLD_ID='monster-12';
   const TACTICS=Object.freeze(Object.fromEntries(Object.entries({
     cloud:{role:'守誓近衛',threat:'守在章末門前，靠太近會接連承受碰撞與重擊。',counter:'先留好退路，等重擊落空，再與同伴一起上前。'},
-    garden:{role:'庭園守門',threat:'會沿通道逼近；半血時，兩根供能藤會撐起根盾。',counter:'保留退路；根盾亮起後，靠近兩根供能藤點對話斬斷，再進攻園后。'},
+    garden:{role:'庭園守門',threat:'會沿通道逼近；半血時，兩根供能藤會撐起根盾。',counter:'保留退路；根盾亮起後，兩根供能藤會長在園后附近（小地圖「藤」），靠近點對話斬斷，再進攻園后。'},
     roots:{role:'緩行重衛',threat:'行動較慢，但近身碰撞與揮擊都很有力。',counter:'用遠程隊員拉開距離，近戰隊員趁出手間隔反擊。'},
     echo:{role:'晶光射手',threat:'遠處蓄力射晶光；半血會啟動晶罩，普通攻擊暫時無效。',counter:'蓄力時先側移；半血後轉動晶柱，躲到它後方引晶光擊中晶柱破罩；晶柱熄滅可再轉一次。'},
     library:{role:'書庫術衛',threat:'從書架間瞄準旅人，接近也不能免去碰撞傷害。',counter:'沿書架轉角接近，留下能躲回去的掩護。'},
@@ -76,5 +76,35 @@
     const ring=new T.Mesh(new T.RingGeometry(.7,1.05,24),new T.MeshBasicMaterial({color:0xd55668,transparent:true,opacity:.35,side:T.DoubleSide,depthWrite:false}));ring.rotation.x=-Math.PI/2;ring.position.y=.025;model.add(ring);
     Object.assign(model.userData,{body,ring,accent:d.accent,cinemaRig:{head,torso,arms,legs,mouth,eyes}});return model;
   }
-  return Object.freeze({ID,UNDERWORLD_ID,LORDS,UNDERWORLD_LORDS,allLords,defs,forRun,spec,defeated,build,tracks:Object.freeze(tracks)});
+  // Mini lords (小樓主): one per non-lord floor of a modern party journey, picked by floor from its
+  // region's two, so the same region repeats them across floors. Each is a larger, tougher regional
+  // creature (an existing creature form) that is worth extra experience. Not a chapter lord: no
+  // cutscene, voice, boss music, gear drop or descent gate. It takes the free lord slot ID.
+  const MINI_XP=Object.freeze({surface:40,underworld:20}),LORD_XP=100,MINI_HP=1.8,MINI_DAMAGE=1.25;
+  const MINI_LORDS=Object.freeze(Object.fromEntries(Object.entries({
+    summoning:[['雲冠傘王','mushroom',0xe9ddff],['雲階巨蟲','clockmite',0xe2c27a]],
+    garden:[['荊芽花衛','flower',0xe58aa2],['蜜后侍蛾','moth',0xf0c050]],
+    roots:[['老根傘首','mushroom',0xb08a5c],['盤藤遊蟲長','clockmite',0x93b15e]],
+    echo:[['回音晶蟹王','crab',0x8fd8ec],['迴響晶衛長','sentinel',0xa2bde0]],
+    library:[['禁書墨傘','mushroom',0x7a6699],['館藏甲衛長','sentinel',0xcdb47c]],
+    mist:[['霧渠巨蟹','crab',0x74a6ae],['渡霧燈靈','wisp',0xb6f0e0]],
+    frost:[['霜冠術士','shardseer',0xc4ecff],['冰原甲衛長','sentinel',0xdcf0fa]],
+    clockwork:[['發條獵犬長','hound',0xcf9c5a],['巨輪遊蟲','clockmite',0xe3b45e]],
+    furnace:[['炎鬃獵犬王','hound',0xff7c48],['熔晶術士長','shardseer',0xff9c6a]],
+    heart:[['歸燈花后','flower',0xf6d68c],['守門燼犬','hound',0xe4a284]],
+    'underworld:roots':[['深脈傘王','mushroom',0x8f7bb0],['星礦根衛長','sentinel',0x9db88a]],
+    'underworld:mist':[['盲河巨螯','crab',0x6a8f9e],['無名渡魂','wisp',0xa8dcd0]],
+    'underworld:library':[['封誓晶術士','shardseer',0xb59cf0],['誓頁巨蛾','moth',0xd9c08a]],
+    'underworld:furnace':[['無火獵犬王','hound',0xc8724f],['井底鎮甲長','sentinel',0x8f8a9e]],
+    'underworld:heart':[['門庭星靈','wisp',0xf4e2a6],['誓火巨犬','hound',0xf09a6c]],
+  }).map(([region,list])=>[region,Object.freeze(list.map(([name,kind,color],i)=>Object.freeze({id:'mini-'+region.replace(':','-')+'-'+i,name,kind,color,region})))])));
+  const pick=(seed,text)=>{let h=seed>>>0;for(const c of text)h=Math.imul(h^c.charCodeAt(0),16777619)>>>0;return h;};
+  // Whether this floor has a mini lord (every tower region has a catalogue): cheap, for legal-ID checks.
+  const hasMini=run=>!!run?.party?.loadouts&&!run.expedition?.active&&Number.isInteger(run.floor)&&run.floor!==0&&!ALL_LORDS[run.floor];
+  // The catalogue entry for this floor, or null on lord floors, rifts, legacy journeys and unknown regions.
+  function miniFor(run,region){
+    if(!hasMini(run)||!region)return null;
+    const list=MINI_LORDS[region];return list?list[pick(run.seed,'mini-lord:'+run.floor)%list.length]:null;
+  }
+  return Object.freeze({ID,UNDERWORLD_ID,LORDS,UNDERWORLD_LORDS,MINI_LORDS,MINI_XP,LORD_XP,MINI_HP,MINI_DAMAGE,allLords,defs,forRun,spec,defeated,hasMini,miniFor,build,tracks:Object.freeze(tracks)});
 });

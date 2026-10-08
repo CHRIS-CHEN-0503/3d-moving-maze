@@ -87,6 +87,42 @@
     }
     return { id, kind, ...spec, order, reward, catalogVersion };
   }
+  // Hunt rifts: optional battle trials. Half of the floors without a chapter lord (surface and underground,
+  // never floor 99) offer one, independent of the puzzle rift. Fighting is the task itself: clear every
+  // enemy, defeat the rift champion, or take the three crystal shards from their carriers.
+  const HUNT_KINDS = Object.freeze({
+    'hunt-purge': Object.freeze({ title: '討伐裂隙・殲滅', description: '裂隙另一頭聚集了一群躁動的怪物。全部擊倒，讓這道裂縫安靜下來。', objective: '擊敗裂隙中的全部怪物。' }),
+    'hunt-champion': Object.freeze({ title: '討伐裂隙・首領', description: '一隻強大的裂隙首領帶著部下守在深處。擊敗首領，部下就會散去。', objective: '擊敗裂隙首領；其他怪物可以避開。' }),
+    'hunt-shards': Object.freeze({ title: '討伐裂隙・碎晶', description: '三隻怪物吞下了發光的裂晶，正四處遊走。擊倒牠們，取回三枚裂晶。', objective: '擊敗三隻帶晶的怪物，取回裂晶。' }),
+  });
+  const HUNT_CHANCE = 50;
+  const isHuntId = id => typeof id === 'string' && id.startsWith('hunt:');
+  const lordFloor = floor => floor > 0 ? floor === 1 || floor % 10 === 0 : floor % 10 === 0;
+  function huntHash(seed, text) { let h = seed >>> 0; for (const c of text) h = Math.imul(h ^ c.charCodeAt(0), 16777619) >>> 0; h = Math.imul(h ^ (h >>> 16), 0x85ebca6b); h = Math.imul(h ^ (h >>> 13), 0xc2b2ae35); return (h ^ (h >>> 16)) >>> 0; }
+  // Depth tier 1-5: every 20 surface floors, and the whole underground at 5.
+  const huntTier = floor => floor < 0 ? 5 : Math.min(5, 1 + Math.floor((99 - floor) / 20));
+  // The size, targets, time and reward of one hunt kind at one tier; shared with the detailed atlas.
+  function huntShape(kind, tier) {
+    const count = kind === 'hunt-purge' ? 3 + tier : kind === 'hunt-champion' ? 2 + Math.ceil(tier / 2) : 4 + Math.ceil(tier / 2);
+    const champion = kind === 'hunt-champion' ? 0 : null, carriers = kind === 'hunt-shards' ? [0, 1, 2] : [];
+    const required = kind === 'hunt-purge' ? Array.from({ length: count }, (_, i) => i) : kind === 'hunt-champion' ? [0] : carriers;
+    const reward = { coins: 12 + count * 4 + tier * 4, items: { heal: tier >= 4 ? 2 : 1, ration: 1 }, gear: null };
+    return { size: tier >= 3 ? 9 : 7, count, champion, carriers, required, timeLimit: 120 + count * 15, shiftSeconds: 45, reward };
+  }
+  function rawHunt(floor, seed) {
+    if (!validFloor(floor) || !validSeed(seed) || floor === 99 || lordFloor(floor) || huntHash(seed, 'hunt:' + floor) % 100 >= HUNT_CHANCE) return null;
+    const kinds = Object.keys(HUNT_KINDS), kind = kinds[huntHash(seed, 'hunt-kind:' + floor) % kinds.length], tier = huntTier(floor);
+    return { id: `hunt:${floor}:${seed}`, kind, hunt: true, ...HUNT_KINDS[kind], tier, ...huntShape(kind, tier) };
+  }
+  function huntOffer(run) {
+    if (!run || !validFloor(run.floor) || !validSeed(run.seed) || !run.party?.loadouts) return null;
+    const generated = rawHunt(run.floor, run.seed);
+    if (!generated || run.expedition?.history?.some(entry => entry.id === generated.id)) return null;
+    return generated;
+  }
+  // The offer behind the active expedition, puzzle or hunt.
+  function activeOffer(run) { const id = run?.expedition?.active?.id; return isHuntId(id) ? huntOffer(run) : offer(run); }
+  const huntDone = (run, generated) => !!generated?.hunt && generated.required.every(index => (run.defeatedMonsters || []).includes('monster-h-' + index));
   function newExpedition(version = CATALOG_VERSION) { return { version, discovered: false, history: [], active: null }; }
   function catalogVersion(value) { return value === undefined ? 1 : value; }
   function maxObservedShifts(active, generated) { return Math.floor((active.elapsed + 0.25) / generated.shiftSeconds); }
@@ -96,6 +132,11 @@
     if (!value || typeof value !== 'object' || Array.isArray(value) || ![1, 2, 3, 4].includes(value.version) || typeof value.discovered !== 'boolean' || !Array.isArray(value.history) || value.history.length > 99) return null;
     const history = [], ids = new Set();
     for (const item of value.history) {
+      if (item && isHuntId(item.id)) {
+        const hunt = validFloor(item.floor) && item.floor >= floor ? rawHunt(item.floor, seed) : null;
+        if (!hunt || hunt.id !== item.id || hunt.kind !== item.kind || !['completed', 'abandoned', 'expired'].includes(item.outcome) || ids.has(item.id) || item.catalogVersion !== undefined) return null;
+        ids.add(item.id); history.push({ id: item.id, kind: item.kind, floor: item.floor, outcome: item.outcome }); continue;
+      }
       if (!item || !towerFloor(item.floor) || item.floor < floor || !['completed', 'abandoned', 'expired'].includes(item.outcome)) return null;
       const version = catalogVersion(item.catalogVersion);
       if (![1, 2, 3, 4].includes(version) || version > value.version || item.floor === floor && version !== value.version) return null;
@@ -106,6 +147,13 @@
     const generated = rawOffer(floor, seed, value.version);
     if (value.discovered && !generated) return null;
     let active = null;
+    if (value.active !== null && isHuntId(value.active?.id)) {
+      const a = value.active, config = getCore().floorConfig(floor), hunt = rawHunt(floor, seed);
+      if (!hunt || ids.has(a.id) || a.id !== hunt.id || a.kind !== hunt.kind || a.floor !== floor || !number(a.elapsed, 0, hunt.timeLimit) || a.mistakes !== 0 || !Array.isArray(a.progress) || a.progress.length) return null;
+      if (catalogVersion(a.catalogVersion) !== value.version) return null;
+      if (!a.returnCell || !number(a.returnCell.x, 0, config.size - 1, true) || !number(a.returnCell.y, 0, config.size - 1, true) || !number(a.returnShift, 0, config.shiftSeconds)) return null;
+      return { version: value.version, discovered: value.discovered, history, active: { id: a.id, kind: a.kind, floor, elapsed: a.elapsed, progress: [], mistakes: 0, returnCell: { x: a.returnCell.x, y: a.returnCell.y }, returnShift: a.returnShift, ...(value.version >= 2 ? { catalogVersion: value.version } : {}) } };
+    }
     if (value.active !== null) {
       const a = value.active, config = getCore().floorConfig(floor);
       if (!a || typeof a !== 'object' || Array.isArray(a) || !generated || !value.discovered || ids.has(a.id) || a.id !== generated.id || a.kind !== generated.kind || a.floor !== floor || !number(a.elapsed, 0, generated.timeLimit) || !number(a.mistakes, 0, 10000, true)) return null;
@@ -142,8 +190,8 @@
   }
   function enter(run, id, returnPoint, expectedRevision) {
     return getCore().transaction(run, expectedRevision, next => {
-      const generated = offer(next), config = getCore().floorConfig(next.floor);
-      if (!generated || generated.id !== id || !next.expedition.discovered || next.expedition.active) return { ok: false, message: '目前無法進入這道裂隙。' };
+      const hunting = isHuntId(id), generated = hunting ? huntOffer(next) : offer(next), config = getCore().floorConfig(next.floor);
+      if (!generated || generated.id !== id || !hunting && !next.expedition.discovered || next.expedition.active) return { ok: false, message: '目前無法進入這道裂隙。' };
       if (!returnPoint || !number(returnPoint.x, 0, config.size - 1, true) || !number(returnPoint.y, 0, config.size - 1, true) || !number(returnPoint.shiftLeft, 0, config.shiftSeconds)) return { ok: false, message: '無效的返回位置。' };
       next.expedition.active = { id, kind: generated.kind, floor: next.floor, elapsed: 0, progress: [], mistakes: 0, returnCell: { x: returnPoint.x, y: returnPoint.y }, returnShift: returnPoint.shiftLeft, ...(next.expedition.version >= 2 ? { catalogVersion: next.expedition.version } : {}), ...(generated.kind === 'stars' ? { shiftCount: 0, shiftAtStart: null } : {}) };
       return { ok: true, message: `進入${generated.title}。`, effect: { entered: true, offer: generated } };
@@ -152,7 +200,7 @@
   function interact(run, index, expectedRevision, details) {
     return getCore().transaction(run, expectedRevision, next => {
       const a = next.expedition.active, generated = offer(next);
-      if (!a || !generated || a.elapsed >= generated.timeLimit || !number(index, 0, 2, true)) return { ok: false, message: '目前無法啟動這個副本目標。' };
+      if (!a || isHuntId(a.id) || !generated || a.elapsed >= generated.timeLimit || !number(index, 0, 2, true)) return { ok: false, message: '目前無法啟動這個副本目標。' };
       if (a.progress.length === 3) return { ok: false, message: '目標已完成，請返回裂隙出口。' };
       if (a.kind === 'bells' && generated.order[a.progress.length] !== index) {
         a.progress = []; a.mistakes = Math.min(10000, a.mistakes + 1);
@@ -180,7 +228,7 @@
   }
   function observeShift(run) {
     return getCore().transaction(run, undefined, next => {
-      const a = next.expedition.active, generated = offer(next);
+      const a = next.expedition.active, generated = activeOffer(next);
       if (!a || a.kind !== 'stars' || !generated || a.elapsed >= generated.timeLimit || a.shiftCount >= maxObservedShifts(a, generated)) return { ok: false, message: '目前沒有新的星路變形可記錄。' };
       a.shiftCount += 1;
       return { ok: true, message: a.shiftAtStart !== null && a.shiftCount > a.shiftAtStart ? '牆壁已移動，新的星路可以辨認了。' : '', effect: { shiftObserved: true, shiftCount: a.shiftCount } };
@@ -188,7 +236,7 @@
   }
   function tick(run, seconds) {
     return getCore().transaction(run, undefined, next => {
-      const a = next.expedition.active, generated = offer(next);
+      const a = next.expedition.active, generated = activeOffer(next);
       if (!a || !generated || !number(seconds, 0, 60)) return { ok: false, message: '無效的副本時間更新。' };
       a.elapsed = Math.min(generated.timeLimit, a.elapsed + seconds);
       const expired = a.elapsed >= generated.timeLimit;
@@ -198,10 +246,10 @@
   function finish(run, outcome, expectedRevision) {
     const C = getCore();
     const settle = next => {
-      const a = next.expedition.active, generated = offer(next);
+      const a = next.expedition.active, generated = activeOffer(next);
       if (!a || !generated || !['completed', 'abandoned', 'expired'].includes(outcome)) return { ok: false, message: '沒有可結案的副本。' };
       if (outcome === 'expired' && a.elapsed < generated.timeLimit) return { ok: false, message: '副本尚未到時限。' };
-      if (outcome === 'completed' && (next.status !== 'playing' || a.progress.length !== 3 || a.elapsed >= generated.timeLimit)) return { ok: false, message: '尚未在時限內完成副本目標。' };
+      if (outcome === 'completed' && (next.status !== 'playing' || (generated.hunt ? !huntDone(next, generated) : a.progress.length !== 3) || a.elapsed >= generated.timeLimit)) return { ok: false, message: '尚未在時限內完成副本目標。' };
       if (next.expedition.history.length >= 99) return { ok: false, message: '副本歷史紀錄已滿。' };
       const reward = outcome === 'completed' ? generated.reward : null;
       if (reward) {
@@ -211,8 +259,12 @@
         for (const [id, count] of Object.entries(reward.items)) next.bag[id] += count;
       }
       const effect = { outcome, returnCell: { ...a.returnCell }, returnShift: a.returnShift, reward };
-      next.expedition.history.push({ id: a.id, kind: a.kind, floor: a.floor, outcome, ...(next.expedition.version >= 2 ? { catalogVersion: next.expedition.version } : {}) });
+      // A hunt record only matters on its own floor (it stops a second entry there), so earlier ones are dropped
+      // instead of filling the 99-entry history.
+      if (generated.hunt) next.expedition.history = next.expedition.history.filter(entry => !isHuntId(entry.id) || entry.floor === a.floor);
+      next.expedition.history.push({ id: a.id, kind: a.kind, floor: a.floor, outcome, ...(next.expedition.version >= 2 && !generated.hunt ? { catalogVersion: next.expedition.version } : {}) });
       next.expedition.active = null;
+      if (generated.hunt) C.clearHunt(next);
       return { ok: true, message: outcome === 'completed' ? `${generated.title}探索完成，報酬已收下。` : '返回原本樓層，這道裂隙已經關閉。', effect };
     };
     if (run && run.status === 'dead') {
@@ -225,5 +277,5 @@
     }
     return C.transaction(run, expectedRevision, settle);
   }
-  return Object.freeze({ TYPES, CATALOG_VERSION, SHIFT_INTERVAL_BONUS, newExpedition, validateExpedition, offer, discover, enter, interact, observeShift, tick, finish });
+  return Object.freeze({ TYPES, HUNT_KINDS, HUNT_CHANCE, huntTier, huntShape, CATALOG_VERSION, SHIFT_INTERVAL_BONUS, newExpedition, validateExpedition, offer, huntOffer, activeOffer, huntDone, isHuntId, discover, enter, interact, observeShift, tick, finish });
 });

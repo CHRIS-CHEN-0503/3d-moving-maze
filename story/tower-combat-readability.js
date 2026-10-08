@@ -1,5 +1,7 @@
 /* Attack anticipation and impact feedback: two local draws per visible enemy,
-   no new lights, timers, full-screen flashes, textures or gameplay decisions. */
+   no new lights, timers, full-screen flashes, textures or gameplay decisions.
+   A landed hit briefly brightens the enemy's own lit materials (emissive is a
+   uniform, so no shader is rebuilt) and restores each value exactly afterwards. */
 (function(root){'use strict';
   function attach(T,model){
     if(model.userData.combatReadability)return model.userData.combatReadability;
@@ -8,12 +10,27 @@
     const disc=new T.Mesh(new T.PlaneGeometry(4.1,4.1),material);disc.rotation.x=-Math.PI/2;disc.position.y=.045;group.add(disc);
     const shape=new T.Shape();shape.moveTo(0,.65);shape.lineTo(.18,0);shape.lineTo(0,.14);shape.lineTo(-.18,0);shape.closePath();
     const direction=new T.Mesh(new T.ShapeGeometry(shape),new T.MeshBasicMaterial({color:0xffce83,transparent:true,opacity:.65,depthWrite:false,side:T.DoubleSide,forceSinglePass:true,toneMapped:false}));direction.rotation.x=Math.PI/2;direction.scale.setScalar(.65);direction.position.set(0,.45,.35);group.add(direction);
-    const data={group,disc,direction,material,baseScale:model.userData.body?.scale.clone(),impact:0,lastRelease:0,windupTotal:0,lastWindup:0};model.userData.combatReadability=data;return data;
+    const data={group,disc,direction,material,baseScale:model.userData.body?.scale.clone(),impact:0,lastRelease:0,windupTotal:0,lastWindup:0,flash:0,flashColor:null,flashSaved:null};model.userData.combatReadability=data;return data;
+  }
+  const FLASH_SECONDS=.16;
+  function litMaterials(model,cue){const list=new Set();model.traverse(o=>{if(cue&&(o===cue||o.parent===cue))return;for(const m of Array.isArray(o.material)?o.material:[o.material])if(m?.emissive&&!m.userData?.sharedResource)list.add(m);});return [...list];}
+  function restoreFlash(state){if(!state.flashSaved)return;for(const [m,hex,intensity]of state.flashSaved){m.emissive.setHex(hex);m.emissiveIntensity=intensity;}state.flashSaved=null;state.flash=0;}
+  // Mark a landed hit; update() applies and fades it with the frame clock.
+  function hit(T,model,color=0xffffff){
+    if(!model)return null;const state=attach(T,model);
+    if(!state.flashSaved)state.flashSaved=litMaterials(model,state.group).map(m=>[m,m.emissive.getHex(),m.emissiveIntensity]);
+    state.flash=FLASH_SECONDS;state.flashColor=(state.flashColor||new T.Color()).setHex(color);return state;
+  }
+  function applyFlash(state,dt){
+    if(!state.flashSaved)return;state.flash=Math.max(0,state.flash-dt);if(state.flash<=0){restoreFlash(state);return;}
+    const k=Math.pow(state.flash/FLASH_SECONDS,1.5)*.85;
+    for(const [m,hex,intensity]of state.flashSaved){m.emissive.setHex(hex).lerp(state.flashColor,k);m.emissiveIntensity=intensity+(1-intensity)*k;}
   }
   function update(T,m,{dt=0,stunned=false,visible=true,reducedMotion=false,bounds=null}={}){
     if(!m.alive&&!m.model.userData.combatReadability)return null;
     const state=attach(T,m.model),w=Math.max(0,m.windup||0),body=m.model.userData.body;
-    if(!m.alive||!visible){state.group.visible=false;state.lastRelease=m.cueRelease||0;state.impact=0;state.lastWindup=0;if(body&&state.baseScale)body.scale.copy(state.baseScale);return state;}
+    if(!m.alive||!visible){state.group.visible=false;state.lastRelease=m.cueRelease||0;state.impact=0;state.lastWindup=0;restoreFlash(state);if(body&&state.baseScale)body.scale.copy(state.baseScale);return state;}
+    applyFlash(state,dt);
     if((m.cueRelease||0)!==state.lastRelease&&!stunned)state.impact=.22;
     state.lastRelease=m.cueRelease||0;state.impact=Math.max(0,state.impact-dt);
     if(bounds)state.material.uniforms.bounds.value.set(bounds.minX,bounds.minZ,bounds.maxX,bounds.maxZ);
@@ -27,8 +44,9 @@
     state.direction.visible=attacking&&!!m.def.ranged;
     if(m.model.userData.ring)m.model.userData.ring.visible=!attacking&&(stunned||alert);
     // A readable windup/release silhouette also works for colour-blind players.
-    if(body&&state.baseScale){const charge=attacking&&!reducedMotion?Math.min(1,w/(state.windupTotal||w))*.07:0;body.scale.set(state.baseScale.x*(1+charge),state.baseScale.y*(1-charge),state.baseScale.z);}
+    // A hit also squashes the body for a moment (skipped with reduced motion).
+    if(body&&state.baseScale){const charge=attacking&&!reducedMotion?Math.min(1,w/(state.windupTotal||w))*.07:0,recoil=!reducedMotion&&state.flash>0?Math.sin(state.flash/FLASH_SECONDS*Math.PI)*.08:0;body.scale.set(state.baseScale.x*(1+charge+recoil),state.baseScale.y*(1-charge-recoil),state.baseScale.z*(1+recoil));}
     return state;
   }
-  root.TowerCombatReadability={attach,update};if(typeof module==='object'&&module.exports)module.exports=root.TowerCombatReadability;
+  root.TowerCombatReadability={attach,update,hit,FLASH_SECONDS};if(typeof module==='object'&&module.exports)module.exports=root.TowerCombatReadability;
 })(globalThis);

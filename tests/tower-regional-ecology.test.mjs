@@ -26,7 +26,9 @@ test('regional decorations are immutable copies and preserve canonical sensing a
   }assert.equal(JSON.stringify(P.defs()),before);
 });
 test('opening enemies and shift reinforcements use the same current ecology, with original counts and caps',()=>{
-  for(const floor of floors){let r=fresh(floor),pool=M.monsterTypes(r),specs=P.monsterSpecs(r);assert.equal(specs.filter(s=>!s.lord&&!s.reinforcement).length,C.floorConfig(floor,r.seed).monsterCount);for(const s of specs.filter(s=>!s.lord)){assert.ok(pool.includes(s.kind));assert.equal(s.def.name,M.ecology(r).variants[s.kind].name);assert.equal(s.strength,Math.min(5,P.defs()[s.kind].strength+C.floorConfig(floor).monsterStrengthBonus));}
+  for(const floor of floors){let r=fresh(floor),pool=M.monsterTypes(r),specs=P.monsterSpecs(r);assert.equal(specs.filter(s=>!s.lord&&!s.elite&&!s.reinforcement).length,C.floorConfig(floor,r.seed).monsterCount);for(const s of specs.filter(s=>!s.lord&&!s.elite)){assert.ok(pool.includes(s.kind));assert.equal(s.def.name,M.ecology(r).variants[s.kind].name);assert.equal(s.strength,Math.min(5,P.defs()[s.kind].strength+C.floorConfig(floor).monsterStrengthBonus));}
+    // A mini lord is one of the same region's creatures, one strength step above its ordinary kin.
+    for(const s of specs.filter(s=>s.elite)){assert.ok(pool.includes(s.kind),floor+' '+s.kind);assert.match(s.def.name,/^小樓主・/);assert.equal(s.strength,Math.min(5,P.defs()[s.kind].strength+C.floorConfig(floor).monsterStrengthBonus+1));}
     assert.deepEqual(P.monsterSpecs(r),P.monsterSpecs(structuredClone(r)));for(let i=0;i<15;i++){const add=R.spawn(r,cells);assert.ok(add.ok,add.message);r=add.run;for(const m of add.effect.reinforcements)assert.ok(pool.includes(m.kind));assert.ok(P.monsterSpecs(r).filter(s=>!r.defeatedMonsters.includes(s.id)).length<=R.limit(C.floorConfig(floor).size));}assert.ok(C.validateSave(r));
   }
 });

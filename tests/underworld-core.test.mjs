@@ -84,7 +84,11 @@ test('underground combat scales HP and attack per ten floors without changing gl
   const original=clone(P.defs());let previous=0;
   for(const floor of [-1,-11,-21,-31,-41]){const base=P.defs().clockmite,p=P.monsterPower(floor,base,5);assert.notEqual(p.def,base);assert.equal(p.def.damage,Math.round(base.damage*(1.25+Math.floor((-floor-1)/10)*.1)));assert.ok(p.maxHp>previous);previous=p.maxHp;}
   let run=underground(29,0);move(run,-41);for(let i=0;i<50;i++){const result=R.spawn(run,[{x:18,y:18},{x:19,y:19},{x:20,y:20}]);assert.ok(result.ok,result.message);run=result.run;assert.ok(P.monsterSpecs(run).filter(m=>!run.defeatedMonsters.includes(m.id)).length<=20);assert.ok(C.validateSave(run));}
-  const specs=P.monsterSpecs(run);assert.ok(specs.some(s=>s.reinforcement));for(const spec of specs.filter(s=>!s.lord)){
+  const specs=P.monsterSpecs(run);assert.ok(specs.some(s=>s.reinforcement));
+  // The deep mini lord scales from the same underground power, then x1.8 HP and x1.25 attack (capped below the chapter lord).
+  for(const spec of specs.filter(s=>s.elite)){const power=P.monsterPower(run.floor,M.decorate(run,P.defs()[spec.kind],spec.kind),spec.strength),lord=B.allLords()[-Math.ceil(-run.floor/10)*10];
+    assert.equal(spec.maxHp,Math.round(power.maxHp*1.8));assert.equal(spec.def.damage,Math.min(lord.damage-1,Math.round(power.def.damage*1.25)));assert.ok(spec.maxHp<lord.maxHp);}
+  for(const spec of specs.filter(s=>!s.lord&&!s.elite)){
     assert.ok(spec.strength>=1&&spec.strength<=5);const base=P.defs()[spec.kind],regional=M.decorate(run,base,spec.kind),originalPower=P.monsterPower(run.floor,base,spec.strength);
     assert.deepEqual({def:spec.def,maxHp:spec.maxHp},P.monsterPower(run.floor,regional,spec.strength));
     assert.equal(spec.maxHp,originalPower.maxHp);for(const key of ['damage','speed','strength','sight','shape','ranged','id'])assert.equal(spec.def[key],originalPower.def[key],key+' still follows original combat scaling');

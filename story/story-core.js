@@ -9,7 +9,22 @@
   const STATE_VERSION = 2;
   const MAX_HP = 60;
   const MAX_MONSTERS = 32; // Stable original/lord IDs plus the finite reinforcement roster; live caps are 10/15/20.
-  const validMonsterId = (id, floor = 99) => typeof id === 'string' && (/^monster-(0|[1-9]\d*)$/.test(id) && Number(id.slice(8)) < (floor < 0 ? 13 : 12) || /^monster-r-[1-9]\d{0,5}-[0-2]$/.test(id));
+  // Hunt rift combatants (monster-h-0..9) only exist while that rift is active; clearHunt removes every trace on leaving.
+  const HUNT_ID = /^monster-h-[0-9]$/;
+  const validMonsterId = (id, floor = 99) => typeof id === 'string' && (/^monster-(0|[1-9]\d*)$/.test(id) && Number(id.slice(8)) < (floor < 0 ? 13 : 12) || /^monster-r-[1-9]\d{0,5}-[0-2]$/.test(id) || HUNT_ID.test(id));
+  const huntIds = run => [...(run.defeatedMonsters || []), ...Object.keys(run.monsterStuns || {}), ...Object.keys(run.party?.health || {}), ...Object.keys(run.party?.poise || {}), ...Object.keys(run.party?.loadouts?.enemy || {}), ...Object.keys(run.party?.loadouts?.afflictions?.enemies || {}), ...(run.party?.loot?.rolled || [])].filter(id => HUNT_ID.test(id));
+  // Leaving a hunt rift (finished, abandoned, expired or fallen) restores the floor's own combat state.
+  function clearHunt(next) {
+    const drop = dict => { if (dict && typeof dict === 'object') for (const id of Object.keys(dict)) if (HUNT_ID.test(id)) delete dict[id]; };
+    next.defeatedMonsters = (next.defeatedMonsters || []).filter(id => !HUNT_ID.test(id));
+    drop(next.monsterStuns); drop(next.party?.health); drop(next.party?.poise); drop(next.party?.loadouts?.enemy); drop(next.party?.loadouts?.afflictions?.enemies);
+    if (next.party?.loot) next.party.loot.rolled = next.party.loot.rolled.filter(id => !HUNT_ID.test(id));
+    for (const actor of Object.values(next.party?.loadouts?.actors || {})) {
+      if (actor?.shot && HUNT_ID.test(String(actor.shot.target))) actor.shot = null;
+      if (actor?.pending?.targets?.some(id => HUNT_ID.test(id))) actor.pending = null;
+    }
+    return next;
+  }
   const isFloor = floor => Number.isInteger(floor) && (floor >= 1 && floor <= 99 || floor >= -50 && floor <= -1);
   const isUnderworld = run => !!run && run.floor < 0 && run.underworld?.version === 1;
   const MAX_COINS = 999999;
@@ -380,6 +395,8 @@
     const chronicle = narrativeRules().validateChronicle(run.chronicle, run.floor);
     const expedition = dungeonRules().validateExpedition(run.expedition, run.floor, run.seed);
     if (!chronicle || !expedition) return null;
+    // Hunt combatants never outlive their rift.
+    if (!(typeof expedition.active?.id === 'string' && expedition.active.id.startsWith('hunt:')) && huntIds(run).length) return null;
     const party = run.party === undefined ? undefined : partyRules()?.validate(run.party, run.floor, defeatedMonsters,hiredWarriors,run.seed);
     if (run.party !== undefined && !party) return null;
     if(party?.loadouts&&!heroRules().validEquipment({party,equipment,gearBag,floor:run.floor,underworld}))return null;
@@ -774,5 +791,5 @@
     });
   }
 
-  return Object.freeze({ STATE_VERSION, MAX_HP, MAX_MONSTERS, HASTE_DURATION, HASTE_PERCENT, hasteMultiplier, validMonsterId, isFloor, isUnderworld, ITEMS, itemLimit, itemStorageLimit, GEAR, MONSTERS, CHAPTERS, OPENING, ENDING, EXCHANGES, floorConfig, newRun, validateSave, supplyPrice, buy, sell, exchange, useItem, collect, takeDamage, tickEffects, tickEffectsLive, startUnderworld, descend, monsterStrength, warriorOffer, hireWarrior, interceptMonster, createGear, validateGear, originalDurabilityMultiplier, durabilityMultiplier, durabilityMinimumRoll, durabilityForRoll, DURABILITY_VERSION, gearPrice, equipmentStats, receiveGear, grantGear, equipGear, discardGear, buyGear, effectiveMonsterStrength, hitMonster, resolveHeldMonster, transaction, applyDamage, newAdventure, validateAdventure });
+  return Object.freeze({ STATE_VERSION, MAX_HP, MAX_MONSTERS, HASTE_DURATION, HASTE_PERCENT, hasteMultiplier, validMonsterId, HUNT_ID, clearHunt, isFloor, isUnderworld, ITEMS, itemLimit, itemStorageLimit, GEAR, MONSTERS, CHAPTERS, OPENING, ENDING, EXCHANGES, floorConfig, newRun, validateSave, supplyPrice, buy, sell, exchange, useItem, collect, takeDamage, tickEffects, tickEffectsLive, startUnderworld, descend, monsterStrength, warriorOffer, hireWarrior, interceptMonster, createGear, validateGear, originalDurabilityMultiplier, durabilityMultiplier, durabilityMinimumRoll, durabilityForRoll, DURABILITY_VERSION, gearPrice, equipmentStats, receiveGear, grantGear, equipGear, discardGear, buyGear, effectiveMonsterStrength, hitMonster, resolveHeldMonster, transaction, applyDamage, newAdventure, validateAdventure });
 });

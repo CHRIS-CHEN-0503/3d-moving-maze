@@ -1,23 +1,40 @@
 <!doctype html>
-<html lang="zh-Hant">
+<html lang="zh-Hant" data-edition="player">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#0a151e">
 <meta name="description" content="倒轉高塔劇情模式完整圖鑑：八職業、所有技能、五階武器防具與機器人機件、補給材料、合作連攜、烹飪與鍛造。共用遊戲原創圖示與目前規則，支援手機查閱。">
 <title>冒險者全書 · 倒轉高塔劇情圖鑑</title>
+<script>/* 玩家版是預設；只有「#逃生梯」開啟逃生梯詳細版。這只是不公開，不是存取控制。 */try{if(decodeURIComponent(location.hash.slice(1))==='逃生梯'){document.documentElement.dataset.edition='gm';document.title='冒險者全書・逃生梯詳細版';}}catch{}</script>
 <link rel="icon" href="../assets/app-icon/favicon-48.png">
-<link rel="stylesheet" href="story-atlas.css?v=1.47.0">
+<link rel="stylesheet" href="story-atlas.css?v=1.58.2">
 </head>
 <body id="top">
 <a class="skip" href="#results">跳到圖鑑內容</a>
 <div class="wrap">
-<header class="topbar"><a class="brand" href="../index.html#home"><img src="../assets/app-icon/icon-192.png" alt="" width="38" height="38">3D移動迷宮</a><small>劇情模式 · v1.58.1 圖鑑</small></header>
+<header class="topbar"><a class="brand" href="../index.html#home"><img src="../assets/app-icon/icon-192.png" alt="" width="38" height="38">3D移動迷宮</a><small>劇情模式 · v1.58.2 圖鑑<b class="edition-badge" data-edition-only="gm">逃生梯詳細版</b></small></header>
 <section class="hero" aria-labelledby="pageTitle">
-<div><p class="eyebrow">從雲頂高塔，到地底深處</p><h1 id="pageTitle">倒轉高塔<span>冒險者全書</span></h1><p class="intro">認識每一種職業，找到適合自己的武器與技能。這裡收錄目前劇情模式的完整規則與遊戲圖示，地上高塔與地下遠征一次查清楚。</p><div class="stats" id="stats" aria-label="圖鑑收錄數量"></div></div>
+<div><p class="eyebrow">從雲頂高塔，到地底深處</p><h1 id="pageTitle">倒轉高塔<span>冒險者全書</span></h1><p class="intro" data-edition-only="player">認識每一種職業，找到適合自己的武器與技能。先讀「冒險前先看」掌握玩法重點，再用下方分類與搜尋查每一招、每件裝備與每種道具。</p><p class="intro" data-edition-only="gm">逃生梯專用：完整規則、判定細節、機率與設計數值。內容會透露尚未遇到的樓主與機制，分享給玩家請用<a href="職業裝備圖鑑.html">玩家版</a>。</p><div class="stats" id="stats" aria-label="圖鑑收錄數量"></div></div>
 <div class="hero-art" role="img" aria-label="遊戲原創高塔召喚封面"><p>99 層高塔 ／ 50 層地下遠征</p></div>
 </section>
-<details class="rules" id="readingRules"><summary>閱讀前先看：成長、技能抽選與裝備規則</summary><div class="rules-grid">
+<details class="rules" id="readingRules" data-edition-only="player"><summary>冒險前先看：玩法重點</summary><div class="rules-grid">
+<section><h3>職業與技能</h3><p>八種職業都能選男女外觀，能力相同。出發前會揭曉隨機三個主動技能與兩個被動技能；本書列出每個職業的全部候選，不代表一個人全部都會。卡片上的等級表是「技能等級」，不是人物等級。</p></section>
+<section><h3>升級與同伴</h3><p>地上主角最高 10 級、同伴 5 級；進入地下後主角可到 15 級、同伴 10 級，最多帶四位同伴。主角 10 級時覺醒一招絕技，12、15 級再學進階招式；同伴 6、8 級可挑選技能。越往下層，怪物給的經驗越多；認真清怪並打倒小樓主，大約在第 10 層前後就能滿級。</p></section>
+<section><h3>裝備與修理</h3><p>一至五階裝備分別需要 1、3、5、8、10 級，四、五階只在地下出現。近戰命中、射箭與施放光彈都會消耗耐久，記得找商人或鍛匠修理，商人可一鍵全部修滿。雙手武器不能配盾；男女裝外型不同，數值相同。</p></section>
+<section><h3>機器人</h3><p>機殼與雙拳是一體的，不能換一般防具或配盾，要找鍛匠或鐵嶺用礦材與零件進階。兩個動力核心會慢慢修復生命；料理、療癒藥和治療魔法修不了機器人。能源用完時只能慢慢走、不能攻擊，用微光、星輝或曜心石補充，微光石可向蘇禾購買。</p></section>
+<section><h3>補給、採集與照明</h3><p>物資不會在地上自己長回來，主要靠打倒怪物、商店與委託取得。牆角有時能採到藥草、礦石與動力石，環境合適時比較常見；同一層重新讀檔也不會補回。火把可照明 5 分鐘，術士的日光術 10 分鐘。</p></section>
+<section><h3>料理、鍛造與附魔</h3><p>在安全營地可以煮飯與鍛造；沒有廚師也能帶著食材，付 2～12 枚銅幣請蘇禾代煮。每件裝備可選一種工藝、最多兩級。另可用礦材附魔：武器命中時有機會造成灼傷、中毒等異常，防具則減輕同種異常；失敗會扣材料與費用，但保留原本的附魔。</p></section>
+<section><h3>隊友與連攜</h3><p>沒有操控的隊友會自己判斷出招、補血，遠攻隊友被貼近時會拉開距離。想讓隊友用食材或零件施放技能，要在該隊員的「自動行動與補給」打勾允許；自動喝療癒藥的時機也能分別設定。兩三位隊員學會指定技能並站好位置時，會出現連攜鈕，按下後一起準備發動。</p></section>
+<section><h3>戰鬥小技巧</h3><p>瞬發技能可以邊走邊放，手機可按住搖桿再點技能；需要準備或持續引導的招式會讓角色暫停移動。全隊倒下時，可付最多 12 枚銅幣「重整後再挑戰」，回到本層入口重新來過。</p></section>
+<section><h3>小樓主</h3><p>沒有章末樓主的樓層，會有一隻頭戴金冠、腳下有金色光環的小樓主，名字前標示「小樓主」。牠比同層怪物強壯，但經驗比較多，擊敗後必定留下一瓶療癒藥。小樓主不擋樓梯，打不過也可以先避開。</p></section>
+<section><h3>討伐裂隙</h3><p>約一半沒有章末樓主的樓層，會出現小地圖標示「獵」的討伐裂隙，走近即可進入，同伴一起作戰。「殲滅」要打倒全部怪物，「首領」只要打倒裂隙首領，「碎晶」要打倒三隻「帶晶」的怪物。裡面的怪物經驗減半、不掉東西；限時內完成後走到出口，可領銅幣、療癒藥與乾糧。中途離開、時間到或倒下就沒有獎勵，每層只能挑戰一次。</p></section>
+<section><h3>樓梯、樓主與記憶裂隙</h3><p>完成本層必要條件（例如主線印記、迷宮機關或樓層主）後，樓梯才會浮現。章末樓主半血時可能張開護罩，要先破解附近的機關，例如斬斷供能藤或引晶光擊中晶柱，小地圖會標示位置。記憶裂隙要在裡面帶回三段記憶才算完成。</p></section>
+<section><h3>故事與日誌</h3><p>日誌會把讀過的故事整理成線索手記，不會提前透露還沒讀到的內容。過場動畫可以跳過，也能在日誌重看，觀看時不消耗時間與補給。靠近地標按對話鈕可以觀察環境。想看每一招的光影，請開<a href="技能光影預覽.html">技能光影預覽</a>。</p></section>
+<section><h3>怎麼使用這本書</h3><p>上方分類可切換職業、技能、裝備、道具、料理、鍛造與連攜；可以搜尋名稱、效果或材料，或只看某個職業、地上或地下的內容。卡片數值是基礎值，實際效果會受等級、被動與料理加成影響。本頁不會讀取或改動你的存檔。</p></section>
+</div></details>
+<aside class="gm-banner" data-edition-only="gm" role="note"><strong>🪜 逃生梯詳細版</strong><span>包含完整判定、機率、設計數值與尚未遇到的樓主資料，只供測試與調整。卡片保留全部開發註記。</span><a href="職業裝備圖鑑.html">切換到玩家版</a></aside>
+<details class="rules" id="gmRules" data-edition-only="gm" open><summary>完整規則：成長、判定、機率與內部規則</summary><div class="rules-grid">
 <section><h3>職業本領不等於隨機技能</h3><p>八種職業皆可選男女外觀，能力相同。出發前揭曉隨機三主動、兩被動；圖鑑收錄全部候選，不代表一人同時擁有所有技能。廚師雙份料理等效果須實際學會對應被動。</p></section>
 <section><h3>地上與地下成長分開</h3><p>地上主角最高十級、同伴五級。進入地下才開放主角十五級、同伴十級，並可帶四位同伴；地下新招募一律五級，入隊隨機取得四級追加技能，不再補選。</p></section>
 <section><h3>覺醒與進階路線</h3><p>地上主角十級隨機覺醒；地下尚未覺醒者可二選一，已有絕技不重抽。同伴六／八級可選普通技能，地下十級二選一；主角十二、十五級各獲得同路線進階招式。</p></section>
@@ -35,7 +52,9 @@
 <section><h3>隊友戰術與演出</h3><p>未操控隊友依視線、射程、怪物蓄力及已有異常選擇技能；淨化會尋找真正需要解除異常的隊員。怪物從牆後轉出或進入技能射程時會立刻重新判斷，準備好的攻擊技能優先於普通攻擊。遠攻職接敵過近時會尋找不穿牆、不擠到隊友的退步位置，三種行動策略仍保留。準備、共同連攜及操作切換不能藉此重複扣料或施放。</p><p>八職業特效依刃光、元素、風羽、暖霧、花瓣、金屬火星、箭芒及核心脈衝，分成凝聚、接觸、釋放與消散節奏；角色表情平滑轉換。各環境加入局部浮塵、花瓣、霜晶等，不提供照明、不揭露隔牆人物，省電模式減量，減少動態時隱藏。</p></section>
 <section><h3>療癒與自動補血</h3><p>草藥療癒基礎冷卻五秒；治療、持續回血、復甦、連攜及被動技能的生命恢復量提高50%。料理與藥品本身的恢復、護盾量、裝備修理及機械修復不增加；食物觸發的技能額外回血會增加。卡片列出各技能的最新基礎數值，裝備與被動加成另計，生命不超過上限。</p><p>「優先輔助」不會自動授權耗材。需在該隊員的「自動行動與補給」勾選「允許技能消耗食材／零件」，並持有足夠材料；草藥療癒需要一份藥草。未操控療癒師實際學會治療招式、冷卻結束，且隊友低於50%生命、在六個世界距離單位內可見才會主動補血；不能隔牆治療或治癒機器人。一般隊友策略不替目前操控角色施法；若已學「救援本能」並另開「自動救援」，操控中的療癒師也可自動救援五個世界距離單位內可見隊友，仍需材料許可。自動喝療癒藥的開關、觸發百分比及保留瓶數另行設定，不影響治療技能的判定。</p><p>全隊倒下時可付最多 12 枚銅幣「重整後再挑戰」：回到本層入口，全隊回到主角操控並恢復體力，飽食度至少回到 65；已拾取的補給不會重複出現，未結案委託會解除。</p></section>
 <section><h3>移動中施放技能</h3><p>瞬發技能可一邊移動一邊使用，手機可按住搖桿再點技能；輔助技能待選隊友時仍可移動，再點左側職業卡完成選取。需要準備、持續引導或共同連攜的招式，開始施放後暫時停止受控角色的行走與轉向，完成或取消後依仍按住的搖桿／按鍵恢復移動；期間放開方向就保持原地，不會自動往前走。隊友自己的準備不會阻止領隊移動，衝鋒期間由招式控制位移。</p></section>
-<section><h3>樓主半血反制</h3><p>第80層庭園樓主半血時形成護罩，需斬斷兩根供能藤；第60層晶窟樓主需轉向晶柱，再引晶光擊中它。護罩解除後再繼續攻擊；原迷宮封印與出口條件仍須完成。</p></section>
+<section><h3>小樓主</h3><p>沒有章末樓主的樓層，各有一隻小樓主：由該區域的怪物放大而成，頭戴金冠、腳下有金色光環，名稱前標示「小樓主」。每個區域有兩種，會在同區域的不同樓層重複出現。血量約為同層一般怪的兩倍，傷害低於該章樓主；擊敗後經驗較多（地上額外＋40，地下額外＋20 再依地下規則乘五），並必定留下一瓶療癒藥。擊敗地上章末樓主另得額外 100 點經驗。小樓主不擋住樓梯，也可以選擇避開。</p></section>
+<section><h3>討伐裂隙</h3><p>沒有章末樓主的樓層（第 99 層除外），約一半會在地圖某處出現討伐裂隙入口，小地圖標示「獵」。入口不需先發現，走近即可選擇進入；它和記憶裂隙互不影響，同一層可能兩者都有。進入後只有裂隙自己的怪物，同伴一起進場，可普通攻擊與施放技能；原樓層的任務、已擊敗怪物與掉落都保留。三種目標：「殲滅」擊倒全部怪物；「首領」擊倒裂隙首領（由該區域小樓主強化而成），其他怪物可避開；「碎晶」擊倒三隻名稱前標示「帶晶」的怪物。越往下層，怪物越多、限時越長（120 秒＋每隻 15 秒）。裂隙中擊倒怪物只得一半經驗，不掉銅幣與物品；完成目標後走到出口返回，領取銅幣、療癒藥（深層兩瓶）與乾糧一份。中途離開、時間到或倒下，裂隙怪物全部清除且不給獎勵。每層只能挑戰一次。</p></section>
+<section><h3>經驗節奏</h3><p>地上越往下層，每隻怪物的經驗越多（以第 99 層為基準，到第 1 層約 2.9 倍）；地下維持五倍。依此設計，地上清掉約八成五的怪物並擊敗每層小樓主與章末樓主，主角約在第 10 層前後達到地上上限 10 級；全清會提早到第 13～15 層，只清六成要到最後兩三層，略過小樓主則到第 1 層仍未滿級。討伐裂隙的經驗也算在內，多打幾座會更早滿級。地下從 10 級出發，同樣清八成五可在地下盡頭前達到 15 級。</p></section><section><h3>樓主半血反制</h3><p>第80層庭園樓主半血時形成護罩，需斬斷長在她附近的兩根供能藤（小地圖「藤」標示，迷霧中也看得到）；第60層晶窟樓主需轉向晶柱，再引晶光擊中它。護罩解除後再繼續攻擊；原迷宮封印與出口條件仍須完成。</p></section>
 <section><h3>數值怎麼閱讀</h3><p>各卡列出基礎效果、耗材、準備及冷卻；等級表指技能等級，不是裝備階級。實際效果可能受人物等級、被動、強化與料理加成影響。本頁唯讀，不讀取或更動你的存檔。</p></section>
 <section><h3>手機操作與說明</h3><p>交易、營地及工坊把長篇規則收進「?」小鈕，點開可查閱或朗讀，關閉只收起說明，不離開交易畫面。價格、庫存、材料、耐久與操作失敗原因仍直接顯示；完整詳細規則也可在本圖鑑搜尋。</p></section>
 <section><h3>重要時刻鏡頭</h3><p>首次看見樓層主，鏡頭先對準他，開場台詞講完才開始戰鬥；擊敗樓主、取得主線印記及首次查看裂隙入口也有短演出。人物會呼吸、轉頭、眨眼，並按挑戰、受傷、告別或引導做手勢；嘴部依實際語音播放做節奏動作，不是逐字精準對嘴。關閉語音或下載等待不假裝說話，背景與直式切換會暫停演出。期間雙方、飢餓、技能及變形計時暫停，可按「跳過」，回到遊戲恢復原視角與人物姿勢。減少動態設定會降低動作幅度。演出完成後本層不重播。</p></section>
@@ -43,6 +62,7 @@
 <section><h3>雲頂電影演出與技能預覽</h3><p>第99～90層的雲頂故事共用淡藍天空、綠色遠山、雕紋召喚台與隨風旗幟，後續樓層不再退回灰色簡易平台。正式開場保留專用演出；其餘段落依當下文字安排三至四個鏡位與人物反應，不重演尚未發生的故事。技能光影涵蓋八職業，以雷電、藤蔓、刃光、蒸氣、花瓣、箭羽及機械脈衝區分用途；可在<a href="技能光影預覽.html">技能光影預覽</a>逐招查看、暫停或重播全部72種主動技能。</p></section>
 <section><h3>通關後樓梯浮現</h3><p>劇情各層尚未完成既有必要通關條件時，樓梯、地板洞口及地圖出口標記都隱藏。主線印記、章末迷宮機關與樓層主依本層規則判定；裂隙需帶回三段記憶。達成後七階石梯依序浮現，動畫完成才可選擇下樓或留在本層。沒有額外必要條件的普通樓層維持原本可下樓的規則，選擇性委託不變成強制任務。已開啟樓梯讀檔或同層變形不重播；減少動態設定則直接呈現。</p></section>
 </div></details>
+<details class="rules gm-data" id="gmData" data-edition-only="gm" open><summary>設計數值速查（直接讀取遊戲程式）</summary><div class="gm-tables" id="gmTables"></div></details>
 </div>
 <div class="controls-shell"><div class="wrap">
 <nav class="categories" id="categories" aria-label="圖鑑分類"></nav>
@@ -57,7 +77,7 @@
 <div class="results-top"><div><h2 id="sectionTitle">職業總覽</h2><p id="resultCount" role="status" aria-live="polite">正在整理圖鑑…</p></div><div class="actions"><button id="reset" type="button">重設篩選</button><button id="expand" type="button" aria-pressed="false">全部展開</button><button id="print" type="button">列印</button></div></div>
 <div class="grid" id="content"></div>
 <noscript>本頁需要開啟瀏覽器的程式執行功能，才能讀取與遊戲共用的圖示及規則。</noscript>
-<footer><p>所有圖示取自本專案遊戲；職業、技能、裝備數值與遊戲共用資料。特殊材料新增小圖也同步用於遊戲管理介面。</p><p>只收錄目前劇情玩法，不混入搶購商品、一般多人道具或退役的舊版裝備。主線物件名稱可能透露章節線索，不顯示故事結局。版本標示不代表正式網站已部署。</p><p>列印只輸出目前篩選結果；如需完整全書，先按「全部」並重設其他篩選。<a href="../index.html#home">返回遊戲首頁</a></p></footer>
+<footer><p>所有圖示取自本專案遊戲；職業、技能、裝備數值與遊戲共用資料。特殊材料新增小圖也同步用於遊戲管理介面。</p><p>只收錄目前劇情玩法，不混入搶購商品、一般多人道具或退役的舊版裝備。主線物件名稱可能透露章節線索，不顯示故事結局。<span data-edition-only="gm">版本標示不代表正式網站已部署。</span></p><p>列印只輸出目前篩選結果；如需完整全書，先按「全部」並重設其他篩選。<a href="../index.html#home">返回遊戲首頁</a></p></footer>
 </main>
 <a class="back-top" href="#top">回頁首 ↑</a>
 <script src="../story/tower-underworld.js?v=1.47.0"></script>
@@ -66,9 +86,9 @@
 <script src="../story/tower-ascension-catalog.js?v=1.57.2"></script>
 <script src="../story/tower-gear-tiers.js?v=1.54.0"></script>
 <script src="../story/tower-hero-growth.js?v=1.58.0"></script>
-<script src="../story/tower-heroes-core.js?v=1.58.0"></script>
+<script src="../story/tower-heroes-core.js?v=1.58.2"></script>
 <script src="../story/tower-heroes-icons.js?v=1.54.0"></script>
-<script src="../story/story-core.js?v=1.58.0"></script>
+<script src="../story/story-core.js?v=1.58.2"></script>
 <script src="../story/tower-affixes.js?v=1.55.0"></script>
 <script src="../story/tower-adventure-events.js?v=1.57.0"></script>
 <script src="../story/tower-landmarks.js?v=1.55.0"></script>
@@ -77,21 +97,24 @@
 <script src="../story/tower-expedition-core.js?v=1.58.0"></script>
 <script src="../story/tower-lighting-core.js?v=1.58.0"></script>
 <script src="../story/tower-encounters.js?v=1.55.0"></script>
-<script src="../story/tower-loot.js?v=1.55.0"></script>
+<script src="../story/tower-loot.js?v=1.58.2"></script>
 <script src="../story/tower-foraging.js?v=1.55.0"></script>
-<script src="../story/tower-party-core.js?v=1.57.4"></script>
+<script src="../story/tower-party-core.js?v=1.58.2"></script>
 <script src="../story/tower-commission-cooking.js?v=1.54.0"></script>
 <script src="../story/tower-recruitment.js?v=1.54.0"></script>
-<script src="../story/tower-party-runtime.js?v=1.58.0"></script>
-<script src="../story/tower-lighting-runtime.js?v=1.58.0"></script>
+<script src="../story/tower-party-runtime.js?v=1.58.2"></script>
+<script src="../story/tower-lighting-runtime.js?v=1.58.2"></script>
 <script src="../story/tower-resource-icons.js?v=1.48.0"></script>
 <script src="../story/tower-forge-icons.js?v=1.47.0"></script>
 <script src="../story/tower-cooperation-core.js?v=1.58.0"></script>
 <script src="../story/tower-cooperation-runtime.js?v=1.58.0"></script>
 <script src="../story/tower-field-guide.js?v=1.57.4"></script>
+<script src="../story/tower-floor-lords.js?v=1.58.2"></script>
+<script src="../story/tower-dungeons.js?v=1.58.2"></script>
 <script src="story-atlas-rules.js?v=1.58.0"></script>
 <script src="story-atlas-items.js?v=1.58.0"></script>
 <script src="story-atlas-cooperation.js?v=1.55.0"></script>
-<script src="story-atlas.js?v=1.49.0"></script>
+<script src="story-atlas-gm.js?v=1.58.2"></script>
+<script src="story-atlas.js?v=1.58.2"></script>
 </body>
 </html>

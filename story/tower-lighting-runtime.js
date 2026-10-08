@@ -8,6 +8,9 @@
   function create(ctx){
     const T=ctx.THREE,r=ctx.run,G=ctx.G;
     let group=null,sources=[],supplies=[],lamps=[],carried=null,orb=null,rig=null,profile=null,nearClock=0,nearSources=[],range=7,lastFuel=0,lastDaylight=0,panelRevision=null;
+    // Skill flashes light the floor, walls and actors through one more permanent slot (dark when idle),
+    // so the light count never changes during a fight. Battery mode builds no slot at all.
+    let flashLight=null,flashLeft=0,flashTotal=0,flashPower=0;
     const enabled=()=>ctx.active()&&!!r()?.party?.light;
     const ready=()=>enabled()&&r().status==='playing'&&G.running&&!G.shifting;
     const distance=p=>Math.hypot(G.px-p.x,G.pz-p.z);
@@ -70,13 +73,14 @@
       const model=sourceModel(style,color);model.position.set(point.x,0,point.z);group.add(model);
       sources.push({...point,model,color,name});
     }
-    function reset(){if(group){group.parent?.remove(group);ctx.dispose(group);}group=rig=carried=orb=profile=materials=null;baked.clear();sources=[];supplies=[];lamps=[];nearSources=[];nearClock=0;panelRevision=null;}
+    function reset(){if(group){group.parent?.remove(group);ctx.dispose(group);}group=rig=carried=orb=profile=materials=null;baked.clear();sources=[];supplies=[];lamps=[];nearSources=[];nearClock=0;panelRevision=null;flashLight=null;flashLeft=flashTotal=flashPower=0;}
     function build(random,used){
       reset();if(!enabled())return;
       profile=L.profile(ctx.environment().id,ctx.environment().underworld===true);rig=ctx.environment().rig;
       group=new T.Group();group.name='tower-lighting';ctx.world().add(group);
       // Keep a constant light count (no shader recompilation when walking past lamps).
       for(let i=0;i<3;i++){const light=new T.PointLight(0xffd19a,0,i===0?14:10.5,1.4);light.name='tower-light-slot-'+i;light.castShadow=false;group.add(light);lamps.push(light);}
+      if(root.MazeQuality?.mode?.()!=='battery'){flashLight=new T.PointLight(0xffffff,0,8,1.6);flashLight.name='tower-light-slot-skill';flashLight.castShadow=false;group.add(flashLight);}
       carried=torchModel();carried.scale.setScalar(.8);group.add(carried);
       orb=bakedModel('daylight-orb','orb',a=>{a.add(new T.IcosahedronGeometry(.14,0),0xfff4cb,0,0,0,true);a.add(new T.TorusGeometry(.26,.018,4,16),0xffe2a1,0,0,0,true,{rx:Math.PI/2});});group.add(orb);
       const entry=ctx.cell(0,0);
@@ -179,8 +183,17 @@
       const yaw=ctx.player()?.rotation.y||0;carried.position.set(G.px+Math.cos(yaw)*.38-Math.sin(yaw)*.24,1.23,G.pz-Math.sin(yaw)*.38-Math.cos(yaw)*.24);carried.rotation.y=yaw;
       orb.position.set(G.px,2.65,G.pz);orb.rotation.y=r().elapsed*.3;
     }
+    // A short burst of coloured light where a skill is cast or lands. The strongest current burst wins.
+    function flash(at,color=0xffffff,power=2,seconds=.25){
+      if(!flashLight||!at||!Number.isFinite(at.x)||!Number.isFinite(at.z)||!(power>0)||!(seconds>0))return false;
+      const current=flashTotal>0?flashPower*Math.pow(flashLeft/flashTotal,2):0;if(current>power)return false;
+      flashLight.position.set(at.x,Number.isFinite(at.y)?at.y:1.4,at.z);flashLight.color.setHex(color);flashLight.distance=Math.min(12,6+power*1.2);
+      flashPower=Math.min(8,power);flashTotal=flashLeft=Math.min(1.2,seconds);flashLight.intensity=flashPower;return true;
+    }
+    function decayFlash(dt){if(!flashLight||flashLeft<=0)return;flashLeft=Math.max(0,flashLeft-dt);flashLight.intensity=flashLeft>0?flashPower*Math.pow(flashLeft/flashTotal,2):0;}
     function tick(dt){
       if(!enabled()||!group)return;
+      decayFlash(Math.max(0,Number(dt)||0));
       updateVisual(dt);const l=r().party.light;
       if(lastFuel>0&&l.fuel===0)ctx.toast('火把燃盡了，找個亮處補充吧。',2500,'火把燃盡了');
       if(lastDaylight>0&&l.daylight===0)ctx.toast('日光術結束了。',2000,'日光術結束了');
@@ -193,7 +206,7 @@
         }
       }
     }
-    return {install,build,reset,tick,hud,panel,quickUse,handle,merchantCard,updateVisual,reserved:()=>[...sources,...supplies],radius:()=>enabled()?range:null};
+    return {install,build,reset,tick,hud,panel,quickUse,handle,merchantCard,updateVisual,flash,reserved:()=>[...sources,...supplies],radius:()=>enabled()?range:null};
   }
   root.TowerLightingRuntime={create,icon};
 })(typeof globalThis!=='undefined'?globalThis:this);

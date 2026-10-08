@@ -19,7 +19,7 @@
     const movement=new Map();let dashes=[];
     const dashing=id=>dashes.some(d=>d.id===id);
     const visible=at=>!root.MazeSight?.active()||root.MazeSight.visible(at.x,at.z);
-    const lights=root.TowerSkillEffects.create(T,{world:ctx.world,limit:12,visible,reducedMotion:root.matchMedia?.('(prefers-reduced-motion: reduce)').matches});
+    const lights=root.TowerSkillEffects.create(T,{world:ctx.world,limit:12,visible,reducedMotion:root.matchMedia?.('(prefers-reduced-motion: reduce)').matches,flash:ctx.skillFlash,kick:(amount,seconds)=>root.kickCamera?.(amount,seconds)});
     const glow=(skillId,at,options={})=>lights.emit(H.SKILLS[skillId],at,ctx.player()?.rotation.y||0,options);
     const enabled=()=>H.enabled(r()),ready=()=>enabled()&&G.running&&!ctx.paused()&&!G.shifting,name=id=>id==='hero'?(r().name||'主角'):root.TowerPartyCore.person(H.job(r(),id),H.sex(r(),id));
     const tactics=root.TowerTeamTactics?.create({run:r,ready,escape:esc,label:id=>H.JOBS[H.job(r(),id)].name,
@@ -125,8 +125,15 @@
     }
     function impact(m,id=H.state(r()).active,skillId=null){
       const center=m.model.position,origin=pos(id)||{x:G.px,z:G.pz},d=distance(center,origin)||1,offset=Math.min(.6,d*.45),at={x:center.x+(origin.x-center.x)/d*offset,z:center.z+(origin.z-center.z)/d*offset},weapon=H.GEAR[H.equipment(r(),id)?.weapon?.kind],job=H.job(r(),id),skill=H.SKILLS[skillId]||{id:'weapon-'+(weapon?.kind||job),job,effect:'stun'};
-      engage(m,id);lights.emit(skill,(skill?.effect==='thorns'||skill?.presentation?.family==='thorns')?center:at,Math.atan2(origin.x-center.x,origin.z-center.z),{impact:true,weapon:weapon?.type});
+      engage(m,id);const shown=lights.emit(skill,(skill?.effect==='thorns'||skill?.presentation?.family==='thorns')?center:at,Math.atan2(origin.x-center.x,origin.z-center.z),{impact:true,weapon:weapon?.type});
+      // The enemy itself flashes with the hit's colour (a plain weapon flashes warm white).
+      if(shown||visible(center))root.TowerCombatReadability?.hit(T,m.model,skillId?root.TowerSkillEffects.colorsFor(skill)[0]:0xfff1d6);
       if(distance({x:G.px,z:G.pz},at)<=12&&clear({x:G.px,z:G.pz},at))ctx.audio.sfxAction?.(skillId&&['shock','thorns','starfall','star_ring','splash'].includes(skill.effect)?root.CombatAudio.skillKind(skill):root.CombatAudio?.hitKind(weapon)||'hit');
+    }
+    // A defeated enemy bursts into light in its own colour instead of simply vanishing.
+    function defeat(m,id=H.state(r()).active){
+      const at=m?.model?.position;if(!at||!visible(at))return null;const tint=Number.isInteger(m.def?.color)?m.def.color:0xffc58a;
+      return lights.emit({id:'monster-defeat',job:H.job(r(),id)||'swordsman',effect:'stun',presentation:{colors:[0xfff4dc,tint]}},{x:at.x,z:at.z},0,{stage:'land',defeat:true});
     }
     function actionSound(skill,id,kind,seconds){const at=pos(id);if(at&&distance({x:G.px,z:G.pz},at)<=12&&clear({x:G.px,z:G.pz},at))return ctx.audio.sfxAction?.(kind||root.CombatAudio?.skillKind(skill)||'magic',seconds);}
     let releaseTarget=null;
@@ -233,7 +240,7 @@
     }
     function install(){growth.install();cooperation?.install();for(const [id,role]of [['heroSkillBar','角色主動技能'],['heroTargetPrompt','技能目標選擇'],['heroTeamBar','隊員策略與角色切換']]){const el=document.createElement('div');el.id=id;el.hidden=true;el.setAttribute('aria-label',role);document.getElementById(id==='heroSkillBar'?'gameScreen':'towerLeftHud').appendChild(el);}const prompt=document.getElementById('heroTargetPrompt'),bind=ctx.bind||root.bindActionBtn;prompt.innerHTML='<span role="status" aria-live="polite"></span><button type="button" aria-label="取消技能目標選擇">取消</button>';const cancel=prompt.querySelector('button');if(bind)bind(cancel,cancelTarget);else cancel.addEventListener('click',cancelTarget);for(const type of ['pointerdown','touchstart','mousedown'])prompt.addEventListener(type,e=>e.stopPropagation());const bar=document.getElementById('heroSkillBar'),activate=e=>{const b=e.target?.closest('[data-hero-skill]');if(b&&bar.contains(b)&&!b.disabled)cast(b.dataset.heroSkill);};if(bind)bind(bar,activate);else bar.addEventListener('click',activate);tactics?.install();document.addEventListener('keydown',e=>{if(e.repeat||/INPUT|TEXTAREA|SELECT/.test(e.target.tagName)||!ready())return;const i=['v','n'].indexOf(e.key.toLowerCase());if(i>=0){e.preventDefault();cast(H.actor(r()).skills[i+1]);}});}
     function daylight(){const id=H.ids(r()).find(k=>H.job(r(),k)==='mage'&&H.hp(r(),k)>0);if(!id||!pos(id))return false;const skill={id:'innate-daylight',job:'mage',effect:'daylight',name:'日光術'};motion(id,'skill',.85,skill);lights.emit(skill,pos(id));actionSound(skill,id,'heal');specialty('mage',id);return true;}
-    return {position:id=>{const at=pos(id);return at?{x:at.x,z:at.z}:null;},enabled,panel,selected:()=>selected,catalog,handle,cast,shoot,aimTarget,hud,tick,install,reset,blocker,impact,info,skills,preparing,dashing,movementLocked,workProgress:()=>channel?{label:'拆解陷阱',ratio:Math.max(0,Math.min(1,1-channel.left/channel.total))}:null,daylight,specialty,engage,engagement:id=>intent.target(id),cooperating:id=>dashing(id)||!!cooperation?.preparing(id),victory:id=>{root.CharacterFace?.react(actorModel(id),'happy',2.5);return barks.say('victory',id);},battle:id=>{root.CharacterFace?.react(actorModel(id),'alert',1.8);return barks.say('battle',id);},resetVoices:()=>barks.reset(),effectStats:lights.stats,wantsSkill:(id,enemy)=>dashing(id)||!!preparing(id)||growth.wantsSkill(id,enemy)};
+    return {defeat,position:id=>{const at=pos(id);return at?{x:at.x,z:at.z}:null;},enabled,panel,selected:()=>selected,catalog,handle,cast,shoot,aimTarget,hud,tick,install,reset,blocker,impact,info,skills,preparing,dashing,movementLocked,workProgress:()=>channel?{label:'拆解陷阱',ratio:Math.max(0,Math.min(1,1-channel.left/channel.total))}:null,daylight,specialty,engage,engagement:id=>intent.target(id),cooperating:id=>dashing(id)||!!cooperation?.preparing(id),victory:id=>{root.CharacterFace?.react(actorModel(id),'happy',2.5);return barks.say('victory',id);},battle:id=>{root.CharacterFace?.react(actorModel(id),'alert',1.8);return barks.say('battle',id);},resetVoices:()=>barks.reset(),effectStats:lights.stats,wantsSkill:(id,enemy)=>dashing(id)||!!preparing(id)||growth.wantsSkill(id,enemy)};
   }
   root.TowerHeroesRuntime={create};
 })(globalThis);

@@ -17,6 +17,9 @@
     h=Math.imul(h^(h>>>16),0x85ebca6b);h=Math.imul(h^(h>>>13),0xc2b2ae35);return (h^(h>>>16))>>>0;
   }
   const fresh=()=>({version:1,rolled:[],entries:[]});
+  // The mini lord's guaranteed draught: exactly one healing item from the lord slot on a floor without a chapter lord.
+  const Lords=()=>typeof module==='object'&&module.exports?require('./tower-floor-lords.js'):globalThis.TowerFloorLords;
+  const bonusDrop=(e,floor)=>typeof e?.id==='string'&&e.id.endsWith(':bonus')&&e.type==='item'&&e.key==='heal'&&e.quantity===1&&e.rarity==='uncommon'&&e.source===(floor<0?'monster-12':'monster-11')&&!Lords()?.allLords()[floor];
   function pool(run,spec){
     const regional=M().dropPool(run,spec),supplies=[{type:'item',key:'ration',rarity:'common',quantity:1},{type:'fuel',key:'kit',rarity:'common',quantity:1},{type:'item',key:'heal',rarity:'uncommon',quantity:1},...['shield','map','bell','hourglass'].map(key=>({type:'item',key,rarity:'rare',quantity:1})),{type:'item',key:'feather',rarity:'legendary',quantity:1},...(P().has(run,'archer')?[{type:'item',key:'arrow',rarity:'common',quantity:ARROW_DROP_QUANTITY}]:[]),...(P().has(run,'robot')?H().ROBOT.fuelItemIds.map(key=>({type:'item',key,rarity:H().ROBOT.FUEL_ITEMS[key].dropRarity,quantity:1})):[])];
     // Weight ecology and ordinary supplies equally before the original rarity
@@ -30,6 +33,8 @@
     state.rolled.push(spec.id);const maxCell=C().floorConfig(run.floor,run.seed).size-1,prefix=run.floor+':'+spec.id,cx=num(cell?.x,0,maxCell)?cell.x:0,cy=num(cell?.y,0,maxCell)?cell.y:0,entries=[];
     const choices=pool(run,spec),pick=choices[hash(run.seed,prefix+':kind')%choices.length];
     if(hash(run.seed,prefix+':item')%100<chance(pick))entries.push({...pick,id:prefix+':item',source:spec.id,cx,cy});
+    // A mini lord always leaves one healing draught as well, so the harder fight pays for its own recovery.
+    if(spec.elite)entries.push({type:'item',key:'heal',rarity:'uncommon',quantity:1,id:prefix+':bonus',source:spec.id,cx,cy});
     if(spec.lord&&hash(run.seed,prefix+':gear')%100<50){const kinds=run.party.loadouts?H().gearPool(run.floor):['helmet','armor','shield','bat','pan','staff'],kind=kinds[hash(run.seed,prefix+':gear-kind')%kinds.length];entries.push({type:'gear',key:kind,rarity:'rare',quantity:1,id:prefix+':gear',source:spec.id,cx,cy,gear:C().createGear(kind,run.floor,run.seed,'lord-drop',true)});}
     // Preserve every existing ground drop. Stop adding piles when the finite
     // floor storage is full; never let long-running reinforcement farming
@@ -48,7 +53,7 @@
   }
   function validate(value,floor,defeated){
     if(value===undefined)return fresh();if(!value||value.version!==1||!Array.isArray(value.rolled)||value.rolled.length>128||new Set(value.rolled).size!==value.rolled.length||!value.rolled.every(id=>C().validMonsterId(id,floor)&&defeated.includes(id))||!Array.isArray(value.entries)||value.entries.length>128||new Set(value.entries.map(e=>e?.id)).size!==value.entries.length)return null;
-    const maxCell=C().floorConfig(floor).size-1,entries=[];for(const e of value.entries){if(!e||!value.rolled.includes(e.source)||!['item','ingredient','material','fuel','gear'].includes(e.type)||!Object.hasOwn(CHANCES,e.rarity)||!num(e.quantity,1,e.type==='item'&&e.key==='arrow'?ARROW_DROP_QUANTITY:20)||!num(e.cx,0,maxCell)||!num(e.cy,0,maxCell)||e.id!==floor+':'+e.source+':'+(e.type==='gear'?'gear':'item'))return null;
+    const maxCell=C().floorConfig(floor).size-1,entries=[];for(const e of value.entries){if(!e||!value.rolled.includes(e.source)||!['item','ingredient','material','fuel','gear'].includes(e.type)||!Object.hasOwn(CHANCES,e.rarity)||!num(e.quantity,1,e.type==='item'&&e.key==='arrow'?ARROW_DROP_QUANTITY:20)||!num(e.cx,0,maxCell)||!num(e.cy,0,maxCell)||e.id!==floor+':'+e.source+':'+(e.type==='gear'?'gear':bonusDrop(e,floor)?'bonus':'item'))return null;
       if(e.type==='item'&&(!Object.hasOwn(C().ITEMS,e.key)||e.key==='coin')||e.type==='ingredient'&&!Object.hasOwn(P().INGREDIENTS,e.key)||e.type==='material'&&(!Object.hasOwn(M().MATERIALS,e.key)||floor>0&&['starore','abyssalloy'].includes(e.key))||e.type==='fuel'&&e.key!=='kit')return null;
       if(e.type==='item'&&C().ITEMS[e.key]?.fuel&&(e.quantity!==1||e.rarity!==C().ITEMS[e.key].dropRarity))return null;
       const gear=e.type==='gear'?C().validateGear(e.gear):undefined;if(e.type==='gear'&&(!gear||gear.kind!==e.key||e.quantity!==1||e.source!==(floor<0?'monster-12':'monster-11')))return null;

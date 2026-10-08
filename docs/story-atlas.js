@@ -2,11 +2,18 @@
 (function(){
   'use strict';
   const $=id=>document.getElementById(id),esc=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  // Player edition by default; "#逃生梯" opens the detailed edition (set before paint by the page head).
+  const gmHash=()=>{try{return decodeURIComponent(location.hash.slice(1))==='逃生梯';}catch{return false;}};
+  const gm=document.documentElement.dataset.edition==='gm';
+  // Players do not need clauses about old-save migration, internal code or probability breakdowns; the detailed edition keeps them.
+  const DEV_CLAUSE=/舊存檔|旧存檔|舊旅程|舊版|遷移|程式|退役|／[^；。]*機率為/;
+  const playerText=text=>{if(gm||typeof text!=='string')return text;const parts=text.split(/(?<=[；。])/),kept=parts.filter(part=>!DEV_CLAUSE.test(part));return kept.length===parts.length?text:kept.join('').replace(/；$/,'。');};
+  const forPlayer=r=>gm?r:{...r,description:playerText(r.description)||r.description,notes:(r.notes||[]).map(playerText).filter(Boolean),details:(r.details||[]).map(d=>({...d,value:playerText(d.value)}))};
   try{
     const R=StoryAtlasRules.build(),itemRecords=StoryAtlasItems.records();
     function spriteIcon(r){if(r.icon?.provider!=='pickup')return '';const p=PickupObjects,f=p.frames[r.icon.key],s=p.sheets[p.sheetFor[r.icon.key]];return f&&s?'<svg class="pickup-sprite" viewBox="'+f.join(' ')+'" aria-hidden="true"><image width="'+s.width+'" height="'+s.height+'" href="../'+esc(s.src)+'"/></svg>':'';}
     const items=itemRecords.map(r=>({...r,itemCategory:r.category,category:r.recipe?'cooking':'items',jobs:r.jobs||[],iconHtml:StoryAtlasItems.iconHtml(r)||spriteIcon(r),tags:[r.category,...(r.drop?[r.drop.label]:[])],details:[{label:'效果與使用方式',value:r.effect},{label:'取得方式',value:r.acquisition},...(r.capacityRule?[{label:'箭袋容量',value:r.capacityRule}]:r.stackLimit?[{label:'持有上限',value:r.stackLimit+' 份'}]:[])],notes:r.notes||[],underground:r.gateFloor<0||!!r.requiredDepth||!!r.recipe?.requiredDepth||!!r.underground}));
-    const cooperation=StoryAtlasCooperation.records();const entries=[...R.entries,...items,...cooperation].map(r=>({...r,notes:r.notes||[],underground:!!(r.underground||r.ascension||r.tier>3),anchor:'entry-'+r.category+'-'+r.id}));
+    const cooperation=StoryAtlasCooperation.records();const entries=[...R.entries,...items,...cooperation].map(r=>forPlayer({...r,notes:r.notes||[],underground:!!(r.underground||r.ascension||r.tier>3),anchor:'entry-'+r.category+'-'+r.id}));
     if(entries.some(r=>!r.iconHtml))throw Error('圖示缺漏：'+entries.filter(r=>!r.iconHtml).map(r=>r.id).join('、'));
     const categories={all:'全部',jobs:'職業',skills:'技能',weapons:'武器',armor:'防具',items:'道具與材料',cooking:'烹飪',forging:'鍛造',cooperation:'連攜'};
     const titles={all:'完整圖鑑',jobs:'職業總覽',skills:'技能全書',weapons:'武器圖鑑',armor:'防具與盾牌',items:'補給、材料與探索物資',cooking:'營地料理與地下食譜',forging:'鍛匠工藝',cooperation:'隊伍合作連攜'};
@@ -39,7 +46,8 @@
     $('content').addEventListener('click',e=>{if(e.target.closest('[data-clear]'))clear();const b=e.target.closest('[data-job-skills]');if(b){category='skills';$('search').value='';$('scope').value='';$('job').value=b.dataset.jobSkills;subtypes();render();$('results').scrollIntoView({block:'start'});}});
     let printed=[];addEventListener('beforeprint',()=>{printed=[...document.querySelectorAll('details')].map(d=>[d,d.open]);for(const[d]of printed)d.open=true;});addEventListener('afterprint',()=>{for(const[d,open]of printed)d.open=open;printed=[];});$('print').addEventListener('click',()=>window.print());
     function deepLink(){let anchor;try{anchor=decodeURIComponent(location.hash.slice(1));}catch{return;}if(!anchor.startsWith('entry-'))return;const entry=entries.find(r=>r.anchor===anchor);if(!entry)return;if(!$(anchor)){category=entry.category;for(const id of ['search','job','scope','kind'])$(id).value='';subtypes();render();}const target=$(anchor);target.querySelector('details').open=true;requestAnimationFrame(()=>target.scrollIntoView({block:'start'}));}
-    const params=new URLSearchParams(location.search);if(Object.hasOwn(categories,params.get('category')))category=params.get('category');$('search').value=params.get('q')||'';for(const id of ['job','scope'])$(id).value=params.get(id)||'';subtypes();$('kind').value=params.get('kind')||'';render();deepLink();addEventListener('hashchange',deepLink);
+    const params=new URLSearchParams(location.search);if(Object.hasOwn(categories,params.get('category')))category=params.get('category');$('search').value=params.get('q')||'';for(const id of ['job','scope'])$(id).value=params.get(id)||'';subtypes();$('kind').value=params.get('kind')||'';render();deepLink();addEventListener('hashchange',deepLink);addEventListener('hashchange',()=>{if(!gm&&gmHash())location.reload();});
+    if(gm)$('gmTables').innerHTML=StoryAtlasGm.sections().map(t=>'<section class="gm-section" id="gm-'+esc(t.id)+'"><h3>'+esc(t.title)+'</h3><p>'+esc(t.intro)+'</p><div class="gm-scroll"><table class="gm-table"><thead><tr>'+t.columns.map(c=>'<th scope="col">'+esc(c)+'</th>').join('')+'</tr></thead><tbody>'+t.rows.map(row=>'<tr>'+row.map((v,i)=>i?'<td>'+esc(v)+'</td>':'<th scope="row">'+esc(v)+'</th>').join('')+'</tr>').join('')+'</tbody></table></div>'+(t.notes||[]).map(n=>'<p class="entry-note">'+esc(n)+'</p>').join('')+'</section>').join('');
     const topLink=document.querySelector('.back-top'),topState=()=>{topLink.hidden=scrollY<400;};topState();addEventListener('scroll',topState,{passive:true});
     document.documentElement.dataset.atlasReady='true';
   }catch(error){$('loadError').hidden=false;$('loadError').textContent+=' '+error.message;$('resultCount').textContent='載入未完成';console.error(error);}

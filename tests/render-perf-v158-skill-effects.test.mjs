@@ -40,9 +40,14 @@ function familyDigest(Effects,representative){
   }
   return digest(parts);
 }
-// Measured once on the previous implementation (one representative skill per visual family; five stage/impact variants;
-// normal and reduced motion): every node, silhouette, vertex colour, material setting and opacity after one tick.
-const GOLDEN={"slash":"823dfdc4f788","impact":"5821b7bc24e8","spin":"1cdeb67dcffe","shield":"4b65284776d9","wave":"ccbc2e518583","aura":"55e0bda05001","cast":"72c10524ab49","storm":"0b82f63f0f78","meteor":"c194deaa4bde","frost":"495051251ee8","thorns":"b76dd8b87528","scan":"4a02dfd7141a","smoke":"b691fe36dcc3","splash":"19a62b25e057","steam":"9f0450432248","heal":"4134fcccaef2","cleanse":"c50e84282fd8","forge":"c96624c39879","arrow":"262e466c3fc4","rocket_fist":"e85ba2a32880","ram":"5578f4b507e3","quake":"daf0c5c3133e","lubricate":"c7f9b11470dc","rebuild":"7229596a4c2e","twin_fist":"7f0fa0e0a47b"};
+// One representative skill per visual family; five stage/impact variants; normal and reduced motion: every node,
+// silhouette, vertex colour, material setting and opacity after one tick.
+// Re-measured for v1.58.2 after an intentional look change, verified per (family, variant) against v1.58.1: only these
+// rendered families changed: slash/spin (saturated arc, white edge, fading tail, quick fade), hit/burst/impact/forge/
+// mechanical_hit/quake (cores start largest), cast seed, meteor rock (saturated, normal blending, lands in .32 s)
+// and heal/cleanse cross (saturated, normal blending).
+// Every family digest includes the impact variants, which is why all values were re-measured.
+const GOLDEN={"slash":"74e0e177b3a0","impact":"879bd84b0061","spin":"e1d3f95d5a57","shield":"97e9e8e05798","wave":"bb89463c9bfb","aura":"59096cd11662","cast":"e3386b790d90","storm":"7c60578a918f","meteor":"f93e37411953","frost":"a420c08c5682","thorns":"1b7bae191b17","scan":"b530a5307781","smoke":"3b7d859b636c","splash":"a4d90585a8f5","steam":"7f74d6ce460f","heal":"5e7b9461579d","cleanse":"18dce2447ff8","forge":"b7ee0d501630","arrow":"1c9c326d7496","rocket_fist":"d11dfab3fd23","ram":"c8605949989b","quake":"4c946c1acf57","lubricate":"12f3b70a0e77","rebuild":"504e35a48e25","twin_fist":"da1b4d61407d"};
 const byFamily=new Map();for(const skill of skills){const family=V.familyFor(skill);if(family&&!byFamily.has(family))byFamily.set(family,skill);}
 test('every visual family renders exactly what the previous implementation rendered',()=>{
   assert.deepEqual([...byFamily.keys()].sort(),Object.keys(GOLDEN).sort());

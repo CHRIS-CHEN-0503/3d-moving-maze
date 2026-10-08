@@ -999,7 +999,7 @@ button:focus-visible,input:focus-visible{outline:3px solid #fff;outline-offset:3
 <script src="./assets/role-voices.js?v=1.49.0"></script>
 <script src="./assets/character-voices.js?v=1.54.0"></script>
 <script src="story/tower-underworld.js?v=1.45.0"></script>
-<script src="story/tower-floor-lords.js?v=1.57.0"></script>
+<script src="story/tower-floor-lords.js?v=1.58.2"></script>
 <script src="./assets/voice-pack.js?v=1.49.0"></script>
 <script src="./assets/audio-settings.js?v=1.43.3"></script>
 <script src="./assets/game-voice.js?v=1.57.0"></script>
@@ -1011,7 +1011,7 @@ button:focus-visible,input:focus-visible{outline:3px solid #fff;outline-offset:3
    3D移動迷宮 — 給小朋友的變形迷宮冒險
    ===================================================== */
 const $=id=>document.getElementById(id);
-const GAME_VERSION='1.58.1';
+const GAME_VERSION='1.58.2';
 
 /* ---------- 設定（後台可調） ---------- */
 const DEFAULT_CFG={teamSize:2,shiftMin:3,itemCount:6,foodCount:4,hungerMin:3,stunSec:3,pingSec:3,smellCells:3,mazeSize:13,magicMap:0,duelMin:5,unpaidRate:100,musicOn:1,speechOn:1,speechVoice:'',apiUrl:'',roomMax:3,rounds:3,goodsCount:16,shopCollect:1,shopMin:2.5,cartFull:400,views:{fp:1,tp:1,top:1},broker:'wss://broker.emqx.io:8084/mqtt'};
@@ -2919,12 +2919,14 @@ function updateCamera(dt){
       const focus=camera.userData.mazeOrbitFocus||(camera.userData.mazeOrbitFocus=new V3());
       focus.set(G.px,1.5,G.pz);MazeCameraComfort.constrainOrbit(focus,camera.position,G.wallBoxes,G.wallH,.18);
     }
-    camera.lookAt(G.px,1.5,G.pz);
+    const kick=cameraKick(),phase=performance.now()*.19;
+    camera.lookAt(G.px+Math.sin(phase)*kick,1.5+Math.sin(phase*1.37)*kick*.7,G.pz+Math.cos(phase*.83)*kick);
   }else{ // top（滾輪 / 雙指 / ＋－按鈕可拉近拉遠）
     const owl=performance.now()<G.owlUntil;
     const h=owl?58:G.topZoom;
     camera.position.lerp(cameraGoal(G.px,h,G.pz+h*0.16),Math.min(1,dt*5));
-    camera.lookAt(G.px,0,G.pz);
+    const kick=cameraKick()*2.2,phase=performance.now()*.19;
+    camera.lookAt(G.px+Math.sin(phase)*kick,0,G.pz+Math.cos(phase*.83)*kick);
   }
   // 火把跟著玩家（山洞）
   if(envGroup&&envGroup.userData.torch){
@@ -2939,6 +2941,17 @@ function updateCamera(dt){
     scene.fog.far=boost?Math.max(130,th.fog[2]*2):th.fog[2];
   }
   updateTopMask(); // 俯視公平化：只看得到玩家腳邊一圈
+}
+// A brief view kick for heavy skills: it nudges where the camera looks, never where it stands,
+// so it cannot push the camera into a wall or build up in the follow smoothing. Off with reduced motion.
+function kickCamera(amount=.1,seconds=.22){
+  if(!(amount>0)||G.view==='fp'||window.matchMedia?.('(prefers-reduced-motion: reduce)').matches)return false;
+  const now=performance.now(),left=Math.max(0,(G.kickUntil||0)-now)/Math.max(1,G.kickTotal||1)*(G.kickAmp||0);
+  if(left>=amount)return false;G.kickAmp=Math.min(.22,amount);G.kickTotal=Math.min(600,seconds*1000);G.kickUntil=now+G.kickTotal;return true;
+}
+function cameraKick(){
+  const left=(G.kickUntil||0)-performance.now();if(left<=0||G.view==='fp')return 0;
+  return G.kickAmp*Math.pow(left/G.kickTotal,2);
 }
 // The follow cameras ease toward one reused target vector instead of a new one per frame.
 function cameraGoal(x,y,z){return (cameraGoal.v||(cameraGoal.v=new V3())).set(x,y,z);}
@@ -3092,6 +3105,7 @@ function drawMap(cv,big){
   if(window.TowerMode&&TowerMode.active&&TowerMode.mapMarkers){
     ctx.save();
     for(const m of TowerMode.mapMarkers()){
+      if(m.beacon)continue; // Beacons are drawn above the sight fog below.
       const px=gx(m.cx)+cw/2,py=gy(m.cy)+ch/2,r=big?13:7;
       ctx.beginPath();ctx.arc(px,py,r,0,Math.PI*2);ctx.fillStyle='#152638';ctx.fill();
       ctx.strokeStyle=m.color;ctx.lineWidth=1.5;ctx.stroke();ctx.fillStyle=m.color;
@@ -3149,6 +3163,17 @@ function drawMap(cv,big){
   }
   // 玩家（帶方向的三角形）
   window.MazeSight?.map(ctx,pad,cw,ch);
+  // Lord counters (vines, crystals) are beacons: always shown, even in unexplored fog.
+  if(window.TowerMode&&TowerMode.active&&TowerMode.mapMarkers){
+    ctx.save();
+    for(const m of TowerMode.mapMarkers()){
+      if(!m.beacon)continue;const px=gx(m.cx)+cw/2,py=gy(m.cy)+ch/2,r=big?14:Math.max(11,cw*.55);
+      ctx.beginPath();ctx.arc(px,py,r+(big?4:2),0,Math.PI*2);ctx.strokeStyle='rgba(188,217,145,.45)';ctx.lineWidth=big?3:2;ctx.stroke();
+      ctx.beginPath();ctx.arc(px,py,r,0,Math.PI*2);ctx.fillStyle='#152638';ctx.fill();ctx.strokeStyle=m.color;ctx.lineWidth=1.5;ctx.stroke();
+      ctx.fillStyle=m.color;ctx.font='bold '+(big?17:Math.round(r*1.3))+'px sans-serif';ctx.textAlign='center';ctx.textBaseline='middle';ctx.fillText(m.label,px,py);
+    }
+    ctx.restore();
+  }
   // Public challenge landmarks show their locations, not unseen terrain or opponents.
   if(globalThis.ModeVariants)ModeVariants.map(ctx,big,pad,cw,ch);
   const PX=pad+(G.px/G.cell+(W-1)/2)*cw+cw*0.5;
@@ -5414,24 +5439,24 @@ window.addEventListener('pagehide',()=>{AudioEng.shiftSound?.stop();AudioEng.com
 <script src="story/tower-ascension-catalog.js?v=1.57.2"></script>
 <script src="story/tower-gear-tiers.js?v=1.54.0"></script>
 <script src="story/tower-hero-growth.js?v=1.58.0"></script>
-<script src="story/tower-heroes-core.js?v=1.58.0"></script>
+<script src="story/tower-heroes-core.js?v=1.58.2"></script>
 <script src="story/tower-heroes-icons.js?v=1.54.0"></script>
 <script src="story/tower-combat-motion.js?v=1.57.4"></script>
 <script src="story/tower-menu-voice.js?v=1.42.4"></script>
 <script src="assets/equipment-surfaces.js?v=1.58.0"></script>
 <script src="story/tower-heroes-visuals.js?v=1.58.0"></script>
-<script src="story/tower-skill-effects.js?v=1.58.0"></script>
+<script src="story/tower-skill-effects.js?v=1.58.2"></script>
 <script src="story/tower-growth-runtime.js?v=1.58.0"></script>
 <script src="story/tower-team-tactics.js?v=1.57.1"></script>
 <script src="story/tower-combat-intent.js?v=1.43.3"></script>
 <script src="story/tower-equipment-compare.js?v=1.44.0"></script>
-<script src="story/tower-heroes-runtime.js?v=1.58.0"></script>
+<script src="story/tower-heroes-runtime.js?v=1.58.2"></script>
 <script src="story/tower-cooperation-core.js?v=1.58.0"></script>
 <script src="story/tower-cooperation-runtime.js?v=1.58.0"></script>
-<script src="story/story-core.js?v=1.58.0"></script>
+<script src="story/story-core.js?v=1.58.2"></script>
 <script src="story/tower-narrative.js?v=1.45.0"></script>
 <script src="story/tower-side-stories.js?v=1.45.0"></script>
-<script src="story/tower-dungeons.js?v=1.55.0"></script>
+<script src="story/tower-dungeons.js?v=1.58.2"></script>
 <script src="story/tower-hazards.js?v=1.49.0"></script>
 <script src="story/tower-encounters.js?v=1.55.0"></script>
 <script src="story/tower-characters.js?v=1.51.0"></script>
@@ -5439,21 +5464,21 @@ window.addEventListener('pagehide',()=>{AudioEng.shiftSound?.stop();AudioEng.com
 <script src="story/tower-materials.js?v=1.48.0"></script>
 <script src="story/tower-expedition-core.js?v=1.58.0"></script>
 <script src="story/tower-lighting-core.js?v=1.58.0"></script>
-<script src="story/tower-loot.js?v=1.55.0"></script>
+<script src="story/tower-loot.js?v=1.58.2"></script>
 <script src="story/tower-foraging.js?v=1.55.0"></script>
 <script src="story/tower-reinforcements.js?v=1.48.0"></script>
 <script src="story/tower-stairs.js?v=1.57.0"></script>
 <script src="story/tower-monster-sense.js?v=1.44.0"></script>
-<script src="story/tower-party-core.js?v=1.57.4"></script>
+<script src="story/tower-party-core.js?v=1.58.2"></script>
 <script src="story/tower-commission-cooking.js?v=1.54.0"></script>
 <script src="story/tower-recruitment.js?v=1.54.0"></script>
 <script src="story/tower-resource-icons.js?v=1.48.0"></script>
 <script src="story/tower-forge-icons.js?v=1.47.0"></script>
 <script src="story/tower-compact-help.js?v=1.54.0"></script>
-<script src="story/tower-party-runtime.js?v=1.58.0"></script>
-<script src="story/tower-lighting-runtime.js?v=1.58.0"></script>
+<script src="story/tower-party-runtime.js?v=1.58.2"></script>
+<script src="story/tower-lighting-runtime.js?v=1.58.2"></script>
 <script src="story/tower-encounter-alert.js?v=1.42.5"></script>
-<script src="story/tower-combat-readability.js?v=1.57.0"></script>
+<script src="story/tower-combat-readability.js?v=1.58.2"></script>
 <script src="story/tower-field-guide.js?v=1.57.4"></script>
 <script src="story/tower-creature-art.js?v=1.58.0"></script>
 <script src="story/tower-cinematic-actors.js?v=1.58.0"></script>
@@ -5467,8 +5492,8 @@ window.addEventListener('pagehide',()=>{AudioEng.shiftSound?.stop();AudioEng.com
 <script src="story/tower-story-insights.js?v=1.57.0"></script>
 <script src="story/tower-environment-life.js?v=1.58.0"></script>
 <!-- 逃生梯（GM）：只在網址為 #逃生梯 時建立面板，必須早於劇情模組載入以選用獨立存檔。 -->
-<script src="story/tower-gm.js?v=1.58.1"></script>
-<script src="story/tower-mode.js?v=1.58.1"></script>
+<script src="story/tower-gm.js?v=1.58.2"></script>
+<script src="story/tower-mode.js?v=1.58.2"></script>
 <script src="assets/room-lifecycle.js?v=1.58.0"></script>
 <script src="assets/shop-collection-core.js?v=1.55.0"></script>
 <script src="assets/shop-collection.js?v=1.58.0"></script>

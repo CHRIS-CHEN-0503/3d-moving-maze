@@ -110,7 +110,8 @@
     for(const k of ['cooldown','guardLeft','trapWard','slowLeft'])if(!num(value[k],0,30))return null;
     const dict=(v,max)=>v&&typeof v==='object'&&!Array.isArray(v)&&Object.keys(v).length<=C().MAX_MONSTERS&&Object.keys(v).every(id=>C().validMonsterId(id,floor)&&!defeated.includes(id)&&num(v[id],0,max));
     if(!dict(value.health,floor<0?1560:312)||!dict(value.poise,5))return null;
-    if(floor<0){const lord=B().spec({floor,party:value});for(const [id,hp]of Object.entries(value.health))if(hp>(id===lord?.id?lord.maxHp:258))return null;}
+    // Ordinary deep monsters stay within 258; the chapter lord within its own maximum and a mini lord (free lord slot) within 258 x MINI_HP.
+    if(floor<0){const lord=B().spec({floor,party:value});for(const [id,hp]of Object.entries(value.health))if(hp>(id===lord?.id?lord.maxHp:(!lord&&id===B().UNDERWORLD_ID||/^monster-h-/.test(id))?Math.round(258*B().MINI_HP):258))return null;}
     const loot=Loot()?.validate(value.loot,floor,defeated),reinforcements=Re()?.validate(value.reinforcements,floor),foraging=Foraging()?.validate(value.foraging,floor,seed);if(!loot||!reinforcements||!foraging)return null;
     const boss=X().validateBoss(value.boss,floor,value.journey===undefined),journey=X().validateJourney(value.journey,floor);
     if(value.light!==undefined&&!L())return null; // Never silently discard saved fuel if a script failed to load.
@@ -203,11 +204,38 @@
     const step=Math.floor((-floor-1)/10);
     return {def:{...def,damage:Math.round(def.damage*(1.25+step*.1))},maxHp:Math.round(Math.round(baseHp*(2+step*.3))*1.15)};
   }
+  const Dg=()=>typeof module==='object'&&module.exports?require('./tower-dungeons.js'):globalThis.TowerDungeons;
+  // Inside a hunt rift only its own combatants exist (monster-h-N): this region's creatures, a mini-lord-grade
+  // champion or three crystal carriers. The floor's own roster waits untouched for the return.
+  function huntSpecs(run,hunt){
+    const f=run.floor,config=C().floorConfig(f,run.seed),pool=Mat().monsterTypes(run),region=Mat().ecology(run)?.id;
+    const pick=text=>{let h=run.seed>>>0;for(const c of text)h=Math.imul(h^c.charCodeAt(0),16777619)>>>0;return h;};
+    return Array.from({length:hunt.count},(_,i)=>{
+      const champion=hunt.champion===i,carrier=hunt.carriers.includes(i),entry=champion?(B().MINI_LORDS[region]||[])[pick('hunt-champion:'+f)%2]:null;
+      const kind=entry&&defs()[entry.kind]?entry.kind:pool[pick('hunt-monster:'+f+':'+i)%pool.length],base=Mat().decorate(run,defs()[kind],kind);
+      const strength=Math.min(5,base.strength+config.monsterStrengthBonus+(champion?1:0)),power=monsterPower(f,base,strength);
+      if(!champion)return {id:'monster-h-'+i,kind,strength,hunt:true,...(carrier?{carrier:true}:{}),maxHp:power.maxHp,def:carrier?{...power.def,name:'帶晶・'+power.def.name}:power.def};
+      const chapterLord=B().allLords()[f>0?Math.max(1,Math.floor(f/10)*10):-Math.ceil(-f/10)*10],cap=chapterLord?chapterLord.damage-1:Infinity;
+      return {id:'monster-h-'+i,kind,strength,hunt:true,elite:true,champion:true,maxHp:Math.round(power.maxHp*B().MINI_HP),
+        def:{...power.def,name:'裂隙首領・'+(entry?.name||power.def.name),color:entry?.color??power.def.color,damage:Math.min(cap,Math.round(power.def.damage*B().MINI_DAMAGE)),speed:Math.min(3.2,(power.def.speed??2.1)*1.08),sight:(power.def.sight||8)+2,elite:true}};
+    });
+  }
   function monsterSpecs(run){
+    const hunt=run.expedition?.active&&Dg()?.isHuntId?.(run.expedition.active.id)?Dg().activeOffer(run):null;if(hunt)return huntSpecs(run,hunt);
     const f=run.floor,config=C().floorConfig(f,run.seed),count=config.monsterCount;
     const pool=Mat().monsterTypes(run);
     const result=Array.from({length:count},(_,i)=>{const kind=pool[hash(run.seed,`monster:${f}:${i}`)%pool.length],def=Mat().decorate(run,defs()[kind],kind),strength=Math.min(5,def.strength+config.monsterStrengthBonus);return {id:`monster-${i}`,kind,strength,...monsterPower(f,def,strength)};});
-    const lord=B().spec(run);if(lord)result.push(lord);return result.concat(Re().specs(run));
+    const lord=B().spec(run);if(lord)result.push(lord);
+    // One regional mini lord on every other floor of a modern journey, in the free lord ID slot.
+    const mini=B().miniFor?.(run,Mat().ecology(run)?.id),miniId=f<0?B().UNDERWORLD_ID:B().ID;
+    if(mini&&defs()[mini.kind]&&!result.some(m=>m.id===miniId)){
+      const base=Mat().decorate(run,defs()[mini.kind],mini.kind),strength=Math.min(5,base.strength+config.monsterStrengthBonus+1),power=monsterPower(f,base,strength);
+      // Never hits as hard as the lord waiting at the end of this chapter.
+      const chapterLord=B().allLords()[f>0?Math.max(1,Math.floor(f/10)*10):-Math.ceil(-f/10)*10],cap=chapterLord?chapterLord.damage-1:Infinity;
+      result.push({id:miniId,kind:mini.kind,strength,elite:true,mini:mini.id,maxHp:Math.round(power.maxHp*B().MINI_HP),
+        def:{...power.def,name:'小樓主・'+mini.name,color:mini.color,damage:Math.min(cap,Math.round(power.def.damage*B().MINI_DAMAGE)),speed:Math.min(3.2,(power.def.speed??2.1)*1.08),sight:(power.def.sight||8)+2,elite:true}});
+    }
+    return result.concat(Re().specs(run));
   }
   function strike(run,id,options={},revision){if(run.party?.loadouts)return H().strike(run,id,options,revision);return transact(run,revision,(n,p)=>{
     const spec=monsterSpecs(n).find(m=>m.id===id);if(!spec||n.defeatedMonsters.includes(id))return {ok:false,message:'這隻怪物已經倒下了。'};

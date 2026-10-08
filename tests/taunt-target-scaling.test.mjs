@@ -31,7 +31,11 @@ test('entering any puzzle rift drops tower targets and leaving restores only the
   const {run}=fixture('dawn_breach');run.floor=90;run.defeatedMonsters=[];run.party.health={};const monsters=[{id:'monster-11',alive:true,x:0,z:1},{id:'monster-0',alive:true,x:0,z:2}];
   assert.deepEqual(apply(run,monsters),['monster-11']);
   for(const kind of ['bells','archive','lantern','threads']){run.expedition.active={id:'rift-'+kind,kind};assert.deepEqual(apply(run,monsters),[]);assert.deepEqual(taunted(run),[]);}
-  run.expedition.active=null;assert.deepEqual(apply(run,monsters),['monster-11']);run.floor=89;assert.deepEqual(apply(run,monsters),['monster-0']);
+  run.expedition.active=null;assert.deepEqual(apply(run,monsters),['monster-11']);
+  // On floor 89 the lord slot belongs to that floor's mini lord, so it is a real target; an ID that no
+  // monster on this floor can have (monster-12 on the surface) is still never chosen, even when nearest.
+  run.floor=89;assert.deepEqual(apply(run,monsters),['monster-11']);
+  assert.deepEqual(apply(run,[{id:'monster-12',alive:true,x:0,z:.5},{id:'monster-0',alive:true,x:0,z:2}]),['monster-0']);
 });
 test('repeated aura refreshes never reconstruct full monster specs, even when ticks replace the run object',()=>{
   let {run}=fixture('dawn_breach');const monsters=crowd(run),sandbox={TowerCore:C,TowerRobotCore:require('../story/tower-robot-core.js'),TowerPartyCore:{...P,monsterSpecs(){throw Error('full monster reconstruction is forbidden in aura refresh');}},TowerFloorLords:require('../story/tower-floor-lords.js'),TowerHeroGrowth:G,TowerAscensionCatalog:require('../story/tower-ascension-catalog.js'),TowerGearTiers:require('../story/tower-gear-tiers.js')};

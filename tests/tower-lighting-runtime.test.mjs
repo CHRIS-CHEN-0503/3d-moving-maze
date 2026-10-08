@@ -21,9 +21,10 @@ function harness(job='mage',modern=false){
 test('original light models have bounded geometry, no textures or independent animation loops',()=>{
   const h=harness();let meshes=0,triangles=0,lights=0;
   h.world.traverse(o=>{if(o.isPointLight){lights++;assert.equal(o.castShadow,false);}if(o.isMesh){meshes++;triangles+=(o.geometry.index?.count||o.geometry.attributes.position.count)/3;assert.equal(o.material.map,null);}});
-  assert.equal(lights,3);assert.ok(meshes<100&&triangles<5000,{meshes,triangles});
+  // Three lamp slots plus the one skill-flash slot, all permanent and dark when idle.
+  assert.equal(lights,4);assert.equal(h.world.getObjectByName('tower-light-slot-skill').intensity,0);assert.ok(meshes<100&&triangles<5000,{meshes,triangles});
   assert.doesNotMatch(source,/\b(setInterval|setTimeout|requestAnimationFrame|TextureLoader)\s*\(/);
-  for(let i=0;i<4;i++)h.build();lights=0;h.world.traverse(o=>{if(o.isPointLight)lights++;});assert.equal(lights,3);assert.equal(h.disposals,4);
+  for(let i=0;i<4;i++)h.build();lights=0;h.world.traverse(o=>{if(o.isPointLight)lights++;});assert.equal(lights,4,'the light count never changes across rebuilds');assert.equal(h.disposals,4);
   h.ui.reset();assert.equal(h.world.children.length,0);
 });
 test('camp and every merchant have permanent light; intervening wall disables local light slots',()=>{
@@ -82,7 +83,7 @@ test('world range follows single core < torch < dual core < daylight with no ext
   h.run=H.switchActor(h.run,m.id).run;h.ui.updateVisual(0,true);assert.equal(h.ui.radius(),12);assert.equal(h.world.getObjectByName('tower-light-slot-0').color.getHex(),0x48a8ff);
   h.run=L.daylight(h.run).run;h.ui.updateVisual(0,true);assert.equal(h.ui.radius(),15);assert.equal(h.world.getObjectByName('daylight-orb').visible,true);assert.equal(h.world.getObjectByName('tower-light-slot-0').color.getHex(),0xfff2d1);
   H.state(h.run).switchLeft=0;h.run=H.switchActor(h.run,'hero').run;assert.equal(H.state(h.run).active,'hero');h.ui.updateVisual(0,true);assert.equal(h.ui.radius(),15);assert.equal(h.world.getObjectByName('tower-light-slot-0').color.getHex(),0xfff2d1);assert.equal(h.world.getObjectByName('tower-light-slot-0').intensity,4.2);
-  let lights=0;h.world.traverse(p=>{if(p.isPointLight)lights++;});assert.equal(lights,3);H.setHp(h.run,'hero',0);L.tick(h.run,601);h.ui.updateVisual(0,true);assert.equal(h.ui.radius(),10);
+  let lights=0;h.world.traverse(p=>{if(p.isPointLight)lights++;});assert.equal(lights,4,'robot cores add no light of their own');H.setHp(h.run,'hero',0);L.tick(h.run,601);h.ui.updateVisual(0,true);assert.equal(h.ui.radius(),10);
 });
 test('robot lighting quick button casts its living mage companion instead of opening the core panel',()=>{
   const h=harness('robot',true),m={id:'quick-mage',profession:'mage',sex:'male',level:1,hp:34,cooldown:0,hurtLeft:0};h.G.px=200;h.run.party.members.push(m);h.run.party.joined.push(m.id);H.addMember(h.run,m);h.ui.hud();assert.equal(h.button.dataset.icon,'daylight');assert.equal(h.button['aria-label'],'施放日光術');assert.equal(h.button.style.color,'');
@@ -91,4 +92,16 @@ test('robot lighting quick button casts its living mage companion instead of ope
 test('a robot without a mage can directly light a useful torch; dead companions cannot replace the quick action',()=>{
   const h=harness('robot',true),m={id:'quick-dead-mage',profession:'mage',sex:'male',level:1,hp:34,cooldown:0,hurtLeft:0};h.G.px=200;h.run.party.members.push(m);h.run.party.joined.push(m.id);H.addMember(h.run,m);H.setHp(h.run,m.id,0);h.ui.hud();assert.equal(h.button.dataset.icon,'core');assert.equal(h.button['aria-label'],'使用火把');assert.equal(h.ui.quickUse(),true);assert.equal(h.run.party.light.fuel,300);assert.equal(h.run.party.light.lit,true);assert.equal(h.ui.radius(),10);assert.ok(!h.events.includes('robot-panel'));
   const fuel=h.run.party.light.fuel;L.tick(h.run,3);assert.equal(h.run.party.light.fuel,fuel-3);assert.equal(h.ui.quickUse(),true);assert.equal(h.run.party.light.lit,false);assert.equal(h.ui.radius(),8);
+});
+
+test('the skill-flash slot lights where a skill lands, fades by the frame clock, keeps the stronger burst, and battery mode builds none',()=>{
+  const h=harness('mage',true),slot=h.world.getObjectByName('tower-light-slot-skill');assert.ok(slot);assert.equal(slot.intensity,0);
+  assert.equal(h.ui.flash({x:3,z:-2},0x86e4ff,4,.5),true);assert.equal(slot.intensity,4);assert.deepEqual([slot.position.x,slot.position.z],[3,-2]);assert.equal(slot.color.getHex(),0x86e4ff);
+  assert.equal(h.ui.flash({x:9,z:9},0xffffff,1,.2),false,'a weaker burst does not cut a strong one short');assert.equal(slot.position.x,3);
+  h.ui.tick(.25);assert.ok(slot.intensity>0&&slot.intensity<4,'fades');h.ui.tick(.3);assert.equal(slot.intensity,0,'dark again when done');
+  assert.equal(h.ui.flash({x:1,z:1},0xffaa66,2,.3),true,'a new burst after the fade takes over');
+  for(const bad of [null,{x:NaN,z:0},{x:0,z:0}])assert.equal(h.ui.flash(bad,0xffffff,bad?.x===0?0:2,.2),false);
+  let lights=0;h.world.traverse(o=>{if(o.isPointLight)lights++;});assert.equal(lights,4,'flashing never adds a light');
+  h.ui.build();assert.equal(h.world.getObjectByName('tower-light-slot-skill').intensity,0,'a new floor starts dark');
+  const source=readFileSync(new URL('../story/tower-lighting-runtime.js',import.meta.url),'utf8');assert.match(source,/if\(root\.MazeQuality\?\.mode\?\.\(\)!=='battery'\)\{flashLight=new T\.PointLight/);
 });

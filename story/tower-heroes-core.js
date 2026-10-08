@@ -4,6 +4,7 @@
   const C=()=>typeof module==='object'&&module.exports?require('./story-core.js'):globalThis.TowerCore;
   const P=()=>typeof module==='object'&&module.exports?require('./tower-party-core.js'):globalThis.TowerPartyCore;
   const B=()=>typeof module==='object'&&module.exports?require('./tower-floor-lords.js'):globalThis.TowerFloorLords;
+  const Dg=()=>typeof module==='object'&&module.exports?require('./tower-dungeons.js'):globalThis.TowerDungeons;
   const X=()=>typeof module==='object'&&module.exports?require('./tower-expedition-core.js'):globalThis.TowerExpedition;
   const R=()=>typeof module==='object'&&module.exports?require('./tower-recruitment.js'):globalThis.TowerRecruitment;
   const F=()=>typeof module==='object'&&module.exports?require('./tower-affixes.js'):globalThis.TowerAffixes;
@@ -147,11 +148,12 @@
   function tauntMonsterIds(run){
     // tickEffects clones the run every frame, so a per-run cache would miss on
     // every refresh. Derive only cheap stable IDs, not full species/drop data.
-    // Puzzle rifts have no combatants; never carry a tower roster into one.
-    const valid=new Set();if(run.expedition?.active)return valid;
+    // Puzzle rifts have no combatants and a hunt rift only its own; never carry the tower roster into either.
+    const valid=new Set();if(run.expedition?.active){const hunt=Dg()?.isHuntId?.(run.expedition.active.id)?Dg().activeOffer(run):null;for(let i=0;i<(hunt?.count||0);i++)valid.add('monster-h-'+i);return valid;}
     const count=C().floorConfig(run.floor,run.seed).monsterCount;
     for(let i=0;i<count;i++)valid.add('monster-'+i);
     const lord=B().spec(run);if(lord)valid.add(lord.id);
+    if(B().hasMini?.(run))valid.add(C().isUnderworld(run)?B().UNDERWORLD_ID:B().ID);
     for(const m of run.party.reinforcements?.monsters||[])valid.add(m.id);
     return valid;
   }
@@ -305,7 +307,11 @@
   }
   const organicHealable=(run,id)=>!!actor(run,id)&&job(run,id)!=='robot';
   function heal(run,id,amount,options={}){if(!actor(run,id)||!Number.isFinite(amount)||amount<=0||hp(run,id)<=0||!organicHealable(run,id)&&options.mechanical!==true)return 0;const before=hp(run,id);setHp(run,id,before+amount*(F()?.offense(run,id)??1));return hp(run,id)-before;}
-  function finishMonster(run,spec,lootCell){if(run.defeatedMonsters.includes(spec.id))return [];run.defeatedMonsters.push(spec.id);delete run.party.health[spec.id];delete run.party.poise[spec.id];delete run.monsterStuns[spec.id];delete state(run).enemy[spec.id];if(F()?.state(run))delete F().state(run).enemies[spec.id];run.coins=Math.min(999999,run.coins+8+spec.strength*2);const Loot=typeof module==='object'&&module.exports?require('./tower-loot.js'):globalThis.TowerLoot,drops=Loot.recordKill(run,spec,lootCell);gainXp(run,(5+spec.strength*2)*(C().isUnderworld(run)?5:1));return drops;}
+  function finishMonster(run,spec,lootCell){if(run.defeatedMonsters.includes(spec.id))return [];run.defeatedMonsters.push(spec.id);delete run.party.health[spec.id];delete run.party.poise[spec.id];delete run.monsterStuns[spec.id];delete state(run).enemy[spec.id];if(F()?.state(run))delete F().state(run).enemies[spec.id];if(!spec.hunt)run.coins=Math.min(999999,run.coins+8+spec.strength*2);const Loot=typeof module==='object'&&module.exports?require('./tower-loot.js'):globalThis.TowerLoot,drops=spec.hunt?[]:Loot.recordKill(run,spec,lootCell);gainXp(run,killXp(run,spec));return drops;}
+  // Kill experience. Deeper surface floors pay more (x1 at 99F to x2.4 at 1F), so a hero who clears about 85% of
+  // the tower reaches level 10 by the last floor; the underground keeps its own x5. Hunt rift foes give half.
+  const SURFACE_XP_DEPTH=52,HUNT_XP=.5;
+  function killXp(run,spec){const under=C().isUnderworld(run),lords=B(),base=5+spec.strength*2+(spec.elite?lords.MINI_XP[under?'underworld':'surface']:spec.lord&&!under?lords.LORD_XP:0),scaled=under?base*5:base*(1+(99-run.floor)/SURFACE_XP_DEPTH);return Math.round(scaled*(spec.hunt?HUNT_XP:1));}
   function gainXp(run,amount){if(!enabled(run)||!Number.isFinite(amount)||amount<0)return;if(amount===0){G.awaken(run);sync(run);return;}const s=state(run),oldHero=s.level,beforeHero=hp(run,'hero'),gain=Math.floor(amount),under=C().isUnderworld(run);s.xp=Math.min(G.XP[maxLevel(run)-1],s.xp+gain);const next=Math.min(maxLevel(run),G.XP.filter(x=>s.xp>=x).length);s.level=Math.max(s.level,next);if(beforeHero>0)setHp(run,'hero',beforeHero+(s.level-oldHero)*3);for(const m of run.party.members){const old=m.level,before=hp(run,m.id);if(under){m.xp=Math.min(G.XP[9],experience(run,m.id)+gain);m.level=Math.max(old,Math.min(10,G.XP.filter(x=>m.xp>=x).length));}else{m.level=Math.max(old,Math.min(5,next));m.xp=G.XP[m.level-1];}if(before>0)setHp(run,m.id,before+(m.level-old)*6);}G.awaken(run);sync(run);}
   const ranged=(run,id=state(run)?.active)=>!!actor(run,id)&&['bow','staff','book'].includes(GEAR[stats(run,id).weapon?.kind]?.type);
   function fireProjectile(run,id,monsterId=null,revision=run.revision){return C().transaction(run,revision,n=>{
@@ -492,5 +498,5 @@
     return {removedTraps:[...value.removedTraps],version:1,xpScale:G.XP_SCALE,active:value.active,level:value.level,xp,heroHp:value.heroHp,switchLeft:value.switchLeft,actors,enemy,growth,...(afflictions?{afflictions}:{})};
   }
   function validEquipment(run){if(!enabled(run))return true;const seen=new Set();for(const g of allGear(run)){if(seen.has(g.id)||(GEAR[g.kind]?.tier>3||X().TRAITS[g.forge?.trait]?.underground)&&!C().isUnderworld(run))return false;seen.add(g.id);}if(run.gearBag.some(ROBOT.isPart)||Object.values(G.state(run).imprints).some(mark=>ROBOT.isCore(allGear(run).find(g=>g.id===mark.gearId))))return false;return ids(run).every(id=>!!validateActorEquipment(equipment(run,id),job(run,id),level(run,id),run.floor));}
-  return Object.freeze({finishMonster,switchRaw,ROBOT,robotUpgradeQuote:ROBOT.upgradeQuote,upgradeRobot:ROBOT.upgrade,JOBS,GEAR,BASE_GEAR,TIER_NAMES,tierKind,gearPool,SKILLS,PASSIVES,SLOTS,PREPARATION,PREPARATION_REDUCTION,preparationSeconds,scale:readScale,state,enabled,ids,job,sex,level,maxLevel,experience,actor,maxHp,hp,equipment,equipmentSlots,validateActorEquipment,pv,teamPassive,buff,tauntTargetLimit,applyTaunt,setBuff,draft,reorderSkills,showHeadgear,preview,enable,addMember,recruitSnapshot,restoreMember,validateRecruitSnapshot,removeMember,sync,setHp,returnToHero,switchActor,followerRecords,canLearn,learnCompanion,allGear,canEquip,equip,unequip,stats,wear,durabilityWarnings,hurt,heal,organicHealable,gainXp,ranged,fireProjectile,fireArrow,strike,cast,food,speed,inflict,noteMovement,hungerScale,toolSpent,rescueChoice,tick,advance,validate,validEquipment,roll});
+  return Object.freeze({finishMonster,killXp,SURFACE_XP_DEPTH,HUNT_XP,switchRaw,ROBOT,robotUpgradeQuote:ROBOT.upgradeQuote,upgradeRobot:ROBOT.upgrade,JOBS,GEAR,BASE_GEAR,TIER_NAMES,tierKind,gearPool,SKILLS,PASSIVES,SLOTS,PREPARATION,PREPARATION_REDUCTION,preparationSeconds,scale:readScale,state,enabled,ids,job,sex,level,maxLevel,experience,actor,maxHp,hp,equipment,equipmentSlots,validateActorEquipment,pv,teamPassive,buff,tauntTargetLimit,applyTaunt,setBuff,draft,reorderSkills,showHeadgear,preview,enable,addMember,recruitSnapshot,restoreMember,validateRecruitSnapshot,removeMember,sync,setHp,returnToHero,switchActor,followerRecords,canLearn,learnCompanion,allGear,canEquip,equip,unequip,stats,wear,durabilityWarnings,hurt,heal,organicHealable,gainXp,ranged,fireProjectile,fireArrow,strike,cast,food,speed,inflict,noteMovement,hungerScale,toolSpent,rescueChoice,tick,advance,validate,validEquipment,roll});
 });

@@ -6,3 +6,22 @@
 @media(prefers-reduced-motion:reduce){html{scroll-behavior:auto}}
 @media(max-width:560px){.hero{padding:20px 0 16px}.eyebrow{margin-bottom:8px}h1{font-size:30px;margin-bottom:12px}.intro{font-size:13px;line-height:1.65}.stats{gap:5px 16px;margin-top:12px}.stats b{font-size:20px}.stats span{font-size:12px}.rules{margin-bottom:12px;padding-block:8px}.topbar{padding-block:10px}}
 @media print{:root{color-scheme:light;--text:#172a32;--muted:#3c5665;--gold:#604113;--mint:#24574c;--line:#bccbd0}body{background:white;color:#172a32;font-size:11px}.wrap{max-width:none;padding:0}.hero{padding:12px 0;display:block}h1{font-size:30px}.hero-art,.controls-shell,.actions,.back-top,.skip,.entry-link,.topbar a{display:none}.grid{grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}.entry{background:#fff;border:1px solid #9aaeb9;padding:12px;break-inside:avoid}.entry h3{color:#40300c;font-size:17px}.entry p,.facts dd{font-size:12px}.entry-head{margin-bottom:6px}.art{background:#203541}.tag{color:#233c46;background:#edf2f3;border-color:#9caeb5}.tag.under{color:#513879;background:#f6f2fa}.rank-table th{background:#e7eef0;color:#253c49}.rank-table td{color:#52401d}.entry-note{background:#f0f4f5;color:#304953}.stats b{color:#172a32}.rules-grid{grid-template-columns:repeat(3,1fr)}footer{font-size:10px}}
+/* Editions: the player edition is the default; "#逃生梯" shows the detailed edition. */
+html:not([data-edition="gm"]) [data-edition-only="gm"]{display:none!important}
+html[data-edition="gm"] [data-edition-only="player"]{display:none!important}
+.edition-badge{margin-left:8px;padding:2px 8px;border-radius:999px;background:#5a3d0c;color:#ffd27a;font-size:12px;white-space:nowrap}
+.intro a,.gm-banner a{color:var(--gold)}
+.gm-banner{display:flex;flex-wrap:wrap;gap:6px 12px;align-items:center;margin:0 0 16px;padding:10px 14px;border:1px solid #8a6420;border-radius:10px;background:rgba(201,138,30,.12);font-size:14px}
+.gm-banner strong{color:var(--gold)}
+.gm-banner span{color:var(--muted);flex:1 1 260px}
+.gm-tables{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px 28px;padding-bottom:20px}
+.gm-section h3{color:var(--mint);font-size:16px;margin:12px 0 6px}
+.gm-section>p{font-size:14px;color:var(--muted);margin:0 0 8px}
+.gm-scroll{overflow-x:auto;-webkit-overflow-scrolling:touch}
+.gm-table{border-collapse:collapse;width:100%;font-size:13px;font-variant-numeric:tabular-nums}
+.gm-table th,.gm-table td{padding:6px 8px;border:1px solid #45606b;text-align:left;vertical-align:top}
+.gm-table thead th{background:#223c49;color:#d4e6e9;font-weight:500;white-space:nowrap}
+.gm-table tbody th{color:var(--gold);font-weight:600;white-space:nowrap}
+#gm-lords,#gm-hunts{grid-column:1/-1}
+@media(max-width:900px){.gm-tables{grid-template-columns:1fr}}
+@media print{.gm-banner{border-color:#bccbd0;background:none}.gm-table thead th{background:#e7eef0;color:#253c49}.gm-table th,.gm-table td{border-color:#bccbd0}}

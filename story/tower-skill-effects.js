@@ -1,5 +1,7 @@
 /* Original layered spells: filled silhouettes, GPU particles and soft light.
-   Uses the existing loop, no dynamic lights, bloom, fullscreen flashes or lines. */
+   Uses the existing loop; no lights of its own, bloom, fullscreen flashes or lines.
+   Real light comes from the floor's one permanent flash slot (ctx.flash), and heavy
+   landings nudge the view (ctx.kick); both are optional and skipped when absent. */
 (function(root){'use strict';
   const PALETTES={swordsman:[0xffe5af,0xffa46c],mage:[0xc6b5ff,0x86e4ff],scout:[0xa3ffe0,0x54cda2],chef:[0xffd6a0,0xff9a64],healer:[0xd9ffe4,0x79edba],smith:[0xffdea9,0xffa465],archer:[0xffe6ac,0x99ddb2],robot:[0xbff3ff,0xffbd73]};
   const FAMILIES={arrow:'arrow',binding:'arrow',volley:'arrow',great_arrow:'arrow',decisive:'slash',star_ring:'meteor',escape:'scan',feast:'steam',sanctuary:'heal',fortress:'shield',cleave:'slash',circle:'spin',blind:'slash',stun:'impact',stagger:'impact',splash:'splash',bolt:'cast',weak:'cast',slow:'slash',mark:'cast',shock:'storm',thorns:'thorns',repel:'wave',starfall:'meteor',guard:'shield',barrier:'shield',ward:'shield',fortify:'shield',rally:'aura',speed:'aura',polish:'forge',stealth:'smoke',smoke:'smoke',stomach:'steam',meal:'steam',soup:'heal',heal:'heal',revive:'heal',cleanse:'cleanse',reveal:'scan',disarm:'scan',daylight:'sun',repair:'forge',frost:'frost',taunt:'wave',barricade:'forge'};
@@ -81,12 +83,17 @@
     };
     material.customProgramCacheKey=()=> 'tower-energy-surface-v1575';
   }
+  // The damage of a falling star is dealt on release, so the rock lands quickly: it falls from 3.5 to rest
+  // at .12 within METEOR_FALL seconds, and its light and view kick come at that moment.
+  const METEOR_FALL=.32;
   const POOL_CAP=16,IMPACTS_PER_FRAME=3,SPARK_MODES=new Set(['contact','spark','electric']),INK_LIMIT=256;
   const smooth=n=>{const t=Math.max(0,Math.min(1,n));return t*t*(3-2*t);};
   function envelope(t,signature,kind='body'){
     if(kind==='charge')return .2+.65*smooth(t);
     if(kind==='ground')return smooth(t/.12)*(1-smooth((t-.35)/.55));
     if(kind==='spark')return smooth(t/.035)*(1-smooth((t-.2)/.6));
+    // A blade arc snaps in and is gone in about a third of a second; sparks and the floor glow linger.
+    if(kind==='slash')return smooth(t/.03)*(1-smooth((t-.1)/.28));
     return smooth((t+.018)/signature.attack)*(1-smooth((t-signature.peak)/Math.max(.15,.95-signature.peak)));
   }
   const PARTICLE_VERTEX=[
@@ -171,14 +178,14 @@
       // Surfaces with identical settings inside one effect share a single material, leased from the pool by shader
       // variant. Colour, opacity and envelope are set at lease time, and nothing mutates the material afterwards.
       const owned=new Map();
-      function material(color,opacity=.8,map=null,sprite=false,{vertexColors=false,blending=T.AdditiveBlending,spark=false,ground=false}={}){
-        const key=[color,opacity,map?map.uuid:'',sprite,vertexColors,blending,spark,ground].join();let m=owned.get(key);if(m)return m;
+      function material(color,opacity=.8,map=null,sprite=false,{vertexColors=false,blending=T.AdditiveBlending,spark=false,ground=false,slash=false}={}){
+        const key=[color,opacity,map?map.uuid:'',sprite,vertexColors,blending,spark,ground,slash].join();let m=owned.get(key);if(m)return m;
         m=lease(ground?'ground':[sprite?'sprite':'mesh',map?map.uuid:'',vertexColors,blending].join(),()=>{
           const opts={color,transparent:true,opacity,depthWrite:false,blending,toneMapped:false,...(map?{map}:{}),...(vertexColors?{vertexColors:true}:{}),...(!sprite?{side:T.DoubleSide,forceSinglePass:true}:{})},made=sprite?new T.SpriteMaterial(opts):new T.MeshBasicMaterial(opts);
           if(ground)finishEnergy(made,{age:{value:0},style:{value:0},tint:{value:new T.Color()},quiet:{value:reduced?1:0}});
           return made;
         });
-        m.color.setHex(color);m.opacity=opacity;m.userData.baseOpacity=opacity;m.userData.envelope=ground?'ground':spark?'spark':undefined;mats.push(m);owned.set(key,m);return m;
+        m.color.setHex(color);m.opacity=opacity;m.userData.baseOpacity=opacity;m.userData.envelope=ground?'ground':spark?'spark':slash?'slash':undefined;mats.push(m);owned.set(key,m);return m;
       }
       function soft(x,y,z,size,tint=0,mode='rise',leaf=false,map=leaf?petal:glow,opacity=.85){const m=new T.Sprite(material(colors[tint],opacity,map,true,{spark:SPARK_MODES.has(mode)}));m.position.set(x,y,z);m.scale.set(size,leaf?size*1.4:size,1);group.add(m);parts.push({m,base:m.position.clone(),scale:m.scale.clone(),mode});return m;}
       function solid(geometry,x,y,z,tint=0,mode='rise',opacity=.65,{material:custom=null,blending=T.AdditiveBlending}={}){
@@ -197,13 +204,21 @@
             if(memo){if(inks.size>=INK_LIMIT)inks.delete(inks.keys().next().value);inks.set(memo,ink);}
           }
         }
-        const m=new T.Mesh(geometry,custom||material(0xffffff,opacity,null,false,{vertexColors:true,blending,spark:SPARK_MODES.has(mode)}));m.position.set(x,y,z);group.add(m);parts.push({m,base:m.position.clone(),scale:m.scale.clone(),mode});return m;
+        const m=new T.Mesh(geometry,custom||material(0xffffff,opacity,null,false,{vertexColors:true,blending,spark:SPARK_MODES.has(mode),slash:mode==='sweep'||mode==='whirl'}));m.position.set(x,y,z);group.add(m);parts.push({m,base:m.position.clone(),scale:m.scale.clone(),mode});return m;
       }
       function particles(flow=0,leaf=false){
         const geometry=new T.BufferGeometry();for(const [key,data,size]of cloudArrays(reduced,flow,leaf))geometry.setAttribute(key,new T.Float32BufferAttribute(data,size));geometry.boundingSphere=new T.Sphere(new T.Vector3(0,1,0),6);
         const cloud=new T.Points(geometry,particleMaterial);cloud.name='batched-spell-particles';cloud.userData.phase={age:0,duration:total,flow,shape:leaf?1:0,tintA:new T.Color(colors[0]),tintB:new T.Color(colors[1])};
         cloud.onBeforeRender=()=>{const u=particleMaterial.uniforms,p=cloud.userData.phase;for(const key of ['age','duration','flow','shape'])u[key].value=p[key];u.tintA.value.copy(p.tintA);u.tintB.value.copy(p.tintB);particleMaterial.uniformsNeedUpdate=true;};
         group.add(cloud);parts.push({m:cloud,mode:'particles'});return cloud;
+      }
+      // An afterimage, not a solid moon: the leading tip (-x, the side the arc turns towards) stays bright
+      // and the trailing tip fades away. Alpha rides in a fourth colour channel of this effect's own copy.
+      function trail(mesh){
+        const g=mesh.geometry,c=g.attributes.color,pos=g.attributes.position;if(!c||c.itemSize!==3)return;
+        let min=Infinity,max=-Infinity;for(let v=0;v<pos.count;v++){min=Math.min(min,pos.getX(v));max=Math.max(max,pos.getX(v));}
+        const rgba=new Float32Array(c.count*4);for(let v=0;v<c.count;v++){const along=(pos.getX(v)-min)/Math.max(.001,max-min);rgba[v*4]=c.getX(v);rgba[v*4+1]=c.getY(v);rgba[v*4+2]=c.getZ(v);rgba[v*4+3]=.3+.7*Math.pow(1-along,1.2);}
+        g.setAttribute('color',new T.Float32BufferAttribute(rgba,4));
       }
       const accent=accentFor(skill,family),ground=new T.Mesh(energyGeometry(T,family,reduced),material(colors[1],signature.ground,glow,false,{ground:true}));ground.name='spell-contact-light';group.add(ground);
       ground.userData.accent=accent;
@@ -227,7 +242,7 @@
         soft(0,.82,.7,2.05,0,'breathe');
         for(let i=0;i<(reduced?1:3);i++){const plate=solid(shape('ram-plate',()=>{const s=new T.Shape();s.moveTo(-.66,0);s.quadraticCurveTo(0,.4,.66,0);s.lineTo(.56,-.11);s.quadraticCurveTo(0,.17,-.56,-.11);s.closePath();return new T.ShapeGeometry(s);}),0,.6+i*.24,.44+i*.21,i%2,'flight',.65);plate.name='robot-charge-pressure-front';}
       }else if(['quake','mechanical_hit'].includes(family)){
-        const impact=soft(0,family==='quake'?.2:1.03,0,skill.unique?3.0:2.2,0,'breathe');impact.name='robot-impact-core';
+        const impact=soft(0,family==='quake'?.2:1.03,0,skill.unique?3.0:2.2,0,'pop');impact.name='robot-impact-core';
         // Debris and filled pressure fans use the same bounded particle program.
         for(let i=0;i<(reduced?2:4);i++){const a=i*Math.PI*2/4,shard=solid(shape(family==='quake'?'dodeca-.17':'dodeca-.11',()=>new T.DodecahedronGeometry(family==='quake'?.17:.11,0)),Math.sin(a)*.33,family==='quake'?.24:1.03,Math.cos(a)*.33,i%2,'contact',.9);shard.name='robot-armor-impact-shard';shard.scale.y=family==='quake'?.7:1.6;}
       }else if(['rebuild','lubricate'].includes(family)){
@@ -247,14 +262,15 @@
         const splash=soft(0,.7,.65,1.8,1,'splat');splash.scale.y=.85;
         for(let i=0;i<count;i++){const drop=solid(shape('drop',()=>new T.SphereGeometry(.15,6,4)),Math.sin(i*1.7)*.7,.65+Math.cos(i)*.2,.8+i*.09,i%2,'contact',.8);drop.scale.y=1.4;}
       }else if(['slash','spin'].includes(family)){
-        for(let i=0;i<2;i++){const sweep=solid(shape('sweep',()=>{const shape=new T.Shape();shape.moveTo(-1.3,0);shape.quadraticCurveTo(.2,1.7,1.4,.1);shape.quadraticCurveTo(.35,.6,-1.3,0);return new T.ShapeGeometry(shape,16);}),0,family==='spin'?.85:1,family==='spin'?0:.5+i*.08,i,family==='spin'?'whirl':'sweep',i?.3:.75);sweep.rotation.x=family==='spin'?Math.PI/2:-.6;sweep.rotation.y=family==='spin'?i*Math.PI:0;sweep.rotation.z=family==='spin'?0:i*.18;}
+        for(let i=0;i<2;i++){const sweep=solid(shape('sweep',()=>{const shape=new T.Shape();shape.moveTo(-1.3,0);shape.quadraticCurveTo(.2,1.7,1.4,.1);shape.quadraticCurveTo(.35,.6,-1.3,0);return new T.ShapeGeometry(shape,16);}),0,family==='spin'?.85:1,family==='spin'?0:.5+i*.08,1-i,family==='spin'?'whirl':'sweep',i?.45:1);
+          trail(sweep);sweep.rotation.x=family==='spin'?Math.PI/2:-.6;sweep.rotation.y=family==='spin'?i*Math.PI:0;sweep.rotation.z=family==='spin'?0:i*.18;}
         for(let i=0;i<count;i++)soft(Math.sin(i*1.6)*.7,.8+i*.09,.6+Math.cos(i)*.5,.45,i%2,'spark');
       }else if(family==='shield'){
         if(!shieldMaterial)shieldMaterial=new T.ShaderMaterial({uniforms:{tint:{value:new T.Color()},opacity:{value:1},age:{value:0}},vertexShader:'varying vec3 n;varying vec3 eye;varying vec2 surfaceUV;void main(){vec4 v=modelViewMatrix*vec4(position,1.);n=normalize(normalMatrix*normal);eye=normalize(-v.xyz);surfaceUV=uv;gl_Position=projectionMatrix*v;}',fragmentShader:'varying vec3 n;varying vec3 eye;varying vec2 surfaceUV;uniform vec3 tint;uniform float opacity;uniform float age;void main(){float rim=pow(1.-abs(dot(normalize(n),normalize(eye))),2.4);vec2 cell=surfaceUV*vec2(12.,7.);cell.x+=mod(floor(cell.y),2.)*.5;vec2 facet=abs(fract(cell)-.5);float plate=(1.-smoothstep(.32,.47,max(facet.x*.86+facet.y*.5,facet.y)))*.065;float shimmer=.72+.28*sin(surfaceUV.y*9.-age*3.);gl_FragColor=vec4(mix(tint,vec3(1.),rim*.6),(.025+rim*.4+plate*shimmer)*opacity);}',side:T.DoubleSide,forceSinglePass:true,transparent:true,depthWrite:false,blending:T.AdditiveBlending,toneMapped:false});shieldMaterial.userData.sharedResource=true;
         const dome=solid(shape('dome',()=>new T.SphereGeometry(1.13,16,9,0,Math.PI*2,0,Math.PI*.62)),0,.42,0,1,'breathe',.18,{material:shieldMaterial});dome.userData.filledShield=true;dome.userData.tint=new T.Color(colors[1]);dome.userData.opacity=1;dome.userData.age=0;dome.onBeforeRender=()=>{shieldMaterial.uniforms.tint.value.copy(dome.userData.tint);shieldMaterial.uniforms.opacity.value=dome.userData.opacity;shieldMaterial.uniforms.age.value=dome.userData.age;shieldMaterial.uniformsNeedUpdate=true;};
         for(let i=0;i<count;i++){const a=i*Math.PI*2/count;const crystal=solid(shape('crystal',()=>new T.OctahedronGeometry(.14)),Math.sin(a)*.95,.35+i*.21,Math.cos(a)*.95,i%2,'orbit',.65);crystal.scale.y=1.5;}
       }else if(family==='meteor'){
-        const n=reduced?1:skill.effect==='star_ring'?3:1;for(let i=0;i<n;i++){const a=i*Math.PI*2/3,x=Math.sin(a)*.8,z=Math.cos(a)*.8;const rock=solid(shape('rock',()=>new T.DodecahedronGeometry(.37,0)),x,3.5,z,0,'fall',.95);rock.rotation.set(.2,i,1);const flame=soft(x,4,z,1.35,1,'fall');flame.scale.y=2.7;}
+        const n=reduced?1:skill.effect==='star_ring'?3:1;for(let i=0;i<n;i++){const a=i*Math.PI*2/3,x=Math.sin(a)*.8,z=Math.cos(a)*.8;const rock=solid(shape('rock',()=>new T.DodecahedronGeometry(.37,0)),x,3.5,z,1,'fall',.95,{blending:T.NormalBlending});rock.rotation.set(.2,i,1);const flame=soft(x,4,z,1.35,1,'fall');flame.scale.y=2.7;}
       }else if(family==='charge'){
         soft(0,1.1,0,1.8,0,'breathe');for(let i=0;i<count;i++){const a=i*Math.PI*2/count;soft(Math.sin(a)*1.1,.2+i*.16,Math.cos(a)*1.1,.6,i%2,'gather');}
       }else if(family==='frost'){
@@ -267,17 +283,17 @@
         for(let i=0;i<n;i++){const arrow=solid(shape('arrow',()=>{const s=new T.Shape();s.moveTo(0,1.35);s.lineTo(.13,.85);s.lineTo(.045,.92);s.lineTo(.04,0);s.lineTo(.13,-.2);s.lineTo(0,-.12);s.lineTo(-.13,-.2);s.lineTo(-.04,0);s.lineTo(-.045,.92);s.lineTo(-.13,.85);s.closePath();return new T.ShapeGeometry(s);}),.24*(i-(n-1)/2),1.12,.2,i%2,'flight',.9);arrow.rotation.x=Math.PI/2;arrow.rotation.z=(i-(n-1)/2)*-.2;arrow.scale.setScalar(skill.unique?1.4:1);}
       }else if(family==='cast'){
         soft(0,1.12,.6,1.15,0,'breathe');
-        const core=solid(shape('seed',()=>new T.IcosahedronGeometry(.19,1)),0,1.12,.62,0,'flight',.86);core.name=skill.job==='healer'?'purifying-light-seed':skill.job==='smith'?'weak-point-rivet':'arcane-condensed-core';
+        const core=solid(shape('seed',()=>new T.IcosahedronGeometry(.19,1)),0,1.12,.62,1,'flight',.9,{blending:T.NormalBlending});core.name=skill.job==='healer'?'purifying-light-seed':skill.job==='smith'?'weak-point-rivet':'arcane-condensed-core';
         if(skill.job==='smith'){core.scale.set(.5,.5,1.65);}else core.scale.set(1,1,1.4);
         for(let i=0;i<(reduced?1:3);i++)soft(Math.sin(i*1.9)*.28,.95+i*.07,.4+i*.16,.4,i%2,'spark');
       }else if(['hit','burst','impact','forge'].includes(family)){
-        soft(0,1.05,0,family==='burst'?2.4:1.7,0,'breathe');
+        soft(0,1.05,0,family==='burst'?2.4:1.7,0,'pop');
         const bladeHit=family==='hit'&&['blade','daggers'].includes(options.weapon);
         for(let i=0;i<count;i++){const a=i*Math.PI*2/count;
           const fragment=bladeHit?shape('crescent',()=>{const crescent=new T.Shape();crescent.moveTo(-.44,0);crescent.quadraticCurveTo(0,.42,.44,.02);crescent.quadraticCurveTo(0,.15,-.44,0);return new T.ShapeGeometry(crescent,10);}):shape(family==='forge'?'spark-.085':'spark-.12',()=>new T.OctahedronGeometry(family==='forge'?.085:.12));
           const shard=solid(fragment,Math.sin(a)*.25,.95+Math.cos(a)*.2,Math.cos(a)*.25,i%2,'contact',.8);shard.scale.y=bladeHit?1:1.7;shard.rotation.z=bladeHit?a:0;shard.name=bladeHit?'blade-contact-fragment':'impact-metal-spark';}
       }else if(['heal','cleanse'].includes(family)){
-        soft(0,1.22,0,2.1,1,'breathe');const blessing=solid(shape('blessing',()=>{const s=new T.Shape();s.moveTo(-.12,.46);s.lineTo(.12,.46);s.lineTo(.12,.12);s.lineTo(.46,.12);s.lineTo(.46,-.12);s.lineTo(.12,-.12);s.lineTo(.12,-.46);s.lineTo(-.12,-.46);s.lineTo(-.12,-.12);s.lineTo(-.46,-.12);s.lineTo(-.46,.12);s.lineTo(-.12,.12);s.closePath();return new T.ShapeGeometry(s);}),0,1.65,.16,0,'rise',.7);blessing.name='restorative-blessing';
+        soft(0,1.22,0,2.1,1,'breathe');const blessing=solid(shape('blessing',()=>{const s=new T.Shape();s.moveTo(-.12,.46);s.lineTo(.12,.46);s.lineTo(.12,.12);s.lineTo(.46,.12);s.lineTo(.46,-.12);s.lineTo(.12,-.12);s.lineTo(.12,-.46);s.lineTo(-.12,-.46);s.lineTo(-.12,-.12);s.lineTo(-.46,-.12);s.lineTo(-.46,.12);s.lineTo(-.12,.12);s.closePath();return new T.ShapeGeometry(s);}),0,1.65,.16,1,'rise',.82,{blending:T.NormalBlending});blessing.name='restorative-blessing';
         for(let i=0;i<(reduced?1:3);i++){const a=i*Math.PI*2/3;const petal=soft(Math.sin(a)*.78,.2+i*.25,Math.cos(a)*.78,.55,i%2,family==='cleanse'?'purify':'orbit',true);petal.name=family==='cleanse'?'cleansing-dispersal-petal':'restorative-rising-petal';}
       }else{
         soft(0,['sun','heal','cleanse'].includes(family)?1.65:.6,0,family==='sun'?2.2:1.6,0,'breathe');
@@ -288,13 +304,21 @@
       // animation multiplies this final shape, not its pre-decoration scale.
       for(const part of parts)if(part.scale)part.scale.copy(part.m.scale);
       group.scale.setScalar(power);ctx.world().add(group);
-      const f={group,total,left:total,parts,mats,family,signature,at:{x:at.x,z:at.z},skill:skill.id};effects.push(f);return f;
+      // Real coloured light on the floor, walls and actors, strongest where something lands.
+      const heavy=!options.defeat&&(options.stage==='land'||family==='quake'&&!options.impact),support=SUPPORT.includes(family)||['cleanse','steam','smoke'].includes(family);
+      const lightPower=(options.defeat?3:options.impact?(skill.unique?3.4:2.4):heavy?6:family==='charge'?0:support?2:3.2)*(reduced?.6:1);
+      const kick=!reduced&&(heavy||skill.unique&&skill.attack&&!options.impact&&family!=='charge');
+      const cue=()=>{if(lightPower>0)ctx.flash?.({x:at.x,y:options.impact||options.defeat?1.15:1.4,z:at.z},colors[1],lightPower,options.defeat?.38:options.impact?.2:heavy?.55:support?.75:.34);if(kick)ctx.kick?.(heavy?.14:.08,heavy?.3:.22);};
+      // A falling star lights the room and shakes the view when it reaches the floor, not while it is still high up.
+      const landsAt=family==='meteor'?Math.min(total,METEOR_FALL):0;
+      const f={group,total,left:total,parts,mats,family,signature,at:{x:at.x,z:at.z},skill:skill.id,cue:landsAt>0?{left:landsAt,fire:cue}:null};if(!f.cue)cue();
+      effects.push(f);return f;
     }
-    function tick(dt){impacts=0;if(!Number.isFinite(dt)||dt<0)return;for(let i=effects.length-1;i>=0;i--){const f=effects[i];f.left-=dt;if(f.left<=0){dispose(f);effects.splice(i,1);continue;}if(ctx.visible)f.group.visible=ctx.visible(f.at);
+    function tick(dt){impacts=0;if(!Number.isFinite(dt)||dt<0)return;for(let i=effects.length-1;i>=0;i--){const f=effects[i];f.left-=dt;if(f.cue){f.cue.left-=dt;if(f.cue.left<=0){const fire=f.cue.fire;f.cue=null;fire();}}if(f.left<=0){dispose(f);effects.splice(i,1);continue;}if(ctx.visible)f.group.visible=ctx.visible(f.at);
       const t=1-f.left/f.total,fade=envelope(t,f.signature),travel=reduced?.25:1;for(const m of f.mats)if(m.userData.baseOpacity!==undefined)m.opacity=m.userData.baseOpacity*envelope(t,f.signature,m.userData.envelope||(f.family==='charge'?'charge':'body'));
       for(const p of f.parts){const{m,base,mode,scale}=p;if(mode==='particles'){m.userData.phase.age=f.total-f.left;continue;}if(mode==='energy'){p.phase.age.value=t;continue;}if(m.userData.filledShield){m.userData.opacity=fade;m.userData.age=t;}let size=1;
         if(mode==='rise')m.position.y=base.y+t*.85*travel;
-        if(mode==='fall'){m.position.y=Math.max(.12,base.y-t*4.5);m.rotation.z+=dt*1.2*travel;}
+        if(mode==='fall'){m.position.y=Math.max(.12,base.y-(f.total-f.left)/METEOR_FALL*(base.y-.12));m.rotation.z+=dt*1.2*travel;}
         if(mode==='flight'){m.position.z=base.z+t*2.8*travel;size=1-t*.3;}
         if(mode==='spark'||mode==='contact'){m.position.x=base.x*(1+t*3*travel);m.position.z=base.z*(1+t*3*travel);m.position.y=base.y+(mode==='contact'?(base.y-1.05)*t*3:Math.sin(t*Math.PI)*.6);size=1-t*.6;}
         if(mode==='sweep'){m.rotation.z+=dt*3*travel;size=.7+t*.95;}
@@ -305,6 +329,7 @@
         if(mode==='electric')size=.94+.06*Math.sin(t*Math.PI*3);
         if(mode==='splat'){size=1+t*.9;m.position.y=base.y-t*.5;}
         if(mode==='breathe')size=.82+Math.sin(t*Math.PI)*.42;
+        if(mode==='pop')size=1.45-.75*smooth(t/.4);
         if(mode==='mist'){size=1+t*1.1;m.position.y=base.y+t*.5;}
         if(mode==='gather')m.position.set(base.x*(1-t),base.y+t*.7,base.z*(1-t));
         m.scale.copy(scale).multiplyScalar(size);
@@ -315,5 +340,5 @@
     function destroy(){if(destroyed)return;reset();inks.clear();templates.clear();for(const m of members.keys())m.dispose();members.clear();pool.clear();leased.clear();for(const map of [glow,petal,mist])map.dispose();particleMaterial.dispose();shieldMaterial?.dispose();destroyed=true;}
     return {emit,tick,reset,cancel,destroy,stats:()=>({groups:effects.length,max:limit,meshes:effects.reduce((n,f)=>n+f.group.children.length,0),particles:effects.reduce((n,f)=>n+f.parts.filter(p=>p.mode==='particles').reduce((s,p)=>s+p.m.geometry.attributes.position.count,0),0),textureBytes:destroyed?0:49152})};
   }
-  root.TowerSkillEffects={create,FAMILIES,THEMES,ROBOT_FAMILIES,SIGNATURES,ACCENTS,familyFor,colorsFor,signatureFor,accentFor,envelope};
+  root.TowerSkillEffects={create,FAMILIES,THEMES,ROBOT_FAMILIES,SIGNATURES,ACCENTS,METEOR_FALL,familyFor,colorsFor,signatureFor,accentFor,envelope};
 })(globalThis);

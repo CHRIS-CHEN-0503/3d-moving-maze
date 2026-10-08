@@ -30,7 +30,7 @@ for(const sex of ['male','female'])for(let tier=1;tier<=5;tier++){
   });
   test(`ranger ${sex} tier ${tier}: thrown knife winds back, points forward at release and regains reverse guard`,()=>{
     const f=figure(visuals(),sex,tier),skill=H.SKILLS.throw_blade,refs=references(f.model);assert.equal(M.familyFor(skill),'knife_throw');
-    assert.deepEqual(M.sample(f.model.userData.heroWeapon,'charge',0,1,false,'knife_throw'),M.sample(f.model.userData.heroWeapon,'skill',0,.22,false,'knife_throw'),'preparation and release share their real throwing windup');
+    { const prepared=pose(f,'charge',skill,1);assert.ok(prepared[0].axis.dot(prepared[0].forward)<-.8,'preparation holds the real rearward throwing windup');assert.ok(prepared[1].axis.dot(prepared[1].forward)<-.99,'offhand keeps its reverse guard while preparing (the body leans back as it gathers)');M.cancel(f.model); }
     for(let heading=0;heading<8;heading++){
       f.model.rotation.y=heading*Math.PI/4;
       const windup=pose(f,'skill',skill,.22),release=pose(f,'skill',skill,.48),recover=pose(f,'skill',skill,1);

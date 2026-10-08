@@ -27,8 +27,8 @@ test('every hammer grade has clear gold end faces normal to its actual +Z / -Z c
 test('elven bows share one shooting plane with a centered grip, rear string and correctly nocked forward arrow',()=>{
   const V=visuals();for(let tier=1;tier<=5;tier++)for(const sex of ['male','female']){
     const g=V.gear(T,H.tierKind('elven_bow',tier),{sex}),c=g.userData.contact,string=verticesOfColor(g,0xe4dfc8),grip=verticesOfColor(g,0x9c8b67),arrow=g.getObjectByName('bow-nocked-arrow');
-    assert.ok(arrow);arrow.geometry.computeBoundingBox();const b=arrow.geometry.boundingBox.clone().translate(arrow.position);close(b.min.z,-.32,'nock must meet string');close(b.max.z,.36);close((string.max.z+string.min.z)/2,-.32);close(string.min.y,-.62);close(string.max.y,.62);assert.ok(string.max.x<=.00701&&string.min.x>=-.00701);
-    close((grip.max.x+grip.min.x)/2,0);close((grip.max.z+grip.min.z)/2,0);close(grip.max.y,.105);close(grip.min.y,-.105);assert.deepEqual(array(c.grip),[0,0,0]);assert.deepEqual(array(c.nock),[0,0,-.32]);assert.deepEqual(array(c.normal),[0,0,1]);
+    assert.ok(arrow);arrow.geometry.computeBoundingBox();const b=arrow.geometry.boundingBox.clone().translate(arrow.position);assert.ok(c.nock[2]<-.1,'the string sits behind the grip');close(b.min.z,c.nock[2],'nock must meet string');close(b.max.z,.36);close((string.max.z+string.min.z)/2,c.nock[2]);close(string.min.y,-.62);close(string.max.y,.62);assert.ok(string.max.x<=.00701&&string.min.x>=-.00701);
+    close((grip.max.x+grip.min.x)/2,0);close((grip.max.z+grip.min.z)/2,0);close(grip.max.y,.105);close(grip.min.y,-.105);assert.deepEqual(array(c.grip),[0,0,0]);assert.deepEqual(array(c.nock),[0,0,c.nock[2]]);assert.deepEqual(array(c.normal),[0,0,1]);
     g.updateMatrixWorld(true);close(new T.Box3().setFromObject(g).max.z,c.center[2],'arrowhead must end on actual forward axis');for(const name of ['bow-curved-limbs','bow-centered-grip','bow-taut-string','bow-forward-arrowhead'])assert.ok(g.userData.authoredParts.includes(name));
   }
 });

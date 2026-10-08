@@ -48,15 +48,20 @@
   const FAMILIES=Object.freeze({arrow:'bow',binding:'bow',volley:'bow',great_arrow:'bow',cleave:'slash',circle:'spin',blind:'thrust',stun:'heavy',stagger:'heavy',splash:'cook',bolt:'cast',weak:'cast',slow:'thrust',mark:'thrust',shock:'cast',thorns:'cast',repel:'ward',starfall:'cast',star_ring:'cast',decisive:'heavy',guard:'ward',barrier:'ward',ward:'ward',fortify:'forge',fortress:'deploy',rally:'rally',speed:'cook',polish:'forge',stealth:'scout',smoke:'scout',stomach:'cook',meal:'cook',soup:'cook',feast:'cook',heal:'heal',revive:'heal',cleanse:'heal',sanctuary:'heal',reveal:'scout',escape:'scout',disarm:'deploy',daylight:'cast',repair:'forge',frost:'cast',taunt:'rally',barricade:'deploy',robot_fist:'punch',robot_charge:'charge_run',robot_quake:'ground_slam',robot_guard:'machine_guard',robot_speed:'maintenance',robot_restore:'maintenance',robot_meteor:'ground_slam',robot_double:'double_punch',mech_aid:'core_aid'});
   const ROBOT_FAMILIES=Object.freeze({flying_fist:'punch',iron_charge:'charge_run',shoulder_quake:'ground_slam',folded_guard:'machine_guard',joint_oil:'maintenance',parts_restore:'maintenance',steel_meteor_fist:'ground_slam',explosive_fists:'double_punch',mech_aid:'core_aid'});
   const SKILL_TRACKS={
-    cast:[{rx:-1.6,lx:-1.2,rz:.4,lz:-.6,wx:.1,bookLift:.12},{rx:-1.65,lx:-1.25,rz:-.25,lz:.25,wx:Math.PI/2,wz:0,bookLift:.2,bookPush:.18,lean:.05},{rx:-1.05,lx:-.8,wx:1.2}],
-    heal:[{rx:-1,lx:-1,rz:.25,lz:-.25,bookLift:.1},{rx:-1.5,lx:-1.5,rz:-.4,lz:.4,wx:.65,bookLift:.2,bookTilt:-.1},{rx:-1.15,lx:-1.15,rz:-.15,lz:.15}],
-    ward:[{rx:-.7,lx:-.9,rz:.3,lz:-.2},{rx:-1.2,lx:-1.5,rz:-.25,lz:.2,wx:.9,lean:-.04},{rx:-.8,lx:-1.1,rz:-.1,lz:.1}],
-    rally:[{rx:-.75,lx:-.5,wx:.2},{rx:-2.15,lx:-1.3,rz:-.2,lz:.25,wx:.15,lean:-.06},{rx:-1.3,lx:-.6}],
-    cook:[{rx:-.85,lx:-.85,wx:.9,bookLift:0},{rx:-1.3,lx:-1.1,ry:.35,rz:.15,lz:-.2,wx:1.4,wz:.5,lean:.06},{rx:-1,lx:-.85,ry:-.3,wx:1.2,wz:-.35}],
+    // Every gesture uses the whole body: gather (lean back / brace), release
+    // (lunge, rise or crouch) and a smaller follow-through.
+    cast:[{rx:-1.6,lx:-1.2,rz:.4,lz:-.6,wx:.1,bookLift:.12,lean:-.06,knee:.06},{rx:-1.65,lx:-1.25,rz:-.25,lz:.25,wx:Math.PI/2,wz:0,bookLift:.2,bookPush:.18,lean:.1,knee:.14},{rx:-1.05,lx:-.8,wx:1.2,lean:.03,knee:.06}],
+    // Heal: draw the book to the chest with a small bow, then lift it high with
+    // the free hand opening outward (its magic still projects forward), then
+    // turn the pages up to the sky as it settles.
+    heal:[{rx:-.9,lx:-1.1,rz:.3,lz:-.35,bookLift:.1,bookTilt:.2,lean:.06,knee:.04},{rx:-2,lx:-1.9,rz:-.2,lz:.55,wx:.65,bookLift:.2,bookTilt:-.2,lean:-.1},{rx:-1.3,lx:-1.05,rz:-.1,lz:.2,bookTilt:-.3,lean:-.03}],
+    ward:[{rx:-.7,lx:-.9,rz:.3,lz:-.2,lean:.04,knee:.12},{rx:-1.2,lx:-1.5,rz:-.25,lz:.2,wx:.9,lean:-.05,knee:.22},{rx:-.8,lx:-1.1,rz:-.1,lz:.1,knee:.1}],
+    rally:[{rx:-.75,lx:-.5,wx:.2,lean:.05,knee:.12},{rx:-2.15,lx:-1.3,rz:-.2,lz:.25,wx:.15,lean:-.1},{rx:-1.3,lx:-.6,lean:-.03}],
+    cook:[{rx:-.85,lx:-.85,wx:.9,bookLift:0,tilt:.05,knee:.06},{rx:-1.3,lx:-1.1,ry:.35,rz:.15,lz:-.2,wx:1.4,wz:.5,lean:.08,tilt:-.06},{rx:-1,lx:-.85,ry:-.3,wx:1.2,wz:-.35,tilt:.03}],
     forge:[{rx:-1.5,lx:-1.15,wx:.12,knee:.08},{rx:-.8,lx:-1.15,wx:1.8,lean:.18,knee:.16},{rx:-1.25,lx:-1.1,wx:.55}],
     deploy:[{rx:-.8,lx:-.8,wx:.8,lean:.12,knee:.18},{rx:-1.1,lx:-1.1,rz:.2,lz:-.2,wx:1.35,lean:.24,knee:.32},{rx:-.9,lx:-.9,wx:.8,lean:.12,knee:.15}],
-    scout:[{rx:-.5,lx:-.4,rz:-.25},{rx:-1.2,lx:-.85,ry:.5,rz:-.6,lz:.45,wx:1.1,tilt:-.05},{rx:-.6,lx:-.5,ry:-.3,wx:.6}],
-    thrust:[{rx:-.65,lx:-.55,wx:.7},{rx:-1.6,lx:-.85,wx:1.6,lean:.12},{rx:-.8,lx:-1,wx:1}],
+    scout:[{rx:-.5,lx:-.4,rz:-.25,tilt:.06,knee:.08},{rx:-1.2,lx:-.85,ry:.5,rz:-.6,lz:.45,wx:1.1,tilt:-.09,knee:.16},{rx:-.6,lx:-.5,ry:-.3,wx:.6,tilt:.02}],
+    thrust:[{rx:-.65,lx:-.55,wx:.7,lean:-.05,knee:.08},{rx:-1.6,lx:-.85,wx:1.6,lean:.16,knee:.22},{rx:-.8,lx:-1,wx:1,lean:.06,knee:.1}],
     // Level sweep: blade +Y reaches forward while its +/-X cutting edges
     // lead the lateral motion. Never roll the flat face into the target.
     spin:[{rx:-1.2,lx:-1.1,ry:-.3,rz:.25,lz:-.65,wx:Math.PI/2,wy:0,wz:-1.15,tilt:-.04},{rx:-1.45,lx:-1.25,ry:.25,rz:.55,lz:-.85,wx:Math.PI/2,wy:0,wz:1.15,lean:.08,tilt:.04},{rx:-1.2,lx:-1.1,rz:.6,lz:-.9,wx:Math.PI/2,wy:0,wz:1.55}],
@@ -79,20 +84,37 @@
   const motionFamilies=new Set(Object.values(FAMILIES));
   const familyFor=skill=>skill?.id==='throw_blade'?'knife_throw':ROBOT_FAMILIES[skill?.id]||(motionFamilies.has(skill?.presentation?.motion)?skill.presentation.motion:FAMILIES[skill?.effect]||'');
   function rest(kind,shield){const p={...REST};if(shield)p.lx=-.35;if(['greatsword','warhammer','arcane_staff'].includes(kind)){p.rx=-.35;p.lx=-.5;p.rz=.65;p.lz=-.9;}if(['longsword','greatsword'].includes(kind)){p.wy=Math.PI/2;p.wz=0;}if(kind==='spellbook'){p.rx=-.28;p.rz=-.08;p.lx=0;p.lz=.05;}if(kind==='elven_bow'){p.rx=-.7;p.lx=-.35;p.wx=0;}if(kind==='robot_fists'){p.rx=p.lx=-.64;p.rz=-.14;p.lz=.14;p.wx=p.lwx=p.wz=p.lwz=0;}if(kind==='twin_daggers'){p.wx=p.lwx=p.wy=p.lwy=Math.PI/2;p.wz=p.lwz=0;}return p;}
-  function sample(kind,action='attack',variant=0,progress=1,shield=false,family='',out={}){
+  // Skill timing. The strike bursts out of the wind-up (fastest at its start)
+  // and still moves through the release key, so edges and faces keep leading.
+  // The body (lean, roll, stance) makes a small counter-move before the
+  // wind-up, and after the release its momentum carries a little further
+  // before the follow-through (not for twin daggers, whose follow-through is
+  // the off-hand's own cut). Key times and key poses are unchanged.
+  const smooth=u=>u*u*(3-2*u),strike=u=>1-(1-u)*(1-u),anticipate=u=>(1+ANTICIPATE)*u*u*u-ANTICIPATE*u*u;
+  const ANTICIPATE=.9,MOMENTUM=.35,GATHER=.12,CHARGE_HOLD=.35,BODY=new Set(['lean','tilt','knee']);
+  const SKILL_EASE=[[smooth,anticipate],[strike,strike],[smooth,smooth],[smooth,smooth]],PRIMED_TIMES=[0,.3,.62,1],PRIMED_EASE=[[strike,strike],[smooth,smooth],[smooth,smooth]];
+  function sample(kind,action='attack',variant=0,progress=1,shield=false,family='',out={},from=null){
     kind=kind.replace(/_t[2-5]$/,'');
     const base=rest(kind,shield),track=(WEAPONS[kind]||WEAPONS.unarmed)[variant%2];let poses=track;
     if(action==='skill'||action==='charge'){poses=family==='bow'?WEAPONS.elven_bow[variant%2]:family==='slash'?(kind==='greatsword'?WEAPONS.greatsword[0]:WEAPONS.longsword[0]):family==='heavy'?track:family==='thrust'&&['longsword','greatsword'].includes(kind)?WEAPONS.longsword[1]:family==='thrust'&&kind==='twin_daggers'?WEAPONS.twin_daggers[0]:SKILL_TRACKS[family]||SKILL_TRACKS.cast;}
     if((action==='skill'||action==='charge')&&kind==='greatsword'&&TWO_HAND_SKILLS[family])poses=TWO_HAND_SKILLS[family];
     if((action==='skill'||action==='charge')&&kind==='twin_daggers')poses=DAGGER_SKILLS[family]||DAGGER_GESTURES[family]||DAGGER_GESTURES.scout;
     const t=clamp(progress);if(action!=='charge'&&t===1){Object.assign(out,base);return out;}
-    if(action==='charge'){const prep=poses[0],amount=Math.min(1,t*5);for(const k in base)out[k]=base[k]+((prep[k]??base[k])-base[k])*amount;if(kind==='spellbook')out.bookOpen=amount;return out;}
-    const times=[0,.22,.48,.7,1],frames=[base,poses[0],poses[1],poses[2],base];let i=0;while(i<3&&t>times[i+1])i++;const u=clamp((t-times[i])/(times[i+1]-times[i])),smooth=u*u*(3-2*u);
-    for(const k in base){const a=frames[i][k]??base[k],b=frames[i+1][k]??base[k];out[k]=a+(b-a)*smooth;}if(kind==='spellbook')out.bookOpen=Math.min(1,t/.22,(1-t)/.18);return out;
+    // Preparation reaches the wind-up, then keeps gathering power: it leans a
+    // little further into the wind-up with a wider stance and a soft breathing
+    // pulse. A two-hand greatsword keeps both grips exactly on its wind-up.
+    if(action==='charge'){const prep=poses[0],amount=Math.min(1,t*5),gather=smooth(clamp((t-.2)/.8)),twoHand=kind==='greatsword',pulse=Math.sin(t*Math.PI*6)*gather;for(const k in base){const goal=prep[k]??base[k];out[k]=base[k]+(goal-base[k])*(amount+(twoHand&&!BODY.has(k)?0:GATHER*gather));}if(!twoHand){out.rx+=pulse*.035;out.lx+=pulse*.035;}out.lean+=-.025*gather+pulse*.012;out.knee+=.05*gather;if(kind==='spellbook')out.bookOpen=amount;return out;}
+    // A release that follows its own preparation starts from that exact pose:
+    // no drop back to rest and second wind-up before the strike.
+    const primed=action==='skill'&&from,times=primed?PRIMED_TIMES:[0,.22,.48,.7,1],frames=primed?[from,poses[1],poses[2],base]:[base,poses[0],poses[1],poses[2],base],ease=primed?PRIMED_EASE:action==='skill'?SKILL_EASE:null,last=frames.length-2;
+    let i=0;while(i<last&&t>times[i+1])i++;const u=clamp((t-times[i])/(times[i+1]-times[i])),arm=ease?ease[i][0](u):smooth(u),body=ease?ease[i][1](u):arm,strikeAt=primed?0:1,carry=ease&&i===strikeAt+1&&kind!=='twin_daggers'?Math.sin(Math.PI*u)*MOMENTUM:0;
+    for(const k in base){const a=frames[i][k]??base[k],b=frames[i+1][k]??base[k];out[k]=a+(b-a)*(BODY.has(k)?body:arm);if(carry&&BODY.has(k)){const before=frames[strikeAt][k]??base[k];out[k]+=(a-before)*carry;}}if(kind==='spellbook')out.bookOpen=primed?Math.min(1,(1-t)/.18):Math.min(1,t/.22,(1-t)/.18);return out;
   }
   function state(model){return model.userData.combatMotion||(model.userData.combatMotion={counts:{},action:'',elapsed:0,duration:1,variant:0,family:'',pose:{}});}
-  function begin(model,action,duration,skill){if(!model?.userData)return false;const s=state(model),kind=model.userData.heroWeapon||'unarmed';s.action=action;s.duration=Math.max(.1,Math.min(4,Number(duration)||.65));s.elapsed=0;s.family=familyFor(skill);s.skillId=skill?.id||'';if(action==='attack'){s.variant=s.counts[kind]||0;s.counts[kind]=(s.variant+1)%2;}else s.variant=0;return true;}
+  function begin(model,action,duration,skill){if(!model?.userData)return false;const s=state(model),kind=model.userData.heroWeapon||'unarmed';s.from=action==='skill'&&s.action==='charge'?{...s.pose}:null;s.action=action;s.duration=Math.max(.1,Math.min(4,Number(duration)||.65));s.elapsed=0;s.family=familyFor(skill);s.skillId=skill?.id||'';if(action==='attack'){s.variant=s.counts[kind]||0;s.counts[kind]=(s.variant+1)%2;}else s.variant=0;return true;}
   function cancel(model){if(model?.userData.combatMotion){const s=state(model);s.action='';s.elapsed=s.duration;}}
-  function update(model,dt=0){const s=state(model);s.elapsed=Math.min(s.duration,s.elapsed+Math.max(0,Math.min(.1,Number(dt)||0)));if(s.elapsed>=s.duration)s.action='';return sample(model.userData.heroWeapon||'unarmed',s.action||'attack',s.variant,s.action?s.elapsed/s.duration:1,model.userData.hasShield,s.family,s.pose);}
+  // A preparation holds its gathered pose briefly past its nominal end, so the
+  // release (or a cancel) replaces it instead of a one-frame drop to rest.
+  function update(model,dt=0){const s=state(model),hold=s.action==='charge'?CHARGE_HOLD:0;s.elapsed=Math.min(s.duration+hold,s.elapsed+Math.max(0,Math.min(.1,Number(dt)||0)));if(s.elapsed>=s.duration+hold){s.action='';s.from=null;}return sample(model.userData.heroWeapon||'unarmed',s.action||'attack',s.variant,s.action?Math.min(1,s.elapsed/s.duration):1,model.userData.hasShield,s.family,s.pose,s.action==='skill'?s.from:null);}
   return Object.freeze({WEAPONS,FAMILIES,ROBOT_FAMILIES,familyFor,sample,begin,cancel,update,state});
 });

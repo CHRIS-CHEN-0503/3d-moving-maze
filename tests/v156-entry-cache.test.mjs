@@ -4,7 +4,7 @@ import {readFileSync,statSync} from 'node:fs';
 import {createRequire} from 'node:module';
 
 const root=new URL('../',import.meta.url),origin='https://maze-entry-cache.test';
-const release='1.57.4',knightHealingVersion='1.57.2',filmVersion='1.58.0',lightVersion='1.58.2',gameEntry='index.html',atlasEntry='docs/職業裝備圖鑑.html';
+const release='1.57.4',knightHealingVersion='1.57.2',filmVersion='1.58.0',lightVersion='1.58.2',archerVersion='1.58.3',gameEntry='index.html',atlasEntry='docs/職業裝備圖鑑.html';
 const game=readFileSync(new URL(gameEntry,root),'utf8');
 const atlas=readFileSync(new URL(atlasEntry,root),'utf8');
 const packageInfo=JSON.parse(readFileSync(new URL('package.json',root),'utf8'));
@@ -42,9 +42,10 @@ const changedGameAssets=[
   {asset:'story/tower-growth-runtime.js',kind:'script',version:filmVersion},
   {asset:'story/tower-heroes-runtime.js',kind:'script',version:lightVersion},
   {asset:'story/tower-party-runtime.js',kind:'script',version:lightVersion},
-  {asset:'assets/character-sculpt.js',kind:'script',version:knightHealingVersion},
-  {asset:'story/tower-heroes-visuals.js',kind:'script',version:filmVersion},
-  {asset:'story/tower-combat-motion.js',kind:'script',version:release},
+  // 1.58.3: redesigned archer (proportioned arms, faces, hair) and livelier skill casting.
+  {asset:'assets/character-sculpt.js',kind:'script',version:archerVersion},
+  {asset:'story/tower-heroes-visuals.js',kind:'script',version:archerVersion},
+  {asset:'story/tower-combat-motion.js',kind:'script',version:archerVersion},
   {asset:'story/tower-heroes-core.js',kind:'script',version:lightVersion},
   {asset:'story/tower-ascension-catalog.js',kind:'script',version:knightHealingVersion},
   {asset:'story/tower-cooperation-core.js',kind:'script',version:filmVersion},
@@ -104,8 +105,8 @@ function assertReleaseReferences(html,entry,expected){
 function assertGameVersion(html,manifest){
   const declarations=[...html.matchAll(/\bconst\s+GAME_VERSION\s*=\s*(["'])([^"']+)\1/g)];
   assert.equal(declarations.length,1,'one real game version declaration');
-  assert.equal(declarations[0][2],'1.58.2','GAME_VERSION');
-  assert.equal(manifest.version,'1.58.2','package.json version');
+  assert.equal(declarations[0][2],'1.58.3','GAME_VERSION');
+  assert.equal(manifest.version,'1.58.3','package.json version');
 }
 
 function assertCinematicOrder(html){
@@ -125,9 +126,9 @@ function sectionText(html,title){
   return section[1].replace(/<[^>]*>/g,' ').replace(/\s+/g,' ').trim();
 }
 
-test('actual v1.58.2 game and package versions are synchronized',()=>{
+test('actual v1.58.3 game and package versions are synchronized',()=>{
   assertGameVersion(game,packageInfo);
-  assert.match(atlas,/劇情模式\s*·\s*v1\.58\.2 圖鑑/);
+  assert.match(atlas,/劇情模式\s*·\s*v1\.58\.3 圖鑑/);
 });
 
 test('v1.58.0 region film stages and reviewed fixes update while unchanged assets retain their tags',()=>{
@@ -158,7 +159,7 @@ test('every changed game and atlas asset rejects stale, malformed, unversioned a
     for(const {asset}of expected){
       const ref=references(html,entry).find(ref=>ref.asset===asset);
       assert.ok(ref,asset+' must be found before mutation');
-      for(const value of ['1.56.0','1.57.0-old','broken','',...['1.57.0','1.57.1','1.57.2','1.57.3','1.57.4','1.57.5','1.57.6','1.57.7','1.57.8','1.57.9','1.58.0','1.58.1','1.58.2'].filter(version=>version!==ref.version)]){
+      for(const value of ['1.56.0','1.57.0-old','broken','',...['1.57.0','1.57.1','1.57.2','1.57.3','1.57.4','1.57.5','1.57.6','1.57.7','1.57.8','1.57.9','1.58.0','1.58.1','1.58.2','1.58.3'].filter(version=>version!==ref.version)]){
         const source=ref.source.replace(/([?&])v=[^&#]*/,'$1v='+value);
         assert.notEqual(source,ref.source,asset+' mutation must take effect');
         assert.throws(()=>assertReleaseReferences(html.replace(ref.source,source),entry,expected),undefined,entry+': '+asset+' rejects '+JSON.stringify(value));
@@ -173,8 +174,8 @@ test('every changed game and atlas asset rejects stale, malformed, unversioned a
 });
 
 test('invalid source and manifest versions fail independently instead of matching each other',()=>{
-  for(const stale of ['1.55.0','1.57.3','1.57.4','1.57.5','1.57.6','1.57.7','1.57.8','1.57.9','1.58.0','1.58.1']){
-    const oldGame=game.replace(/(\bconst\s+GAME_VERSION\s*=\s*["'])1\.58\.2/,(_,prefix)=>prefix+stale);
+  for(const stale of ['1.55.0','1.57.3','1.57.4','1.57.5','1.57.6','1.57.7','1.57.8','1.57.9','1.58.0','1.58.1','1.58.2']){
+    const oldGame=game.replace(/(\bconst\s+GAME_VERSION\s*=\s*["'])1\.58\.3/,(_,prefix)=>prefix+stale);
     assert.notEqual(oldGame,game,'version mutation must take effect');
     assert.throws(()=>assertGameVersion(oldGame,packageInfo));
     assert.throws(()=>assertGameVersion(game,{...packageInfo,version:stale}));

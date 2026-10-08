@@ -122,12 +122,12 @@ for(const sex of ['male','female'])for(let tier=1;tier<=5;tier++){
         const p=frame(f,variant,time,family);assert.ok(p.grip.distanceTo(p.hand)<1e-6,'right hand holds the bow grip');
         assert.ok(p.leftHand.distanceTo(p.nock)<.12,`left draw hand ${p.leftHand.distanceTo(p.nock)} from the nock`);
         assert.ok(p.leftHand.y>f.model.position.y+1,'draw hand reaches chest level');
-        assert.ok(f.model.worldToLocal(p.grip.clone()).z>.65,'bow grip is well ahead of chest armor');
+        assert.ok(f.model.worldToLocal(p.grip.clone()).z>.29+.15,'bow grip is well ahead of the chest volume');
         const rig=f.model.userData.bowArms;
         for(const arm of [rig.right,rig.left]){
           const nodes=[arm.upper,arm.elbow,arm.hand].map(n=>f.model.worldToLocal(n.getWorldPosition(new T.Vector3())));
           for(let bone=0;bone<2;bone++){
-            assert.ok(Math.abs(nodes[bone].distanceTo(nodes[bone+1])-.42)<1e-6,'bone length stays constant');
+            assert.ok(Math.abs(nodes[bone].distanceTo(nodes[bone+1])-arm.bone)<1e-6,'bone length stays constant');
             for(let i=0;i<=12;i++){const point=nodes[bone].clone().lerp(nodes[bone+1],i/12);assert.ok(Math.abs(point.x)>.34||point.z>.29,`arms must stay outside the inflated chest volume: ${arm.side} ${variant} ${time} bone ${bone} point ${point.toArray()} nodes ${nodes.map(n=>n.toArray())}`);}
           }
         }
@@ -136,9 +136,25 @@ for(const sex of ['male','female'])for(let tier=1;tier<=5;tier++){
   });
 }
 
-test('skill preparation holds the same authored windup used by its release',()=>{
+test('skill preparation gathers along its authored windup and the release continues from it without a jump',()=>{
+  const body=new Set(['lean','tilt','knee']);
   for(const kind of Object.keys(M.WEAPONS))for(const family of new Set(Object.values(M.FAMILIES))){
-    assert.deepEqual(M.sample(kind,'charge',0,1,true,family),M.sample(kind,'skill',0,.22,true,family),`${kind} ${family}`);
+    const base=M.sample(kind,'attack',0,1,true,family),windup=M.sample(kind,'skill',0,.22,true,family),prepared=M.sample(kind,'charge',0,1,true,family);
+    for(const k of Object.keys(base)){
+      const authored=windup[k]-base[k],gathered=prepared[k]-base[k],limit=body.has(k)?.08:Math.abs(authored)*.13+.04;
+      assert.ok(Math.abs(gathered-authored)<=limit+1e-9,`${kind} ${family} ${k}: preparation ${prepared[k]} stays on the authored windup ${windup[k]}`);
+      if(kind==='greatsword'&&!body.has(k))assert.equal(prepared[k],windup[k],'two-hand greatsword grips stay exactly on the windup');
+    }
+    // Prepare, hold briefly past the nominal end, release and recover. The release starts exactly at the
+    // prepared pose and is never more abrupt, frame to frame, than the same skill cast without preparation.
+    const skill={effect:Object.keys(M.FAMILIES).find(e=>M.FAMILIES[e]===family)},steps=frames=>Object.fromEntries(Object.keys(base).map(k=>[k,Math.max(0,...frames.slice(1).map((f,i)=>Math.abs(f[k]-frames[i][k])))]));
+    const plain={userData:{heroWeapon:kind,hasShield:true}},instant=[{...M.update(plain,0)}];M.begin(plain,'skill',.85,skill);for(let i=0;i<60;i++)instant.push({...M.update(plain,1/60)});
+    const model={userData:{heroWeapon:kind,hasShield:true}},frames=[];M.begin(model,'charge',.6,skill);for(let i=0;i<45;i++)frames.push({...M.update(model,1/60)});
+    const last={...M.state(model).pose};M.begin(model,'skill',.85,skill);assert.deepEqual({...M.update(model,0)},last,`${kind} ${family}: release starts exactly at the prepared pose`);
+    const released=[last];for(let i=0;i<60;i++)released.push({...M.update(model,1/60)});
+    const regular=steps(instant),primed=steps(released),gathering=steps(frames);
+    for(const k of Object.keys(base)){assert.ok(primed[k]<=regular[k]*1.25+.03,`${kind} ${family} ${k}: prepared release step ${primed[k]} vs regular ${regular[k]}`);assert.ok(gathering[k]<=regular[k]*1.25+.05,`${kind} ${family} ${k}: preparation step ${gathering[k]}`);}
+    assert.deepEqual({...M.update(model,.1)},{...base},'recovers to rest');
   }
 });
 

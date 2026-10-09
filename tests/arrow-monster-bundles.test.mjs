@@ -2,16 +2,20 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {createRequire} from 'node:module';
 const require=createRequire(import.meta.url),C=require('../story/story-core.js'),P=require('../story/tower-party-core.js'),H=require('../story/tower-heroes-core.js'),G=require('../story/tower-hero-growth.js'),L=require('../story/tower-loot.js'),E=require('../story/tower-encounters.js'),N=require('../story/tower-narrative.js');
-const fresh=(job='archer',seed=22)=>H.enable(P.enable(C.newRun({seed}),job).run).run;
+const build=(job,seed)=>H.enable(P.enable(C.newRun({seed}),job).run).run;
+// The first seed whose 99th floor has a monster that really drops an arrow bundle when shot.
+function arrowDrop(run){for(const spec of P.monsterSpecs(run)){if(spec.lord||spec.elite)continue;const trial=structuredClone(run);trial.party.health[spec.id]=1;let shot=H.fireProjectile(trial,'hero',spec.id);if(!shot.ok)continue;shot=H.strike(shot.run,spec.id,{shot:true,lootCell:{x:2,y:2}});if(!shot.ok||!shot.effect.dead)continue;const entry=shot.run.party.loot.entries.find(e=>e.key==='arrow');if(entry)return {result:shot,entry};}return null;}
+const ARROW_SEED=(()=>{for(let seed=1;seed<500;seed++)if(arrowDrop(build('archer',seed)))return seed;throw Error('no seed drops arrows');})();
+const fresh=(job='archer',seed=ARROW_SEED)=>build(job,seed);
 function add(run,job='archer',level=3,id='test-archer'){
   const member={id,profession:job,sex:'female',level,hp:28+level*6,cooldown:0,hurtLeft:0};
   run.party.members.push(member);run.party.joined.push(id);H.addMember(run,member);H.sync(run);assert.ok(C.validateSave(run));return member;
 }
+// The first monster on the floor whose real seeded kill drops an arrow bundle
+// (the drop pool grew with new potions, so a fixed monster index is not stable).
 function arrowKill(run=fresh()){
-  run.party.health['monster-3']=1;
-  let result=H.fireProjectile(run,'hero','monster-3');assert.ok(result.ok,result.message);
-  result=H.strike(result.run,'monster-3',{shot:true,lootCell:{x:2,y:2}});assert.ok(result.ok,result.message);assert.ok(result.effect.dead);
-  const entry=result.run.party.loot.entries.find(e=>e.key==='arrow');assert.ok(entry,'real seeded kill drops arrows');assert.equal(entry.quantity,50);assert.ok(C.validateSave(result.run));return {run:result.run,id:entry.id};
+  const found=arrowDrop(run),result=found?.result,entry=found?.entry;
+  assert.ok(entry,'a real seeded kill on this floor drops arrows');assert.equal(entry.quantity,50);assert.ok(C.validateSave(result.run));return {run:result.run,id:entry.id};
 }
 function underground(){
   const r=fresh();r.floor=1;r.floorsCleared=99;r.status='won';r.chronicle=N.newChronicle(1);r.chronicle.clues=N.CHAPTERS.map(c=>c.clueId);r.chronicle.ending='release';P.advance(r,{reward:false});

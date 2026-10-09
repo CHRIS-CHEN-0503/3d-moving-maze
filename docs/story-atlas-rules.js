@@ -94,7 +94,7 @@
       if(s.effect==='feast')materials.push('三種不同食材各一份');
       if(s.ammo)materials.push('箭矢 ×'+s.ammo);
       if(s.scrapCost)materials.push('金屬零件 ×'+s.scrapCost);
-      details.push(row('冷卻',s.effect==='cleanse'?'一至六級：'+series(s.power,' 秒'):s.cooldown+' 秒'),row('準備時間',prep?prep+' 秒':s.effect==='disarm'?'依下方作業秒數；本身無額外蓄力':'立即施放'),row('消耗',materials.join('、')||'不耗食材或箭矢'),row('作用對象',skillTarget(s)),row('持續／附帶效果',timing(s)));
+      details.push(row('冷卻',s.effect==='cleanse'?'一至六級：'+series(s.power,' 秒'):s.cooldown+' 秒'),row('MP 消耗',s.mp?s.mp+' 點（施放時扣除；不足時不能施放）':s.job==='robot'?'不消耗 MP（機器人改用動力石能源）':'不消耗 MP'),row('準備時間',prep?prep+' 秒':s.effect==='disarm'?'依下方作業秒數；本身無額外蓄力':'立即施放'),row('消耗',materials.join('、')||'不耗食材或箭矢'),row('作用對象',skillTarget(s)),row('持續／附帶效果',timing(s)));
       if(['taunt','fortress'].includes(s.effect))details.push(row('挑釁數量上限','技能一至六級：'+series(Array.from({length:6},(_,i)=>h.tauntTargetLimit(i+1)),' 隻')+'；每名施放者分開計算，主角與同伴遵循同一規則。'));
       if(s.effect==='repair')details.push(row('修補上限','從指定角色尚未損壞、非核心的裝備中，優先修補剩餘比例最低的一件，恢復最大耐久 '+series(s.power,'%')+'；每次最多30點，不超過全滿。無法重建破損裝備，也不會恢復核心耐久。'));
       if(s.attack)notes.push(['mage','healer','archer'].includes(s.job)?'施放攻擊技能就扣一次武器耐久，空放或撞牆不退；同次命中不再重扣。':'近戰攻擊技能確認命中才扣一次武器耐久；同次多目標不重扣。');

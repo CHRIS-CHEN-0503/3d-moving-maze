@@ -81,6 +81,8 @@
   // creature (an existing creature form) that is worth extra experience. Not a chapter lord: no
   // cutscene, voice, boss music, gear drop or descent gate. It takes the free lord slot ID.
   const MINI_XP=Object.freeze({surface:40,underworld:20}),LORD_XP=100,MINI_HP=1.8,MINI_DAMAGE=1.25;
+  // The hunt-rift champion is a little tougher than a floor mini lord (still below the chapter lord).
+  const CHAMPION_HP=2.2,CHAMPION_DAMAGE=1.35;
   const MINI_LORDS=Object.freeze(Object.fromEntries(Object.entries({
     summoning:[['雲冠傘王','mushroom',0xe9ddff],['雲階巨蟲','clockmite',0xe2c27a]],
     garden:[['荊芽花衛','flower',0xe58aa2],['蜜后侍蛾','moth',0xf0c050]],
@@ -106,5 +108,5 @@
     if(!hasMini(run)||!region)return null;
     const list=MINI_LORDS[region];return list?list[pick(run.seed,'mini-lord:'+run.floor)%list.length]:null;
   }
-  return Object.freeze({ID,UNDERWORLD_ID,LORDS,UNDERWORLD_LORDS,MINI_LORDS,MINI_XP,LORD_XP,MINI_HP,MINI_DAMAGE,allLords,defs,forRun,spec,defeated,hasMini,miniFor,build,tracks:Object.freeze(tracks)});
+  return Object.freeze({ID,UNDERWORLD_ID,LORDS,UNDERWORLD_LORDS,MINI_LORDS,MINI_XP,LORD_XP,MINI_HP,MINI_DAMAGE,CHAMPION_HP,CHAMPION_DAMAGE,allLords,defs,forRun,spec,defeated,hasMini,miniFor,build,tracks:Object.freeze(tracks)});
 });

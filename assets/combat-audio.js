@@ -2,14 +2,14 @@
 (function(root,factory){const api=factory();if(typeof module==='object'&&module.exports)module.exports=api;root.CombatAudio=api;})(globalThis,function(){
   'use strict';
   const RATE=22050;
-  const ACTIONS=Object.freeze({slash:.3,bow:.25,metal:.24,magic:.48,frost:.45,heal:.55,shield:.4,scan:.4,smoke:.32,cook:.45,forge:.42,device:.38,drink:.32,charge:.65,burst:.48,thunder:.8,thorns:.65,meteor:.75,equip:.2,'hit-metal':.25,'hit-magic':.32,robot:.6,'robot-impact':.5,'robot-drive':.7});
+  const ACTIONS=Object.freeze({slash:.3,bow:.25,metal:.24,magic:.48,frost:.45,heal:.55,shield:.4,scan:.4,smoke:.32,cook:.45,forge:.42,device:.38,drink:.32,charge:.65,burst:.48,thunder:.8,thorns:.65,meteor:.75,equip:.2,levelup:.8,'hit-metal':.25,'hit-magic':.32,robot:.6,'robot-impact':.5,'robot-drive':.7});
   const ALIASES=Object.freeze({barrier:'shield',mechanism:'device'});
   const SKILL_SOUNDS=Object.freeze({arrow:'bow',binding:'bow',volley:'bow',great_arrow:'bow',cleave:'slash',circle:'slash',blind:'slash',stun:'metal',stagger:'metal',splash:'cook',bolt:'magic',weak:'magic',slow:'slash',mark:'metal',shock:'thunder',thorns:'thorns',repel:'burst',starfall:'meteor',star_ring:'meteor',decisive:'slash',guard:'shield',barrier:'shield',ward:'shield',fortify:'forge',fortress:'shield',rally:'shield',speed:'scan',polish:'forge',stealth:'smoke',smoke:'smoke',stomach:'cook',meal:'cook',soup:'heal',feast:'cook',heal:'heal',revive:'heal',cleanse:'heal',sanctuary:'heal',reveal:'scan',escape:'scan',disarm:'device',daylight:'heal',repair:'forge',frost:'frost',taunt:'metal',barricade:'device',robot_fist:'robot',robot_charge:'robot-drive',robot_quake:'robot-impact',robot_guard:'shield',robot_speed:'robot-drive',robot_restore:'forge',robot_meteor:'robot-impact',robot_double:'robot',mech_aid:'shield'});
   // Older robot metadata shares generic hammer/forge sounds. Upgrade only
   // those legacy choices; an intentionally authored elemental sound wins.
   const skillKind=skill=>skill?.job==='robot'&&['metal','forge'].includes(skill?.presentation?.sound)&&SKILL_SOUNDS[skill.effect]?SKILL_SOUNDS[skill.effect]:Object.hasOwn(ACTIONS,skill?.presentation?.sound)?skill.presentation.sound:SKILL_SOUNDS[skill?.effect]||'magic';
   const hitKind=weapon=>['staff','book'].includes(weapon?.type)?'hit-magic':['blade','daggers','hammer','pan','fists'].includes(weapon?.type)?'hit-metal':'hit';
-  const itemKind=id=>({heal:'drink',haste:'drink',ration:'cook',shield:'shield',hourglass:'scan',bell:'metal',map:'scan',power_glimmer:'magic',power_starlight:'magic',power_sunheart:'magic'}[id]||'device');
+  const itemKind=id=>({heal:'drink',heal_mid:'drink',heal_high:'drink',spirit:'magic',haste_strong:'drink',arcane:'magic',courage:'drink',haste:'drink',ration:'cook',shield:'shield',hourglass:'scan',bell:'metal',map:'scan',power_glimmer:'magic',power_starlight:'magic',power_sunheart:'magic'}[id]||'device');
   const chargeSeconds=value=>Number.isFinite(value)&&value>0?Math.min(4,Math.max(.1,Math.round(value*10)/10)):.65;
   // exp/log is several times cheaper than Math.pow and agrees to ~1e-15 for these positive bases.
   const power=(base,exponent)=>Math.exp(exponent*Math.log(base));
@@ -44,6 +44,8 @@
       if(kind==='cook')sample=air*.12*swell+tone(510)*.12*pulse(.03,20)+Math.sin(tau*(320*t+65*t*t))*.12*pulse(.11,25)+low*.85*swell;
       if(kind==='forge'){const hammer=pulse(0,18)+.68*pulse(.18,22);sample=(tone(440)*.22+tone(711)*.13+tone(1127)*.035)*hammer+tone(92)*.22*(pulse(0,28)+.6*pulse(.18,30))+air*.11*(pulse(0,65)+.55*pulse(.18,60));}
       if(kind==='device'||kind==='equip'){const second=kind==='equip'?.065:.14;sample=(tone(173)*.26+tone(638)*.08+air*.12)*(pulse(0,36)+.65*pulse(second,40))+tone(286)*.075*pulse(second+.024,17);}
+      // Level up: a rising C-E-G-C arpeggio with a short shimmer on top.
+      if(kind==='levelup')sample=tone(523.25)*.2*pulse(0,7)+tone(659.25)*.18*pulse(.075,7)+tone(784)*.17*pulse(.15,6.5)+tone(1046.5)*.16*pulse(.225,4.6)+tone(1568)*.04*pulse(.26,6)+air*.035*pulse(.225,18);
       if(kind==='drink')sample=(Math.sin(tau*(290*t+60*Math.sin(t*15)*t))*.18+low*.75)*(pulse(.025,12)+.65*pulse(.135,14))+air*.06*pulse(0,45);
       if(kind==='burst')sample=(rumble*2.8+low*.85+Math.sin(tau*(110*t-85*t*t))*.27)*pulse(0,5)+air*.11*pulse(0,38);
       if(kind==='thunder')sample=air*.24*(pulse(0,42)+.6*pulse(.095,44)+.3*pulse(.17,48))+rumble*5.6*(pulse(.035,2.6)+.25*pulse(.24,5))+tone(62)*.2*pulse(.035,4)+low*.55*pulse(.12,4);

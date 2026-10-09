@@ -59,7 +59,7 @@ test('documentation separates five-minute shields from much shorter taunt and im
 });
 
 test('healing guide reads current shared skill numbers without stale percent descriptions',()=>{
-  assert.equal(detail(D.skill('herbal_heal'),'冷卻'),G.HEALING.herbalCooldown+' 秒');
+  assert.equal(detail(D.skill('herbal_heal'),'冷卻'),G.HEALING.herbalCooldown*H.COOLDOWN_SCALE+' 秒');
   assert.equal(D.skill('herbal_heal').levels[0].value,30);
   assert.equal(D.skill('banquet_broth').levels[0].value,120);
   assert.equal(D.skill('dawn_return').levels[0].value,90);
@@ -68,7 +68,7 @@ test('healing guide reads current shared skill numbers without stale percent des
   const html=readFileSync(new URL('../docs/職業裝備圖鑑.html',import.meta.url),'utf8');
   const section=html.match(/<section><h3>療癒與自動補血<\/h3>([\s\S]*?)<\/section>/)?.[1];
   assert.ok(section);
-  for(const pattern of [/冷卻五秒/,/生命恢復量提高50%/,/料理與藥品本身.*不增加/,/允許技能消耗食材／零件/,/低於50%生命/,/不能隔牆.*機器人/,/自動喝療癒藥.*另行設定/])assert.match(section,pattern);
+  for(const pattern of [/冷卻 2\.5 秒（所有招式冷卻已減半）/,/生命恢復量提高50%/,/料理與藥品本身.*不增加/,/允許技能消耗食材／零件/,/低於50%生命/,/不能隔牆.*機器人/,/自動喝療癒藥.*另行設定/])assert.match(section,pattern);
 });
 
 test('all gear stats, five tiers, wear and price ranges use game definitions rather than historical docs',()=>{

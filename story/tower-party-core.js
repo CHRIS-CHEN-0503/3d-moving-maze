@@ -117,7 +117,7 @@
     const dict=(v,max)=>v&&typeof v==='object'&&!Array.isArray(v)&&Object.keys(v).length<=C().MAX_MONSTERS&&Object.keys(v).every(id=>C().validMonsterId(id,floor)&&!defeated.includes(id)&&num(v[id],0,max));
     if(!dict(value.health,floor<0?1560:312)||!dict(value.poise,5))return null;
     // Ordinary deep monsters stay within 258; the chapter lord within its own maximum and a mini lord (free lord slot) within 258 x MINI_HP.
-    if(floor<0){const lord=B().spec({floor,party:value});for(const [id,hp]of Object.entries(value.health))if(hp>(id===lord?.id?lord.maxHp:(!lord&&id===B().UNDERWORLD_ID||/^monster-h-/.test(id))?Math.round(258*B().MINI_HP):258))return null;}
+    if(floor<0){const lord=B().spec({floor,party:value});for(const [id,hp]of Object.entries(value.health))if(hp>(id===lord?.id?lord.maxHp:!lord&&id===B().UNDERWORLD_ID?Math.round(258*B().MINI_HP):/^monster-h-/.test(id)?Math.round(258*B().CHAMPION_HP):258))return null;}
     const loot=Loot()?.validate(value.loot,floor,defeated),reinforcements=Re()?.validate(value.reinforcements,floor),foraging=Foraging()?.validate(value.foraging,floor,seed);if(!loot||!reinforcements||!foraging)return null;
     const boss=X().validateBoss(value.boss,floor,value.journey===undefined),journey=X().validateJourney(value.journey,floor);
     if(value.light!==undefined&&!L())return null; // Never silently discard saved fuel if a script failed to load.
@@ -222,8 +222,9 @@
       const strength=Math.min(5,base.strength+config.monsterStrengthBonus+(champion?1:0)),power=monsterPower(f,base,strength);
       if(!champion)return {id:'monster-h-'+i,kind,strength,hunt:true,...(carrier?{carrier:true}:{}),maxHp:power.maxHp,def:carrier?{...power.def,name:'帶晶・'+power.def.name}:power.def};
       const chapterLord=B().allLords()[f>0?Math.max(1,Math.floor(f/10)*10):-Math.ceil(-f/10)*10],cap=chapterLord?chapterLord.damage-1:Infinity;
-      return {id:'monster-h-'+i,kind,strength,hunt:true,elite:true,champion:true,maxHp:Math.round(power.maxHp*B().MINI_HP),
-        def:{...power.def,name:'裂隙首領・'+(entry?.name||power.def.name),color:entry?.color??power.def.color,damage:Math.min(cap,Math.round(power.def.damage*B().MINI_DAMAGE)),speed:Math.min(3.2,(power.def.speed??2.1)*1.08),sight:(power.def.sight||8)+2,elite:true}};
+      // A little tougher than a floor mini lord: more health and harder hits, still capped below the chapter lord.
+      return {id:'monster-h-'+i,kind,strength,hunt:true,elite:true,champion:true,maxHp:Math.round(power.maxHp*B().CHAMPION_HP),
+        def:{...power.def,name:'裂隙首領・'+(entry?.name||power.def.name),color:entry?.color??power.def.color,damage:Math.min(cap,Math.round(power.def.damage*B().CHAMPION_DAMAGE)),speed:Math.min(3.2,(power.def.speed??2.1)*1.08),sight:(power.def.sight||8)+2,elite:true}};
     });
   }
   function monsterSpecs(run){

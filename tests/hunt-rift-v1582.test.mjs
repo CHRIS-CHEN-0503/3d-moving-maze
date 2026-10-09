@@ -10,12 +10,12 @@ const lordFloor=f=>!!B.allLords()[f];
 const huntFloor=(seed=9,kind=null,from=98,to=-49)=>{for(let f=from;f>=to;f--){if(f===0)continue;const run=at(f,seed);const offer=D.huntOffer(run);if(offer&&(!kind||offer.kind===kind))return {run,offer,floor:f};}return null;};
 const enter=(run,offer)=>{const r=D.enter(run,offer.id,{x:0,y:0,shiftLeft:5},run.revision);assert.equal(r.ok,true,r.message);return r.run;};
 
-test('about half of the floors without a chapter lord offer a hunt rift, surface and underground, independent of the puzzle rift',()=>{
+test('about two thirds of the floors without a chapter lord offer a hunt rift, surface and underground, independent of the puzzle rift',()=>{
   let eligible=0,offered=0,both=0;const kinds=new Set();
   for(const seed of [3,9,27])for(let f=98;f>=-49;f--){if(f===0||lordFloor(f))continue;const run=at(f,seed,1,[]);eligible++;const offer=D.huntOffer(run);
     if(offer){offered++;kinds.add(offer.kind);assert.equal(offer.id,'hunt:'+f+':'+seed);assert.deepEqual(D.huntOffer(structuredClone(run)),offer,'deterministic');if(D.offer(run))both++;
       assert.ok(offer.count>=3&&offer.count<=8&&offer.required.length>=1&&offer.required.every(i=>i<offer.count));assert.ok(offer.reward.items.heal>=1&&offer.reward.items.ration===1);}}
-  assert.ok(offered/eligible>.42&&offered/eligible<.58,'about half: '+offered+'/'+eligible);assert.deepEqual([...kinds].sort(),['hunt-champion','hunt-purge','hunt-shards']);assert.ok(both>0,'a floor can have both rifts');
+  assert.equal(D.HUNT_CHANCE,65);assert.ok(offered/eligible>.58&&offered/eligible<.72,'about two thirds: '+offered+'/'+eligible);assert.deepEqual([...kinds].sort(),['hunt-champion','hunt-purge','hunt-shards']);assert.ok(both>0,'a floor can have both rifts');
   for(const f of [99,90,80,50,10,1,-10,-30,-50])for(const seed of [3,9,27])assert.equal(D.huntOffer(at(f,seed,1,[])),null,f+' has a chapter lord or is the first floor');
   const legacy=P.enable(C.newRun({seed:9}),'swordsman').run;for(let f=98;f>40;f--){legacy.floor=f;legacy.floorsCleared=99-f;assert.equal(D.huntOffer(legacy),null,'journeys without hero loadouts have none');}
 });
@@ -32,10 +32,11 @@ test('entering needs no discovery; inside, only the rift\'s own combatants exist
   }
 });
 
-test('hunt foes give half experience and no coins or ground drops; the champion counts as a mini lord',()=>{
+test('hunt foes give half experience and no coins or ground drops; the champion counts as a mini lord and its 1-3 spoils go straight into the bag',()=>{
   const {run,offer}=huntFloor(9,'hunt-champion'),inside=enter(run,offer),specs=P.monsterSpecs(inside);
-  for(const spec of specs){const coins=inside.coins,xp=H.state(inside).xp,drops=H.finishMonster(inside,spec,{x:1,y:1});
-    assert.equal(inside.coins,coins);assert.deepEqual(drops,[]);
+  const stock=r=>[r.bag,r.party.ingredients,r.party.journey.materials].reduce((n,o)=>n+Object.values(o).reduce((a,b)=>a+b,0),0)+(r.party.light?r.party.light.wood:0);
+  for(const spec of specs){const coins=inside.coins,xp=H.state(inside).xp,before=stock(inside),drops=H.finishMonster(inside,spec,{x:1,y:1});
+    assert.equal(inside.coins,coins);if(spec.champion){assert.ok(drops.length>=1&&drops.length<=3,'champion spoils');assert.ok(drops.every(d=>d.direct&&d.label));assert.equal(stock(inside)-before,drops.reduce((n,d)=>n+d.quantity,0),'every spoil lands in the bag');}else assert.deepEqual(drops,[]);
     const full=Math.round((5+spec.strength*2+(spec.elite?B.MINI_XP[inside.floor<0?'underworld':'surface']:0))*(inside.floor<0?5:1+(99-inside.floor)/H.SURFACE_XP_DEPTH));
     assert.equal(H.state(inside).xp-xp,Math.round(full*H.HUNT_XP),spec.id);}
   assert.deepEqual(inside.party.loot.entries.filter(e=>e.source.startsWith('monster-h-')),[]);
@@ -87,4 +88,12 @@ test('the story runtime builds the gate last, fights inside with companions, and
   assert.match(tower,/if\(huntActive\(\)\)\{tickHunt\(dt,now\);return;\}/);assert.match(tower,/inDungeon\(\)&&!huntActive\(\)\|\|\(!run\?\.party\?\.loadouts&&attackLeft>0\)\)return;/,'attacks work inside a hunt');
   assert.match(tower,/if\(spec\.champion\)markMiniLord\(model\);if\(spec\.carrier\)markCarrier\(model\);/);assert.match(tower,/o===huntGate\?'獵'/);
   assert.match(readFileSync(new URL('../story/tower-party-runtime.js',import.meta.url),'utf8'),/\(!ctx\.inDungeon\(\)\|\|ctx\.inHunt\?\.\(\)\)/);
+});
+
+test('the hunt champion is a little tougher than a floor mini lord, still below the chapter lord, and saves at full health deep down',()=>{
+  assert.deepEqual([B.CHAMPION_HP,B.CHAMPION_DAMAGE,B.MINI_HP,B.MINI_DAMAGE],[2.2,1.35,1.8,1.25]);
+  for(const [from,to]of [[98,60],[59,20],[-1,-49]]){const found=huntFloor(9,'hunt-champion',from,to);if(!found)continue;const inside=enter(found.run,found.offer),champion=P.monsterSpecs(inside).find(s=>s.champion),mini=P.monsterSpecs(found.run).find(s=>s.elite);
+    assert.ok(champion.maxHp>mini.maxHp,found.floor+' more health than the floor mini lord');assert.ok(champion.def.damage>=mini.def.damage);
+    const lord=B.allLords()[found.floor>0?Math.max(1,Math.floor(found.floor/10)*10):-Math.ceil(-found.floor/10)*10];assert.ok(champion.def.damage<lord.damage,'below the chapter lord');
+    inside.party.health[champion.id]=champion.maxHp;assert.ok(C.validateSave(JSON.stringify(inside)),found.floor+' saves at full health');}
 });

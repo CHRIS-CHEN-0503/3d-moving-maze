@@ -90,7 +90,7 @@ test('劇情對話讀出當頁，使用補給後播報正確道具且關閉會�
   assert.doesNotMatch(h.get('towerDialog').voiceSummary,/耐久|防禦|35|100/);
   const before=calls.length;
   h.click('use','heal');assert.equal(h.state().run.hp,60);
-  assert.deepEqual(calls.slice(before),[['item','使用 療癒藥',true]]);
+  assert.deepEqual(calls.slice(before),[['item','使用 初級療癒藥',true]],'the basic draught is now named 初級療癒藥');
   h.api.handleAction('journal');assert.equal(h.get('towerDialog').voiceScope,'full');
   h.click('close');assert.deepEqual(calls.at(-1),['stop']);
 });

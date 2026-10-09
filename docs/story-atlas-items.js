@@ -26,7 +26,7 @@
   const icon = (provider, key, source, extra = {}) => ({provider, key, source, ...extra});
   const filename = 'story/';
   const SOURCES = freeze({core: filename + 'story-core.js', party: filename + 'tower-party-core.js', heroes: filename + 'tower-heroes-core.js', growth: filename + 'tower-hero-growth.js', lighting: filename + 'tower-lighting-core.js', encounters: filename + 'tower-encounters.js', loot: filename + 'tower-loot.js', foraging: filename + 'tower-foraging.js', expedition: filename + 'tower-expedition-core.js', narrative: filename + 'tower-narrative.js', runtime: filename + 'tower-mode.js', commission:filename+'tower-commission-cooking.js',robot:filename+'tower-robot-core.js',affixes:filename+'tower-affixes.js',events:filename+'tower-adventure-events.js',landmarks:filename+'tower-landmarks.js'});
-  const rarity = {heal:'uncommon', ration:'common', shield:'rare', hourglass:'rare', bell:'rare', map:'rare', feather:'legendary', arrow:'common'};
+  const rarity = {heal:'uncommon', heal_mid:'uncommon', heal_high:'rare', spirit:'uncommon', haste_strong:'rare', arcane:'rare', courage:'rare', ration:'common', shield:'rare', hourglass:'rare', bell:'rare', map:'rare', feather:'legendary', arrow:'common'};
   const rarityNames = {common:'普通', uncommon:'少見', rare:'稀有', legendary:'珍稀'};
   const dropExplanation = '有生態素材的怪物先以一半機率選素材、一半選補給，再從該組候選物資中抽一種，依該物的稀有度判定；不是每件物品都獨立抽一次。四種常用食材（'+loot().COMMON_FOOD.map(key=>party().INGREDIENTS[key]).join('、')+'）被抽為候選後為普通 '+loot().chance({type:'ingredient',key:'herb',rarity:'common'})+'%；其他普通物資仍為 '+loot().CHANCES.common+'%。沒有素材的怪物只抽補給。落地後需靠近拾取，未拾取物跨存檔與同層變形保留。';
   const profileNames={neutral:'中性',suitable:'適合',unsuitable:'不適合'};
@@ -62,7 +62,13 @@
   function supplyRecords() {
     const C = core(), E = encounters(), L = loot(), R = robot();
     const effects = {
-      heal:'為非機器人的使用者恢復 35 點生命，不超過個人生命上限；滿血不能使用。機器人不能用一般療癒藥恢復生命。',
+      heal:'為非機器人的使用者恢復 '+C.HEAL_POTIONS.heal+' 點生命，不超過個人生命上限；滿血不能使用。機器人不能用一般療癒藥恢復生命。',
+      heal_mid:'為非機器人的使用者恢復 '+C.HEAL_POTIONS.heal_mid+' 點生命，不超過個人生命上限；滿血不能使用。自動喝藥時與其他療癒藥共用門檻與保留數量，依傷勢選用最合適的一瓶。',
+      heal_high:'為非機器人的使用者恢復 '+C.HEAL_POTIONS.heal_high+' 點生命，不超過個人生命上限；滿血不能使用。',
+      spirit:'為使用者恢復 '+C.SPIRIT_MP+' 點 MP，不超過個人上限；MP 已滿不能使用。機器人沒有 MP，技能改由動力石能源驅動。可放入快捷欄，或在自動行動設定中依 MP 門檻自動使用。',
+      haste_strong:'為使用者提高移動速度與普通攻擊速度各 '+C.HASTE_STRONG_PERCENT+'%，持續 '+C.HASTE_DURATION+' 秒（五分鐘）；可取代仍在生效的一般加速藥水，強力加速仍在生效時不能再喝。不縮短技能冷卻或準備時間。',
+      arcane:'使用者的法術攻擊力（法杖、法書光彈與法術技能）提高 '+C.POTION_BUFF_PERCENT+'%，持續 '+C.POTION_BUFF_SECONDS+' 秒（三分鐘）；仍在生效時不能再喝，切換角色不轉移。',
+      courage:'使用者的物理攻擊力（近戰、弓箭與物理技能）提高 '+C.POTION_BUFF_PERCENT+'%，持續 '+C.POTION_BUFF_SECONDS+' 秒（三分鐘）；仍在生效時不能再喝，切換角色不轉移。',
       haste:'為使用者提高移動速度與普通攻擊速度各 '+C.HASTE_PERCENT+'%，持續 '+C.HASTE_DURATION+' 秒（五分鐘）。不縮短技能冷卻或準備時間；同效果不疊加、不刷新，仍在生效時不消耗第二瓶。不因延效被動延長，切換角色也不會轉給別人；暫停、閱讀與離線不扣時間。可放入快捷欄，或在自動道具設定中允許隊友遇敵時使用（預設關閉）。',
       ration:'恢復全隊共用飽食度 45 點，上限 100；不會恢復生命。營地不再提供乾糧全隊回滿的休息捷徑。',
       shield:'提供使用者最大生命 35% 的可消耗護盾，持續最多 300 秒（五分鐘）。護盾吸收傷害後會減少，不是五分鐘無敵。',
@@ -82,6 +88,7 @@
       if (sellers.length) acquisition.push(sellers.join('、') + '販售；' + (key === 'arrow' ? '每包 10 支只需 1 幣；剩餘空間不足 10 支時補滿仍收 1 幣，不回收。射手離隊造成容量下降時，已有箭矢保留，超過容量則不能補充。' : '購買 ' + def.buyPrice + ' 幣／售回 ' + def.sellPrice + ' 幣。'));
       if (drop) acquisition.push((key === 'arrow' ? '隊伍有能行動的射手時，' : fuel ? '隊伍有能行動的機器人時，' : '') + '被抽為討伐候選物資後，' + drop.label + '掉落判定 ' + drop.conditionalPercent + '%，每堆 ' + drop.quantity + (key === 'arrow' ? ' 支。' : fuel ? ' 顆。' : ' 份。'));
       if(fuel)acquisition.push((fuel.fuel>25?'商人不販售，只能靠討伐與採集取得。':'')+'另可採集靠牆角落的同階礦簇，新樓層每處 '+foraging().POWER_DEPOSIT_QUANTITY+' 顆；初始持有零顆。');
+      if (Object.hasOwn(C.POTION_FLOORS,key)) acquisition.push(C.POTION_FLOORS[key] > 0 ? '第 ' + C.POTION_FLOORS[key] + ' 層（含）以下與地下才會在雜貨商販售或從討伐掉落。' : '地下第一層起才會在雜貨商販售或從討伐掉落。');
       if (['heal','ration','shield','hourglass'].includes(key)) acquisition.push('探索者委託的隨機補給報酬；乾糧為 2 份，其餘 1 份。');
       if (['heal','ration'].includes(key)) acquisition.push('開局各 2 份；地上裂隙完成時也可能取得補給。');
       if (key === 'map') acquisition.push('開局 1 張。');

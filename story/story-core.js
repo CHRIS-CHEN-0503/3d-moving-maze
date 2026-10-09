@@ -29,7 +29,12 @@
   const isUnderworld = run => !!run && run.floor < 0 && run.underworld?.version === 1;
   const MAX_COINS = 999999;
   const MAX_STACK = 99;
-  const HASTE_DURATION = 300, HASTE_PERCENT = 20;
+  const HASTE_DURATION = 300, HASTE_PERCENT = 20, HASTE_STRONG_PERCENT = 35, POTION_BUFF_SECONDS = 180, POTION_BUFF_PERCENT = 30;
+  // Healing per draught, and the deepest-first floor each newer potion is sold or dropped from
+  // (surface floors at or below it, and the whole underground; -1 means underground only).
+  const HEAL_POTIONS = Object.freeze({ heal: 35, heal_mid: 70, heal_high: 150 }), SPIRIT_MP = 45;
+  const POTION_FLOORS = Object.freeze({ heal_mid: 60, heal_high: -1, haste_strong: -1, arcane: -1, courage: -1 });
+  const potionAvailable = (id, floor) => !Object.hasOwn(POTION_FLOORS, id) || floor <= POTION_FLOORS[id];
   function hasteMultiplier(run,id=run?.party?.loadouts?.active){
     const loadouts=run?.party?.loadouts,active=loadouts?loadouts.actors?.[id]?.buffs?.some(b=>b.id==='haste'&&b.left>0):run?.effects?.haste>0;
     return active?1+HASTE_PERCENT/100:1;
@@ -74,9 +79,15 @@
   });
   const ITEMS = Object.freeze({
     ...(heroRules()?.ROBOT?.FUEL_ITEMS||ROBOT_FUEL_COMPAT),
-    heal: Object.freeze({ id: 'heal', name: '療癒藥', description: '恢復 35 點生命。', buyPrice: 14, sellPrice: 6, color: '#ff7889' }),
+    heal: Object.freeze({ id: 'heal', name: '初級療癒藥', description: '恢復 35 點生命。', buyPrice: 14, sellPrice: 6, color: '#ff7889' }),
+    heal_mid: Object.freeze({ id: 'heal_mid', name: '中級療癒藥', description: '恢復 70 點生命。第 60 層起出現。', buyPrice: 30, sellPrice: 13, color: '#ff5f78' }),
+    heal_high: Object.freeze({ id: 'heal_high', name: '高級療癒藥', description: '恢復 150 點生命。地下第一層起出現。', buyPrice: 60, sellPrice: 26, color: '#ff4f9a' }),
+    spirit: Object.freeze({ id: 'spirit', name: '精神藥水', description: '恢復 45 點 MP，讓技能能再次施放；機器人改用動力石。', buyPrice: 16, sellPrice: 7, color: '#6ab6ff' }),
     ration: Object.freeze({ id: 'ration', name: '乾糧', description: '恢復 45 點飽食度。', buyPrice: 8, sellPrice: 3, color: '#efc073' }),
     haste: Object.freeze({ id: 'haste', name: '加速藥水', description: '使用者的移動速度與普通攻擊速度提高 '+HASTE_PERCENT+'%，持續五分鐘。不能疊加或刷新，不縮短技能冷卻與準備時間。', buyPrice: 24, sellPrice: 10, color: '#f3bc57' }),
+    haste_strong: Object.freeze({ id: 'haste_strong', name: '強力加速藥水', description: '使用者的移動速度與普通攻擊速度提高 '+HASTE_STRONG_PERCENT+'%，持續五分鐘；可取代仍在生效的一般加速藥水。地下第一層起出現。', buyPrice: 45, sellPrice: 20, color: '#ffd24a' }),
+    arcane: Object.freeze({ id: 'arcane', name: '魔力藥水', description: '使用者的法術攻擊力提高 '+POTION_BUFF_PERCENT+'%，持續三分鐘。地下第一層起出現。', buyPrice: 40, sellPrice: 18, color: '#b28cff' }),
+    courage: Object.freeze({ id: 'courage', name: '勇氣藥水', description: '使用者的物理攻擊力提高 '+POTION_BUFF_PERCENT+'%，持續三分鐘。地下第一層起出現。', buyPrice: 40, sellPrice: 18, color: '#ff8a4a' }),
     shield: Object.freeze({ id: 'shield', name: '星紋護盾', description: '職業旅程：最大生命35%的護盾，持續五分鐘。舊旅程：25秒減傷65%。', buyPrice: 18, sellPrice: 8, color: '#70bfff' }),
     hourglass: Object.freeze({ id: 'hourglass', name: '定牆沙漏', description: '暫停迷宮變形 25 秒。', buyPrice: 20, sellPrice: 9, color: '#ffd36f' }),
     bell: Object.freeze({ id: 'bell', name: '驅怪鈴', description: '讓怪物退避 20 秒。', buyPrice: 18, sellPrice: 8, color: '#bda2ff' }),
@@ -151,7 +162,7 @@
     const seed = Number.isInteger(opts.seed) && opts.seed > 0 && opts.seed <= 0xffffffff ? opts.seed : ((Date.now() >>> 0) || 1);
     return {
       stateVersion: STATE_VERSION, mode: 'tower', floor: 99, hp: MAX_HP, hunger: 100, coins: 24,
-      bag: { heal: 2, ration: 2, haste: 0, shield: 0, hourglass: 0, bell: 0, map: 1, feather: 0, arrow: 0, ...Object.fromEntries(Object.keys(ITEMS).filter(k=>ITEMS[k].fuel).map(k=>[k,0])) },
+      bag: { heal: 2, heal_mid: 0, heal_high: 0, spirit: 0, haste_strong: 0, arcane: 0, courage: 0, ration: 2, haste: 0, shield: 0, hourglass: 0, bell: 0, map: 1, feather: 0, arrow: 0, ...Object.fromEntries(Object.keys(ITEMS).filter(k=>ITEMS[k].fuel).map(k=>[k,0])) },
       effects: { shield: 0, freeze: 0, repel: 0, reveal: 0, haste: 0 },
       engine: { shovels: 1, kites: 0, whistles: 0, shovelCooldownMs: 0, skillCooldownMs: 0 },
       claimed: [], floorElapsed: 0, warrior: null, hiredWarriors: [], defeatedMonsters: [],
@@ -318,7 +329,7 @@
     for (const id of Object.keys(ITEMS).filter((key) => key !== 'coin')) {
       // Old journeys get their initial quiver once, without resetting other inventory.
       if (id === 'arrow' && !Object.hasOwn(run.bag,id)) { bag.arrow=run.party?.loadouts&&(run.party.profession==='archer'||run.party.members?.some(m=>m.profession==='archer'))?30:0; continue; }
-      if (id === 'haste' && !Object.hasOwn(run.bag,id)) { bag.haste=0; continue; }
+      if (['haste','heal_mid','heal_high','spirit','haste_strong','arcane','courage'].includes(id) && !Object.hasOwn(run.bag,id)) { bag[id]=0; continue; }
       if (ITEMS[id].fuel && !Object.hasOwn(run.bag,id)) { bag[id]=0; continue; }
       if (!Object.hasOwn(run.bag, id) || !validNumber(run.bag[id], 0, itemStorageLimit(id), true)) return null;
       bag[id] = run.bag[id];
@@ -620,14 +631,15 @@
       if (itemId === 'arrow') return { ok: false, message: '箭矢會在弓射時自動使用，不需要手動使用。' };
       if (ITEMS[itemId]?.fuel) return {ok:false,message:'動力石只供職業旅程中的機器人使用。'};
       const maximum=next.party?.loadouts?heroRules().maxHp(next):MAX_HP;
-      if (itemId === 'heal' && next.hp >= maximum) return { ok: false, message: '生命已滿，先把療癒藥留著吧。' };
+      if (Object.hasOwn(HEAL_POTIONS,itemId) && next.hp >= maximum) return { ok: false, message: '生命已滿，先把療癒藥留著吧。' };
+      if (['spirit','haste_strong','arcane','courage'].includes(itemId)) return { ok: false, message: ITEMS[itemId].name+'只在職業旅程中使用。' };
       if (itemId === 'ration' && next.hunger >= 100) return { ok: false, message: '飽食度已滿，暫時不需要乾糧。' };
       const effect = { id: itemId };
       if (itemId === 'haste') {
         if (next.effects.haste > 0) return {ok:false,message:'加速藥水仍在生效，不需重複使用。'};
         next.effects.haste=HASTE_DURATION; effect.duration=HASTE_DURATION;
       }
-      if (itemId === 'heal') { effect.healed = Math.min(35, maximum - next.hp); next.hp += effect.healed; }
+      if (Object.hasOwn(HEAL_POTIONS,itemId)) { effect.healed = Math.min(HEAL_POTIONS[itemId], maximum - next.hp); next.hp += effect.healed; }
       if (itemId === 'ration') { effect.fed = Math.min(45*(next.party?.loadouts?1+heroRules().teamPassive(next,'gourmet')/100:1), 100 - next.hunger); next.hunger += effect.fed;if(next.party?.loadouts)heroRules().food(next); }
       const timed = { shield: ['shield', 25], hourglass: ['freeze', 25], bell: ['repel', 20], map: ['reveal', 18] };
       if (timed[itemId]) {
@@ -791,5 +803,5 @@
     });
   }
 
-  return Object.freeze({ STATE_VERSION, MAX_HP, MAX_MONSTERS, HASTE_DURATION, HASTE_PERCENT, hasteMultiplier, validMonsterId, HUNT_ID, clearHunt, isFloor, isUnderworld, ITEMS, itemLimit, itemStorageLimit, GEAR, MONSTERS, CHAPTERS, OPENING, ENDING, EXCHANGES, floorConfig, newRun, validateSave, supplyPrice, buy, sell, exchange, useItem, collect, takeDamage, tickEffects, tickEffectsLive, startUnderworld, descend, monsterStrength, warriorOffer, hireWarrior, interceptMonster, createGear, validateGear, originalDurabilityMultiplier, durabilityMultiplier, durabilityMinimumRoll, durabilityForRoll, DURABILITY_VERSION, gearPrice, equipmentStats, receiveGear, grantGear, equipGear, discardGear, buyGear, effectiveMonsterStrength, hitMonster, resolveHeldMonster, transaction, applyDamage, newAdventure, validateAdventure });
+  return Object.freeze({ STATE_VERSION, MAX_HP, MAX_MONSTERS, HASTE_DURATION, HASTE_PERCENT, HASTE_STRONG_PERCENT, POTION_BUFF_SECONDS, POTION_BUFF_PERCENT, HEAL_POTIONS, SPIRIT_MP, POTION_FLOORS, potionAvailable, hasteMultiplier, validMonsterId, HUNT_ID, clearHunt, isFloor, isUnderworld, ITEMS, itemLimit, itemStorageLimit, GEAR, MONSTERS, CHAPTERS, OPENING, ENDING, EXCHANGES, floorConfig, newRun, validateSave, supplyPrice, buy, sell, exchange, useItem, collect, takeDamage, tickEffects, tickEffectsLive, startUnderworld, descend, monsterStrength, warriorOffer, hireWarrior, interceptMonster, createGear, validateGear, originalDurabilityMultiplier, durabilityMultiplier, durabilityMinimumRoll, durabilityForRoll, DURABILITY_VERSION, gearPrice, equipmentStats, receiveGear, grantGear, equipGear, discardGear, buyGear, effectiveMonsterStrength, hitMonster, resolveHeldMonster, transaction, applyDamage, newAdventure, validateAdventure });
 });

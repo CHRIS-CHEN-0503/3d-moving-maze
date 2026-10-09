@@ -14,7 +14,7 @@ function fn(name){const start=html.indexOf('function '+name+'(');assert.ok(start
 function room({host=true,id=host?'host':'guest'}={}){
   const toasts=[],sent=[],G={mazeW:5,mazeH:5,cell:4,px:0,pz:0,wallBoxes:[],running:true};
   const MP={on:true,started:true,ended:false,host,id,mode:'treasure',seriesRound:1,round:0,order:['host','guest'],roster:[{id:'host',name:'房主'},{id:'guest',name:'客人'},{id:'gone',name:'離開者'}],players:{guest:{tx:0,tz:0,lastSeen:1000,mesh:{position:{x:0,z:0},visible:true}},gone:{tx:4,tz:4,lastSeen:1000,mesh:{position:{x:4,z:4},visible:true}}},outs:{},finishers:[],treasure:{holder:null,cell:{x:2,y:2},lastPing:null,nextPingAt:0},bots:[]};
-  const nodes=new Map();const c=vm.createContext({MP,G,CHARS:[{emoji:''}],GameRules,GAME_VERSION:'1.58.5',clearInterval(){},MP_ROUND_EVENTS:new Set(),performance:{now:()=>1000},
+  const nodes=new Map();const c=vm.createContext({MP,G,CHARS:[{emoji:''}],GameRules,GAME_VERSION:'1.58.7',clearInterval(){},MP_ROUND_EVENTS:new Set(),performance:{now:()=>1000},
     $:id=>{if(!nodes.has(id))nodes.set(id,{style:{},textContent:'',disabled:true});return nodes.get(id);},showToast:s=>toasts.push(s),AudioEng:{sfxUse(){},sfxHit(){},stopMusic(){},stopItemLoop(){}},updateAtkBtn(){},escapeHtml:s=>String(s),CaptureFlag:{leave(){}},
     mpBroadcastLobby(){},mpRenderLobby(){},mpEndRace(){c.ended=(c.ended||0)+1;},mpSend:m=>{const packet={...m,f:MP.id,sr:1};sent.push(packet);c.mpHandle(packet);}});
   vm.runInContext([fn('cellToWorld'),fn('worldToCell'),fn('botPosOf'),fn('mpName'),fn('raceSettledCount'),fn('dropTreasure'),fn('syncTreasure'),fn('mpVersionMismatch'),fn('setTreasureHolder'),block('function mpHandle(', 'function mpAfterStart(')].join('\n'),c);
@@ -51,7 +51,7 @@ test('a racer who finished and then left counts once; the grace period ends even
 
 test('a lobby keeps seats for connected people only and joining twice never keeps two live connections',()=>{
   const h=room();h.MP.started=false;h.MP.mode='race';h.MP.maxPlayers=3;h.MP.roster=[{id:'host'},{id:'bot1',bot:true},{id:'bot2',bot:true},{id:'old',disconnected:true}];
-  h.c.mpHandle({t:'hello',f:'friend',name:'朋友',charIdx:0,ver:'1.58.5'});
+  h.c.mpHandle({t:'hello',f:'friend',name:'朋友',charIdx:0,ver:'1.58.7'});
   assert.deepEqual(h.MP.roster.map(r=>r.id),['host','friend']);assert.equal(h.sent.some(m=>m.t==='full'),false);
   const join=html.slice(html.indexOf("$('mpJoin').onclick="),html.indexOf("$('mpStart').onclick="));assert.match(join,/MP\.net\.close\(\);MP\.net=null;/);assert.match(join,/\$\('mpJoin'\)\.disabled=true;/);
   const connect=fn('mpConnect');assert.match(connect,/if\(MP\.net!==net\)return;/);assert.match(connect,/Math\.min\(8000,1000\*2\*\*tries\)/);
@@ -108,17 +108,17 @@ test('a guest that missed treasure verdicts adopts the host state carried by the
 });
 
 test('rooms only admit the same release, and a newer guest leaves an older host with clear advice',()=>{
-  assert.match(html,/const GAME_VERSION='1\.58\.5'/);
+  assert.match(html,/const GAME_VERSION='1\.58\.7'/);
   const h=room();h.MP.started=false;h.MP.mode='race';h.MP.maxPlayers=4;h.MP.roster=[{id:'host'}];
   h.c.mpHandle({t:'hello',f:'old',name:'舊版',charIdx:0});h.c.mpHandle({t:'hello',f:'odd',name:'他版',charIdx:0,ver:'1.57.9'});
   assert.deepEqual(h.MP.roster.map(r=>r.id),['host'],'older or different clients get no seat');
-  assert.deepEqual(h.sent.filter(m=>m.t==='full').map(m=>[m.to,m.reason,m.ver]),[['old','version','1.58.5'],['odd','version','1.58.5']]);
-  h.c.mpHandle({t:'hello',f:'same',name:'同版',charIdx:0,ver:'1.58.5'});assert.deepEqual(h.MP.roster.map(r=>r.id),['host','same']);
+  assert.deepEqual(h.sent.filter(m=>m.t==='full').map(m=>[m.to,m.reason,m.ver]),[['old','version','1.58.7'],['odd','version','1.58.7']]);
+  h.c.mpHandle({t:'hello',f:'same',name:'同版',charIdx:0,ver:'1.58.7'});assert.deepEqual(h.MP.roster.map(r=>r.id),['host','same']);
   assert.match(fn('mpBroadcastLobby'),/fillBots:MP\.fillBots,ver:GAME_VERSION\}\)/,'the lobby announces the release');
   // A guest told its version differs leaves the room but keeps the join screen with the reason.
   const g=room({host:false,id:'guest'});g.MP.started=false;let closed=0;g.MP.net={close(){closed++;}};
   g.c.mpHandle({t:'full',to:'guest',reason:'version',ver:'1.59.0',f:'host'});
-  assert.equal(closed,1);assert.equal(g.MP.on,false);assert.equal(g.MP.net,null);assert.match(g.nodes.get('mpStatus').textContent,/房主是 v1\.59\.0，你的是 v1\.58\.5/);assert.equal(g.nodes.get('mpJoin').disabled,false);
+  assert.equal(closed,1);assert.equal(g.MP.on,false);assert.equal(g.MP.net,null);assert.match(g.nodes.get('mpStatus').textContent,/房主是 v1\.59\.0，你的是 v1\.58\.7/);assert.equal(g.nodes.get('mpJoin').disabled,false);
   const old=room({host:false,id:'guest'});old.MP.started=false;old.MP.net={close(){}};old.c.mpHandle({t:'lobby',f:'host',players:[{id:'host'}],mode:'race'});
   assert.equal(old.MP.on,false,'an older host (no version in its lobby) is left at once');assert.match(old.nodes.get('mpStatus').textContent,/版本與你不同/);
   assert.match(html,/const hello=\(\)=>mpSend\(\{t:'hello',name:getPlayerName\(\),charIdx:G\.charIdx,ver:GAME_VERSION\}\);/);

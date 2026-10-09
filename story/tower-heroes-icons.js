@@ -105,6 +105,15 @@
     tempered_edge:g(sword,'rotate(40 32 32)')+p('M8 55q-6-15 5-22 0 14 10 13 1 12-15 9Z'),
     sturdy_gear:drawings.heavy_armor+p('M27 30h10v14H27m5-10v6'),
     item_heal:p('M23 5h18v9H23Zm2 9v9L13 34v22h38V34L39 23v-9M15 37h34M26 43h12m-6-6v18'),
+    // Higher healing grades: the same bottle with tinted liquid and tier bars by the neck.
+    item_heal_mid:'<path fill="#ff5f78" fill-opacity=".8" stroke="none" d="M15 38h34v16H15Z"/>'+p('M23 5h18v9H23Zm2 9v9L13 34v22h38V34L39 23v-9M15 37h34M26 45h12m-6-6v14M47 7v8M52 7v8'),
+    item_heal_high:'<path fill="#ff4f9a" fill-opacity=".8" stroke="none" d="M15 36h34v18H15Z"/>'+p('M23 5h18v9H23Zm2 9v9L13 34v22h38V34L39 23v-9M15 37h34M26 45h12m-6-6v14M46 6v9M51 6v9M56 6v9'),
+    // Spirit restores MP: a round flask of blue water with a rising swirl.
+    item_spirit:'<path fill="#6ab6ff" fill-opacity=".8" stroke="none" d="M15 38c2 12 6 17 17 17s15-5 17-17Z"/>'+p('M27 5h10v8H27Zm1 8v9C15 28 13 46 22 55h20c9-9 7-27-6-33v-9M24 44q8-9 16 0q-8 6-12-1')+circle(32,30,2),
+    // Battle draughts: a gold double bolt, a violet star, an orange blade.
+    item_haste_strong:'<path fill="#ffd24a" fill-opacity=".85" stroke="none" d="M18 40h28v15H18Z"/>'+p('M28 5h17v8H28Zm2 8v9C16 30 14 48 25 56h20c11-8 9-26-3-34v-9')+'<path fill="#ffe27a" stroke="#fff3c9" d="m30 28-8 12h6l-3 10 11-14h-7l3-8Zm12 0-8 12h6l-3 10 11-14h-7l3-8Z"/>',
+    item_arcane:'<path fill="#b28cff" fill-opacity=".8" stroke="none" d="M17 38h30v17H17Z"/>'+p('M27 5h10v8H27Zm1 8v10L14 36v20h36V36L36 23V13')+g(star,'translate(20 30) scale(.38)'),
+    item_courage:'<path fill="#ff8a4a" fill-opacity=".8" stroke="none" d="M17 38h30v17H17Z"/>'+p('M27 5h10v8H27Zm1 8v10L14 36v20h36V36L36 23V13M32 31v20M27 47h10M32 51v4'),
     item_haste:p('M28 5h17v8H28Zm2 8v9C16 30 14 48 25 56h20c11-8 9-26-3-34v-9M22 35q11-5 24 0M17 20H5m9 9H2m10 13H4m10 10H8')+'<path fill="#f3bc57" fill-opacity=".95" stroke="#ffe5a4" d="m37 29-10 14h8l-3 12 13-17h-9l4-9Z"/>',
     item_ration:p('M8 24Q8 8 32 8t24 16v31H8ZM8 28h48M19 17l-4 7m15-10-4 9m15-9-4 9M13 47h38'),
     item_shield:shield+g(star,'translate(21 20) scale(.35)'),

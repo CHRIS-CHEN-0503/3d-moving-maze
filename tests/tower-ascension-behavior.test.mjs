@@ -50,7 +50,7 @@ test('every level-twelve active is castable through actual progression; its mast
   for(const s of A.actives)for(const level of [12,15]){
     let r=supply(awaken(s.ascension.base,level,s.effect==='revive'));const target=targetFor(r,s),before=H.hp(r,target),gear=H.equipment(r,target).weapon,durability=gear?.durability;
     const result=cast(r,s.id,{targetId:target}),n=result.run,m=level===15?A.PASSIVES[A.BRANCHES[s.ascension.base].steps[1].id].modifiers:{powerPct:0,cooldownPct:0},power=s.power[5]*(1+m.powerPct/100);
-    approx(result.effect.power,power);approx(H.actor(n).cooldowns[s.id],s.cooldown*(1-H.pv(n,'recovery')/100)*(1-m.cooldownPct/100));
+    approx(result.effect.power,power);approx(H.actor(n).cooldowns[s.id],H.SKILLS[s.id].cooldown*(1-H.pv(n,'recovery')/100)*(1-m.cooldownPct/100));assert.equal(H.SKILLS[s.id].cooldown,s.cooldown*H.COOLDOWN_SCALE,'advanced moves are halved like every move');
     if(s.attack)assert.equal(H.actor(n).pending.id,s.id);
     if(s.effect==='speed'){approx(H.buff(n,'speed').power,power);assert.equal(H.buff(n,'speed').left,20);}
     if(s.effect==='ward'){approx(H.buff(n,'ward').left,power*(1+H.stats(n).support));assert.equal(H.buff(n,'ward').power,1);}

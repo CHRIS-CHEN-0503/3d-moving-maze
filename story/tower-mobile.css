@@ -109,3 +109,7 @@
 .hero-bag-head{display:flex;align-items:center;justify-content:space-between;gap:8px}.hero-bag-head>p{margin:0}.hero-bag-head>.tower-compact-help{margin:0;flex:none}
 /* v1.58.0 · an unreadable save is announced instead of looking like a fresh start. */
 .tower-save-warning{border:1px solid rgba(255,196,92,.55);background:rgba(255,176,64,.12);border-radius:10px;padding:.55em .75em;color:#ffe2a8}
+
+/* Settings: 離開遊戲 sits immediately left of 繼續遊戲, both at the right end of the row. */
+#towerDialog>.tower-actions .tower-btn.is-leave{margin-left:auto}
+#towerDialog>.tower-actions .tower-btn.is-leave+.tower-btn.is-exit{margin-left:0}

@@ -33,6 +33,6 @@ test('each profession card selects its live representative, and replay/pause con
 });
 
 test('preview stays silent and isolated, supports reduced motion and releases the renderer and shared effects on exit',()=>{
-  assert.doesNotMatch(html,/localStorage|sessionStorage|\bfetch\s*\(|WebSocket|AudioContext|new\s+Audio\b/);assert.match(html,/靶柱不是角色造型/);assert.match(html,/目前靜音/);assert.match(html,/min-height:44px/);assert.match(html,/tower-skill-effects\.js\?v=1\.58\.2/);
+  assert.doesNotMatch(html,/localStorage|sessionStorage|\bfetch\s*\(|WebSocket|AudioContext|new\s+Audio\b/);assert.match(html,/靶柱不是角色造型/);assert.match(html,/目前靜音/);assert.match(html,/min-height:44px/);assert.match(html,/tower-skill-effects\.js\?v=1\.58\.7/);
   const f=setup(true);assert.equal(f.env.skillPreview.reducedMotion,true);assert.ok(f.env.skillPreview.stats().particles<=12);f.events.get('pagehide')({persisted:true});assert.equal(f.disposed,0);f.events.get('pagehide')({persisted:false});assert.equal(f.disposed,1);assert.equal(f.raf.size,0);assert.equal(f.env.skillPreview.stats().groups,0);assert.equal(f.env.skillPreview.stats().textureBytes,0);assert.equal(f.env.skillPreview.destroy(),false);
 });

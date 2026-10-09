@@ -260,9 +260,9 @@
   }
   // Confirmations read as the main choice, irreversible ones as warnings and
   // leaving the menu as the quiet exit; keys and order never change.
-  function action(label, key, item, disabled) {
+  function action(label, key, item, disabled, extra='') {
     const tone=/(?:-confirm|-do)$|^hero-robot-upgrade$/.test(key)?' primary':/^(?:discard|party-dismantle|party-dismiss)$/.test(key)?' danger':key==='close'?' is-exit':'';
-    return '<button class="tower-btn'+tone+'" data-tower="' + key + '"' + (item ? ' data-item="' + text(item) + '"' : '') + (disabled ? ' disabled' : '') + '>' + text(label) + '</button>';
+    return '<button class="tower-btn'+tone+(extra?' '+extra:'')+'" data-tower="' + key + '"' + (item ? ' data-item="' + text(item) + '"' : '') + (disabled ? ' disabled' : '') + '>' + text(label) + '</button>';
   }
   function returnAction(){
     const shop=menuReturn&&nearest&&nearest.id===menuReturn.merchant&&Math.hypot(G.px-nearest.x,G.pz-nearest.z)<2.6;
@@ -330,7 +330,7 @@
       else window.GameVoice?.readPanel(el('towerDialog'));
     }
   }
-  function openBattleSettings(quiet=false){if(!active||!G.running)return;dialog('旅程暫停中','遊戲設定','調整聲音、畫質與操作，關閉後繼續冒險。',window.MazeAudioSettings.controls()+(window.MazeQuality?.controls()||'')+'<div class="battle-settings-options">'+action('音樂：'+(G.muted?'關':'開'),'battle-music')+(modern()?'<button class="tower-btn" data-tower="battle-auto-aim" role="switch" aria-checked="'+autoAim+'">自動對準：'+(autoAim?'開':'關')+'</button>'+action('技能排序','hero-order')+action('自動行動／快捷欄','hero-policy'):'')+'</div>'+(modern()?'<p class="tower-copy">自動對準：按攻擊或對敵技能時，朝向攻擊範圍內最近、未被牆壁遮擋的怪物。不會自動走位；輔助技能仍由你選隊友。</p>':''),action('繼續遊戲','close')+action('離開遊戲','quit'),{silent:quiet,summary:'遊戲設定。可以調整音量、畫質、自動對準與隊友行動。'});}
+  function openBattleSettings(quiet=false){if(!active||!G.running)return;dialog('旅程暫停中','遊戲設定','調整聲音、畫質與操作，關閉後繼續冒險。',window.MazeAudioSettings.controls()+(window.MazeQuality?.controls()||'')+'<div class="battle-settings-options">'+action('音樂：'+(G.muted?'關':'開'),'battle-music')+(modern()?'<button class="tower-btn" data-tower="battle-auto-aim" role="switch" aria-checked="'+autoAim+'">自動對準：'+(autoAim?'開':'關')+'</button>'+action('技能排序','hero-order')+action('自動行動／快捷欄','hero-policy'):'')+'</div>'+(modern()?'<p class="tower-copy">自動對準：按攻擊或對敵技能時，朝向攻擊範圍內最近、未被牆壁遮擋的怪物。不會自動走位；輔助技能仍由你選隊友。</p>':''),action('離開遊戲','quit',null,false,'is-leave')+action('繼續遊戲','close'),{silent:quiet,summary:'遊戲設定。可以調整音量、畫質、自動對準與隊友行動。'});}
   function closeDialog() {
     if(pendingDungeonShift)return;
     menuReturn=null;if(el('towerDialog').dataset)el('towerDialog').dataset.pageKey='';
@@ -991,16 +991,19 @@
   // The healing draught on the floor: a round red flask with a cork and a white
   // cross, matching the bag icon. (The 🧴 emoji sprite was the grab mode's
   // laundry detergent bottle.) Owned meshes, released with the drop.
-  function potionModel(){
-    const group=new THREE.Group();group.name='healing-draught';
-    const glass=new THREE.MeshPhongMaterial({color:0xd8f0ff,transparent:true,opacity:.38,shininess:90,specular:0xffffff,depthWrite:false}),liquid=new THREE.MeshLambertMaterial({color:0xe2384f,emissive:0x8a1424,emissiveIntensity:.45}),cork=new THREE.MeshLambertMaterial({color:0x9a6b43}),mark=new THREE.MeshBasicMaterial({color:0xffffff}),band=new THREE.MeshLambertMaterial({color:0xe8c66a});
+  // Floor drops of every potion share this bottle, tinted by kind.
+  const POTION_TINTS={heal:[0xe2384f,0x8a1424],heal_mid:[0xff5f2e,0x8a2a10],heal_high:[0xff3f9a,0x8a1050],spirit:[0x4f9df0,0x123e7a],haste_strong:[0xffcf3a,0x8a6410],arcane:[0xa77bff,0x3c2280],courage:[0xff7a2e,0x8a3410]};
+  function potionModel(key='heal'){
+    const tint=POTION_TINTS[key]||POTION_TINTS.heal,group=new THREE.Group();group.name='healing-draught';group.userData.potion=key;
+    const glass=new THREE.MeshPhongMaterial({color:0xd8f0ff,transparent:true,opacity:.38,shininess:90,specular:0xffffff,depthWrite:false}),liquid=new THREE.MeshLambertMaterial({color:tint[0],emissive:tint[1],emissiveIntensity:.45}),cork=new THREE.MeshLambertMaterial({color:0x9a6b43}),band=new THREE.MeshLambertMaterial({color:0xe8c66a});
     const body=new THREE.Mesh(new THREE.SphereGeometry(.26,16,12),glass);body.position.y=.26;body.renderOrder=2;
     const fill=new THREE.Mesh(new THREE.SphereGeometry(.215,14,10,0,Math.PI*2,Math.PI*.32,Math.PI*.68),liquid);fill.position.y=.26;
     const neck=new THREE.Mesh(new THREE.CylinderGeometry(.075,.09,.18,12,1,true),glass);neck.position.y=.58;neck.renderOrder=2;
     const ring=new THREE.Mesh(new THREE.TorusGeometry(.085,.018,6,14),band);ring.rotation.x=Math.PI/2;ring.position.y=.5;
     const stopper=new THREE.Mesh(new THREE.CylinderGeometry(.07,.062,.12,10),cork);stopper.position.y=.71;
     group.add(fill,body,neck,ring,stopper);
-    for(const [w,h]of [[.15,.045],[.045,.15]]){const bar=new THREE.Mesh(new THREE.BoxGeometry(w,h,.012),mark);bar.position.set(0,.27,.255);group.add(bar);}
+    // Healing draughts carry a white cross; the others stay plain.
+    if(key.startsWith('heal')){const mark=new THREE.MeshBasicMaterial({color:0xffffff});for(const [w,h]of [[.15,.045],[.045,.15]]){const bar=new THREE.Mesh(new THREE.BoxGeometry(w,h,.012),mark);bar.position.set(0,.27,.255);group.add(bar);}}
     return group;
   }
   function repositionForaging(){
@@ -1029,7 +1032,7 @@
       else if(entry.type==='gear'){const gear=HeroVisual.gear(THREE,entry.gear.kind);gear.scale.setScalar(.48);gear.updateMatrixWorld(true);const box=new THREE.Box3().setFromObject(gear),center=box.getCenter(new THREE.Vector3());gear.position.sub(center);icon.add(gear);}
       else if(entry.type==='fuel'){const wood=new THREE.Mesh(new THREE.CylinderGeometry(.07,.08,.75,6),new THREE.MeshLambertMaterial({color:0xa98a64}));wood.rotation.z=-.5;icon.add(wood);const cloth=new THREE.Mesh(new THREE.BoxGeometry(.35,.26,.18),new THREE.MeshLambertMaterial({color:0xe4d6b4}));cloth.position.set(.16,.12,0);icon.add(cloth);}
       else if(Heroes?.ROBOT?.fuelItemIds.includes(entry.key))icon.add(powerStoneModel(entry.key,entry.quantity));
-      else if(entry.type==='item'&&entry.key==='heal')icon.add(potionModel());
+      else if(entry.type==='item'&&Object.hasOwn(POTION_TINTS,entry.key))icon.add(potionModel(entry.key));
       else{const symbols={ration:'🍪',shield:'🛡️',hourglass:'⌛',bell:'🔔',map:'🗺️',feather:'🪶',arrow:'🏹'};icon.add(makeEmojiSprite(symbols[entry.key],.9));}
       icon.position.y=.65;model.add(icon,makePickupMarker(entry.type==='gear'?0xffd77c:0x84dfbc,Loot.label(entry)));world.add(model);loot.push({...point,id:entry.id,entry,kind:'combat-drop',model,icon,retry:0});
     }
@@ -1525,7 +1528,8 @@
     const hidden=modern()&&(Heroes.buff(run,'stealth')||status?.blind>0);
     const repelled=run.effects.repel>0||safe||now<G.invisUntil;
     const sense=window.TowerMonsterSense,baseProfile=sense?.profile(m.def)||{range:m.def.sight},profile={...baseProfile,range:baseProfile.range*(AdventureEvents?.senseScale(run)??1)},inRange=distance<=profile.range+(m.alertLeft>0?4:0),line=inRange&&hasClearPath(p.x,p.z,G.px,G.pz),concealed=hidden||now<G.invisUntil,detected=distance<=(concealed?Math.min(2,profile.range):profile.range)+(m.alertLeft>0?4:0)&&(line||profile.hearing&&!concealed);
-    m.awarenessLeft=Math.max(0,(m.awarenessLeft||0)-dt);if(detected&&m.elite&&!m.announced){m.announced=true;showToast(m.def.name+' 出現了！比一般怪物強，擊敗可獲得較多經驗。',3200);}if(detected&&!repelled){m.awarenessLeft=2.5;m.lastKnown={x:G.px,z:G.pz};if(m.lord){if(!cinema)lordVoice(m,'encounter');if((run.party.health[m.id]??m.maxHp)<=m.maxHp*.5)lordVoice(m,'wounded');}}
+    m.awarenessLeft=Math.max(0,(m.awarenessLeft||0)-dt);// A short silent notice: the name only, no spoken explanation.
+    if(detected&&m.elite&&!m.announced){m.announced=true;showToast(m.def.name+' 出現了！',2200,false);}if(detected&&!repelled){m.awarenessLeft=2.5;m.lastKnown={x:G.px,z:G.pz};if(m.lord){if(!cinema)lordVoice(m,'encounter');if((run.party.health[m.id]??m.maxHp)<=m.maxHp*.5)lordVoice(m,'wounded');}}
     m.cooldown=Math.max(0,m.cooldown-dt);m.pathLeft-=dt;
     m.model.userData.body.position.y=(m.kind==='clockmite' ? .6 : 1)+Math.sin(now*.004+m.phase)*.1;
     m.model.userData.ring.material.opacity=m.windup>0?.9:.35;

@@ -95,7 +95,8 @@
     'hunt-champion': Object.freeze({ title: '討伐裂隙・首領', description: '一隻強大的裂隙首領帶著部下守在深處。擊敗首領，部下就會散去。', objective: '擊敗裂隙首領；其他怪物可以避開。' }),
     'hunt-shards': Object.freeze({ title: '討伐裂隙・碎晶', description: '三隻怪物吞下了發光的裂晶，正四處遊走。擊倒牠們，取回三枚裂晶。', objective: '擊敗三隻帶晶的怪物，取回裂晶。' }),
   });
-  const HUNT_CHANCE = 50;
+  // Raised from 50% (v1.58.7): about two thirds of the eligible floors offer a hunt.
+  const HUNT_CHANCE = 65;
   const isHuntId = id => typeof id === 'string' && id.startsWith('hunt:');
   const lordFloor = floor => floor > 0 ? floor === 1 || floor % 10 === 0 : floor % 10 === 0;
   function huntHash(seed, text) { let h = seed >>> 0; for (const c of text) h = Math.imul(h ^ c.charCodeAt(0), 16777619) >>> 0; h = Math.imul(h ^ (h >>> 16), 0x85ebca6b); h = Math.imul(h ^ (h >>> 13), 0xc2b2ae35); return (h ^ (h >>> 16)) >>> 0; }

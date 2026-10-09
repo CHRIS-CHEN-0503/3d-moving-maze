@@ -310,3 +310,20 @@ test('a monster stepping out from behind a wall is a new question: the companion
     assert.equal(skill,true,'phase '+phase+': the skill is cast within one second');assert.equal(basic,false,'phase '+phase+': no basic attack comes first');
   }
 });
+test('each team card shows experience toward the next level as a plain bar (percent read aloud only), redrawing only when it changes',()=>{
+  const f=fixture({jobs:['swordsman'],dom:true,tickCore:true,hero:'mage'});f.advance(.5);const team=barOf(f,'heroTeamBar'),G=require('../story/tower-hero-growth.js');
+  const level=H.level(f.run(),'hero'),span=G.XP[level]-G.XP[level-1];H.gainXp(f.run(),G.XP[level-1]+Math.round(span*.45)-H.state(f.run()).xp);f.advance(.3);
+  const percent=Math.floor(H.xpProgress(f.run(),'hero')*100);assert.ok(percent>=44&&percent<=45,String(percent));
+  assert.equal((team.innerHTML.match(/class="hero-xp"/g)||[]).length,H.ids(f.run()).length,'one bar per card');assert.match(team.innerHTML,new RegExp('<span class="hero-xp" aria-hidden="true"><i style="width:'+percent+'%"></i></span>'),'a plain bar, no visible text');assert.doesNotMatch(team.innerHTML,/<b>經驗/);
+  assert.match(team.innerHTML,new RegExp('aria-label="[^"]*經驗 '+percent+'%'),'the percent is read out with the card');
+  const writes=team.writes;f.advance(1);assert.equal(team.writes,writes,'no redraw while the percent stays the same');
+  H.gainXp(f.run(),Math.ceil(span*.02));f.advance(.3);assert.equal(team.writes,writes+1,'one redraw when it changes');
+});
+test('a real level up in play lights the leveled members and flashes their cards, but a new floor does not',()=>{
+  const f=fixture({jobs:['swordsman'],dom:true,tickCore:true,hero:'mage'});f.advance(.5);const team=barOf(f,'heroTeamBar'),G=require('../story/tower-hero-growth.js');
+  const vfx=()=>{let n=0;f.world.traverse(o=>{if(o.name==='skill-vfx-level-up')n++;});return n;};assert.equal(vfx(),0,'no celebration when the floor starts');
+  const level=H.level(f.run(),'hero'),before=H.ids(f.run()).map(id=>H.level(f.run(),id));H.gainXp(f.run(),G.XP[level]-H.state(f.run()).xp);f.advance(.3);
+  const risen=H.ids(f.run()).filter((id,i)=>H.level(f.run(),id)>before[i]).length;assert.ok(risen>=1);assert.equal(vfx(),risen,'one column of light per member who levelled');
+  assert.equal((team.innerHTML.match(/just-leveled/g)||[]).length,risen);f.advance(2.2);assert.equal(vfx(),0,'the light ends');
+  const next=structuredClone(f.run());next.floor-=1;next.floorsCleared+=1;H.gainXp(next,G.XP[H.level(next,'hero')]-H.state(next).xp);f.setRun(next);f.advance(.2);assert.equal(vfx(),0,'a different floor only re-baselines');
+});

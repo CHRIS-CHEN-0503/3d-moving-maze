@@ -127,7 +127,7 @@
       }) };
     });
     const ingredientOffers = groceryCatalogue(floor, seed);
-    if (ingredientOffers) shops.push({ ...MERCHANTS.suHe, equipmentKinds: [], supplies: [...MERCHANTS.suHe.supplies].filter(key=>!['power_starlight','power_sunheart'].includes(key)), gear: [], ingredientOffers });
+    if (ingredientOffers) shops.push({ ...MERCHANTS.suHe, equipmentKinds: [], supplies: [...MERCHANTS.suHe.supplies].filter(key=>!['power_starlight','power_sunheart'].includes(key)&&C.potionAvailable(key,floor)), gear: [], ingredientOffers });
     return shops;
   }
   function merchant(run, merchantId) { return merchantOffers(run.floor, run.seed,!!run.party?.loadouts).find(entry => entry.id === merchantId); }

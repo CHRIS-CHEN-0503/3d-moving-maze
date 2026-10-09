@@ -36,12 +36,14 @@ test('life depends on the profession: a level-1 swordsman companion is sturdier 
 });
 
 test('a dropped healing draught is a red flask with a cork, not the grab mode detergent sprite',()=>{
-  const tower=read('story/tower-mode.js'),start=tower.indexOf('  function potionModel(){'),end=tower.indexOf('  function repositionForaging(){');
-  assert.ok(start>0&&end>start);assert.match(tower,/else if\(entry\.type==='item'&&entry\.key==='heal'\)icon\.add\(potionModel\(\)\);/);assert.doesNotMatch(tower,/heal:'🧴'/);
-  const c=vm.createContext({THREE:T});vm.runInContext(tower.slice(start,end)+';this.potionModel=potionModel;',c);const flask=c.potionModel();
+  const tower=read('story/tower-mode.js'),start=tower.indexOf('  const POTION_TINTS='),end=tower.indexOf('  function repositionForaging(){');
+  assert.ok(start>0&&end>start);assert.match(tower,/else if\(entry\.type==='item'&&Object\.hasOwn\(POTION_TINTS,entry\.key\)\)icon\.add\(potionModel\(entry\.key\)\);/,'every potion drop uses the bottle');assert.doesNotMatch(tower,/heal:'🧴'/);
+  const c=vm.createContext({THREE:T});vm.runInContext(tower.slice(start,end)+';this.potionModel=potionModel;',c);const flask=c.potionModel('heal');
   const meshes=[];flask.traverse(o=>{if(o.isMesh)meshes.push(o);});assert.ok(meshes.length>=7&&meshes.length<=9);
   assert.ok(meshes.some(m=>m.material.color.getHex()===0xe2384f),'red healing liquid');assert.ok(meshes.some(m=>m.material.color.getHex()===0x9a6b43),'cork');assert.ok(meshes.filter(m=>m.material.color.getHex()===0xffffff).length===2,'white cross');
-  assert.ok(meshes.every(m=>!m.material.map),'no texture, no emoji sprite');flask.updateMatrixWorld(true);const box=new T.Box3().setFromObject(flask);assert.ok(box.max.y<.85&&box.min.y>-.01);
+  assert.ok(meshes.every(m=>!m.material.map),'no texture, no emoji sprite');
+  // Other potions reuse the bottle in their own colour; only healing draughts carry the white cross.
+  for(const [key,color]of [['spirit',0x4f9df0],['arcane',0xa77bff],['courage',0xff7a2e],['heal_mid',0xff5f2e]]){const b=c.potionModel(key),list=[];b.traverse(o=>{if(o.isMesh)list.push(o);});assert.ok(list.some(m=>m.material.color.getHex()===color),key);assert.equal(list.filter(m=>m.material.color.getHex()===0xffffff).length,key.startsWith('heal')?2:0,key);}flask.updateMatrixWorld(true);const box=new T.Box3().setFromObject(flask);assert.ok(box.max.y<.85&&box.min.y>-.01);
 });
 
 test('older saved cell surveys keep their original rule, so no journey in progress breaks',()=>{

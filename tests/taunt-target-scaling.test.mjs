@@ -102,7 +102,7 @@ test('cooperative dawn breach scales taunt only; attack remains one target with 
     space.monsters=P.monsterSpecs(run).slice(0,6).map((m,i)=>({id:m.id,alive:true,x:i*.1,z:2.5}));
     const result=Co.cast(run,'dawn_breach',space);assert.ok(result.ok,result.message);
     assert.equal(result.effect.casts.find(c=>c.kind==='taunt').targets.length,count);assert.equal(result.effect.targets.length,1);
-    assert.equal(result.run.bag.arrow,run.bag.arrow-1);assert.equal(H.actor(result.run,'hero').cooldowns.taunt,48);assert.ok(C.validateSave(result.run));
+    assert.equal(result.run.bag.arrow,run.bag.arrow-1);assert.equal(H.actor(result.run,'hero').cooldowns.taunt,Co.DEFINITIONS.find(d=>d.id==='dawn_breach').cooldown);assert.equal(Co.DEFINITIONS.find(d=>d.id==='dawn_breach').cooldown,48*.5,'combos recover twice as fast too');assert.ok(C.validateSave(result.run));
   }
 });
 test('actual fortress runtime uses bounded stable selection and stops when its buff ends',()=>{
@@ -146,5 +146,5 @@ test('disarm exposes ratio-only progress, freezes on pause, and clears on comple
 test('game descriptions and shared atlas expose all six capped ranks for both taunts',()=>{
   for(const id of ['taunt','moving_fortress']){assert.match(H.SKILLS[id].description,/一～二級一隻、三～四級兩隻、五～六級三隻/);const entry=Atlas.skill(id);assert.match(entry.details.find(v=>v.label==='挑釁數量上限').value,/1／1／2／2／3／3/);}
   assert.match(Co.DEFINITIONS.find(s=>s.id==='dawn_breach').description,/五～六級三隻/);
-  assert.equal(H.SKILLS.taunt.cooldown,22);assert.deepEqual(H.SKILLS.taunt.power,[3,4,5,6,7,8]);assert.equal(H.SKILLS.moving_fortress.cooldown,90);
+  assert.equal(H.SKILLS.taunt.cooldown,22*H.COOLDOWN_SCALE);assert.deepEqual(H.SKILLS.taunt.power,[3,4,5,6,7,8]);assert.equal(H.SKILLS.moving_fortress.cooldown,90*H.COOLDOWN_SCALE);
 });

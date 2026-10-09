@@ -91,7 +91,7 @@ test('the mini lord can be taunted, is marked larger with a crown and a halo, an
   assert.equal(model.scale.x,1.35);assert.ok(model.getObjectByName('mini-lord-crown'));assert.ok(model.getObjectByName('mini-lord-halo'));assert.equal(model.userData.miniLord,true);
   const other=c.markMiniLord(new T.Group());assert.equal(other.getObjectByName('mini-lord-halo').geometry,model.getObjectByName('mini-lord-halo').geometry,'crown parts are shared');
   model.traverse(o=>{if(o.isMesh){assert.equal(o.geometry.userData.sharedResource,true);assert.equal(o.material.userData.sharedResource,true);}});
-  assert.match(tower,/if\(spec\?\.elite\)markMiniLord\(model\);/);assert.match(tower,/if\(detected&&m\.elite&&!m\.announced\)\{m\.announced=true;showToast\(m\.def\.name\+' 出現了！/);
+  assert.match(tower,/if\(spec\?\.elite\)markMiniLord\(model\);/);assert.match(tower,/if\(detected&&m\.elite&&!m\.announced\)\{m\.announced=true;showToast\(m\.def\.name\+' 出現了！',2200,false\);\}/,'a short silent notice: no spoken explanation');assert.doesNotMatch(tower,/比一般怪物強，擊敗可獲得較多經驗/);
 });
 
 test('a defeated mini lord always leaves one healing draught; forged bonus drops are rejected',()=>{

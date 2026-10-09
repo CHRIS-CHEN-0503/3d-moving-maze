@@ -16,8 +16,8 @@ function growthRuntime(initial,{positions,blocked=false,paused=false}={}){let ru
   return {ui,casts,at,get run(){return run;},wall(value){wall=value;},pause(value){stop=value;}};
 }
 
-test('restoration metadata is increased once at all six ranks; herbal healing cooldown is five seconds',()=>{
-  assert.equal(G.HEALING.multiplier,1.5);assert.equal(H.SKILLS.herbal_heal.cooldown,5);assert.deepEqual(H.SKILLS.herbal_heal.cost,{herb:1});
+test('restoration metadata is increased once at all six ranks; herbal healing cooldown is five seconds, halved with every move',()=>{
+  assert.equal(G.HEALING.multiplier,1.5);assert.equal(H.COOLDOWN_SCALE,.5);assert.equal(H.SKILLS.herbal_heal.cooldown,5*H.COOLDOWN_SCALE);assert.deepEqual(H.SKILLS.herbal_heal.cost,{herb:1});
   for(const [key,old]of Object.entries({herbal_heal:[20,25,30,35,40,45],warm_soup:[6,9,12,15,18,21],revive:[15,20,25,30,35,40]}))assert.deepEqual(H.SKILLS[key].power,old.map(n=>n*1.5),key);
   assert.deepEqual(H.PASSIVES.nourishment.power,[3,4.5,6,7.5,9,10.5]);assert.deepEqual(H.PASSIVES.food_sharing.power,[1.5,3,4.5,6,7.5,9]);assert.deepEqual(H.PASSIVES.gentle_care.power,[1.5,3,4.5,6,7.5,9]);
   assert.ok(H.SKILLS.dawn_sanctuary.power.every(n=>n===60));assert.ok(H.SKILLS.banquet_broth.power.every(n=>n===120));assert.ok(H.SKILLS.dawn_return.power.every(n=>n===90));
@@ -28,7 +28,7 @@ test('restoration metadata is increased once at all six ranks; herbal healing co
 test('herbal healing increases its full formula by fifty percent, preserves bonuses, costs and HP cap',()=>{
   let r=fresh('herbal_heal');H.actor(r).passives=['herbalism','gentle_care'];H.setHp(r,'hero',1);
   const old=(20*(1+H.pv(r,'herbalism')/100+H.stats(r).heal)+1),herbs=r.party.ingredients.herb,result=H.cast(r,'herbal_heal');assert.ok(result.ok,result.message);r=result.run;
-  close(H.hp(r,'hero'),Math.min(H.maxHp(r),1+old*1.5));assert.equal(H.actor(r).cooldowns.herbal_heal,5);assert.equal(r.party.ingredients.herb,herbs-1);assert.ok(C.validateSave(r));
+  close(H.hp(r,'hero'),Math.min(H.maxHp(r),1+old*1.5));assert.equal(H.actor(r).cooldowns.herbal_heal,5*H.COOLDOWN_SCALE);assert.equal(r.party.ingredients.herb,herbs-1);assert.ok(C.validateSave(r));
   H.tick(r,5);H.setHp(r,'hero',H.maxHp(r)-1);r=H.cast(r,'herbal_heal').run;assert.equal(H.hp(r,'hero'),H.maxHp(r));assert.equal(H.cast(r,'herbal_heal').ok,false);
 });
 

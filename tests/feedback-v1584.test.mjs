@@ -55,17 +55,24 @@ function upgradeFixture(){
   const run=GM.build({floor:50,job:'swordsman',level:6,seed:7,companions:[{job:'archer',level:5}],gear:false}).run;
   const add=(kind,id)=>{const g=C.createGear(kind,50,run.seed,id);run.gearBag.push(g);return g;};return {run,add};
 }
-test('a stronger pickup is suggested to the member it helps, measured with the real equip; weaker, equal or shield-dropping gear is not',()=>{
+test('a pickup is suggested whenever attack or defense rises for someone, measured with the real equip; equal or unusable gear is not',()=>{
   const {run,add}=upgradeFixture(),snapshot=JSON.stringify(run);
   const sword=add('longsword_t2','up-sword'),u=H.upgradeFor(run,sword.id);assert.equal(u.actorId,'hero');assert.equal(u.slot,'weapon');assert.ok(u.after.offense>u.before.offense*1.03);assert.equal(u.worn.kind,'longsword');
   const bow=add('elven_bow_t2','up-bow'),b=H.upgradeFor(run,bow.id);assert.equal(H.job(run,b.actorId),'archer','goes to the archer, not the leader');
   const armor=add('heavy_armor_t2','up-armor'),a=H.upgradeFor(run,armor.id);assert.equal(a.slot,'armor');assert.ok(a.after.armor>a.before.armor);
-  assert.equal(H.upgradeFor(run,add('longsword','same').id),null,'an equal item');assert.equal(H.upgradeFor(run,add('greatsword_t2','two-hand').id),null,'a two-hand weapon that drops the shield and lowers defense');
+  assert.equal(H.upgradeFor(run,add('longsword','same').id),null,'an equal item changes nothing');
+  // A trade-off still asks: attack rises, defense drops because the shield comes off; the prompt says so.
+  const great=H.upgradeFor(run,add('greatsword_t2','two-hand').id);assert.equal(great.actorId,'hero');assert.ok(great.offense>0&&great.armor<0);assert.equal(great.tradeoff,true);assert.equal(great.shieldOff,true);
+  // Small rises count too: a +1 helmet or shield.
+  const plusHelm=C.createGear('heavy_helm',50,run.seed,'helm-plus',true);run.gearBag.push(plusHelm);const helm=H.upgradeFor(run,plusHelm.id);assert.equal(helm.slot,'helmet');assert.ok(helm.armor>0&&!helm.tradeoff,'a +'+plusHelm.bonus+' helmet');
   assert.equal(H.upgradeFor(run,add('spellbook_t2','no-healer').id),null,'nobody in this party can use a healer book');assert.ok(C.validateSave(JSON.stringify(run)),'the fixture stays a real save');assert.equal(H.upgradeFor(run,'missing'),null);
   const young=GM.build({floor:94,job:'swordsman',level:2,seed:7,gear:false}).run,early=C.createGear('longsword_t2',94,young.seed,'early');young.gearBag.push(early);assert.equal(H.upgradeFor(young,early.id),null,'level 2 cannot wear a level-3 weapon yet');
   const before=JSON.parse(snapshot);assert.equal(JSON.stringify({...JSON.parse(JSON.stringify(run)),gearBag:before.gearBag}),JSON.stringify(before),'read only: nothing but the added bag items differ');
   // A broken weapon counts as no weapon, so even an identical fresh one is an upgrade.
   H.equipment(run,'hero').weapon.durability=0;assert.equal(H.upgradeFor(run,run.gearBag.find(g=>g.id.includes('same')).id)?.actorId,'hero');
+  // A pure improvement wins over a bigger trade-off for the same pickup choice.
+  assert.equal(H.upgradeGain({offense:10,armor:8},{offense:10.1,armor:8}).offense>0,true,'a 1% attack rise counts');assert.equal(H.upgradeGain({offense:10,armor:8},{offense:10,armor:8.5}).armor>0,true,'half a point of defense counts');
+  assert.equal(H.upgradeGain({offense:10,armor:8},{offense:10,armor:8}),null);assert.equal(H.upgradeGain({offense:10,armor:8},{offense:9,armor:7}),null,'nothing rises');assert.equal(H.upgradeGain({offense:10,armor:8},{offense:12,armor:6}).tradeoff,true);
   const swapped=H.equip(run,u.actorId,u.gearId,run.revision);assert.equal(swapped.ok,true);assert.equal(H.equipment(swapped.run,'hero').weapon.id,sword.id);assert.ok(swapped.run.gearBag.some(g=>g.kind==='longsword'),'the old weapon returns to the bag');assert.ok(C.validateSave(JSON.stringify(swapped.run)));
 });
 
@@ -75,6 +82,7 @@ test('the runtime pulses a prompt after a stronger pickup or chest, opens a comp
   assert.match(tower,/if\(result\.effect\.outcome==='gear'\)partyUI\?\.heroes\?\.suggestUpgrade\?\.\(result\.effect\.gear\.id\);/);
   assert.match(runtime,/upgrade\.id='heroUpgradeAlert';upgrade\.hidden=true;document\.getElementById\('towerLeftHud'\)\.appendChild\(upgrade\);if\(bind\)bind\(upgrade,upgradeDialog\)/);
   assert.match(runtime,/act\('立刻換上','hero-upgrade-equip',u\.actorId\+'\|'\+u\.gearId\)\+act\('暫不更換','hero-upgrade-skip',u\.gearId\)/);
+  assert.match(runtime,/\(u\.tradeoff\?'。注意：'\+\(u\.offense<0\?'攻擊':'防禦'\)\+'會下降'\+\(u\.shieldOff\?'，雙手武器會卸下盾牌（放回行囊）':''\):''\)/,'a trade-off names what drops');assert.match(runtime,/rises=\(u\.offense>1e-6\?'攻擊↑':''\)\+\(u\.armor>1e-6\?'防禦↑':''\)/,'the prompt says what rises');
   assert.match(runtime,/if\(key==='hero-upgrade-equip'\)\{[^\n]*commit\(H\.equip\(r\(\),who,item,r\(\)\.revision\)\)/,'one tap uses the normal equip transaction');
   assert.match(runtime,/function hud\(force=false\)\{if\(force\)upgradeAlert\(\);/,'a stale prompt clears after any change');assert.match(runtime,/function reset\(\)\{upgrades=\[\];upgradeAlert\(\);/);
   assert.match(css,/#heroUpgradeAlert\{[^}]*animation:hero-upgrade-pulse/);assert.match(css,/prefers-reduced-motion:reduce\)\{#heroUpgradeAlert\{animation:none/);assert.match(css,/#heroUpgradeAlert\{[^}]*min-height:44px/);

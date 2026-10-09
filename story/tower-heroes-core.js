@@ -263,17 +263,26 @@
   // An outer bound on anyone's life in a hero journey (the exact cap per actor is maxHp):
   // the sturdiest hero or companion at the level cap, plus the robot body talent's 30.
   function hpCeiling(under){const jobs=Object.keys(P().VITALITY);return Math.max(...jobs.map(j=>P().vitalHp(j,under?15:10,true)),...jobs.map(j=>P().vitalHp(j,under?10:5,false)))+30;}
-  const UPGRADE_MIN=.03,offenseOf=s=>Math.max(s.damage,s.spellDamage)*(1+s.support)/s.interval;
+  // Any rise counts: suggest it whenever attack per second or defense goes up,
+  // even if the other one drops (a two-hand weapon displacing a shield); the
+  // comparison shows both. Only floating-point noise is ignored.
+  const UPGRADE_EPSILON=1e-6,offenseOf=s=>Math.max(s.damage,s.spellDamage)*(1+s.support)/s.interval;
+  function upgradeGain(before,after){
+    const offense=after.offense/before.offense-1,armor=(after.armor-before.armor)/Math.max(4,before.armor);
+    if(offense<=UPGRADE_EPSILON&&armor<=UPGRADE_EPSILON)return null;
+    return {offense,armor,gain:Math.max(offense,armor),tradeoff:offense<-UPGRADE_EPSILON||armor<-UPGRADE_EPSILON};
+  }
   function upgradeFor(run,gearId){
     if(!enabled(run))return null;const g=run.gearBag.find(x=>x.id===gearId),d=GEAR[g?.kind];if(!g||!d||g.durability<=0)return null;
     let best=null;
     for(const id of ids(run)){
       if(!canEquip(run,id,g))continue;const trial=equip(run,id,gearId,run.revision);if(!trial.ok)continue;
-      const before=stats(run,id),after=stats(trial.run,id),weapon=d.slot==='weapon';
-      const gain=weapon?(after.armor<before.armor?0:offenseOf(after)/offenseOf(before)-1):after.armor-before.armor>=1?(after.armor-before.armor)/Math.max(4,before.armor):0;
-      if(gain<UPGRADE_MIN)continue;
-      const candidate={gearId,actorId:id,slot:d.slot,gear:g,worn:equipment(run,id)[d.slot]||null,gain,before:{offense:offenseOf(before),armor:before.armor},after:{offense:offenseOf(after),armor:after.armor}};
-      if(!best||gain>best.gain+1e-9||Math.abs(gain-best.gain)<=1e-9&&id===state(run).active)best=candidate;
+      const s0=stats(run,id),s1=stats(trial.run,id),before={offense:offenseOf(s0),armor:s0.armor},after={offense:offenseOf(s1),armor:s1.armor},rise=upgradeGain(before,after);
+      if(!rise)continue;
+      const candidate={gearId,actorId:id,slot:d.slot,gear:g,worn:equipment(run,id)[d.slot]||null,...rise,before,after,shieldOff:d.slot==='weapon'&&!!equipment(run,id).shield&&!equipment(trial.run,id).shield};
+      // A pure improvement beats a trade-off; then the larger rise; ties go to the leader.
+      const better=!best||(best.tradeoff&&!candidate.tradeoff)||best.tradeoff===candidate.tradeoff&&(candidate.gain>best.gain+1e-9||Math.abs(candidate.gain-best.gain)<=1e-9&&id===state(run).active);
+      if(better)best=candidate;
     }
     return best;
   }
@@ -519,5 +528,5 @@
     return {removedTraps:[...value.removedTraps],version:1,xpScale:G.XP_SCALE,active:value.active,level:value.level,xp,heroHp:value.heroHp,switchLeft:value.switchLeft,actors,enemy,growth,...(afflictions?{afflictions}:{})};
   }
   function validEquipment(run){if(!enabled(run))return true;const seen=new Set();for(const g of allGear(run)){if(seen.has(g.id)||(GEAR[g.kind]?.tier>3||X().TRAITS[g.forge?.trait]?.underground)&&!C().isUnderworld(run))return false;seen.add(g.id);}if(run.gearBag.some(ROBOT.isPart)||Object.values(G.state(run).imprints).some(mark=>ROBOT.isCore(allGear(run).find(g=>g.id===mark.gearId))))return false;return ids(run).every(id=>!!validateActorEquipment(equipment(run,id),job(run,id),level(run,id),run.floor));}
-  return Object.freeze({hpCeiling,upgradeFor,UPGRADE_MIN,finishMonster,killXp,SURFACE_XP_DEPTH,HUNT_XP,switchRaw,ROBOT,robotUpgradeQuote:ROBOT.upgradeQuote,upgradeRobot:ROBOT.upgrade,JOBS,GEAR,BASE_GEAR,TIER_NAMES,tierKind,gearPool,SKILLS,PASSIVES,SLOTS,PREPARATION,PREPARATION_REDUCTION,preparationSeconds,scale:readScale,state,enabled,ids,job,sex,level,maxLevel,experience,actor,maxHp,hp,equipment,equipmentSlots,validateActorEquipment,pv,teamPassive,buff,tauntTargetLimit,applyTaunt,setBuff,draft,reorderSkills,showHeadgear,preview,enable,addMember,recruitSnapshot,restoreMember,validateRecruitSnapshot,removeMember,sync,setHp,returnToHero,switchActor,followerRecords,canLearn,learnCompanion,allGear,canEquip,equip,unequip,stats,wear,durabilityWarnings,hurt,heal,organicHealable,gainXp,ranged,fireProjectile,fireArrow,strike,cast,food,speed,inflict,noteMovement,hungerScale,toolSpent,rescueChoice,tick,advance,validate,validEquipment,roll});
+  return Object.freeze({hpCeiling,upgradeFor,upgradeGain,finishMonster,killXp,SURFACE_XP_DEPTH,HUNT_XP,switchRaw,ROBOT,robotUpgradeQuote:ROBOT.upgradeQuote,upgradeRobot:ROBOT.upgrade,JOBS,GEAR,BASE_GEAR,TIER_NAMES,tierKind,gearPool,SKILLS,PASSIVES,SLOTS,PREPARATION,PREPARATION_REDUCTION,preparationSeconds,scale:readScale,state,enabled,ids,job,sex,level,maxLevel,experience,actor,maxHp,hp,equipment,equipmentSlots,validateActorEquipment,pv,teamPassive,buff,tauntTargetLimit,applyTaunt,setBuff,draft,reorderSkills,showHeadgear,preview,enable,addMember,recruitSnapshot,restoreMember,validateRecruitSnapshot,removeMember,sync,setHp,returnToHero,switchActor,followerRecords,canLearn,learnCompanion,allGear,canEquip,equip,unequip,stats,wear,durabilityWarnings,hurt,heal,organicHealable,gainXp,ranged,fireProjectile,fireArrow,strike,cast,food,speed,inflict,noteMovement,hungerScale,toolSpent,rescueChoice,tick,advance,validate,validEquipment,roll});
 });

@@ -246,11 +246,14 @@
     let upgrades=[];
     function upgradeTop(){upgrades=upgrades.filter(gid=>r().gearBag.some(g=>g.id===gid));for(const gid of upgrades){const u=H.upgradeFor(r(),gid);if(u)return u;}return null;}
     function upgradeAlert(){const el=document.getElementById('heroUpgradeAlert');if(!el)return null;const u=enabled()?upgradeTop():null;el.hidden=!u;
-      if(u&&el.dataset.gear!==u.gearId+'|'+u.actorId){el.dataset.gear=u.gearId+'|'+u.actorId;el.innerHTML=icon(u.gear.kind)+'<span><b>更強裝備</b><small>'+esc(name(u.actorId))+' 可換上</small></span>';el.setAttribute('aria-label','發現更強的裝備：'+u.gear.name+'，適合'+name(u.actorId)+'。點擊查看並快速更換');}
+      if(u&&el.dataset.gear!==u.gearId+'|'+u.actorId){el.dataset.gear=u.gearId+'|'+u.actorId;const rises=(u.offense>1e-6?'攻擊↑':'')+(u.armor>1e-6?'防禦↑':'');el.innerHTML=icon(u.gear.kind)+'<span><b>更強裝備</b><small>'+esc(name(u.actorId))+' '+rises+'</small></span>';el.setAttribute('aria-label','發現更強的裝備：'+u.gear.name+'，'+name(u.actorId)+'換上後'+(u.offense>1e-6?'攻擊上升':'')+(u.offense>1e-6&&u.armor>1e-6?'、':'')+(u.armor>1e-6?'防禦上升':'')+'。點擊查看並快速更換');}
       if(!u)delete el.dataset.gear;return u;}
     function suggestUpgrade(gearId){if(!enabled()||!gearId)return false;upgrades=[gearId,...upgrades.filter(g=>g!==gearId)].slice(0,6);return !!upgradeAlert();}
     function upgradeDialog(){const u=upgradeAlert();if(!u){ctx.toast('這件裝備已經不是更好的選擇了。');return false;}
-      const fmt=n=>n.toFixed(1).replace(/\.0$/,''),change=u.slot==='weapon'?'每秒攻擊力 '+fmt(u.before.offense)+' → '+fmt(u.after.offense)+'（+'+Math.round(u.gain*100)+'%）':'防禦 '+fmt(u.before.armor)+' → '+fmt(u.after.armor);
+      // Show every stat that changes, up or down, so a trade-off is a clear choice.
+      const digits=(a,b)=>Math.abs(a-b)<.1?2:1,fmt=(n,d=1)=>n.toFixed(d).replace(/\.?0+$/,''),pct=p=>(p>0?'+':'−')+fmt(Math.abs(p*100),Math.abs(p)<.01?1:0)+'%',delta=n=>(n>0?'+':'−')+fmt(Math.abs(n),digits(n,0));
+      const lines=[...(Math.abs(u.offense)>1e-6?['每秒攻擊力 '+fmt(u.before.offense,digits(u.before.offense,u.after.offense))+' → '+fmt(u.after.offense,digits(u.before.offense,u.after.offense))+'（'+pct(u.offense)+'）']:[]),...(Math.abs(u.after.armor-u.before.armor)>1e-6?['防禦 '+fmt(u.before.armor)+' → '+fmt(u.after.armor)+'（'+delta(u.after.armor-u.before.armor)+'）']:[])];
+      const change=lines.join('；')+(u.tradeoff?'。注意：'+(u.offense<0?'攻擊':'防禦')+'會下降'+(u.shieldOff?'，雙手武器會卸下盾牌（放回行囊）':''):'');
       const card=(g,label)=>'<article class="hero-equipped">'+(g?icon(g.kind)+'<b>'+esc(label)+' · '+esc(g.name)+'</b><p>'+esc(info(g,u.actorId))+'</p>':'<b>'+esc(label)+' · 空著</b>')+'</article>';
       ctx.dialog('發現更強的裝備 · 暫停中',name(u.actorId)+' · '+H.JOBS[H.job(r(),u.actorId)].name,change+'。換下的裝備會放回行囊。','<div class="hero-equipped-grid">'+card(u.worn,'目前')+card(u.gear,'新裝備')+'</div>',
         act('立刻換上','hero-upgrade-equip',u.actorId+'|'+u.gearId)+act('暫不更換','hero-upgrade-skip',u.gearId)+act('回到迷宮','close'),{heroManagement:true,summary:'發現更強的裝備：'+u.gear.name+'，適合'+name(u.actorId)+'。'+change+'。'});return true;}

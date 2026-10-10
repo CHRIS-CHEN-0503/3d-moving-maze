@@ -11,6 +11,7 @@
     jinHe: Object.freeze({ id: 'jinHe', name: '裁甲師・錦禾', goods: Object.freeze(['armor', 'pan']), colors: Object.freeze({ cloth: 0x9c4778, metal: 0xa4b2bf, accent: 0xe1c67d }), silhouette: '女性、紫紅披肩、分層胸甲與裁縫腰包' }),
     lanZhou: Object.freeze({ id: 'lanZhou', name: '盾匠・嵐舟', goods: Object.freeze(['shield', 'staff']), colors: Object.freeze({ cloth: 0x356b58, metal: 0x899ca3, accent: 0xc8ad73 }), silhouette: '高瘦、綠長外套、單片護目與背圓盾' }),
     suHe: Object.freeze({ id: 'suHe', name: '雜貨商・蘇禾', goods: Object.freeze(['heal', 'haste', 'herb']), colors: Object.freeze({ cloth: 0xc39c54, metal: 0x71918b, accent: 0xa8d7ac }), silhouette: '成年女性、編髮草帽、青綠圍裙、提籃與隨身藥瓶' }),
+    hunter: Object.freeze({ id: 'hunter', name: '魔物獵人・灰狼', goods: Object.freeze(['meat', 'shell', 'dragonpepper']), colors: Object.freeze({ cloth: 0x5d4a3a, metal: 0x7d7368, accent: 0xd9a35b }), silhouette: '成年男性、灰狼毛領皮甲、背負獵刀與獵獲袋、腰掛獠牙' }),
   });
   const EXPLORER_STYLES = Object.freeze({
     eve: Object.freeze({ id: 'eve', name: '伊芙', title: '探索者', description: '擅長記錄路線的青年旅人，總把新發現畫在隨身地圖上。', silhouette: '女性、旅行帽、側辮、青綠斗篷與地圖' }),
@@ -199,11 +200,28 @@
     return g;
   }
 
+  function makeHunter(k) {
+    const g=figure(k,{width:.7,legHeight:.62,bodyY:1.02,headY:1.68,shirt:0x5d4a3a,pants:0x3b3a35,skin:0xc99a74});
+    hair(k,g,{job:'scout',color:0x2f2a28,name:'hunter-hair'});
+    k.torus(g,[.4,.11,6,14],0x8a7a66,'wolf-fur-collar',0,1.42,0).rotation.x=Math.PI/2;
+    k.box(g,[.52,.62,.1],0x6a5343,'leather-chest',0,1.02,.2);
+    belt(k,g,[.74,.1,.42],0x3e3128,'hunter-belt',.78);
+    for(const [i,x]of [-.16,0,.16].entries())k.cone(g,[.03,.11,4],0xe8dcc4,'fang-charm-'+i,x,.7,.25).rotation.x=Math.PI;
+    k.box(g,[.08,.78,.05],0x8d8378,'back-blade',-.14,1.12,-.27).rotation.z=.35;
+    k.box(g,[.14,.16,.07],0x3e3128,'blade-grip',-.33,1.5,-.27).rotation.z=.35;
+    const sack=new k.T.Group();sack.name='catch-sack';sack.position.set(0,-.46,.14);g.userData.armR.add(sack);
+    k.sphere(sack,[.2,8,6],0x9b7e5c,'sack-body',0,0,0).scale.set(1,1.25,.9);k.torus(sack,[.1,.03,4,10],0x3e3128,'sack-tie',0,.22,0);
+    k.cone(sack,[.05,.18,4],0xd9a35b,'sack-horn',.13,.12,.08).rotation.z=-.6;
+    k.box(g,[.05,.05,.3],0xd9a35b,'eye-scar',.13,1.74,.2).rotation.y=Math.PI/2;
+    g.userData.armR.rotation.z=-.16;g.userData.sex='male';
+    return g;
+  }
+
   function buildMerchant(id, deps) {
     const canonical = typeof id === 'string' && (Object.hasOwn(MERCHANT_STYLES, id) ? id : Object.hasOwn(aliases, id) ? aliases[id] : null);
     if (!canonical) throw new RangeError('未知的高塔商人：' + id);
     const k = kit(deps);
-    const group = canonical === 'tieLing' ? makeSmith(k) : canonical === 'jinHe' ? makeArmorer(k) : canonical === 'suHe' ? makeGrocer(k) : makeShieldsmith(k, deps);
+    const group = canonical === 'tieLing' ? makeSmith(k) : canonical === 'jinHe' ? makeArmorer(k) : canonical === 'suHe' ? makeGrocer(k) : canonical === 'hunter' ? makeHunter(k) : makeShieldsmith(k, deps);
     group.name = 'tower-merchant-' + canonical;
     Object.assign(group.userData, { merchantId: canonical, role: 'merchant', style: MERCHANT_STYLES[canonical] });
     return group;

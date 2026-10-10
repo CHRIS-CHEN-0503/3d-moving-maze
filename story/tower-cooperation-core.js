@@ -43,7 +43,8 @@
       if(members.some((id,i)=>members.slice(i+1).some(other=>distance(positions[id],positions[other])>d.formation.distance||!look(positions[id],positions[other]))))continue;
       const nearby=h.ids(run).filter(id=>h.hp(run,id)>0&&point(positions[id])&&members.every(m=>distance(positions[m],positions[id])<=6&&look(positions[m],positions[id]))),choices=d.effect.targetMember!==undefined?[members[d.effect.targetMember]]:nearby,target=choices.filter(id=>nearby.includes(id)&&validTarget(run,d,id,nearby,members)).sort((a,b)=>h.hp(run,a)/h.maxHp(run,a)-h.hp(run,b)/h.maxHp(run,b))[0];
       if(!target||nearby.filter(id=>h.hp(run,id)<h.maxHp(run,id)).length<(d.effect.injured||0))continue;
-      let targets=monsters.filter(m=>d.participants.every((p,i)=>!p.range||(distance(positions[members[i]],m)<=p.range&&look(positions[members[i]],m))));
+      // space.tolerance (metres) only widens the monster range at release, never the formation.
+      let targets=monsters.filter(m=>d.participants.every((p,i)=>!p.range||(distance(positions[members[i]],m)<=p.range+(space.tolerance||0)&&look(positions[members[i]],m))));
       if(d.formation.kind==='front')targets=targets.filter(m=>{const front=distance(positions[members[d.formation.front]],m);return members.every((id,i)=>i===d.formation.front||distance(positions[id],m)>=front+.6);});
       if(d.formation.kind==='pincer')targets=targets.filter(m=>{const a=positions[members[0]],b=positions[members[1]],den=distance(a,m)*distance(b,m);return den>.01&&((a.x-m.x)*(b.x-m.x)+(a.z-m.z)*(b.z-m.z))/den<=.34;});
       targets=targets.sort((a,b)=>distance(origin,a)-distance(origin,b)).slice(0,d.effect.targets||3);

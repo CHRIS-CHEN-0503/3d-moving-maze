@@ -9,7 +9,7 @@ assert.ok(['127.0.0.1','localhost'].includes(base.hostname),'QA must use an isol
 const version='1.54.3',out='.agent-run/v1543-atlas-qa';
 const report={version,url:new URL('docs/'+encodeURIComponent('職業裝備圖鑑.html')+'?v='+version,base).href,views:[],screenshots:[],errors:[],missing:[],blocked:[],socketAttempts:[]};
 const resources=[
-  {name:'香草',id:'ingredient:herb',category:'items'},
+  {name:'藥草',id:'ingredient:herb',category:'items'},
   {name:'精鐵礦',id:'material:ironore',category:'items'},
   {name:'微光動力石',id:'item:power_glimmer',category:'items'}
 ];

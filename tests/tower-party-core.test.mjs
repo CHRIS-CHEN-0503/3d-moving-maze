@@ -26,7 +26,7 @@ test('recruitment is deterministic, revision-checked, paid once, and capped at f
   assert.equal(P.recruit(r,P.recruitOffer(r).id).ok,true);
 });
 test('surface recipes debit ingredients, preserve legacy chef double portions, cap stacks and prevent stale spending',()=>{
-  assert.equal(Object.keys(P.RECIPES).length,23);assert.equal(Object.keys(P.availableRecipes(fresh('chef'))).length,18);assert.equal(Object.keys(P.availableRecipes(fresh())).length,6);
+  assert.equal(Object.values(P.RECIPES).filter(r=>!r.hidden&&!r.research).length,23);assert.equal(Object.keys(P.availableRecipes(fresh('chef'))).length,18);assert.equal(Object.keys(P.availableRecipes(fresh())).length,6);
   for(const id of Object.keys(P.availableRecipes(fresh('chef')))){let r=fresh('chef');for(const k of Object.keys(r.party.ingredients))r.party.ingredients[k]=30;const before=structuredClone(r);const result=P.cook(r,id,r.revision);assert.equal(result.ok,true);assert.equal(result.run.party.meals[id],2);for(const[k,n]of Object.entries(P.RECIPES[id].cost))assert.equal(result.run.party.ingredients[k],30-n);assert.deepEqual(r,before);assert.equal(P.cook(result.run,id,r.revision).ok,false);result.run.party.meals[id]=99;assert.equal(P.cook(result.run,id).ok,false);}
   const r=fresh();r.party.ingredients.root=0;assert.equal(P.cook(r,'stew').ok,false);
 });

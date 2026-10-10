@@ -9,16 +9,16 @@ function move(run,floor){run.floor=floor;run.floorsCleared=floor>0?99-floor:99+(
 function underground(job='mage'){const run=move(fresh(job),1);run.chronicle.ending='keeper';run.chronicle.clues.push('clue:heart');run.party.boss.started=true;run.party.boss.done=true;run.party.boss.seals.fill(true);run.defeatedMonsters.push('monster-11');const ended=C.descend(run);assert.ok(ended.ok);const entered=C.startUnderworld(ended.run);assert.ok(entered.ok);return entered.run;}
 
 test('regional ingredients and minerals start empty, preserve the six original supplies and stay separate',()=>{
-  const run=fresh();assert.equal(Object.keys(P.INGREDIENTS).length,21);assert.equal(Object.keys(M.MATERIALS).length,6);assert.deepEqual(P.INGREDIENTS,M.INGREDIENTS);
+  const run=fresh();assert.equal(Object.keys(P.INGREDIENTS).length,58);assert.equal(Object.keys(M.MATERIALS).length,6);assert.deepEqual(P.INGREDIENTS,M.INGREDIENTS);
   assert.deepEqual(Object.fromEntries(legacyIngredients.map(k=>[k,run.party.ingredients[k]])),{root:3,mushroom:2,herb:2,nectar:0,meat:0,shell:1});
-  for(const key of Object.keys(P.INGREDIENTS).filter(k=>!legacyIngredients.includes(k)))assert.equal(run.party.ingredients[key],0);
+  for(const key of Object.keys(P.INGREDIENTS).filter(k=>!legacyIngredients.includes(k)&&k!=='dew'))assert.equal(run.party.ingredients[key],0);assert.equal(run.party.ingredients.dew,2,'two dew start the potion base');
   assert.deepEqual(run.party.journey.materials,Object.fromEntries(Object.keys(M.MATERIALS).map(k=>[k,0])));
   for(const key of Object.keys(M.MATERIALS))assert.equal(Object.hasOwn(run.party.ingredients,key),false,'metals cannot be eaten as a skill ingredient');
   assert.deepEqual(C.validateSave(JSON.stringify(run)),run);
 });
 
 test('legacy six-ingredient and sixteen-meal saves migrate losslessly and without gifting resources',()=>{
-  const source=move(underground(),-50);source.party.ingredients.meat=9;source.party.ingredients.shell=11;source.party.journey.scrap=17;source.coins=412;
+  const source=move(underground(),-50);source.party.ingredients.meat=9;source.party.ingredients.shell=11;source.party.journey.scrap=17;source.coins=412;source.party.ingredients.dew=0;
   for(const key of previousRecipes)source.party.meals[key]=2;source.equipment.weapon.forge={trait:'durable',level:1,reserve:1,wearCredit:0};
   const old=structuredClone(source);old.party.ingredients=Object.fromEntries(legacyIngredients.map(k=>[k,old.party.ingredients[k]]));old.party.meals=Object.fromEntries(previousRecipes.map(k=>[k,old.party.meals[k]]));delete old.party.journey.materials;delete old.equipment.weapon.forge.wearCredit;
   const raw=JSON.stringify(old),migrated=C.validateSave(raw);assert.ok(migrated);assert.equal(JSON.stringify(old),raw);assert.deepEqual(migrated,source);
@@ -40,8 +40,8 @@ test('ingredients, prepared food and new forging materials survive environment c
 });
 
 test('all fifteen regional ingredients have recipes and region-exclusive recipes cannot use old ingredients as substitutes',()=>{
-  const regionKeys=Object.keys(P.INGREDIENTS).filter(k=>!legacyIngredients.includes(k));assert.equal(regionKeys.length,15);
-  for(const key of regionKeys){const matches=Object.entries(P.RECIPES).filter(([,r])=>r.cost[key]);assert.ok(matches.length>0,key);for(const[id,recipe]of matches){const run=move(underground('chef'),-50);for(const key of legacyIngredients)run.party.ingredients[key]=99;const before=JSON.stringify(run);assert.equal(P.cook(run,id).ok,false,id);assert.equal(JSON.stringify(run),before);for(const[k,v]of Object.entries(recipe.cost))run.party.ingredients[k]=v;const cooked=P.cook(run,id);assert.ok(cooked.ok,id+': '+cooked.message);assert.equal(cooked.run.party.ingredients[key],0);assert.ok(C.validateSave(cooked.run));}}
+  const regionKeys=Object.keys(P.INGREDIENTS).filter(k=>!legacyIngredients.includes(k)&&k!=='dew'&&Object.values(P.RECIPES).some(r=>!r.hidden&&r.cost[k]));assert.equal(regionKeys.length,15);
+  for(const key of regionKeys){const matches=Object.entries(P.RECIPES).filter(([,r])=>r.cost[key]&&!r.hidden);assert.ok(matches.length>0,key);for(const[id,recipe]of matches){const run=move(underground('chef'),-50);for(const key of legacyIngredients)run.party.ingredients[key]=99;const before=JSON.stringify(run);assert.equal(P.cook(run,id).ok,false,id);assert.equal(JSON.stringify(run),before);for(const[k,v]of Object.entries(recipe.cost))run.party.ingredients[k]=v;const cooked=P.cook(run,id);assert.ok(cooked.ok,id+': '+cooked.message);assert.equal(cooked.run.party.ingredients[key],0);assert.ok(C.validateSave(cooked.run));}}
 });
 
 test('all seven forge treatments consume scaled regional material costs atomically, never by repair',()=>{

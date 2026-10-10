@@ -184,7 +184,8 @@
     talk.innerHTML='<svg viewBox="0 0 32 32" aria-hidden="true" focusable="false"><path d="M23 18h2a3 3 0 0 0 3-3V8a3 3 0 0 0-3-3H13a3 3 0 0 0-3 3v2"/><path d="M7 12h12a3 3 0 0 1 3 3v7a3 3 0 0 1-3 3h-6l-6 4v-4a3 3 0 0 1-3-3v-7a3 3 0 0 1 3-3Z"/><path d="M9 18h.1M13 18h.1M17 18h.1"/></svg>';
     el('hudRightBtns').appendChild(talk);
     const objective = document.createElement('div'); objective.id = 'towerObjective'; objective.hidden=true; el('gameScreen').appendChild(objective);
-    objectiveHint=createObjectiveHint(el('hudRoundControl'),objective,()=>active&&floorStarted&&G.running&&!paused&&run?.status==='playing',()=>N&&!inDungeon()?N.objective(run):null);
+    // While a lord's half-health shield is up, the held hint shows the counter objective instead of the chapter line.
+    objectiveHint=createObjectiveHint(el('hudRoundControl'),objective,()=>active&&floorStarted&&G.running&&!paused&&run?.status==='playing',()=>{if(inDungeon())return null;const guard=AdventureEvents?.guardNotice?.(run);return guard?guard.objective:N?N.objective(run):null;});
     const overlay = document.createElement('div'); overlay.id = 'towerOverlay'; overlay.hidden = true;
     overlay.innerHTML = '<section id="towerDialog" class="tower-card" role="dialog" aria-modal="true" aria-labelledby="towerDialogTitle" tabindex="-1"></section>';
     document.body.appendChild(overlay);
@@ -536,7 +537,7 @@
       '<p class="tower-copy">本層 ' + floorConfig.size + ' × ' + floorConfig.size + '｜物資 '+counts.total+' 件，不隨變形重生｜每 ' + floorConfig.shiftSeconds + ' 秒變形｜' + (floorConfig.monsterCount ? '武器只能擊暈，善用護衛合作' : '安全探索，先儲備補給') + '</p><p class="tower-copy">左側移動 · 右側看四周 · 背包／裝備 B · 互動 R · 擊暈 X · 空白鍵鐵鍬</p>', action('踏入迷宮', 'close'));
   }
   function floorFacts() {
-    return '<p class="tower-copy">本層 '+floorConfig.size+' × '+floorConfig.size+' · 每 '+floorConfig.shiftSeconds+' 秒變形 · 怪物總上限 '+(Reinforcements?.limit(floorConfig.size)||20)+' 隻</p><p class="tower-copy">討伐候選物資判定：普通20%'+(run.party?'（四種常用食材'+Loot.chance({type:'ingredient',key:'herb',rarity:'common'})+'%）':'')+'、少見12%、稀有6%、珍稀3%，需靠近拾取。'+(run.party?'牆角可採藥草與礦石，本層採過不補回。':'')+'商人、寶箱與委託獎勵保留；樓層主另有50%機率掉裝備。變形後會增援1～3隻，不超過總上限。</p><p class="tower-copy">魔法地圖需探索道路，可由怪物掉落或向商人購買；使用後揭露本次迷宮，變形後重新探索。</p><p class="tower-copy">左側移動 · 右側看四周 · 背包 B · 互動 R · 故事日誌 J</p>';
+    return '<p class="tower-copy">本層 '+floorConfig.size+' × '+floorConfig.size+' · 每 '+floorConfig.shiftSeconds+' 秒變形 · 怪物總上限 '+(Reinforcements?.limit(floorConfig.size)||20)+' 隻</p><p class="tower-copy">討伐候選物資判定：普通20%'+(run.party?'（五種常用食材'+Loot.chance({type:'ingredient',key:'herb',rarity:'common'})+'%）':'')+'、少見12%、稀有6%、珍稀3%，需靠近拾取。'+(run.party?'牆角可採藥草與礦石，本層採過不補回。':'')+'商人、寶箱與委託獎勵保留；樓層主另有50%機率掉裝備。變形後會增援1～3隻，不超過總上限。</p><p class="tower-copy">魔法地圖需探索道路，可由怪物掉落或向商人購買；使用後揭露本次迷宮，變形後重新探索。</p><p class="tower-copy">左側移動 · 右側看四周 · 背包 B · 互動 R · 故事日誌 J</p>';
   }
   function prose(paragraphs) { return '<div class="tower-prose">'+paragraphs.map(p=>'<p>'+text(p)+'</p>').join('')+'</div>'; }
   function echoCards(entries) { return entries.map(e=>'<aside class="tower-story-echo"><small>旅途回聲 · '+text(e.title)+'</small><p>'+text(e.text)+'</p></aside>').join(''); }
@@ -954,6 +955,9 @@
     if(followupMarker)followupMarker.model.visible=s.chain?.status==='active'&&s.chain.targetFloor===run.floor;
     for(const item of counterObjects){item.model.visible=s.lord?.phase==='guarded'&&!s.lord.broken[item.index];const glow=s.lord?.armed>0?.65:.15;if(item.glow!==glow){item.glow=glow;item.model.traverse(o=>{if(o.isMesh)o.material.emissiveIntensity=glow;});}}
     if(s.lord?.phase==='guarded'&&!lordCounterNotice){lordCounterNotice=true;showToast(run.floor===80?'園后的根盾亮起了！斬斷她身旁的兩根供能藤（小地圖「藤」）。':'伯爵的晶罩亮起了！轉動晶柱，引晶光擊中它。',4200);AudioEng.sfxAction?.('barrier');}
+    // The shield itself is visible on the lord: a tinted dome while guarded, gone once exposed.
+    const guardedLord=monsters.find(m=>m.lord&&m.alive),notice=AdventureEvents.guardNotice?.(run);
+    if(guardedLord){let dome=guardedLord.model.getObjectByName('lord-guard-dome');if(notice&&!dome){dome=new THREE.Mesh(new THREE.SphereGeometry(1.45,14,10),new THREE.MeshBasicMaterial({color:notice.color,transparent:true,opacity:.26,depthWrite:false,side:THREE.DoubleSide}));dome.name='lord-guard-dome';dome.position.y=1.05;guardedLord.model.add(dome);}if(dome)dome.visible=!!notice;}
     nearbyAdventure=[eventMarker,followupMarker,...counterObjects].find(o=>o?.model.visible&&Math.hypot(G.px-o.x,G.pz-o.z)<2.6&&hasClearPath(G.px,G.pz,o.x,o.z))||null;
   }
   function adventureDialog(){
@@ -1343,6 +1347,8 @@
     else if(dungeon){const offer=dungeonOffer(),state=run.expedition.active;floorText='裂隙 · '+run.floor+' F';objective=offer.title+' · '+state.progress.length+'/3 · 剩 '+Math.ceil(Math.max(0,offer.timeLimit-state.elapsed))+' 秒'+(['bells','threads'].includes(offer.kind)?' · '+offer.order.map(i=>i+1).join('→'):offer.kind==='stars'&&state.progress.length===1?(state.shiftCount>state.shiftAtStart?' · 星路已更新':' · 等待牆壁變形'):'');}
     if(nearbyJourney){talkDisabled=false;talkLabel=nearbyJourney===rift?'裂隙（R）':nearbyJourney===huntGate?'討伐（R）':nearbyJourney===mainClue?'印記（R）':'調查（R）';objective=nearbyJourney===rift?'裂隙副本 · 自願進入，結束回到原層':nearbyJourney===huntGate?huntGate.offer.title+' · 自願進入，結束回到原層':nearbyJourney===mainClue?'主線印記 · '+N.chapterForFloor(run.floor).clueName:objective;}
     if(nearbyAdventure){talkDisabled=false;talkLabel='調查（R）';objective=nearbyAdventure===eventMarker?eventMarker.offer.name:nearbyAdventure===followupMarker?'後續留言 · 靠近查看':run.floor===80?'供能藤 · 靠近斬斷':'晶柱 · 轉向後引來晶光';}
+    // The half-health shield owns the objective line until its counters are done; the vine/pillar prompt still wins when one is in reach.
+    const guardNotice=!nearbyAdventure&&!dungeon?AdventureEvents?.guardNotice?.(run):null;if(guardNotice)objective=guardNotice.objective;
     if(talkDisabled&&canObserveLandmark()){talkDisabled=false;talkLabel='觀察地標（R）';}
     hudSet('towerFloor','textContent',floorText);hudSet('towerObjective','textContent',objective);
     hudSet('towerTalkBtn','disabled',talkDisabled);hudSet('towerTalkBtn','ariaLabel',talkLabel);hudSet('towerTalkBtn','hidden',paused||!G.running||talkDisabled);
@@ -1533,18 +1539,19 @@
     m.cooldown=Math.max(0,m.cooldown-dt);m.pathLeft-=dt;
     m.model.userData.body.position.y=(m.kind==='clockmite' ? .6 : 1)+Math.sin(now*.004+m.phase)*.1;
     m.model.userData.ring.material.opacity=m.windup>0?.9:.35;
+    if(m.lord){const dome=m.model.getObjectByName('lord-guard-dome');if(dome?.visible)dome.material.opacity=.2+.1*Math.sin(now*.005);m.strikeLeft=Math.max(0,(m.strikeLeft||0)-dt);if(!cinema)Lords?.pose?.(m.model,{windup:m.windup,total:m.windupTotal,strike:m.strikeLeft});}
     if(m.def.ranged&&!blocked){
       if(repelled){m.windup=0;m.aim=null;}
       else if(m.windup>0){
         m.windup-=dt;
-        if(m.windup<=0){if(m.aim&&hasClearPath(p.x,p.z,m.aim.x,m.aim.z))launchBolt(m);m.aim=null;m.cooldown=3.4;}
+        if(m.windup<=0){if(m.aim&&hasClearPath(p.x,p.z,m.aim.x,m.aim.z))launchBolt(m);m.strikeLeft=.4;m.aim=null;m.cooldown=3.4;}
         return;
       }else if(detected&&!hidden&&distance<=Math.min(12,profile.range)&&m.cooldown<=0&&line){
         m.aim={x:G.px,z:G.pz};m.windup=1.1;m.windupTotal=1.1;m.model.rotation.y=Math.atan2(G.px-p.x,G.pz-p.z);return;
       }
       if(!repelled&&detected&&distance<=Math.min(7,profile.range)&&!hidden)return;
     }
-    if(!m.def.ranged&&!blocked&&m.windup>0){m.windup-=dt;if(m.windup<=0){if(!repelled&&distance<2.05&&hasClearPath(p.x,p.z,G.px,G.pz)){m.cueRelease=(m.cueRelease||0)+1;damage(monsterDamage,'monster','',m.id);if(status)status.weak=0;}m.cooldown=2.3;}return;}
+    if(!m.def.ranged&&!blocked&&m.windup>0){m.windup-=dt;if(m.windup<=0){if(!repelled&&distance<2.05&&hasClearPath(p.x,p.z,G.px,G.pz)){m.cueRelease=(m.cueRelease||0)+1;damage(monsterDamage,'monster','',m.id);if(status)status.weak=0;}m.strikeLeft=.4;m.cooldown=2.3;}return;}
     if(!m.def.ranged&&!blocked&&!repelled&&distance<1.85&&m.cooldown<=0&&hasClearPath(p.x,p.z,G.px,G.pz)){m.windup=.8;m.windupTotal=.8;return;}
     if(distance>22)return;
     if(m.pathLeft<=0){
@@ -1833,10 +1840,10 @@
       const chip=(icon,label,value)=>'<span class="bag-chip">'+icon+'<span>'+text(label)+'</span><b>'+text(value)+'</b></span>';
       const overview='<section class="bag-overview" aria-label="隊伍持有資源">'+chip(window.TowerResourceIcons?.svg('coin')||'','銅幣',run.coins)+chip(window.TowerResourceIcons?.svg('scrap')||'','零件',run.party.journey.scrap+'／99')+chip(window.TowerPartyRuntime?.foodArt?.('herb')||'','食材',sum(run.party.ingredients)+' 份')+chip(window.TowerResourceIcons?.svg('ironore')||'','鍛造素材',sum(run.party.journey.materials)+' 份')+chip('','裝備行囊',run.gearBag.length+'／'+(C.isUnderworld(run)?28:24))+'</section>';
       const body=overview+'<h3 class="bag-section-title">可以使用 · '+owned.length+' 種</h3><div class="tower-grid">'+lightCard+(owned.map(supplyCard).join('')||'')+'</div>'+(owned.length?'':'<p class="bag-empty">目前沒有可使用的補給，可向雜貨商購買或在迷宮拾取。</p>')+(missing.length?'<details class="bag-more"><summary>還沒有的補給 · '+missing.length+' 種</summary><div class="tower-grid">'+missing.map(supplyCard).join('')+'</div></details>':'');
-      dialog('旅人背包 · 暫停中','生存補給','',body,action('隊伍裝備','hero-panel',Heroes.state(run).active)+action('料理','party-kitchen')+action('生物誌','party-bestiary')+(run.party.boss&&!inDungeon()?action('機關說明','party-boss-help'):'')+action('任務','quest-view')+returnAction()+action('回到迷宮','close'),{silent:quiet===true,summary:'生存補給。選擇道具，或開啟隊伍管理。'});return;}
+      dialog('旅人背包 · 暫停中','生存補給','',body,action('隊伍裝備','hero-panel',Heroes.state(run).active)+action('料理','party-kitchen')+(window.TowerAlchemy?.makers(run).length?action('藥水製作','party-alchemy'):'')+(P.has(run,'chef')?action('食譜研發','party-lab'):'')+action('生物誌','party-bestiary')+(run.party.boss&&!inDungeon()?action('機關說明','party-boss-help'):'')+(AdventureEvents?.guardNotice?.(run)?action('樓主護罩','adventure-lord-help'):'')+action('任務','quest-view')+returnAction()+action('回到迷宮','close'),{silent:quiet===true,summary:'生存補給。選擇道具，或開啟隊伍管理。'});return;}
     if(run.party){
       const body='<section class="tower-guard-summary"><h3>防禦 '+stats.defense+' · 強化 +'+stats.bonus+'</h3><p>武器可直接討伐怪物，命中消耗一點耐久；短暫暈眩後，怪物會有四秒抗暈期。三件防具受擊各消耗一點耐久。武器損壞後仍可徒手攻擊。</p></section><h3>穿戴中</h3><div class="tower-grid">'+(worn||'<p>尚未穿戴裝備。</p>')+'</div><h3>裝備行囊 '+run.gearBag.length+'/24</h3><div class="tower-grid">'+stored+'</div><h3>生存補給</h3><div class="tower-grid">'+cards+'</div>';
-      dialog('旅人背包 · 暫停中','裝備與補給','生命 '+Math.ceil(run.hp)+' / '+C.MAX_HP+' · 飽足 '+Math.ceil(run.hunger)+'% · 銅幣 '+run.coins,body,action('隊伍','party-team')+action('食材與料理','party-kitchen')+action('鍛匠工坊','party-forge')+(run.party.boss&&!inDungeon()?action('本層機關說明','party-boss-help'):'')+action('生物誌','party-bestiary')+action('故事日誌','journal')+action('任務日誌','quest')+(inDungeon()?action('副本目標','dungeon-brief'):'')+action('回到迷宮','close')+action('保存並離開','quit'),{silent:quiet===true,summary:'裝備與補給。可以更換裝備、使用道具，或查看隊伍、料理與鍛匠工坊。'});return;
+      dialog('旅人背包 · 暫停中','裝備與補給','生命 '+Math.ceil(run.hp)+' / '+C.MAX_HP+' · 飽足 '+Math.ceil(run.hunger)+'% · 銅幣 '+run.coins,body,action('隊伍','party-team')+action('食材與料理','party-kitchen')+action('鍛匠工坊','party-forge')+(window.TowerAlchemy?.makers(run).length?action('藥水製作','party-alchemy'):'')+(P.has(run,'chef')?action('食譜研發','party-lab'):'')+(run.party.boss&&!inDungeon()?action('本層機關說明','party-boss-help'):'')+(AdventureEvents?.guardNotice?.(run)?action('樓主護罩說明','adventure-lord-help'):'')+action('生物誌','party-bestiary')+action('故事日誌','journal')+action('任務日誌','quest')+(inDungeon()?action('副本目標','dungeon-brief'):'')+action('回到迷宮','close')+action('保存並離開','quit'),{silent:quiet===true,summary:'裝備與補給。可以更換裝備、使用道具，或查看隊伍、料理與鍛匠工坊。'});return;
     }
     dialog('旅人背包 · 暫停中','裝備與補給','生命 '+Math.ceil(run.hp)+' / '+C.MAX_HP+' · 飽足 '+Math.ceil(run.hunger)+'% · 銅幣 '+run.coins,'<section class="tower-guard-summary"><h3>防禦 '+stats.defense+' · 強化 +'+stats.bonus+' · 擊暈 '+stats.stunSeconds+' 秒</h3><p>每次命中，三件已穿防具各減 1 耐久；武器命中減 1。每點已穿裝備強化增加 10 秒擊暈，耐久耗盡即損壞。</p></section><h3>穿戴中</h3><div class="tower-grid">'+(worn||'<p>尚未穿戴裝備。</p>')+'</div><h3 class="tower-section-title">裝備行囊 '+run.gearBag.length+'/24</h3><div class="tower-grid">'+(stored||'<p>商人與寶箱取得的裝備會放在這裡。</p>')+'</div><h3 class="tower-section-title">生存補給</h3><div class="tower-grid">'+cards+'</div><section class="tower-guard-summary"><h3>'+text(warriorStatus())+'</h3></section>'+warriorRules(),(N?action('故事日誌','journal'):'')+action('任務日誌','quest')+(inDungeon()?action('副本目標','dungeon-brief'):'')+action('回到迷宮','close')+action('保存並離開','quit'),{silent:quiet===true,summary:'裝備與補給。穿戴中：'+(Object.values(run.equipment).filter(Boolean).map(gearSpeech).join('、')||'尚未穿戴裝備')+'。可以更換裝備或使用補給。'});
   }
@@ -1853,9 +1860,9 @@
     }
     if(!active||G.shifting||!nearest||run.status!=='playing')return;
     syncEngine();menuReturn={kind:'trade',merchant:nearest.id};
-    const grocer=nearest.id===E.GROCERY.merchantId,ingredients=grocer&&run.party?E.groceryOffers(run):[],scrollTop=quiet?(el('towerDialog').querySelector('.tower-dialog-content')?.scrollTop||0):0;
+    const grocer=nearest.id===E.GROCERY.merchantId,hunter=nearest.id===E.HUNTER?.merchantId,ingredients=E.INGREDIENT_MERCHANTS?.includes(nearest.id)&&run.party?E.groceryOffers(run,nearest.id):[],scrollTop=quiet?(el('towerDialog').querySelector('.tower-dialog-content')?.scrollTop||0):0;
     if(!quiet||tradeMerchant!==nearest.id){tradeCategory='supplies';tradeMerchant=nearest.id;}
-    if(!ingredients.length)tradeCategory='supplies';
+    if(!ingredients.length)tradeCategory='supplies';if(hunter)tradeCategory='ingredients';
     const heading=(art,name,stat)=>art+'<div><h3>'+text(name)+'</h3><small>'+text(stat)+'</small></div><span class="trade-detail-indicator" aria-hidden="true">⌄</span>';
     const scrap=grocer&&run.party?window.TowerExpedition?.scrapOffer?.(run):null;
     const scrapMost=scrap?Math.min(scrap.remaining,scrap.room):0,scrapBlocked=!scrap?'':!scrap.remaining?'本層已售完':!scrap.room?'零件袋已滿':'';
@@ -1865,7 +1872,7 @@
       const item=C.ITEMS[id],quantity=id==='arrow'?Math.max(0,Math.min(10,C.itemLimit('arrow',run)-run.bag.arrow)):1,cost=C.supplyPrice(id,quantity),full=run.bag[id]>=C.itemLimit(id,run);
       return '<article class="tower-item grocery-supply"><details class="trade-item-details"><summary>'+heading(window.TowerHeroIcons?.svg(Heroes?.ROBOT?.FUEL_ITEMS[id]?id:'item_'+id)||'',item.name,'持有 '+run.bag[id]+'／'+C.itemLimit(id,run))+'</summary><p>'+text(item.description)+'</p></details><div class="trade-card-actions">'+action(full?(id==='arrow'?'箭袋已滿':'已達上限'):run.coins<cost?'銅幣不足 · '+cost+' 幣':(id==='arrow'&&quantity<10?'補滿'+' '+quantity+' 支':'買'+(id==='arrow'?' '+quantity+' 支':''))+' · '+cost+' 幣','buy',id,full||quantity===0||run.coins<cost)+(item.sellPrice>0?action('賣 '+item.sellPrice+' 幣','sell',id,!run.bag[id]):'')+'</div></article>';
     }).join('');
-    const ingredientCards=ingredients.map(offer=>'<article class="tower-item grocery-ingredient'+(offer.specialty?' is-specialty':'')+'" data-grocery-offer="'+text(offer.id)+'"><details class="trade-item-details"><summary>'+heading(window.TowerPartyRuntime?.foodArt(offer.ingredientId)||'',offer.ingredientId==='herb'?offer.name+'（藥草）':offer.name,'持有 '+run.party.ingredients[offer.ingredientId]+' · 剩 '+offer.remaining+'/'+offer.stock)+'</summary><p>'+(offer.specialty?'遠方特產 · '+text(floorLabel(offer.sourceFloor)+' · '+offer.sourceName):'常用食材')+'；本層限量，不會補貨。</p></details><div class="trade-card-actions">'+action(!offer.remaining?'本層已售完':run.party.ingredients[offer.ingredientId]>=99?'食材袋已滿':run.coins<offer.price?'銅幣不足 · '+offer.price+' 幣':'買 1 份 · '+offer.price+' 幣','buy-ingredient',offer.id,!offer.remaining||run.party.ingredients[offer.ingredientId]>=99||run.coins<offer.price)+'</div></article>').join('');
+    const ingredientCards=ingredients.map(offer=>'<article class="tower-item grocery-ingredient'+(offer.specialty?' is-specialty':'')+'" data-grocery-offer="'+text(offer.id)+'"><details class="trade-item-details"><summary>'+heading(window.TowerPartyRuntime?.foodArt(offer.ingredientId)||'',offer.ingredientId==='herb'?offer.name+'（藥草）':offer.name,'持有 '+run.party.ingredients[offer.ingredientId]+' · 剩 '+offer.remaining+'/'+offer.stock)+'</summary><p>'+(offer.hunter?'魔物獵人的獵獲 · 各層稀罕食材，可用於食譜研發':offer.specialty?'遠方特產 · '+text(floorLabel(offer.sourceFloor)+' · '+offer.sourceName):'常用食材')+'；本層限量，不會補貨。</p></details><div class="trade-card-actions">'+action(!offer.remaining?'本層已售完':run.party.ingredients[offer.ingredientId]>=99?'食材袋已滿':run.coins<offer.price?'銅幣不足 · '+offer.price+' 幣':'買 1 份 · '+offer.price+' 幣','buy-ingredient',offer.id,!offer.remaining||run.party.ingredients[offer.ingredientId]>=99||run.coins<offer.price)+'</div></article>').join('');
     // Gear is grouped by body slot and tells who in the party can use it and
     // how it compares, so a long late-floor stock reads at a glance.
     const fit=gear=>{if(!modern()||!Heroes?.GEAR?.[gear.kind])return '';const users=Heroes.ids(run).filter(id=>Heroes.canEquip?.(run,id,gear));if(!users.length)return '<small class="trade-fit is-muted">隊伍目前無人可用 · '+text(Heroes.GEAR[gear.kind].jobs.map(j=>Heroes.JOBS[j]?.name||j).join('、'))+'</small>';
@@ -1877,13 +1884,13 @@
     const SLOT_GROUPS=[['weapon','武器'],['helmet','頭部'],['armor','身體'],['shield','盾牌']],slotOf=entry=>entry.gear.slot;
     const groups=[...SLOT_GROUPS,['','其他']].map(([slot,label])=>[label,nearest.offer.gear.filter(entry=>slot?slotOf(entry)===slot:!SLOT_GROUPS.some(([s])=>s===slotOf(entry)))]).filter(([,list])=>list.length);
     const gear=groups.length>1?groups.map(([label,list])=>'<h3 class="trade-group-title">'+text(label)+' <small>'+list.length+' 件</small></h3><div class="tower-grid trade-stock-grid">'+list.map(gearCardHtml).join('')+'</div>').join(''):'<div class="tower-grid trade-stock-grid">'+nearest.offer.gear.map(gearCardHtml).join('')+'</div>';
-    const stockVoice=grocer?'這裡可以買藥品、道具與限量食材，也可以委託料理。':('出售：'+nearest.offer.gear.map(g=>gearSpeech(g.gear)).join('、')+'。也可以維護與強化裝備。');
+    const stockVoice=grocer?'這裡可以買藥品、道具與限量食材，也可以委託料理。':hunter?'這裡可以買各層的稀罕食材，拿去廚房做食譜研發。':('出售：'+nearest.offer.gear.map(g=>gearSpeech(g.gear)).join('、')+'。也可以維護與強化裝備。');
     const voiceSummary=nearest.name+'。'+stockVoice;
     const tabs=grocer&&ingredients.length?'<nav class="trade-categories" aria-label="商品分類">'+['supplies','ingredients'].map(id=>'<button class="tower-btn" data-tower="trade-tab" data-item="'+id+'" aria-pressed="'+(tradeCategory===id)+'">'+(id==='supplies'?'藥品與道具':'限量食材')+'</button>').join('')+'</nav>':'';
-    const notes='<p>'+text(nearest.offer.greeting||'')+'</p><p>'+(grocer?'藥品、食材與道具可在這裡購買；限量食材本層售完不補貨。已解鎖菜色也能自備材料委託料理。':'裝備放入背包後可更換穿戴；每件本層限一件。'+(run.party?'本店維護及強化費比隊內鍛匠多 20%，材料不加價。':'')+'藥品、食材與道具請向雜貨商購買。')+'</p>';
-    const help=window.TowerCompactHelp?.render(grocer?'雜貨與委託說明':'購買與維護說明',notes)||notes;
-    const stock=help+(grocer?tabs+'<section class="grocery-stock" data-trade-category="supplies"'+(tradeCategory!=='supplies'?' hidden':'')+'><div class="tower-grid trade-stock-grid">'+cards+'</div></section><section class="grocery-stock" data-trade-category="ingredients"'+(tradeCategory!=='ingredients'?' hidden':'')+'><div class="tower-grid trade-stock-grid">'+ingredientCards+'</div></section>':gear);
-    dialog(nearest.name+' · 行商營地',grocer?'旅行雜貨與遠方食材':'專門裝備與維護','',stock,(run.party?(grocer?action('委託料理','commission-cooking'):action('維護與強化','party-merchant-forge',nearest.id)):'')+(modern()&&!grocer?action('隊伍裝備','hero-panel',Heroes.state(run).active):action('背包','bag'))+action('結束交易','close'),{silent:quiet===true,commerce:grocer?'grocery':'merchant',wallet:run.coins,summary:voiceSummary,asset:'merchant.'+nearest.id,afterText:stockVoice+'。'+(modern()&&!grocer?'隊伍裝備':'背包')+'。結束交易。'});
+    const notes='<p>'+text(nearest.offer.greeting||'')+'</p><p>'+(grocer?'藥品、食材與道具可在這裡購買；限量食材本層售完不補貨。已解鎖菜色也能自備材料委託料理。':hunter?'六樣各層稀罕食材隨機上架，每份 '+(E.HUNTER?.price??5)+' 幣，本層售完不補貨；配合廚師的食譜研發，命中就能記下隱藏食譜。':'裝備放入背包後可更換穿戴；每件本層限一件。'+(run.party?'本店維護及強化費比隊內鍛匠多 20%，材料不加價。':'')+'藥品、食材與道具請向雜貨商購買。')+'</p>';
+    const help=window.TowerCompactHelp?.render(grocer?'雜貨與委託說明':hunter?'獵獲食材說明':'購買與維護說明',notes)||notes;
+    const stock=help+(grocer?tabs+'<section class="grocery-stock" data-trade-category="supplies"'+(tradeCategory!=='supplies'?' hidden':'')+'><div class="tower-grid trade-stock-grid">'+cards+'</div></section><section class="grocery-stock" data-trade-category="ingredients"'+(tradeCategory!=='ingredients'?' hidden':'')+'><div class="tower-grid trade-stock-grid">'+ingredientCards+'</div></section>':hunter?'<section class="grocery-stock" data-trade-category="ingredients"><div class="tower-grid trade-stock-grid">'+ingredientCards+'</div></section>':gear);
+    dialog(nearest.name+' · 行商營地',grocer?'旅行雜貨與遠方食材':hunter?'各層稀罕食材':'專門裝備與維護','',stock,(run.party?(grocer?action('委託料理','commission-cooking'):hunter?(P.has(run,'chef')?action('食譜研發','party-lab'):''):action('維護與強化','party-merchant-forge',nearest.id)):'')+(modern()&&!grocer&&!hunter?action('隊伍裝備','hero-panel',Heroes.state(run).active):action('背包','bag'))+action('結束交易','close'),{silent:quiet===true,commerce:grocer||hunter?'grocery':'merchant',wallet:run.coins,summary:voiceSummary,asset:'merchant.'+nearest.id,afterText:stockVoice+'。'+(modern()&&!grocer&&!hunter?'隊伍裝備':'背包')+'。結束交易。'});
     if(quiet)el('towerDialog').querySelector('.tower-dialog-content').scrollTop=scrollTop;
   }
   function cookingServiceReady(){
@@ -2110,8 +2117,8 @@
       if(transact(window.TowerExpedition.buyScrap(run,nearest.id,quantity,run.revision))){trade(true,true);window.GameVoice?.announce('獲得 金屬零件',true);}return;
     }
     if(key==='buy-ingredient'){
-      if(!active||!G.running||!nearest||nearest.id!==E.GROCERY.merchantId||Math.hypot(G.px-nearest.x,G.pz-nearest.z)>=2.6||!hasClearPath(G.px,G.pz,nearest.x,nearest.z))return;
-      const offer=E.groceryOffers(run).find(o=>o.id===id);
+      if(!active||!G.running||!nearest||!E.INGREDIENT_MERCHANTS?.includes(nearest.id)||Math.hypot(G.px-nearest.x,G.pz-nearest.z)>=2.6||!hasClearPath(G.px,G.pz,nearest.x,nearest.z))return;
+      const offer=E.groceryOffers(run,nearest.id).find(o=>o.id===id);
       if(offer&&transact(E.buyIngredient(run,nearest.id,id,1,run.revision))){trade(true);window.GameVoice?.announce('獲得 '+offer.name,true);}return;
     }
     if(key==='buy'||key==='sell'||key==='buy-gear'){

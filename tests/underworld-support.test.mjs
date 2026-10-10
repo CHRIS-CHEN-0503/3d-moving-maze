@@ -38,7 +38,7 @@ test('underground disables all old rifts while preserving authentic completed to
 test('underground merchants, chests and rewards are deterministic, valid and do not reduce the three-tier catalogue',()=>{
   let chestCount=0,gearCount=0;const merchants=new Set();
   for(let floor=-1;floor>=-50;floor--)for(let seed=1;seed<=16;seed++){
-    const shops=E.merchantOffers(floor,seed,true),professionals=shops.filter(m=>m.id!=='suHe');assert.deepEqual(E.merchantOffers(floor,seed,true),shops);assert.ok(professionals.length>=1&&professionals.length<=2);
+    const shops=E.merchantOffers(floor,seed,true),professionals=shops.filter(m=>!['suHe','hunter'].includes(m.id));assert.deepEqual(E.merchantOffers(floor,seed,true),shops);assert.ok(professionals.length>=1&&professionals.length<=2);
     for(const shop of professionals){merchants.add(shop.id);assert.ok(shop.gear.some(g=>H.GEAR[g.kind].tier===3));assert.deepEqual(shop.supplies,[]);for(const entry of shop.gear){assert.ok(C.validateGear(entry.gear));assert.ok(entry.price>0&&Number.isFinite(entry.price));}}
     for(const shop of shops.filter(m=>m.id==='suHe')){assert.deepEqual(shop.gear,[]);assert.ok(shop.supplies.includes('arrow'));assert.equal(shop.ingredientOffers.length,5);}
     const chest=E.chestOffer(floor,seed,true);assert.deepEqual(E.chestOffer(floor,seed,true),chest);if(chest){chestCount++;if(chest.gear){gearCount++;assert.ok(C.validateGear(chest.gear));}else assert.ok(chest.damage>0&&Number.isFinite(chest.damage));}

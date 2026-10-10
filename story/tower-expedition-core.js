@@ -83,7 +83,7 @@
     mage:{name:'失控的定牆符文',verb:'穩定符文',description:'古代符文正影響牆壁。術士能解讀；也可以慢慢比對碑文。',reward:'暫停迷宮變形二十秒。'},
     scout:{name:'被掩蓋的暗門',verb:'找出暗扣',description:'牆邊有不自然的接縫。遊俠能直接找到暗扣；也可以仔細敲查石壁。',reward:'開通附近一道內牆，顯示十八秒出口路線。'},
     chef:{name:'棘殼食材箱',verb:'處理食材',description:'當地食材藏在帶刺硬殼裡。廚師能快速處理；也可以慢慢去除外殼。',reward:'取得兩份當地特色食材。'},
-    healer:{name:'受污染的泉眼',verb:'淨化泉水',description:'泉水混著灰色雜質。療癒師能淨化；也可以反覆過濾。',reward:'恢復主角十二點生命、同伴十點生命。'},
+    healer:{name:'受污染的泉眼',verb:'淨化泉水',description:'泉水混著灰色雜質。療癒師能淨化；也可以反覆過濾。',reward:'恢復主角十二點生命、同伴十點生命，並裝回兩份清露。'},
     smith:{name:'損壞的機關箱',verb:'修復機關',description:'齒輪箱裡的卡榫斷了。鍛匠能修復；也可以慢慢拆開重組。',reward:'取得四份金屬零件，穿戴裝備恢復兩點耐久。'},
     archer:{name:'斷索箭臺',verb:'重新繫索',description:'高處的箭臺斷了繩索。射手能以弓繩接回；也可以慢慢搬石搭梯。',reward:'取得三十支箭矢，顯示十二秒出口路線；箭袋放不下的部分不會加入。'},
     cleric:{name:'荒廢的小祠',verb:'淨化小祠',description:'路旁的小祠積滿塵灰。神職能以祝詞淨化；也可以慢慢清掃。',reward:'全隊抵擋下一次異常，取得二十支箭矢；箭袋放不下的部分不會加入。'},
@@ -129,7 +129,7 @@
     if(offer.job==='mage')n.effects.freeze=Math.max(n.effects.freeze,20);
     if(offer.job==='scout')n.effects.reveal=Math.max(n.effects.reveal,18);
     if(offer.job==='chef'){const key=Materials().signature(n);n.party.ingredients[key]=Math.min(99,n.party.ingredients[key]+2);}
-    if(offer.job==='healer'){if(n.party.loadouts)H().ids(n).forEach(id=>H().heal(n,id,id==='hero'?12:10));else{n.hp=Math.min(C().MAX_HP,n.hp+12);n.party.members.forEach(m=>m.hp=Math.min(P().memberMax(m),m.hp+10));}}
+    if(offer.job==='healer'){if(n.party.loadouts)H().ids(n).forEach(id=>H().heal(n,id,id==='hero'?12:10));else{n.hp=Math.min(C().MAX_HP,n.hp+12);n.party.members.forEach(m=>m.hp=Math.min(P().memberMax(m),m.hp+10));}n.party.ingredients.dew=Math.min(99,(n.party.ingredients.dew||0)+2);}
     if(offer.job==='smith'){n.party.journey.scrap=Math.min(99,n.party.journey.scrap+4);Object.values(n.equipment).filter(g=>g&&!H().ROBOT.isCore(g)&&g.durability>0).forEach(g=>g.durability=Math.min(g.maxDurability,g.durability+2));}
     if(offer.job==='archer'){n.bag.arrow=Math.max(n.bag.arrow,Math.min(C().itemLimit('arrow',n),n.bag.arrow+30));n.effects.reveal=Math.max(n.effects.reveal,12);}
     if(offer.job==='cleric'){if(n.party.loadouts)H().ids(n).filter(id=>H().hp(n,id)>0).forEach(id=>H().setBuff(n,id,'ward',60,1));n.bag.arrow=Math.max(n.bag.arrow,Math.min(C().itemLimit('arrow',n),n.bag.arrow+20));}
@@ -146,7 +146,7 @@
     abyssward:{name:'鎮淵',description:'地下限定。每級在防禦減傷前抵銷 1 點怪物攻擊，全身最高 4 點；不抵銷陷阱或飢餓，仍至少承受 1 點原始攻擊。',parts:6,coins:18,materialCost:{abyssalloy:2,embercore:1},modernOnly:true,underground:true,slots:['helmet','armor','shield'],effects:{monsterFlat:1}},
   }).map(([id,t])=>[id,Object.freeze({...t,id,icon:'forge_'+id,maxLevel:2,materialCost:Object.freeze(t.materialCost),slots:Object.freeze(t.slots||['weapon','helmet','armor','shield']),...(t.types?{types:Object.freeze(t.types)}:{}),effects:Object.freeze(t.effects||{})})])));
   function traitFits(trait,definition){const t=TRAITS[trait];return !!t&&!!definition&&!definition.integrated&&!definition.core&&t.slots.includes(definition.slot)&&(!t.types||t.types.includes(definition.type));}
-  function validateForge(value,slot,definition){if(value===undefined)return undefined;if(!value||!own(TRAITS,value.trait)||!integer(value.level,1,2)||!integer(value.reserve,0,value.trait==='durable'?value.level*2:0)||!TRAITS[value.trait].slots.includes(slot)||definition&&!traitFits(value.trait,definition)||value.wearCredit!==undefined&&(value.trait!=='durable'||!integer(value.wearCredit,0,9)))return null;return {trait:value.trait,level:value.level,reserve:value.reserve,...(value.trait==='durable'?{wearCredit:value.wearCredit??0}:{})};}
+  function validateForge(value,slot,definition){if(value===undefined)return undefined;const smith=value?.smith===true;if(!value||!own(TRAITS,value.trait)||!integer(value.level,1,2)||!integer(value.reserve,0,value.trait==='durable'?value.level*2:0)||!TRAITS[value.trait].slots.includes(slot)||definition&&!traitFits(value.trait,definition)||value.smith!==undefined&&value.smith!==true||value.wearCredit!==undefined&&(value.trait!=='durable'&&!smith||!integer(value.wearCredit,0,9)))return null;return {trait:value.trait,level:value.level,reserve:value.reserve,...(value.trait==='durable'||smith?{wearCredit:value.wearCredit??0}:{}),...(smith?{smith:true}:{})};}
   const traitPower=(gear,key)=>gear?.durability>0?(TRAITS[gear.forge?.trait]?.effects[key]||0)*(gear.forge?.level||0):0;
   const H=()=>typeof module==='object'&&module.exports?require('./tower-heroes-core.js'):globalThis.TowerHeroes;
   const allGear=run=>run.party?.loadouts?H().allGear(run):[...run.gearBag,...Object.values(run.equipment).filter(Boolean)];
@@ -205,7 +205,7 @@
     const t=own(TRAITS,trait)?TRAITS[trait]:null,g=run?.party?allGear(run).find(g=>g.id===id):null;if(!t||!g||H().ROBOT?.isPart(g.kind)||H().ROBOT?.isCore(g.kind))return null;
     const definition=C().GEAR[g.kind],level=(g.forge?.level||0)+1,discount=run.party.loadouts?H().teamPassive(run,'economy'):P().has(run,'smith')?50:0,parts=level*t.parts,rule=serviceRule(run,g,service),baseCoins=Math.ceil(level*t.coins*(1-discount/100)),coins=rule.merchant?Math.ceil(baseCoins*1.2):baseCoins;
     const materialCost=Object.fromEntries(Object.entries(t.materialCost).map(([key,count])=>[key,count*level]));
-    const reason=!traitFits(trait,definition)?'這種特性不適用目前裝備。':t.modernOnly&&!run.party.loadouts?'此特性需要職業裝備系統。':t.underground&&!C().isUnderworld(run)?'地下探索開放後才能進行這種鍛造。':g.durability===0?'請先修復損壞裝備。':g.forge&&g.forge.trait!==trait?'每件裝備只能保留一種特性，不能改選。':level>2?'這件裝備的特性已達二級。':!rule.allowed?rule.reason:'';
+    const reason=!traitFits(trait,definition)?'這種特性不適用目前裝備。':t.modernOnly&&!run.party.loadouts?'此特性需要職業裝備系統。':t.underground&&!C().isUnderworld(run)?'地下探索開放後才能進行這種鍛造。':g.durability===0?'請先修復損壞裝備。':g.forge&&g.forge.trait!==trait?'每件裝備只能保留一種特性，不能改選。':level>2?'這件裝備的特性已達二級。':rule.merchant&&level>=2?'第二級工藝只有隊內鍛匠能承作；商人只做一級。':!rule.allowed?rule.reason:'';
     return {trait,name:t.name,level,parts,baseCoins,coins,materialCost,allowed:!reason,reason,merchant:rule.merchant,affordable:run.party.journey.scrap>=parts&&run.coins>=coins&&Object.entries(materialCost).every(([key,count])=>(run.party.journey.materials?.[key]||0)>=count),underground:!!t.underground};
   }
   function forgeOptions(run,gear,service){if(!gear||!run?.party)return [];return Object.keys(TRAITS).filter(t=>genuine(t)&&(!gear.forge||gear.forge.trait===t)).map(t=>forgeQuote(run,gear.id,t,service)).filter(Boolean);
@@ -214,10 +214,10 @@
   function forge(run,id,trait,revision,service){return C().transaction(run,revision,n=>{
     const q=forgeQuote(n,id,trait,service);if(!q)return {ok:false,message:'無效的鍛造選項。'};if(!q.allowed)return {ok:false,message:q.reason};
     if(!q.affordable)return {ok:false,message:`需要${q.parts}份金屬零件、${q.coins}枚銅幣，以及`+Object.entries(q.materialCost).map(([key,count])=>count+'份'+Materials().MATERIALS[key]).join('、')+'。'};
-    const g=allGear(n).find(g=>g.id===id);n.party.journey.scrap-=q.parts;n.coins-=q.coins;for(const[key,count]of Object.entries(q.materialCost))n.party.journey.materials[key]-=count;g.forge={trait,level:q.level,reserve:g.forge?.reserve||0,...(trait==='durable'?{wearCredit:g.forge?.wearCredit||0}:{})};
-    return {ok:true,message:`${g.name}獲得${TRAITS[trait].name}，第${q.level}級。`};
+    const g=allGear(n).find(g=>g.id===id);n.party.journey.scrap-=q.parts;n.coins-=q.coins;for(const[key,count]of Object.entries(q.materialCost))n.party.journey.materials[key]-=count;const smith=!q.merchant||!!g.forge?.smith;g.forge={trait,level:q.level,reserve:g.forge?.reserve||0,...(trait==='durable'||smith?{wearCredit:g.forge?.wearCredit||0}:{}),...(smith?{smith:true}:{})};
+    return {ok:true,message:`${g.name}獲得${TRAITS[trait].name}，第${q.level}級${smith?'，留下匠印':''}。`,effect:{smith}};
   });}
-  function wear(run,g){if(g.durability<=0)return;if(g.forge?.reserve>0){g.forge.reserve--;return;}if(g.forge?.trait==='durable'){g.forge.wearCredit=(g.forge.wearCredit||0)+g.forge.level;if(g.forge.wearCredit>=10){g.forge.wearCredit-=10;return;}}g.durability--;if(g.durability===0&&run.party&&!run.party.loadouts)run.party.journey.scrap=Math.min(99,run.party.journey.scrap+1);}
+  function wear(run,g){if(g.durability<=0)return;if(g.forge?.reserve>0){g.forge.reserve--;return;}const save=(g.forge?.trait==='durable'?g.forge.level:0)+(g.forge?.smith?1:0);if(save>0){g.forge.wearCredit=(g.forge.wearCredit||0)+save;if(g.forge.wearCredit>=10){g.forge.wearCredit-=10;return;}}g.durability--;if(g.durability===0&&run.party&&!run.party.loadouts)run.party.journey.scrap=Math.min(99,run.party.journey.scrap+1);}
   function traits(run){let light=0,grip=0;for(const g of Object.values(run.equipment||{}).filter(g=>g&&g.durability>0&&g.slot!=='weapon')){if(g.forge?.trait==='light')light+=g.forge.level;if(g.forge?.trait==='grip')grip+=g.forge.level;}return {speed:1+Math.min(2,light)*.03,grip:Math.min(4,grip)};}
   function attackInterval(run){const f=run.equipment.weapon?.forge;return .8-(f?.trait==='light'?f.level*.08:0);}
   return Object.freeze({BOSSES,SITES,TRAITS,newBoss,validateBoss,phase,cycle,target,hint,bossAction,danger,SCRAP_SHOP,newJourney,validateJourney,scrapOffer,buyScrap,siteOffer,explore,validateForge,traitFits,traitPower,allGear,salvageValue,dismantle,repairQuote,repair,repairAllQuote,repairAll,maintenanceAllQuote,maintenanceAll,emergencyRepairAmount,forgeQuote,forgeOptions,forge,wear,traits,attackInterval});

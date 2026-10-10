@@ -9,7 +9,7 @@ function underground(floor=-1){const run=atFloor(fresh(),1);run.chronicle.ending
 const fill=run=>{Object.keys(run.party.ingredients).forEach(k=>run.party.ingredients[k]=30);run.hp=10;run.hunger=0;return run;};
 
 test('twenty-three recipes include eighteen shared meals and five regional underground meals',()=>{
-  assert.equal(Object.keys(P.RECIPES).length,23);assert.equal(Object.keys(P.availableRecipes(fresh())).length,18);
+  assert.equal(Object.values(P.RECIPES).filter(r=>!r.hidden&&!r.research).length,23);assert.equal(Object.keys(P.availableRecipes(fresh())).length,18);
   assert.deepEqual(Object.values(P.RECIPES).filter(r=>r.requiredDepth).map(r=>r.requiredDepth),[1,11,21,31,41]);
   for(const [floor,count]of [[-1,19],[-10,19],[-11,20],[-20,20],[-21,21],[-30,21],[-31,22],[-40,22],[-41,23],[-50,23]])assert.equal(Object.keys(P.availableRecipes(underground(floor))).length,count);
   for(const [id,r]of Object.entries(P.RECIPES)){assert.ok(r.name);assert.ok(Object.entries(r.cost).every(([k,n])=>Object.hasOwn(P.INGREDIENTS,k)&&Number.isInteger(n)&&n>0));}
@@ -26,10 +26,10 @@ test('older eight-meal saves add zero-count new recipes without changing earned 
 });
 
 test('every recipe cooks and eats using real transaction rules with accurate costs and effects',()=>{
-  for(const [id,recipe]of Object.entries(P.RECIPES)){
+  for(const [id,recipe]of Object.entries(P.RECIPES).filter(([,r])=>!r.hidden&&!r.research)){
     const run=fill(recipe.requiredDepth?underground(-recipe.requiredDepth):fresh()),before=JSON.stringify(run),cooked=P.cook(run,id,run.revision);assert.ok(cooked.ok,id+': '+cooked.message);assert.equal(JSON.stringify(run),before);assert.equal(cooked.run.party.meals[id],1,id);
     for(const key of Object.keys(P.INGREDIENTS))assert.equal(cooked.run.party.ingredients[key],30-(recipe.cost[key]||0));
-    assert.equal(P.cook(cooked.run,id,run.revision).ok,false,'stale revision cannot double spend');const eaten=P.eat(cooked.run,id,cooked.run.revision);assert.ok(eaten.ok,eaten.message);assert.equal(eaten.run.party.meals[id],0);assert.equal(eaten.run.hp,Math.min(H.maxHp(eaten.run),10+recipe.hp));assert.equal(eaten.run.hunger,Math.min(100,recipe.hunger*(1+H.teamPassive(eaten.run,'gourmet')/100)));
+    assert.equal(P.cook(cooked.run,id,run.revision).ok,false,'stale revision cannot double spend');const q=cooked.run.party.specials[id]>0?1+P.specialBonus(cooked.run)/100:1,eaten=P.eat(cooked.run,id,cooked.run.revision);assert.ok(eaten.ok,eaten.message);assert.equal(eaten.run.party.meals[id],0);assert.equal(eaten.run.hp,Math.min(H.maxHp(eaten.run),10+Math.round(recipe.hp*q)),id+' chef specials add their bonus');assert.equal(eaten.run.hunger,Math.min(100,recipe.hunger*q*(1+H.teamPassive(eaten.run,'gourmet')/100)));
     if(recipe.buff)assert.ok(eaten.run.party.buffs.some(b=>b.id===recipe.buff&&b.floors===3));assert.ok(C.validateSave(JSON.stringify(eaten.run)),id);
   }
 });
@@ -50,7 +50,7 @@ test('cooking still refuses insufficient ingredients and full meal stacks withou
 });
 
 test('each new dish has a distinct real game illustration and extended flavour history validates without truncation',()=>{
-  const icons=Object.keys(P.RECIPES).map(id=>globalThis.TowerPartyRuntime.dishArt(id));assert.equal(new Set(icons).size,Object.keys(P.RECIPES).length);for(const svg of icons){assert.match(svg,/^<svg/);assert.doesNotMatch(svg,/undefined|NaN|<image|<script/);}
+  const open=Object.keys(P.RECIPES).filter(id=>!P.RECIPES[id].hidden),icons=open.map(id=>globalThis.TowerPartyRuntime.dishArt(id));assert.equal(new Set(icons).size,open.length);for(const svg of icons){assert.match(svg,/^<svg/);assert.doesNotMatch(svg,/undefined|NaN|<image|<script/);}
   const saved=G.fresh(),names=Object.keys(P.RECIPES);saved.tastes=names;saved.tasteLeft=80;const read=G.validate(saved,{members:[],floor:-50});assert.ok(read);assert.deepEqual(read.tastes,names);assert.equal(G.validate(saved,{members:[],floor:99}),null);saved.tastes=[...names,names[0]];assert.equal(G.validate(saved,{members:[],floor:-50}),null);
 });
 

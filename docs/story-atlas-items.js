@@ -18,6 +18,7 @@
   const foraging = () => moduleFor('tower-foraging', 'TowerForaging');
   const fieldGuide = () => moduleFor('tower-field-guide', 'TowerFieldGuide');
   const commission = () => moduleFor('tower-commission-cooking', 'TowerCommissionCooking');
+  const alchemy = () => moduleFor('tower-alchemy', 'TowerAlchemy');
   const robot = () => moduleFor('tower-robot-core', 'TowerRobotCore');
   const affixes = () => moduleFor('tower-affixes', 'TowerAffixes');
   const events = () => moduleFor('tower-adventure-events', 'TowerAdventureEvents');
@@ -30,7 +31,7 @@
   const rarityNames = {common:'普通', uncommon:'少見', rare:'稀有', legendary:'珍稀'};
   const dropExplanation = '有生態素材的怪物先以一半機率選素材、一半選補給，再從該組候選物資中抽一種，依該物的稀有度判定；不是每件物品都獨立抽一次。四種常用食材（'+loot().COMMON_FOOD.map(key=>party().INGREDIENTS[key]).join('、')+'）被抽為候選後為普通 '+loot().chance({type:'ingredient',key:'herb',rarity:'common'})+'%；其他普通物資仍為 '+loot().CHANCES.common+'%。沒有素材的怪物只抽補給。落地後需靠近拾取，未拾取物跨存檔與同層變形保留。';
   const profileNames={neutral:'中性',suitable:'適合',unsuitable:'不適合'};
-  const foragingExplanation='每層的香草（藥草）株數與自然礦石堆數獨立抽取，整體出現率依環境分類：'+Object.entries(profileNames).map(([id,name])=>name+'環境 '+(100-foraging().PROFILES[id][0])+'% 出現、'+foraging().PROFILES[id][0]+'% 不出現；1／2／3 處機率為 '+[1,2,3].map(n=>Number(foraging().PROFILES[id][n].toFixed(2))+'%').join('／')).join('；')+'。資源放在靠牆角落，每株或每堆採得 1 份；同層變形與讀檔不補回已採集資源，與討伐掉落分開計算。舊旅程已生成的株數與礦堆保留原狀，新樓層才套用新出現率。';
+  const foragingExplanation='每層的藥草株數與自然礦石堆數獨立抽取，整體出現率依環境分類：'+Object.entries(profileNames).map(([id,name])=>name+'環境 '+(100-foraging().PROFILES[id][0])+'% 出現、'+foraging().PROFILES[id][0]+'% 不出現；1／2／3 處機率為 '+[1,2,3].map(n=>Number(foraging().PROFILES[id][n].toFixed(2))+'%').join('／')).join('；')+'。資源放在靠牆角落，每株或每堆採得 1 份；同層變形與讀檔不補回已採集資源，與討伐掉落分開計算。舊旅程已生成的株數與礦堆保留原狀，新樓層才套用新出現率。';
   const powerForagingExplanation='動力石採集獨立抽取每層至多一處礦簇，整體出現率依藥草的環境分類：'+Object.entries(profileNames).map(([id,name])=>name+'環境 '+(100-foraging().POWER_PROFILES[id][0])+'% 出現、'+foraging().POWER_PROFILES[id][0]+'% 不出現；微光／星輝／曜心機率為 '+[1,2,3].map(n=>Number(foraging().POWER_PROFILES[id][n].toFixed(2))+'%').join('／')).join('；')+'。新樓層每處只有 1 顆動力石，靠牆角落放置；背包已滿時不消耗它，同層變形與讀檔不補回已採集礦簇；舊旅程已生成的礦簇保留原狀，新樓層才套用新出現率。';
   function naturalSource(kind,key){
     const F=foraging(),regions=materials().ECOLOGIES.filter(e=>kind==='herb'||F.orePool({floor:e.high}).includes(key));
@@ -44,7 +45,7 @@
       foragingExplanation,
       powerForagingExplanation,
       '自然礦堆依環境取得精鐵礦、共鳴晶片或星脈礦；星脈礦僅地下出現。藥草可作料理食材與藥草技能材料。',
-      '雜貨商・蘇禾每層有 40% 機率出現，販售藥品、消耗道具、箭矢、火把、金屬零件（每層限量）、四種常用食材及一種隨機樓層特產。食材各限 1～5 份，同層變形／讀檔不補貨；地上可買其他地上樓層特產，地下可另抽到地下特產。三位裝備商只販售裝備並提供對應維護服務。',
+      '雜貨商・蘇禾每層有 40% 機率出現，販售藥品、消耗道具、箭矢、火把、金屬零件（每層限量）與五種常用食材。魔物獵人・灰狼另以相同的 40% 機率獨立出現，隨機販售六樣各層稀罕食材（每份 5 幣），供食譜研發使用；雜貨商不再賣隨機樓層特產。食材各限 1～5 份，同層變形／讀檔不補貨；地上可買其他地上樓層特產，地下可另抽到地下特產。三位裝備商只販售裝備並提供對應維護服務。',
       '蘇禾可代煮已解鎖食譜，沒有廚師也能委託。自備原配方全部食材，另付代煮費；每次固定一份，不觸發廚師的雙份或保鮮被動。',
       '共鳴晶凍、餘火椒根串與霜莓蜜煮另給享用者五分鐘單次異常保護，分別抵擋電麻、灼傷與中毒；不是五分鐘無敵，不為全隊同時套用。材料附魔的效果、成功率與費用可在鍛造分類查看。',
       '職業探索機關、固定景觀及兩選事件是地圖互動，不占背包。固定景觀的位置不隨同層迷宮變形移動；事件選擇會影響下一層，兩層後的後續留言可領取答謝或放棄，不阻擋主線。',
@@ -90,6 +91,7 @@
       if (sellers.length) acquisition.push(sellers.join('、') + '販售；' + (key === 'arrow' ? '每包 10 支只需 1 幣；剩餘空間不足 10 支時補滿仍收 1 幣，不回收。射手離隊造成容量下降時，已有箭矢保留，超過容量則不能補充。' : '購買 ' + def.buyPrice + ' 幣／售回 ' + def.sellPrice + ' 幣。'));
       if (drop) acquisition.push((key === 'arrow' ? '隊伍有能行動的射手時，' : fuel ? '隊伍有能行動的機器人時，' : '') + '被抽為討伐候選物資後，' + drop.label + '掉落判定 ' + drop.conditionalPercent + '%，每堆 ' + drop.quantity + (key === 'arrow' ? ' 支。' : fuel ? ' 顆。' : ' 份。'));
       if(fuel)acquisition.push((fuel.fuel>25?'商人不販售，只能靠討伐與採集取得。':'')+'另可採集靠牆角落的同階礦簇，新樓層每處 '+foraging().POWER_DEPOSIT_QUANTITY+' 顆；初始持有零顆。');
+      const brew=alchemy().RECIPES[key];if(brew)acquisition.push(alchemy().MAKERS[brew.maker].name+'可在安全營地'+alchemy().MAKERS[brew.maker].verb+'：'+Object.entries(brew.cost).map(([id,n])=>materials().INGREDIENTS[id]+' ×'+n).join(' ＋ ')+'，做出的藥水與商店販售相同，解鎖樓層也相同。');
       if (Object.hasOwn(C.POTION_FLOORS,key)) acquisition.push(C.POTION_FLOORS[key] > 0 ? '第 ' + C.POTION_FLOORS[key] + ' 層（含）以下與地下才會在雜貨商販售或從討伐掉落。' : '地下第一層起才會在雜貨商販售或從討伐掉落。');
       if (['heal','ration','shield','hourglass'].includes(key)) acquisition.push('探索者委託的隨機補給報酬；乾糧為 2 份，其餘 1 份。');
       if (['heal','ration'].includes(key)) acquisition.push('開局各 2 份；地上裂隙完成時也可能取得補給。');
@@ -114,11 +116,12 @@
       const meta = M.INGREDIENT_META[key], sources = meta.sources, type = meta.rarity,conditionalPercent=L.chance({type:'ingredient',key,rarity:type}),natural=key==='herb'?naturalSource('herb',key):null;
       const recipes = Object.values(P.RECIPES).filter(r => Object.hasOwn(r.cost,key)).map(r => r.name + ' ×' + r.cost[key]);
       const skills = Object.values(H.SKILLS).filter(s => Object.hasOwn(s.cost || {},key)).map(s => s.name + ' ×' + s.cost[key]);
-      const signature=M.ECOLOGIES.filter(e=>M.signature(e.high)===key).map(e=>e.name),grocery=encounters().GROCERY,common=grocery.commonIngredients.includes(key),grocerySource=common?'雜貨商販售常用食材，每份 '+grocery.commonPrice+' 幣（香草也作藥草使用），本層每種限 1～5 份。':signature.length?'可能成為雜貨商的隨機樓層特產，每份 '+grocery.specialtyPrice+' 幣，本層限 1～5 份；可早於原產地樓層買到，地上不抽地下特產。':'';
-      return {id:'ingredient:' + key,key,name,category:key === 'shell' ? '製作材料' : '料理食材',description:meta.description+' 整隊共用，持有上限 99 份；在營地料理或技能消耗時使用。',effect:[recipes.length ? '食譜用量：' + recipes.join('、') + '。' : '',skills.length ? '技能材料：' + skills.join('、') + '。' : ''].filter(Boolean).join(' ')||'可作料理或製作材料，實際用途依持有技能與食譜。',
+      const potions=Object.entries(alchemy().RECIPES).filter(([,r])=>Object.hasOwn(r.cost,key)).map(([id,r])=>core().ITEMS[id].name+' ×'+r.cost[key]);
+      const signature=M.ECOLOGIES.filter(e=>M.signature(e.high)===key).map(e=>e.name),grocery=encounters().GROCERY,common=grocery.commonIngredients.includes(key),hunterSold=encounters().hunterPool().includes(key),grocerySource=common?'雜貨商販售常用食材，每份 '+grocery.commonPrice+' 幣，本層每種限 1～5 份。':hunterSold?'魔物獵人・灰狼可能隨機販售（六樣之一），每份 '+encounters().HUNTER.price+' 幣，本層限 1～5 份；不分樓層，可早於原產地買到。':'';
+      return {id:'ingredient:' + key,key,name,category:key === 'shell' ? '製作材料' : '料理食材',description:meta.description+' 整隊共用，持有上限 99 份；在營地料理或技能消耗時使用。',effect:[recipes.length ? '食譜用量：' + recipes.join('、') + '。' : '',skills.length ? '技能材料：' + skills.join('、') + '。' : '',potions.length?'藥水配方：'+potions.join('、')+'。':''].filter(Boolean).join(' ')||'可作料理或製作材料，實際用途依持有技能與食譜。',
         acquisition:sources.join('；')+'。被抽為素材候選後，以'+rarityNames[type]+' '+conditionalPercent+'%判定；每堆 '+(key==='shell'?1:2)+' 份。'+(natural?'另可採集靠牆角落的藥草，每株 1 份。':'')+(key==='shell'?'完成章末迷宮機關另外給 3 份。':'')+(signature.length?'「棘殼食材箱」在'+signature.join('、')+'完成時另給此食材 2 份。':''),
-        notes:['開局食材：甜根莖 3、月傘菇 2、香草 2、硬殼 1；其他為 0。','已收集食材隨隊保留；討伐掉落仍需遇到相應怪物，並非每層都有蟹肉。',grocerySource,'食材不會隨迷宮變形在地面重新生成；雜貨商的庫存與特產也不因變形或讀檔重抽。',...(natural?[foragingExplanation,'藥草可生長環境：'+naturalRegions(natural)+'。']:[])].filter(Boolean),stackLimit:99,underground:sources.every(s=>s.includes('地下 B')),drop:{rarity:type,conditionalPercent,quantity:key==='shell'?1:2},...(natural?{foraging:natural}:{}),
-        recipes,skills,icon:icon('party-food',key,filename + 'tower-party-runtime.js'),sources:[filename+'tower-materials.js',SOURCES.party,SOURCES.heroes,SOURCES.loot,SOURCES.expedition,...(natural?[SOURCES.foraging]:[])]};
+        notes:['開局食材：甜根莖 3、月傘菇 2、藥草 2、硬殼 1、清露 2；其他為 0。','已收集食材隨隊保留；討伐掉落仍需遇到相應怪物，並非每層都有蟹肉。',grocerySource,'食材不會隨迷宮變形在地面重新生成；雜貨商的庫存與特產也不因變形或讀檔重抽。',...(natural?[foragingExplanation,'藥草可生長環境：'+naturalRegions(natural)+'。']:[])].filter(Boolean),stackLimit:99,underground:sources.every(s=>s.includes('地下 B')),drop:{rarity:type,conditionalPercent,quantity:key==='shell'?1:2},...(natural?{foraging:natural}:{}),
+        recipes,skills,icon:icon('party-food',key,filename + 'tower-party-runtime.js'),sources:[filename+'tower-materials.js',filename+'tower-alchemy.js',SOURCES.party,SOURCES.heroes,SOURCES.loot,SOURCES.expedition,...(natural?[SOURCES.foraging]:[])]};
     });
   }
   function materialRecords(){
@@ -129,10 +132,10 @@
   }
   function mealRecords() {
     const P = party();
-    return Object.entries(P.RECIPES).map(([key,r]) => ({id:'meal:' + key,key,name:r.name,category:r.requiredDepth?'地下料理':'料理',
-      description:(r.description?r.description+' ':'')+(P.BASIC_RECIPES.includes(key)?'基本料理：任何職業的隊伍皆可在安全營地烹飪。':'廚師料理：隊中有能行動的廚師才會顯示菜譜，且需在安全營地烹飪。'),
+    return Object.entries(P.RECIPES).map(([key,r]) => ({id:'meal:' + key,key,name:r.name,category:r.hidden?'隱藏食譜':r.research?'研發副產品':r.requiredDepth?'地下料理':'料理',hidden:!!r.hidden,research:!!r.research,
+      description:(r.description?r.description+' ':'')+(r.hidden?'隱藏食譜：廚師在食譜研發裡用相同食材組合命中後才會記入菜譜，之後與其他廚師料理一樣烹飪。':r.research?'研發沒命中時有一半機率做成；不能直接烹飪。':P.BASIC_RECIPES.includes(key)?'基本料理：任何職業的隊伍皆可在安全營地烹飪。':'廚師料理：隊中有能行動的廚師才會顯示菜譜，且需在安全營地烹飪。'),
       effect:[r.hp ? '恢復目前操控者生命 ' + r.hp + ' 點。' : '不直接恢復目前操控者生命。','恢復全隊共用飽食度 ' + r.hunger + ' 點。',r.team ? '其他仍能行動的隊友各恢復生命 ' + r.team + ' 點，不復活倒地成員。' : '',r.buff ? P.BUFFS[r.buff] + '；維持 3 層，同時最多保留 2 種料理增益。重吃同種會刷新持續樓層。' : '',r.ward?'另給享用者五分鐘內抵擋一次'+affixes().EFFECTS[r.ward].name+'的保護；觸發即消失，不抵擋直接伤害。'.replace('伤','傷'):''].filter(Boolean).join(' '),
-      acquisition:(r.requiredDepth?'地下 B'+r.requiredDepth+' 起解鎖；地上及尚未抵達的地下層不能烹飪或享用。':'地上與地下皆可烹飪。')+'材料：' + Object.entries(r.cost).map(([id,n]) => P.INGREDIENTS[id] + ' ×' + n).join(' ＋ ') + '。烹飪基礎產量 1 份。亦可在本層蘇禾處委託代煮，'+commission().LABELS[commission().category(key)]+'費用 '+commission().fee(key)+' 幣，仍需自備全部材料。',
+      acquisition:r.research?'沒有固定配方：食譜研發沒命中隱藏食譜時，有一半機率做成一份。不能直接烹飪，也不接受委託代煮。':(r.requiredDepth?'地下 B'+r.requiredDepth+' 起解鎖；地上及尚未抵達的地下層不能烹飪或享用。':'地上與地下皆可烹飪。')+'材料：' + Object.entries(r.cost).map(([id,n]) => P.INGREDIENTS[id] + ' ×' + n).join(' ＋ ') + '。烹飪基礎產量 1 份。'+(r.hidden?'需先由廚師在食譜研發裡命中這組配方，之後與其他廚師料理一樣烹飪；蘇禾不代煮隱藏食譜。':'亦可在本層蘇禾處委託代煮，'+commission().LABELS[commission().category(key)]+'費用 '+commission().fee(key)+' 幣，仍需自備全部材料。'),
       notes:['沒有廚師時營地只顯示六道基本菜譜；原先做好的高階成品仍能享用，不會隨廚師離隊消失。蘇禾代煮不需廚師，但不能跳過地下食譜深度限制；其他裝備商不提供料理。','一料雙份、食材保鮮、食療與分享等效果必須實際學會相應被動才生效；不是有廚師就必定雙倍。委託代煮固定一份、按原配方扣料，不觸發雙份或保鮮。','機器人不能享用料理；料理與一般治療不會修復機器人隊友。機體生命改由動力核心或機械修復技能恢復。','生命與飽食恢復不超過上限；料理欄每種最多 99 份。'],
       recipe:{...r,cost:{...r.cost}},commission:{fee:commission().fee(key),category:commission().category(key),quantity:1},requiredDepth:r.requiredDepth||0,underground:!!r.requiredDepth,stackLimit:99,icon:icon('party-dish',key,filename + 'tower-party-runtime.js'),sources:[SOURCES.party,SOURCES.heroes,SOURCES.growth,SOURCES.commission,...(r.ward?[SOURCES.affixes]:[])]}));
   }

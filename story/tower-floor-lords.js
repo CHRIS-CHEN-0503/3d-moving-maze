@@ -45,36 +45,104 @@
   function spec(run){const d=forRun(run);return d?{id:d.underworld?UNDERWORLD_ID:ID,kind:d.id,def:d,strength:d.strength,maxHp:d.maxHp||Math.round(Math.min(240,85+Math.round((99-run.floor)*1.5))*1.3),lord:true}:null;}
   const defeated=run=>{const d=forRun(run);return !d||run.defeatedMonsters.includes(d.underworld?UNDERWORLD_ID:ID);};
   const tracks={};for(const d of Object.values(LORDS))for(const [i,event]of ['encounter','wounded','defeat'].entries())tracks['lord.'+d.environment+'.'+event]=Object.freeze({src:'./assets/voice/lords/'+d.environment+'-'+event+'.mp3',text:d.lines[i],speaker:d.speaker,instruction:'成年角色，普通话清楚自然，正常速度，沉稳有戏剧感，不要尖叫，不要唱歌。',category:'character-bark'});
+  // Every lord is sculpted for its own hall: a cloud knight, a thorn queen, a treant,
+  // a crystal count, a book warden, a ferryman, an antlered hunter, a gear foreman,
+  // a furnace brawler and the listener of the tower heart. Underground wardens reuse
+  // their hall's silhouette in their own colours with a warden badge. The cinematic
+  // rig (head/torso/arms/legs/mouth/eyes) and the gameplay ring keep their contract.
+  const shade=(hex,f)=>{const r=Math.min(255,Math.round(((hex>>16)&255)*f)),g=Math.min(255,Math.round(((hex>>8)&255)*f)),b=Math.min(255,Math.round((hex&255)*f));return (r<<16)|(g<<8)|b;};
   function build(T,d){
-    const model=new T.Group(),body=new T.Group();model.name=d.id;model.userData.floorLord=true;model.add(body);body.position.y=1;
+    const model=new T.Group(),body=new T.Group();model.name=d.id;model.userData.floorLord=true;model.userData.environment=d.environment;model.add(body);body.position.y=1;
     const materials=new Map(),mat=(color,glow=false)=>{const key=color+':'+glow;if(!materials.has(key))materials.set(key,glow?new T.MeshBasicMaterial({color}):new T.MeshLambertMaterial({color}));return materials.get(key);};
-    const add=(geo,color,x,y,z,glow=false)=>{const o=new T.Mesh(geo,mat(color,glow));o.position.set(x,y,z);body.add(o);return o;};
-    const orb=(color,x,y,z,w,h=w,depth=w)=>{const o=add(new T.SphereGeometry(1,10,8),color,x,y,z);o.scale.set(w,h,depth);return o;};
-    const plate=(w,h,zDepth,color,x,y,z)=>add(new T.BoxGeometry(w,h,zDepth),color,x,y,z);
-    // Articulate the existing sculpture, not a second cutscene model. Reparent
-    // every ornament with its body part while preserving its authored position.
     const joint=(name,x,y,z)=>{const g=new T.Group();g.name='cinema-'+name;g.position.set(x,y,z);body.add(g);return g;};
-    const head=joint('head',0,1.12,.03),torso=joint('torso',0,.25,0);
-    const arms=[joint('arm-left',.69,.7,0),joint('arm-right',-.69,.7,0)];
-    const legs=[joint('leg-left',.32,-.25,0),joint('leg-right',-.32,-.25,0)];
-    const mount=(mesh,g)=>{mesh.position.sub(g.position);g.add(mesh);return mesh;};
+    // Parts are authored in body space and re-parented under their joint, so acting rotates them around the joint.
+    const put=(parent,geo,color,x,y,z,{glow=false,rx=0,ry=0,rz=0,sx=1,sy=1,sz=1}={})=>{const o=new T.Mesh(geo,mat(color,glow)),base=parent===body?{x:0,y:0,z:0}:parent.position;o.position.set(x-base.x,y-base.y,z-base.z);o.rotation.set(rx,ry,rz);o.scale.set(sx,sy,sz);parent.add(o);return o;};
+    const box=(w,h,dep)=>new T.BoxGeometry(w,h,dep),cyl=(rt,rb,h,n=8)=>new T.CylinderGeometry(rt,rb,h,n),cone=(r,h,n=6)=>new T.ConeGeometry(r,h,n),ball=(r,w=8,h=6)=>new T.SphereGeometry(r,w,h),ring=(r,t,a=5,b=12)=>new T.TorusGeometry(r,t,a,b),gem=r=>new T.OctahedronGeometry(r,0);
+    const env=d.environment,C=d.color,A=d.accent,dark=shade(C,.6),light=shade(C,1.3);
+    const head=joint('head',0,1.15,0),torso=joint('torso',0,.3,0),arms=[joint('arm-left',.62,.72,0),joint('arm-right',-.62,.72,0)],legs=[joint('leg-left',.3,-.3,0),joint('leg-right',-.3,-.3,0)];
     const arm=side=>arms[side>0?0:1],leg=side=>legs[side>0?0:1],eyes=[];
-    mount(orb(d.color,0,.25,0,.6,.72,.43),torso);mount(orb(d.color,0,1.12,.03,.41,.4,.34),head);
-    for(const side of [-1,1]){mount(orb(d.color,side*.69,.25,0,.2,.5,.22),arm(side));mount(orb(d.color,side*.32,-.65,0,.22,.48,.25),leg(side));eyes.push(mount(add(new T.SphereGeometry(.055,8,6),d.accent,side*.15,1.18,.35,true),head));}
-    const mouth=mount(plate(.18,.05,.025,0x26313b,0,1.01,.375),head);mouth.name='cinema-mouth';
-    const env=d.environment;
-    if(['cloud','frost','heart'].includes(env)){for(const side of [-1,1]){const wing=mount(plate(.7,.3,.15,d.accent,side*.75,.72,-.18),arm(side));wing.rotation.z=side*.3;}mount(add(new T.TorusGeometry(.42,.06,5,16),d.accent,0,1.17,-.06),head);}
-    if(env==='cloud'){mount(orb(d.accent,-.82,.28,.23,.3,.4,.1),arm(-1));mount(plate(.045,.85,.055,d.accent,.88,.44,.1),arm(1));mount(orb(d.accent,.88,.93,.1,.12,.15,.12),arm(1));}
-    if(env==='frost'){for(const side of [-1,1])mount(add(new T.OctahedronGeometry(.19),d.accent,side*.32,1.55,.02),head).scale.y=1.45;mount(plate(.045,1.45,.045,d.accent,.86,.42,.1),arm(1));mount(add(new T.ConeGeometry(.11,.35,4),d.accent,.86,1.3,.1),arm(1));}
-    if(['garden','roots'].includes(env)){for(let i=0;i<5;i++){const branch=mount(add(new T.ConeGeometry(env==='roots'?.17:.12,.65,5),i%2?d.color:d.accent,(i-2)*.18,1.6,-.02),head);branch.rotation.z=(i-2)*.22;}for(const side of [-1,1]){const leaf=mount(orb(d.accent,side*.7,.7,0,.2,.36,.1),arm(side));leaf.rotation.z=side*.7;}}
-    if(env==='echo'){for(const side of [-1,1])mount(add(new T.OctahedronGeometry(.28),d.accent,side*.6,.8,.05),arm(side)).scale.y=1.6;mount(add(new T.OctahedronGeometry(.21),d.accent,0,.35,.45),torso);}
-    if(env==='library'){mount(plate(.8,.65,.14,d.accent,0,.16,.5),torso);for(const side of [-1,1]){const cover=mount(plate(.42,.68,.06,d.color,side*.22,.16,.61),torso);cover.rotation.y=side*-.24;}mount(plate(.85,.14,.75,d.color,0,1.56,.02),head);}
-    if(env==='mist'){const paddle=mount(plate(.1,1.55,.09,d.accent,.9,.5,.1),arm(1));paddle.rotation.z=-.3;mount(plate(.35,.5,.12,d.color,1.12,-.2,.1),arm(1));mount(add(new T.ConeGeometry(.55,.36,8),d.accent,0,1.55,0),head);}
-    if(env==='clockwork'){for(const side of [-1,1]){const wheel=mount(add(new T.TorusGeometry(.28,.08,5,12),d.accent,side*.58,.65,.02),arm(side));wheel.rotation.y=Math.PI/2;}mount(plate(.46,.46,.12,d.accent,.84,.25,.1),arm(1));}
-    if(env==='furnace'){for(const side of [-1,1]){const horn=mount(add(new T.ConeGeometry(.12,.48,5),d.accent,side*.34,1.52,0),head);horn.rotation.z=side*-.5;}mount(orb(d.accent,0,.3,.43,.2,.28,.08),torso);const hammer=mount(plate(.7,.35,.36,d.color,.9,-.1,.1),arm(1));mount(plate(.1,.75,.1,d.accent,.9,.3,.1),arm(1));hammer.rotation.z=.1;}
-    if(env==='heart')mount(orb(d.accent,0,.4,.45,.22,.22,.1),torso);
-    const ring=new T.Mesh(new T.RingGeometry(.7,1.05,24),new T.MeshBasicMaterial({color:0xd55668,transparent:true,opacity:.35,side:T.DoubleSide,depthWrite:false}));ring.rotation.x=-Math.PI/2;ring.position.y=.025;model.add(ring);
-    Object.assign(model.userData,{body,ring,accent:d.accent,cinemaRig:{head,torso,arms,legs,mouth,eyes}});return model;
+    const face=(y=1.2,gap=.15,r=.055,z=.3,mouthY=1.03)=>{for(const side of [-1,1])eyes.push(put(head,ball(r,8,6),A,side*gap,y,z,{glow:true}));const mouth=put(head,box(.18,.05,.025),0x26313b,0,mouthY,z+.03);mouth.name='cinema-mouth';return mouth;};
+    let mouth;
+    if(env==='cloud'){
+      put(torso,box(.9,1,.55),C,0,.3,0);put(torso,box(.7,.5,.12),A,0,.4,.3);put(torso,box(.5,.16,.14),light,0,-.2,.3);
+      for(const s of [-1,1]){put(arm(s),box(.46,.24,.5),light,s*.62,.98,0);put(arm(s),box(.7,.3,.15),A,s*.78,.72,-.2,{rz:s*.3});put(arm(s),box(.26,.75,.26),C,s*.62,.35,0);put(leg(s),box(.32,.7,.34),C,s*.3,-.62,0);put(leg(s),box(.36,.2,.42),dark,s*.3,-.9,.03);}
+      put(head,box(.5,.5,.5),C,0,1.15,0);put(head,box(.4,.08,.05),dark,0,1.2,.27);put(head,box(.08,.3,.4),A,0,1.5,0);
+      put(arm(-1),cyl(.04,.04,2.2,5),light,-.76,.5,.15);put(arm(-1),cone(.09,.35,5),A,-.76,1.75,.15);put(arm(-1),box(.5,.35,.03),A,-1.02,1.35,.15);
+      put(body,ring(.9,.1,6,18),light,0,-.92,0,{rx:Math.PI/2});mouth=face();
+    }else if(env==='garden'){
+      put(torso,cyl(.28,.22,.9,10),C,0,.35,0);put(body,cone(.75,1.4,10),C,0,-.3,0);put(torso,box(.34,.36,.1),A,0,.42,.26);
+      for(let i=0;i<3;i++)put(body,cone(.18,.5,4),A,Math.sin(i*2.1)*.6,-.68,Math.cos(i*2.1)*.6,{rx:.3,ry:i*2.1});
+      put(head,ball(.33,10,8),light,0,1.15,0);put(head,ring(.3,.04,4,10),A,0,1.4,0,{rx:Math.PI/2});for(let i=0;i<6;i++){const a=i*Math.PI/3;put(head,cone(.06,.28,4),dark,Math.sin(a)*.26,1.55,Math.cos(a)*.26,{rx:Math.cos(a)*.35,rz:-Math.sin(a)*.35});}
+      put(head,box(.5,.6,.06),C,0,1.1,-.3);
+      for(const s of [-1,1]){put(arm(s),cyl(.07,.09,.8,6),C,s*.62,.35,0);put(leg(s),cyl(.1,.1,.5,5),dark,s*.2,-.5,0);}
+      put(arm(-1),cyl(.03,.03,1.1,5),dark,-.7,.5,.2);put(arm(-1),ball(.16,8,6),A,-.7,1.1,.2);for(const s of [-1,1])put(arm(-1),cone(.08,.22,4),light,-.7+s*.12,1.04,.2,{rz:s*1.2});
+      mouth=face(1.2,.13,.05,.3,1.05);
+    }else if(env==='roots'){
+      put(torso,cyl(.5,.62,1.1,8),C,0,.3,0);for(let i=0;i<3;i++)put(torso,box(.3,.5,.1),dark,Math.sin(i*2.1)*.5,.2+i*.12,Math.cos(i*2.1)*.5,{ry:i*2.1});put(torso,ball(.5,8,5),A,0,.95,0,{sx:.95,sy:.3,sz:.95});
+      put(head,cyl(.35,.3,.45,7),C,0,1.15,0);for(let i=0;i<5;i++){put(head,cone(.12,.6,5),i%2?C:A,(i-2)*.18,1.56,-.02,{rz:(i-2)*.22});put(head,ball(.11,6,5),A,(i-2)*.24,1.8,-.02);}
+      for(const s of [-1,1]){put(arm(s),cyl(.14,.1,.9,6),C,s*.72,.3,0,{rz:s*.45});for(let i=0;i<3;i++)put(arm(s),cone(.06,.3,4),dark,s*.95+(i-1)*.08,-.2,(i-1)*.08,{rx:Math.PI});put(leg(s),cyl(.22,.28,.7,6),C,s*.32,-.65,0);put(leg(s),cone(.12,.3,4),dark,s*.32,-.88,.25,{rx:-1.3});}
+      mouth=face(1.2,.14,.05,.33,1.02);
+    }else if(env==='echo'){
+      put(torso,gem(.55),C,0,.35,0,{sy:1.3,sz:.8});for(let i=0;i<4;i++)put(torso,box(.3,.9,.06),light,(i-1.5)*.28,.4,-.32,{rz:(i-1.5)*.22});put(torso,gem(.21),A,0,.4,.45,{glow:true});
+      put(head,gem(.3),C,0,1.15,0,{sy:1.3});for(let i=0;i<3;i++)put(head,gem(.1),A,(i-1)*.18,1.58,0,{sy:1.6});
+      for(const s of [-1,1]){put(arm(s),gem(.2),C,s*.62,.35,0,{sy:2});put(leg(s),cyl(.12,.16,.7,6),C,s*.28,-.65,0);put(body,gem(.12),A,s*.95,.1,0,{sy:1.5,glow:true});}
+      put(arm(-1),cyl(.035,.035,1,5),light,-.7,.5,.2);for(const s of [-1,1])put(arm(-1),cyl(.03,.03,.5,5),light,-.7+s*.08,1.2,.2);
+      mouth=face(1.2,.12,.05,.26,1.05);
+    }else if(env==='library'){
+      put(torso,box(.95,1.05,.35),C,0,.3,0);put(torso,box(.12,1.05,.37),dark,-.5,.3,0);put(torso,box(.8,.9,.1),light,0,.3,.2);put(torso,box(.5,.25,.03),A,0,.5,.28);
+      put(head,box(.5,.42,.45),C,0,1.15,0);put(head,cone(.05,.5,4),A,.2,1.5,0,{rz:-.4});put(head,ring(.1,.02,4,10),A,0,1.2,.26);
+      for(const s of [-1,1]){put(arm(s),box(.22,.7,.22),C,s*.62,.35,0);for(let i=0;i<3;i++)put(arm(s),box(.45,.7,.03),light,s*(.9+i*.12),.7+i*.05,-.2-i*.06,{rz:s*(.3+i*.35)});put(leg(s),box(.3,.7,.3),C,s*.3,-.65,0);}
+      put(arm(-1),cyl(.015,.015,.4,4),dark,-.75,.0,.25);put(arm(-1),cyl(.1,.1,.22,6),A,-.75,-.3,.25,{glow:true});
+      mouth=face(1.2,.14,.05,.25,1.03);
+    }else if(env==='mist'){
+      put(body,cone(.6,1.3,9),C,0,-.1,0);put(torso,box(.3,.3,.12),A,0,.45,.3);
+      put(head,ball(.3,9,7),C,0,1.15,0);put(head,cone(.75,.3,10),A,0,1.42,0);put(head,cone(.25,.3,8),A,0,1.62,0);
+      for(const s of [-1,1]){put(arm(s),cyl(.08,.1,.75,6),C,s*.62,.35,0);put(leg(s),cyl(.1,.1,.4,5),dark,s*.2,-.55,0);put(body,ball(.3,7,5),light,s*.65,-.86,.3,{sx:1,sy:.3,sz:1});}
+      put(arm(-1),cyl(.04,.04,2.3,5),light,-.72,.5,.15);put(arm(-1),box(.22,.5,.06),C,-.72,-.6,.15);put(arm(1),cyl(.03,.03,1.6,5),dark,.72,.7,.15);put(arm(1),ball(.14,8,6),A,.72,1.55,.15,{glow:true});
+      mouth=face(1.2,.13,.05,.28,1.03);
+    }else if(env==='frost'){
+      put(torso,box(.8,1,.5),C,0,.3,0);put(torso,ring(.55,.14,6,14),light,0,.8,0,{rx:Math.PI/2});
+      put(head,box(.44,.48,.44),C,0,1.15,0);for(const s of [-1,1]){put(arm(s),gem(.19),A,s*.55,1,0,{sy:1.5});for(let i=0;i<3;i++)put(head,cone(.05,.5,4),light,s*(.25+i*.12),1.42+i*.1,-.05,{rz:s*(-.5-i*.35)});put(arm(s),box(.26,.75,.26),C,s*.62,.35,0);put(leg(s),box(.3,.7,.3),C,s*.3,-.65,0);put(leg(s),ring(.2,.06,5,10),light,s*.3,-.92,0,{rx:Math.PI/2});}
+      put(arm(-1),cyl(.035,.035,2,5),light,-.7,.55,.15);put(arm(-1),cone(.1,.45,4),A,-.7,1.72,.15);
+      mouth=face(1.2,.14,.05,.25,1.03);
+    }else if(env==='clockwork'){
+      put(torso,box(.8,.9,.5),C,0,.3,0);put(torso,ring(.42,.12,6,12),A,0,.35,.2);put(torso,cyl(.1,.1,.6,6),dark,-.3,1.1,-.2);put(torso,ball(.14,6,5),A,-.3,1.42,-.2);
+      put(head,box(.5,.45,.5),C,0,1.15,0);for(const s of [-1,1])put(head,ring(.09,.03,4,10),A,s*.15,1.2,.26);
+      for(const s of [-1,1]){put(arm(s),cyl(.12,.12,.75,6),C,s*.62,.35,0);put(leg(s),box(.3,.7,.3),C,s*.3,-.65,0);put(leg(s),cyl(.06,.06,.5,5),light,s*.45,-.6,0);}
+      put(arm(-1),cyl(.04,.04,1,5),light,-.7,.3,.15);put(arm(-1),box(.22,.18,.1),light,-.7,.85,.15);put(arm(-1),box(.08,.1,.12),dark,-.7,.9,.15);put(arm(1),ring(.18,.06,5,10),A,.72,.1,.2);
+      mouth=face(1.2,.15,.05,.3,1.03);
+    }else if(env==='furnace'){
+      put(torso,box(1.1,1,.65),C,0,.3,0);put(torso,box(.6,.4,.06),A,0,.3,.34,{glow:true});for(let i=0;i<3;i++)put(torso,box(.6,.04,.08),dark,0,.18+i*.12,.36);
+      put(head,box(.55,.5,.5),C,0,1.1,0);for(const s of [-1,1]){put(head,cone(.12,.48,5),A,s*.34,1.5,0,{rz:-s*.5});put(arm(s),cone(.14,.3,5),dark,s*.78,1.05,0);put(arm(s),box(.34,.9,.34),C,s*.72,.3,0);put(leg(s),box(.4,.75,.4),C,s*.32,-.6,0);put(leg(s),box(.44,.28,.44),dark,s*.32,-.86,0);put(torso,ball(.06,5,4),A,s*.45,-.05,.36,{glow:true});}
+      put(arm(-1),cyl(.06,.06,1.1,6),dark,-.82,.4,.15);put(arm(-1),box(.75,.38,.4),C,-.82,1.05,.15);
+      mouth=face(1.15,.16,.05,.28,.98);
+    }else{ // heart
+      put(body,cyl(.35,.6,1.6,10),C,0,0,0);put(torso,box(.4,.9,.08),A,0,.3,.35);
+      put(head,ball(.3,10,8),light,0,1.15,0);put(head,cone(.4,.5,8),C,0,1.4,0);put(head,ring(.5,.03,5,20),A,0,1.62,0,{rx:Math.PI/2,glow:true});put(head,ring(.35,.025,5,18),A,0,1.78,0,{rx:Math.PI/2+.4,glow:true});
+      for(const s of [-1,1]){put(arm(s),cyl(.08,.1,.75,6),C,s*.62,.35,0);put(arm(s),ring(.14,.03,5,12),A,s*.7,.1,.3,{glow:true});put(leg(s),cyl(.08,.08,.3,5),dark,s*.2,-.5,0);}
+      mouth=face(1.2,.13,.05,.28,1.04);
+    }
+    if(d.underworld){put(torso,gem(.14),A,0,.62,.4,{glow:true});for(const s of [-1,1])put(arm(s),ring(.2,.05,5,10),dark,s*.62,.78,0,{rx:Math.PI/2});}
+    const ringMesh=new T.Mesh(new T.RingGeometry(.7,1.05,24),new T.MeshBasicMaterial({color:0xd55668,transparent:true,opacity:.35,side:T.DoubleSide,depthWrite:false}));ringMesh.rotation.x=-Math.PI/2;ringMesh.position.y=.025;model.add(ringMesh);
+    // Strike flash: a short accent shockwave at the feet, hidden until pose() shows a release.
+    const flash=new T.Mesh(new T.RingGeometry(.3,1.2,24),new T.MeshBasicMaterial({color:A,transparent:true,opacity:0,side:T.DoubleSide,depthWrite:false}));flash.rotation.x=-Math.PI/2;flash.position.y=.04;flash.visible=false;flash.name='lord-strike-flash';model.add(flash);
+    Object.assign(model.userData,{body,ring:ringMesh,flash,accent:d.accent,cinemaRig:{head,torso,arms,legs,mouth,eyes}});return model;
+  }
+  // Attack acting shared by every lord: wind-up, release and recovery as absolute joint
+  // targets above the authored rest pose, so cutscene snapshots and restores stay exact.
+  const STYLE=Object.freeze({cloud:'thrust',garden:'sweep',mist:'sweep',echo:'cast',library:'cast',heart:'cast',roots:'smash',frost:'smash',clockwork:'smash',furnace:'smash'});
+  function pose(model,{windup=0,total=0,strike=0}={}){
+    const rig=model?.userData?.cinemaRig,body=model?.userData?.body;if(!rig||!body)return null;
+    const base=model.userData.poseBase||(model.userData.poseBase={torso:[rig.torso.rotation.x,rig.torso.rotation.z],arms:rig.arms.map(a=>[a.rotation.x,a.rotation.z]),head:rig.head.rotation.x,z:body.position.z});
+    const kind=STYLE[model.userData.environment]||'smash',charge=total>0&&windup>0?1-Math.max(0,Math.min(1,windup/total)):0,hit=strike>0?Math.min(1,strike/.4):0;
+    let torsoX=0,armR=0,armL=0,lean=0,lunge=0,headX=0;
+    if(kind==='smash'){armR=-2.4*charge+1.9*hit;armL=-.6*charge+.3*hit;torsoX=-.25*charge+.45*hit;lunge=.35*hit;}
+    else if(kind==='thrust'){armR=-1.3*charge+1.5*hit;torsoX=-.15*charge+.25*hit;lunge=.6*hit;headX=-.1*charge;}
+    else if(kind==='sweep'){armR=-1.6*charge+1.2*hit;lean=.25*charge-.35*hit;torsoX=-.1*charge+.2*hit;lunge=.25*hit;}
+    else{armR=-1.9*charge+.6*hit;armL=-1.9*charge+.6*hit;torsoX=-.2*charge+.1*hit;headX=-.25*charge+.1*hit;lunge=.1*hit;}
+    rig.torso.rotation.x=base.torso[0]+torsoX;rig.torso.rotation.z=base.torso[1]+lean;rig.arms[0].rotation.x=base.arms[0][0]+armL;rig.arms[1].rotation.x=base.arms[1][0]+armR;rig.head.rotation.x=base.head+headX;body.position.z=base.z+lunge;
+    const flash=model.userData.flash;if(flash){flash.visible=hit>0;if(hit>0){flash.scale.setScalar(.6+1.2*(1-hit));flash.material.opacity=.55*hit;}else flash.material.opacity=0;}
+    return {kind,charge,hit};
   }
   // Mini lords (小樓主): one per non-lord floor of a modern party journey, picked by floor from its
   // region's two, so the same region repeats them across floors. Each is a larger, tougher regional
@@ -108,5 +176,5 @@
     if(!hasMini(run)||!region)return null;
     const list=MINI_LORDS[region];return list?list[pick(run.seed,'mini-lord:'+run.floor)%list.length]:null;
   }
-  return Object.freeze({ID,UNDERWORLD_ID,LORDS,UNDERWORLD_LORDS,MINI_LORDS,MINI_XP,LORD_XP,MINI_HP,MINI_DAMAGE,CHAMPION_HP,CHAMPION_DAMAGE,allLords,defs,forRun,spec,defeated,hasMini,miniFor,build,tracks:Object.freeze(tracks)});
+  return Object.freeze({ID,UNDERWORLD_ID,LORDS,UNDERWORLD_LORDS,MINI_LORDS,MINI_XP,LORD_XP,MINI_HP,MINI_DAMAGE,CHAMPION_HP,CHAMPION_DAMAGE,allLords,defs,forRun,spec,defeated,hasMini,miniFor,build,pose,STYLE,tracks:Object.freeze(tracks)});
 });

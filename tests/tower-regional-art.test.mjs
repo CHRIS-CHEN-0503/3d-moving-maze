@@ -13,7 +13,7 @@ function harness(){
 }
 test('all regional foods, meals and forge materials have distinct complete shared vector icons',()=>{
   const {art}=harness();
-  for(const [keys,draw]of [[Object.keys(M.INGREDIENTS),art.foodArt],[Object.keys(P.RECIPES),art.dishArt],[Object.keys(M.MATERIALS),Icons.svg]]){
+  for(const [keys,draw]of [[Object.keys(M.INGREDIENTS),art.foodArt],[Object.keys(P.RECIPES).filter(id=>!P.RECIPES[id].hidden),art.dishArt],[Object.keys(M.MATERIALS),Icons.svg]]){
     const output=keys.map(draw);assert.equal(new Set(output).size,keys.length);
     for(const svg of output){assert.match(svg,/^<svg /);assert.match(svg,/<path|<ellipse|<circle/);assert.doesNotMatch(svg,/undefined|NaN|<script|<image|(?:href|src)=/);}
   }

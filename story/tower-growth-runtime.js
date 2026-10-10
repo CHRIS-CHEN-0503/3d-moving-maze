@@ -37,7 +37,7 @@
     function reset(){clearRoute();lastQuick='';nearby=null;wants.clear();}
     const observed=(p,m)=>m.alive&&r().party.health[m.id]!==0&&!r().defeatedMonsters.includes(m.id)&&dist(p,m.model.position)<=12&&clear(p,m.model.position)&&(!root.MazeSight?.active()||root.MazeSight.visible(m.model.position.x,m.model.position.z));
     function decision(id){
-      const p=pos(id);if(!ready()||!p||id===H.state(r()).active||H.hp(r(),id)<=0)return null;
+      const p=pos(id);if(!ready()||!p||id===H.state(r()).active||H.hp(r(),id)<=0||ctx.reserved?.(id))return null;
       const near=H.ids(r()).filter(k=>pos(k)&&dist(p,pos(k))<=6&&clear(p,pos(k))),focus=ctx.engagement?.(id),enemies=ctx.monsters().filter(m=>observed(p,m)).sort((a,b)=>Number(b.windup>0)-Number(a.windup>0)||Number(b===focus)-Number(a===focus)||dist(p,a.model.position)-dist(p,b.model.position)||String(a.id).localeCompare(String(b.id)));
       const observation=m=>({id:m.id,distance:dist(p,m.model.position),windup:m.windup||0,stationary:m.def?.speed===0,behind:Math.cos(Math.atan2(p.x-m.model.position.x,p.z-m.model.position.z)-(m.model.rotation?.y||0))<0});
       const threatened=near.filter(k=>enemies.some(m=>dist(pos(k),m.model.position)<(m.def?.ranged?7:3)&&clear(pos(k),m.model.position)));

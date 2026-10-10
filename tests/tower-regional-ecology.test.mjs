@@ -8,7 +8,7 @@ function fresh(floor=99,seed=31){let r=H.enable(P.enable(C.newRun({seed}),'sword
 }
 const floors=M.ECOLOGIES.map(e=>e.high),cells=[{x:2,y:2},{x:3,y:3},{x:4,y:4}];
 test('all 149 floors map to exactly one regional food web, with distinct signatures',()=>{
-  assert.equal(M.ECOLOGIES.length,15);assert.equal(Object.keys(M.INGREDIENTS).length,21);assert.equal(Object.keys(M.MATERIALS).length,6);
+  assert.equal(M.ECOLOGIES.length,15);assert.equal(Object.keys(M.INGREDIENTS).length,58);assert.equal(Object.keys(M.MATERIALS).length,6);
   const seen=new Set();for(const e of M.ECOLOGIES){assert.equal(M.ecology(e.high),e);assert.equal(M.ecology(e.low),e);const signature=M.signature(e.high);assert.ok(M.INGREDIENTS[signature]);assert.ok(!seen.has(signature));seen.add(signature);for(let floor=e.high;floor>=e.low;floor--){assert.equal(M.ECOLOGIES.filter(x=>floor<=x.high&&floor>=x.low).length,1);assert.equal(C.floorConfig(floor).name,e.name);}assert.ok(Object.isFrozen(e.variants));}
   for(const floor of [0,100,-51,NaN,undefined])assert.throws(()=>M.ecology(floor),RangeError);
 });
@@ -17,7 +17,7 @@ test('each catalog source is an actual local species and every new ingredient is
     assert.ok(P.defs()[kind]);const drops=M.dropPool(e.high,{kind,def:P.defs()[kind]});assert.equal(new Set(drops.map(d=>d.type+':'+d.key)).size,drops.length);
     for(const d of drops){observed[d.type].add(d.key);const meta=(d.type==='ingredient'?M.INGREDIENT_META:M.MATERIAL_META)[d.key];assert.ok(meta.sources.some(s=>s.includes(e.name)&&s.includes(variant.name)));assert.ok(L.CHANCES[d.rarity]);assert.ok(d.quantity>=1&&d.quantity<=2);if(d.key==='meat'||d.key==='shell')assert.equal(kind,'crab');if(['starore','abyssalloy'].includes(d.key))assert.ok(e.underground);}
   }
-  assert.deepEqual([...observed.ingredient].sort(),Object.keys(M.INGREDIENTS).sort());assert.deepEqual([...observed.material].sort(),Object.keys(M.MATERIALS).sort());
+  assert.deepEqual([...observed.ingredient].sort(),Object.keys(M.INGREDIENTS).filter(k=>!require('../story/tower-recipe-lab.js').EXOTIC.includes(k)).sort(),'every ingredient except the hunter-only exotics drops from a creature');assert.deepEqual([...observed.material].sort(),Object.keys(M.MATERIALS).sort());
   assert.ok(M.INGREDIENT_META.meat.sources.every(s=>s.includes('蟹')));assert.ok(!M.INGREDIENT_META.meat.sources.some(s=>s.includes('雲頂')||s.includes('熔火爐心')));
 });
 test('regional decorations are immutable copies and preserve canonical sensing and combat stats',()=>{

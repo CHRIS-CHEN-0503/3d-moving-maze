@@ -169,7 +169,7 @@ for (const merchantId of ['tieLing', 'jinHe', 'lanZhou']) {
     const offers=catalog.TowerEncounters.merchantOffers(99,seed);
     assert.equal(merchants.length, offers.length);
     assert.deepEqual(merchants.map(m=>m.userData.merchantId).sort(),Array.from(offers,o=>o.id).sort());
-    assert.equal(merchants.filter(m=>m.userData.merchantId!=='suHe').length,1);
+    assert.equal(merchants.filter(m=>!['suHe','hunter'].includes(m.userData.merchantId)).length,1);
     const merchant = merchants.find(m=>m.userData.merchantId===merchantId);
     assert.equal(merchant.userData.merchantId, merchantId);
     assert.ok(merchant.position.x + merchant.position.z >= h.context.G.cell * 2, 'Merchants must not occupy the floor entrance');
@@ -229,23 +229,21 @@ test('grocer exposes every supply, buys and sells medicine, charges ten arrows p
   const before=h.save();h.tick(5);h.emit('pagehide');assert.equal(h.save().elapsed,before.elapsed);assert.ok(h.context.TowerCore.validateSave(h.save()));
 });
 
-test('grocer ingredient UI buys exact limited stock, disables sold out shelves and preserves purchases after reload',()=>{
-  const Core=require('../story/story-core.js'),Party=require('../story/tower-party-core.js'),Narrative=require('../story/tower-narrative.js');
-  const run=Party.enable(Core.newRun({seed:37}),'mage').run;run.floor=92;run.floorsCleared=7;run.chronicle=Narrative.newChronicle(92);Party.advance(run);run.coins=250;
+test('grocer and monster hunter ingredient UIs buy exact limited stock, disable sold out shelves and preserve purchases after reload',()=>{
+  const Core=require('../story/story-core.js'),Party=require('../story/tower-party-core.js'),Narrative=require('../story/tower-narrative.js'),E=require('../story/tower-encounters.js');
+  const run=Party.enable(Core.newRun({seed:37}),'mage').run;run.floor=93;run.floorsCleared=6;run.chronicle=Narrative.newChronicle(93);Party.advance(run);run.coins=250;
   let h=harness(run);h.context.TowerMode.open();h.click('continue');h.click('close');visitMerchant(h,'suHe');
-  const offers=Array.from(h.context.TowerEncounters.groceryOffers(h.save())),special=offers.find(o=>o.specialty);
-  assert.equal(special.sourceFloor,30);assert.equal(special.stock,2);assert.equal(special.ingredientId,'frostberry');
+  const offers=Array.from(h.context.TowerEncounters.groceryOffers(h.save()));assert.equal(offers.length,E.GROCERY.commonIngredients.length);assert.ok(offers.every(o=>!o.specialty),'the grocer now sells only the common shelf');
   assert.deepEqual(h.get('towerDialog').buttons.filter(b=>b.dataset.tower==='buy-ingredient').map(b=>b.dataset.item),offers.map(o=>o.id));
-  assert.match(h.get('towerDialog').innerHTML,/30|霜封迴廊/);
-  const initial=h.save();h.click('buy-ingredient',special.id);assert.equal(h.save().coins,initial.coins-5);assert.equal(h.save().party.ingredients.frostberry,initial.party.ingredients.frostberry+1);assert.equal(h.save().adventure.groceryPurchases[special.id],1);
-  h.click('buy-ingredient',special.id);const purchased=h.save();assert.equal(purchased.adventure.groceryPurchases[special.id],2);assert.equal(purchased.coins,initial.coins-10);
-  const soldOut=()=>h.get('towerDialog').buttons.find(b=>b.dataset.tower==='buy-ingredient'&&b.dataset.item===special.id);
+  const dew=offers.find(o=>o.ingredientId==='dew'),initial=h.save();h.click('buy-ingredient',dew.id);assert.equal(h.save().coins,initial.coins-dew.price);assert.equal(h.save().party.ingredients.dew,initial.party.ingredients.dew+1);assert.equal(h.save().adventure.groceryPurchases[dew.id],1);
+  for(let i=1;i<dew.stock;i++)h.click('buy-ingredient',dew.id);const purchased=h.save();assert.equal(purchased.adventure.groceryPurchases[dew.id],dew.stock);assert.equal(purchased.coins,initial.coins-dew.price*dew.stock);
+  const soldOut=()=>h.get('towerDialog').buttons.find(b=>b.dataset.tower==='buy-ingredient'&&b.dataset.item===dew.id);
   assert.equal(soldOut().disabled,true);assert.match(h.get('towerDialog').innerHTML,/本層已售完/);
   h.get('towerOverlay').listeners.get('click')({target:soldOut()});assert.deepEqual(h.save(),purchased,'Disabled stale requests never deduct currency or duplicate ingredients');
-  h=harness(purchased);h.context.TowerMode.open();h.click('continue');h.click('close');visitMerchant(h,'suHe');assert.equal(soldOut().disabled,true);assert.equal(h.context.TowerEncounters.groceryOffers(h.save()).find(o=>o.id===special.id).remaining,0);
-  const common=offers.find(o=>!o.specialty),before=h.save();h.click('buy-ingredient',common.id);assert.equal(h.save().coins,before.coins-common.price);assert.equal(h.save().party.ingredients[common.ingredientId],before.party.ingredients[common.ingredientId]+1);assert.ok(h.context.TowerCore.validateSave(h.save()));
-  const stale=h.get('towerDialog').buttons.find(b=>b.dataset.tower==='buy-ingredient'&&b.dataset.item===common.id),beforeDistance=h.save();h.context.G.px=h.context.G.pz=0;
-  h.get('towerOverlay').listeners.get('click')({target:stale});assert.deepEqual(h.save(),beforeDistance,'Leaving the actual grocery prevents a pending ingredient purchase');
+  h=harness(purchased);h.context.TowerMode.open();h.click('continue');h.click('close');visitMerchant(h,'suHe');assert.equal(soldOut().disabled,true);assert.equal(h.context.TowerEncounters.groceryOffers(h.save()).find(o=>o.id===dew.id).remaining,0);
+  h.click('close');visitMerchant(h,'hunter');const hunted=Array.from(h.context.TowerEncounters.groceryOffers(h.save(),'hunter'));assert.equal(hunted.length,E.HUNTER.count);assert.ok(hunted.every(o=>o.hunter&&o.price===E.HUNTER.price&&!E.GROCERY.commonIngredients.includes(o.ingredientId)));assert.match(h.get('towerDialog').innerHTML,/魔物獵人的獵獲/);
+  assert.deepEqual(h.get('towerDialog').buttons.filter(b=>b.dataset.tower==='buy-ingredient').map(b=>b.dataset.item),hunted.map(o=>o.id));
+  const rare=hunted[0],before=h.save();h.click('buy-ingredient',rare.id);assert.equal(h.save().coins,before.coins-rare.price);assert.equal(h.save().party.ingredients[rare.ingredientId],before.party.ingredients[rare.ingredientId]+1);assert.equal(h.save().adventure.groceryPurchases[rare.id],1);assert.ok(h.context.TowerCore.validateSave(h.save()));
 });
 
 test('continue restores tools, cooldowns and claimed drops at the saved floor entrance', () => {

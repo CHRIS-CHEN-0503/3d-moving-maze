@@ -49,7 +49,7 @@ test('robot combinations charge for 0.5 or 0.9 seconds and release real attacks,
 });
 
 test('fuel depletion, lost scrap, lost repair need and movement during robot preparation cancel atomically',()=>{
-  for(const change of [h=>H.actor(h.run,'hero').robot.fuel=0,h=>h.run.party.journey.scrap=0,h=>H.equipment(h.run,'hero').armor.durability=H.equipment(h.run,'hero').armor.maxDurability,h=>h.f.space.positions.hero.x+=1,h=>h.setClear(false)]){const h=harness('core_reconstruction');assert.ok(h.ui.start('core_reconstruction'));change(h);const before=structuredClone(h.run);h.finish();assert.equal(h.ui.preparing('hero'),null);assert.deepEqual(h.run,before);assert.equal(h.saves,0);assert.equal(h.hits.length,0);}
+  for(const change of [h=>H.actor(h.run,'hero').robot.fuel=0,h=>h.run.party.journey.scrap=0,h=>H.equipment(h.run,'hero').armor.durability=H.equipment(h.run,'hero').armor.maxDurability,h=>h.f.space.positions.hero.x+=1.5,h=>h.setClear(false)]){const h=harness('core_reconstruction');assert.ok(h.ui.start('core_reconstruction'));change(h);const before=structuredClone(h.run);h.finish();assert.equal(h.ui.preparing('hero'),null);assert.deepEqual(h.run,before);assert.equal(h.saves,0);assert.equal(h.hits.length,0);}
 });
 
 test('a pushed target leaving the second skill range is not hit remotely through the old combo plan',()=>{

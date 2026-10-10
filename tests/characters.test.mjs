@@ -36,7 +36,7 @@ test('瀏覽器與Node皆提供同一個無外部依賴的建模介面', () => {
   const context = vm.createContext({});
   vm.runInContext(readFileSync(new URL('../story/tower-characters.js', import.meta.url), 'utf8'), context);
   for (const method of ['buildMerchant', 'buildExplorer', 'buildChest', 'buildGear']) assert.equal(typeof context.TowerCharacters[method], 'function');
-  assert.deepEqual(Object.keys(characters.MERCHANT_STYLES), ['tieLing', 'jinHe', 'lanZhou', 'suHe']);
+  assert.deepEqual(Object.keys(characters.MERCHANT_STYLES), ['tieLing', 'jinHe', 'lanZhou', 'suHe', 'hunter']);
   assert.deepEqual(Object.keys(characters.EXPLORER_STYLES), ['eve', 'rowan', 'mira', 'oren', 'sena']);
   assert.throws(() => characters.buildMerchant('tieLing'), TypeError);
   for (const invalid of ['missing', '__proto__', 'constructor', null]) assert.throws(() => characters.buildMerchant(invalid, deps), RangeError);

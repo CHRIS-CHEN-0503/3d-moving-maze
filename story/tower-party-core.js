@@ -18,7 +18,7 @@
     mage:{name:'術士',person:'露彌',gender:'female',color:0xb196e8,skill:'震盪結界',description:'技能：擊退附近怪物，使牠們短暫暈眩。另可在照明工具中施放十分鐘的日光術；術士隊友也能協助照明。',cooldown:22},
     scout:{name:'遊俠',person:'巧栗',gender:'female',color:0x68bead,skill:'探路之眼',description:'探路與避險專家。技能：顯示出口路線十八秒，獲得六秒陷阱保護。隊中有遊俠時，陷阱傷害減少四分之一。',cooldown:25},
     chef:{name:'廚師',person:'禾谷',gender:'male',color:0xe6ac65,skill:'隨手料理',description:'烹飪一次可做兩份。技能：用一份根莖恢復飽食度，照顧整支隊伍。',cooldown:25},
-    healer:{name:'療癒師',person:'澄音',gender:'female',color:0x88c69f,skill:'草藥療癒',description:'技能：消耗一份香草恢復生命。隊友在你受重傷時也會使用香草救援。',cooldown:25},
+    healer:{name:'療癒師',person:'澄音',gender:'female',color:0x88c69f,skill:'草藥療癒',description:'技能：消耗一份藥草恢復生命。隊友在你受重傷時也會使用藥草救援。',cooldown:25},
     smith:{name:'鍛匠',person:'砧岳',gender:'male',color:0xbf936e,skill:'應急修補',description:'矮人族裝備修復專家。技能：用一份硬殼修復穿戴的裝備。隊中有鍛匠時，營地修理與鍛造費減半。',cooldown:25},
     archer:{name:'射手',person:'嵐羽',gender:'female',color:0xc8bc79,skill:'鷹眼巡望',description:'精靈弓手，擅長遠程射擊、牽制怪物與帶領隊伍穿行迷宮。弓是雙手武器，不能配盾。',cooldown:25},
     robot:{name:'機器人',person:'鐵衡',gender:'male',color:0x9dc5d7,skill:'摺甲防禦',description:'重防禦拳鬥者，以飛拳與衝撞替隊伍開路；不穿一般裝備，可用礦石和零件進階自身機殼、拳臂。',cooldown:28},
@@ -29,16 +29,17 @@
   const sex=(run,id='hero')=>id==='hero'?(run.party.sex||PROFESSIONS[run.party.profession].gender):run.party.members.find(m=>m.id===id)?.sex||PROFESSIONS[run.party.members.find(m=>m.id===id)?.profession]?.gender;
   const recruitLimit=run=>C().isUnderworld(run)?4:run.party?.loadouts?Math.min(3,H().level(run,'hero')):3;
   const INGREDIENTS=Materials().INGREDIENTS;
+  const Lab=()=>typeof module==='object'&&module.exports?require('./tower-recipe-lab.js'):globalThis.TowerRecipeLab;
   const LEGACY_INGREDIENTS=Object.freeze(['root','mushroom','herb','nectar','meat','shell']);
   const BASIC_RECIPES=Object.freeze(['stew','broth','skewer','soup','bento','salad']);
   const RECIPES=Object.freeze(Object.fromEntries(Object.entries({
     stew:{name:'根莖菇菇燉鍋',cost:{root:2,mushroom:1},hp:8,hunger:35},
-    broth:{name:'香草暖湯',cost:{herb:2,root:1},hp:24,hunger:15},
+    broth:{name:'藥草暖湯',cost:{herb:2,root:1},hp:24,hunger:15},
     skewer:{name:'蜜烤菇串',cost:{nectar:1,mushroom:2},hp:0,hunger:35,buff:'focus'},
     crab:{name:'香煎蟹肉',cost:{meat:2,herb:1},hp:10,hunger:40,buff:'guard'},
     soup:{name:'蜜根熱湯',cost:{root:2,nectar:1},hp:16,hunger:30},
     bento:{name:'旅人飯盒',cost:{root:2,herb:1},hp:0,hunger:55,team:10},
-    salad:{name:'發光香草沙拉',cost:{herb:1,mushroom:1},hp:12,hunger:20,buff:'trail'},
+    salad:{name:'發光藥草沙拉',cost:{herb:1,mushroom:1},hp:12,hunger:20,buff:'trail'},
     feast:{name:'團聚大餐',cost:{root:2,mushroom:2,meat:2,nectar:1},hp:25,hunger:60,team:35},
     trail_bread:{name:'雲絨菇烤餅',cost:{cloudcap:1,root:1},hp:6,hunger:40,buff:'trail',description:'雲頂菇怪的柔軟傘蓋與甜根莖烤成薄餅；離開雲頂後，需要保留的雲絨菇才能再做。'},
     honey_roast:{name:'向陽蜜籽盤',cost:{sunseed:1,nectar:1},hp:12,hunger:30,buff:'focus',description:'庭園的日輪籽裹上蛾蜜烘烤，香氣讓出手更專注。'},
@@ -50,19 +51,23 @@
     frost_compote:{name:'霜莓蜜煮',cost:{frostberry:1,nectar:1},hp:28,hunger:20,buff:'trail',ward:'poison',description:'霜地莓果以雪蜜蛾的花蜜慢煮。享用後五分鐘內，可抵擋一次中毒。'},
     copper_flatbread:{name:'米香齒輪餅',cost:{coppergrain:1,root:1},hp:10,hunger:50,buff:'guard',description:'工坊的銅穗米磨粉烤成齒輪形狀；名字像金屬，實際上是可食穀物。'},
     heart_jam:{name:'塔心蜜果醬',cost:{heartfruit:1,nectar:1},hp:24,hunger:30,team:12,description:'塔心怪物攜帶的心燈果熬成蜜醬，為最後幾層的同行者補充力量。'},
-    root_banquet:{name:'根脈遠征鍋',cost:{deeproot:2,herb:1},hp:26,hunger:55,team:16,buff:'trail',requiredDepth:1,description:'地下根脈特有的深根與香草燉成大鍋；地上甜根莖不能取代主材料。'},
-    mist_broth:{name:'渡渠鮮蝦湯',cost:{blindshrimp:2,herb:1},hp:34,hunger:25,team:18,requiredDepth:11,description:'無名渡渠的盲蝦與香草熬出鮮湯，不再依賴每一區都出現蟹肉。'},
+    root_banquet:{name:'根脈遠征鍋',cost:{deeproot:2,herb:1},hp:26,hunger:55,team:16,buff:'trail',requiredDepth:1,description:'地下根脈特有的深根與藥草燉成大鍋；地上甜根莖不能取代主材料。'},
+    mist_broth:{name:'渡渠鮮蝦湯',cost:{blindshrimp:2,herb:1},hp:34,hunger:25,team:18,requiredDepth:11,description:'無名渡渠的盲蝦與藥草熬出鮮湯，不再依賴每一區都出現蟹肉。'},
     // Keep the previous B21 meal identifier and unlock floor so saved cooked
     // portions and the chef's recipe history remain valid after recipe revision.
     ember_crab:{name:'沉頁夜菇燴',cost:{nighttruffle:2,mushroom:1},hp:22,hunger:60,buff:'focus',requiredDepth:21,description:'沉頁藏書庫的夜松露與菇類慢燴，濃郁香氣讓隊伍更專注。'},
     ash_stew:{name:'灰香燉根',cost:{ashspice:2,root:1},hp:30,hunger:55,team:20,buff:'guard',requiredDepth:31,description:'無火深井的灰香料煨入甜根莖；耐熱的香氣替地下遠征暖胃。'},
     gate_feast:{name:'歸途星露宴',cost:{starjelly:3,nectar:1},hp:38,hunger:75,team:45,buff:'guard',requiredDepth:41,description:'原初門庭的星露凝晶與花蜜製成盛宴，珍貴主材料只在最後一區取得。'},
+    // Research can only stumble into the medley; the hundred hidden dishes come from the recipe lab.
+    medley:{name:'實驗雜燴',cost:{},hp:4,hunger:15,research:true,description:'研發沒命中隱藏食譜時偶然做成的雜燴。'},
+    ...Lab().recipes(),
   }).map(([id,recipe])=>[id,Object.freeze({...recipe,requiresChef:!BASIC_RECIPES.includes(id)})])));
   const LEGACY_RECIPES=Object.freeze(['stew','broth','skewer','crab','soup','bento','salad','feast']);
   const recipeFloorAllowed=(floor,id)=>own(RECIPES,id)&&(!RECIPES[id].requiredDepth||floor<0&&-floor>=RECIPES[id].requiredDepth);
-  const recipeUnlocked=(run,id)=>!!run&&recipeFloorAllowed(run.floor,id)&&(!RECIPES[id].requiredDepth||C().isUnderworld(run));
+  const discovered=(run,id)=>!!run?.party?.discoveries?.includes(id);
+  const recipeUnlocked=(run,id)=>!!run&&recipeFloorAllowed(run.floor,id)&&(!RECIPES[id].requiredDepth||C().isUnderworld(run))&&(!RECIPES[id].hidden||discovered(run,id));
   const recipeAvailable=(run,id)=>recipeUnlocked(run,id)&&(!RECIPES[id].requiresChef||has(run,'chef'));
-  const availableRecipes=run=>Object.fromEntries(Object.entries(RECIPES).filter(([id])=>recipeAvailable(run,id)));
+  const availableRecipes=run=>Object.fromEntries(Object.entries(RECIPES).filter(([id])=>recipeAvailable(run,id)&&!RECIPES[id].research));
   function mealStock(value,floor){
     if(!value||typeof value!=='object'||Array.isArray(value)||!LEGACY_RECIPES.every(id=>own(value,id))||Object.keys(value).some(id=>!own(RECIPES,id))||Object.values(value).some(v=>!num(v,0,99,true)))return null;
     const result=Object.fromEntries(Object.keys(RECIPES).map(id=>[id,value[id]??0]));
@@ -73,7 +78,14 @@
     // Original six-key saves gain empty regional slots, never free ingredients.
     return Object.fromEntries(Object.keys(INGREDIENTS).map(k=>[k,value[k]??0]));
   }
-  const BUFFS=Object.freeze({focus:'專注：攻擊 +3',guard:'暖胃：受到傷害 -2',trail:'輕盈：陷阱傷害減半'});
+  // Chef-made portions (特製) are tracked per dish; older saves simply have none.
+  function specialStock(value,meals){if(value===undefined)return emptyStock(RECIPES);if(!value||typeof value!=='object'||Array.isArray(value)||Object.keys(value).some(id=>!own(RECIPES,id))||Object.entries(value).some(([id,v])=>!num(v,0,99,true)||v>meals[id]))return null;return Object.fromEntries(Object.keys(RECIPES).map(id=>[id,value[id]??0]));}
+  const SPECIAL_BONUS_PER_LEVEL=10,SPECIAL_BONUS_CAP=50,SPECIAL_BONUS_MIN=10;
+  const chefLevel=run=>!run?.party?0:run.party.loadouts?Math.max(0,...H().ids(run).filter(id=>H().job(run,id)==='chef'&&H().hp(run,id)>0).map(id=>H().level(run,id))):run.party.profession==='chef'&&run.hp>0?3:Math.max(0,...run.party.members.filter(m=>m.profession==='chef'&&m.hp>0).map(m=>m.level));
+  // A chef-made portion is always at least a little better; a travelling chef raises it with her level.
+  const specialBonus=run=>Math.max(SPECIAL_BONUS_MIN,Math.min(SPECIAL_BONUS_CAP,SPECIAL_BONUS_PER_LEVEL*chefLevel(run)));
+  function discoveryList(value){if(value===undefined)return [];if(!Array.isArray(value)||value.length>Lab().COUNT||new Set(value).size!==value.length||value.some(id=>!own(RECIPES,id)||!RECIPES[id].hidden))return null;return [...value];}
+  const BUFFS=Object.freeze({focus:'專注：攻擊 +3',guard:'暖胃：受到傷害 -2',trail:'輕盈：陷阱傷害減半',...Lab().BUFFS});
   const MONSTERS=Object.freeze({
     mushroom:{id:'mushroom',name:'蒲傘菇',strength:1,speed:1.05,damage:6,sight:7,color:0xcf95bc,shape:'mushroom',description:'傘蓋膨脹時準備噴孢子；拉開距離，避免短暫緩速。',drop:{mushroom:2}},
     crab:{id:'crab',name:'岩殼蟹',strength:2,speed:1.2,damage:10,sight:8,color:0xc28c62,shape:'crab',description:'正面硬殼擋下部分傷害；趁牠攻擊後，繞到側面出手。',drop:{meat:2,shell:1}},
@@ -97,7 +109,7 @@
   function enable(run,profession,gender=PROFESSIONS[profession]?.gender){
     const next=C().validateSave(run);if(!next||!own(PROFESSIONS,profession)||next.party||!['male','female'].includes(gender))return {ok:false,run,message:'請選擇有效的冒險職業與外觀。'};
     const guard=next.warrior;
-    next.party={version:1,profession,sex:gender,members:[],joined:[],travellers:[],ingredients:{...emptyStock(INGREDIENTS),root:3,mushroom:2,herb:2,shell:1},meals:emptyStock(RECIPES),buffs:[],cooldown:0,guardLeft:0,trapWard:0,slowLeft:0,health:{},poise:{},boss:newBoss(next.floor),journey:X().newJourney(next.floor)};
+    next.party={version:1,profession,sex:gender,members:[],joined:[],travellers:[],ingredients:{...emptyStock(INGREDIENTS),root:3,mushroom:2,herb:2,shell:1,dew:2},meals:emptyStock(RECIPES),specials:emptyStock(RECIPES),discoveries:[],buffs:[],cooldown:0,guardLeft:0,trapWard:0,slowLeft:0,health:{},poise:{},boss:newBoss(next.floor),journey:X().newJourney(next.floor)};
     if(L())next.party.light=L().newState();
     next.party.loot=Loot().fresh();next.party.reinforcements=Re().fresh();next.party.foraging=Foraging().fresh(next);
     if(guard){const m={id:guard.offerId,profession:'swordsman',sex:'male',level:guard.strength,hp:28+guard.strength*6,cooldown:0,hurtLeft:0};next.party.members.push(m);next.party.joined.push(m.id);}
@@ -110,11 +122,12 @@
     if(value?.journey===undefined&&value?.members?.length===1&&value.members[0]?.profession==='swordsman'&&value.members[0].id==null&&value.joined?.length===1&&value.joined[0]===null&&contracts.length===1)value={...value,members:[{...value.members[0],id:contracts[0]}],joined:[contracts[0]]};
     if(!value||value.version!==1||!own(PROFESSIONS,value.profession)||value.sex!==undefined&&!['male','female'].includes(value.sex))return null;
     const gender=value.sex||PROFESSIONS[value.profession].gender;
-    const ingredients=ingredientStock(value.ingredients),meals=mealStock(value.meals,floor);if(!ingredients||!meals)return null;
+    const ingredients=ingredientStock(value.ingredients),meals=mealStock(value.meals,floor);if(!ingredients||!meals)return null;const specials=specialStock(value.specials,meals);if(!specials)return null;const discoveries=discoveryList(value.discoveries);if(!discoveries)return null;
     if(!Array.isArray(value.joined)||value.joined.length>150||new Set(value.joined).size!==value.joined.length||!value.joined.every(id=>typeof id==='string'&&id.length>0&&id.length<=80))return null;
     if(!Array.isArray(value.members)||value.members.length>(floor<0?4:3)||new Set(value.members.map(m=>m?.id)).size!==value.members.length)return null;
     const members=[];
-    for(const m of value.members){const bonus=m?.profession==='robot'&&value.loadouts?.actors?.[m.id]?.passives?.includes('robot_body')?5*(m.level>=10?6:Math.min(5,m.level)):0;if(!m||!value.joined.includes(m.id)||!own(PROFESSIONS,m.profession)||m.sex!==undefined&&!['male','female'].includes(m.sex)||!num(m.level,1,floor<0&&value.loadouts?10:5,true)||!num(m.hp,0,(value.loadouts?vitalHp(m.profession,m.level,false,value.loadouts.actors?.[m.id]?.attrs?.vit):memberMax(m))+bonus)||!num(m.cooldown,0,30)||!num(m.hurtLeft,0,2))return null;const xp=m.xp===undefined?G().XP[m.level-1]:G().migrateXp(m.xp,m.level,value.loadouts?.xpCurve);if(value.loadouts&&!num(xp,G().XP[m.level-1],G().XP[floor<0?9:4],true))return null;members.push({id:m.id,profession:m.profession,sex:m.sex||PROFESSIONS[m.profession].gender,level:m.level,...(value.loadouts?{xp}:{}),hp:m.hp,cooldown:m.cooldown,hurtLeft:m.hurtLeft});}
+    const vigorous=Array.isArray(value.buffs)&&value.buffs.some(b=>b?.id==='vigor');
+    for(const m of value.members){const bonus=m?.profession==='robot'&&value.loadouts?.actors?.[m.id]?.passives?.includes('robot_body')?5*(m.level>=10?6:Math.min(5,m.level)):0;if(!m||!value.joined.includes(m.id)||!own(PROFESSIONS,m.profession)||m.sex!==undefined&&!['male','female'].includes(m.sex)||!num(m.level,1,floor<0&&value.loadouts?10:5,true)||!num(m.hp,0,Math.round(((value.loadouts?vitalHp(m.profession,m.level,false,value.loadouts.actors?.[m.id]?.attrs?.vit):memberMax(m))+bonus)*(vigorous?1.1:1)))||!num(m.cooldown,0,30)||!num(m.hurtLeft,0,2))return null;const xp=m.xp===undefined?G().XP[m.level-1]:G().migrateXp(m.xp,m.level,value.loadouts?.xpCurve);if(value.loadouts&&!num(xp,G().XP[m.level-1],G().XP[floor<0?9:4],true))return null;members.push({id:m.id,profession:m.profession,sex:m.sex||PROFESSIONS[m.profession].gender,level:m.level,...(value.loadouts?{xp}:{}),hp:m.hp,cooldown:m.cooldown,hurtLeft:m.hurtLeft});}
     if(!Array.isArray(value.buffs)||value.buffs.length>2||new Set(value.buffs.map(b=>b?.id)).size!==value.buffs.length||!value.buffs.every(b=>b&&own(BUFFS,b.id)&&num(b.floors,1,3,true)))return null;
     for(const k of ['cooldown','guardLeft','trapWard','slowLeft'])if(!num(value[k],0,30))return null;
     const dict=(v,max)=>v&&typeof v==='object'&&!Array.isArray(v)&&Object.keys(v).length<=C().MAX_MONSTERS&&Object.keys(v).every(id=>C().validMonsterId(id,floor)&&!defeated.includes(id)&&num(v[id],0,max));
@@ -126,10 +139,10 @@
     if(value.light!==undefined&&!L())return null; // Never silently discard saved fuel if a script failed to load.
     const light=L()?.validate(value.light,floor);
     if(boss===undefined||!journey||L()&&!light)return null;
-    const loadouts=value.loadouts===undefined?undefined:H()?.validate(value.loadouts,{profession:value.profession,members,floor});
+    const loadouts=value.loadouts===undefined?undefined:H()?.validate(value.loadouts,{profession:value.profession,members,floor,buffs:Array.isArray(value.buffs)?value.buffs:[]});
     if(value.loadouts!==undefined&&!loadouts)return null;
     const travellers=R().validate(value.travellers,{...value,members,loadouts},floor);if(!travellers)return null;
-    return {version:1,profession:value.profession,sex:gender,members,joined:[...value.joined],travellers,ingredients,meals,buffs:value.buffs.map(b=>({...b})),cooldown:value.cooldown,guardLeft:value.guardLeft,trapWard:value.trapWard,slowLeft:value.slowLeft,health:{...value.health},poise:{...value.poise},boss,journey,loot,reinforcements,foraging,...(light?{light}:{}),...(loadouts?{loadouts}:{})};
+    return {version:1,profession:value.profession,sex:gender,members,joined:[...value.joined],travellers,ingredients,meals,specials,discoveries,buffs:value.buffs.map(b=>({...b})),cooldown:value.cooldown,guardLeft:value.guardLeft,trapWard:value.trapWard,slowLeft:value.slowLeft,health:{...value.health},poise:{...value.poise},boss,journey,loot,reinforcements,foraging,...(light?{light}:{}),...(loadouts?{loadouts}:{})};
   }
   function transact(run,revision,fn){return C().transaction(run,revision,next=>!next.party?{ok:false,message:'尚未選擇冒險職業。'}:fn(next,next.party));}
   function recruitOffer(run){
@@ -175,18 +188,34 @@
   function cook(run,id,revision){return transact(run,revision,(n,p)=>{
     if(!recipeUnlocked(n,id))return {ok:false,message:own(RECIPES,id)?'這份地下料理需抵達地下 B'+RECIPES[id].requiredDepth+' 後才能烹飪。':'沒有這份食譜。'};
     if(!recipeAvailable(n,id))return {ok:false,message:'這道高階料理需要隊伍中仍能行動的廚師調理。'};
-    const r=RECIPES[id],chance=p.loadouts?H().teamPassive(n,'double_portion'):0,amount=p.loadouts?(chance>0&&H().roll(n,p.loadouts.active,'cook')<chance?2:1):has(n,'chef')?2:1;
+    if(RECIPES[id].research)return {ok:false,message:'雜燴只會在研發時偶然做出。'};
+    const r=RECIPES[id],amount=portions(n,p);
     if(p.meals[id]+amount>99)return {ok:false,message:'料理盒已滿。'};
     if(Object.entries(r.cost).some(([k,v])=>p.ingredients[k]<v))return {ok:false,message:'食材還不夠，再去找找吧。'};
-    if(p.loadouts){const chef=H().ids(n).find(k=>H().hp(n,k)>0&&H().pv(n,'ingredient_care',k)>0)||p.loadouts.active;G().consumeCost(n,chef,r.cost);}else for(const[k,v]of Object.entries(r.cost))p.ingredients[k]-=v;p.meals[id]+=amount;return {ok:true,message:`完成${r.name}，共${amount}份。`};
+    if(p.loadouts){const chef=H().ids(n).find(k=>H().hp(n,k)>0&&H().pv(n,'ingredient_care',k)>0)||p.loadouts.active;G().consumeCost(n,chef,r.cost);}else for(const[k,v]of Object.entries(r.cost))p.ingredients[k]-=v;p.meals[id]+=amount;const special=has(n,'chef');if(special){p.specials=p.specials||emptyStock(RECIPES);p.specials[id]=Math.min(p.meals[id],(p.specials[id]||0)+amount);}return {ok:true,message:`完成${r.name}，共${amount}份${special?'（廚師特製）':''}。`,effect:{special,amount}};
+  });}
+  const portions=(n,p)=>{const chance=p.loadouts?H().teamPassive(n,'double_portion'):0;return p.loadouts?(chance>0&&H().roll(n,p.loadouts.active,'cook')<chance?2:1):has(n,'chef')?2:1;};
+  // Recipe research: a chef tries two to four ingredient types; an exact hidden match is learned for good,
+  // a miss spends the ingredients and half the time still leaves a medley, always with a direction hint.
+  function research(run,selection,revision){return transact(run,revision,(n,p)=>{
+    if(!has(n,'chef'))return {ok:false,message:'食譜研發需要隊伍中仍能行動的廚師。'};
+    const picks=Object.entries(selection||{}).filter(([k,v])=>own(INGREDIENTS,k)&&Number.isInteger(v)&&v>0);
+    if(picks.length<2||picks.length>4||picks.reduce((s,[,v])=>s+v,0)>8)return {ok:false,message:'請選 2～4 種食材，總量最多 8 份。'};
+    if(picks.some(([k,v])=>(p.ingredients[k]||0)<v))return {ok:false,message:'食材不夠，先去採集或向商人補貨。'};
+    const cost=Object.fromEntries(picks),hit=Lab().match(cost);p.discoveries=p.discoveries||[];p.specials=p.specials||emptyStock(RECIPES);
+    for(const [k,v] of picks)p.ingredients[k]-=v;
+    if(hit){const fresh=!p.discoveries.includes(hit.id);if(fresh)p.discoveries.push(hit.id);const amount=Math.min(portions(n,p),99-p.meals[hit.id]);p.meals[hit.id]+=amount;p.specials[hit.id]=Math.min(p.meals[hit.id],(p.specials[hit.id]||0)+amount);return {ok:true,message:fresh?'研發成功！新食譜「'+hit.name+'」已記入食譜，做好 '+amount+' 份。':'做出已知的「'+hit.name+'」'+amount+' 份。',effect:{discovered:fresh?hit.id:null,recipe:hit.id,amount}};}
+    const closest=Lab().hint(cost,p.discoveries),medley=hash(n.seed,'research:'+n.revision)%2===0;
+    if(medley)p.meals.medley=Math.min(99,p.meals.medley+1);
+    return {ok:true,message:(medley?'沒有命中隱藏食譜，做成一份實驗雜燴。':'研發失敗，食材都浪費了。')+(closest>0?'（有 '+closest+' 種食材方向正確）':'（沒有食材接近任何隱藏食譜）'),effect:{discovered:null,medley,closest}};
   });}
   function eat(run,id,revision){return transact(run,revision,(n,p)=>{
     if(p.loadouts&&H().job(n)==='robot')return {ok:false,message:'機器人不能享用料理，請使用動力核心或零件回補修復。'};
     if(!recipeUnlocked(n,id)||!p.meals[id])return {ok:false,message:'料理盒裡沒有可享用的這道料理。'};const r=RECIPES[id];
-    if(p.loadouts)H().heal(n,p.loadouts.active,r.hp);else n.hp=Math.min(C().MAX_HP,n.hp+r.hp);n.hunger=Math.min(100,n.hunger+r.hunger*(p.loadouts?1+H().teamPassive(n,'gourmet')/100:1));if(r.team){if(p.loadouts)H().ids(n).filter(k=>k!==p.loadouts.active&&H().hp(n,k)>0).forEach(k=>H().heal(n,k,r.team));else p.members.forEach(m=>m.hp=Math.min(memberMax(m),m.hp+r.team));}if(p.loadouts){H().food(n);G().recipe(n,id);}
+    const special=(p.specials?.[id]||0)>0,bonus=special?specialBonus(n):0,q=1+bonus/100,hpGain=Math.round(r.hp*q),teamGain=Math.round((r.team||0)*q);if(p.loadouts)H().heal(n,p.loadouts.active,hpGain);else n.hp=Math.min(C().MAX_HP,n.hp+hpGain);n.hunger=Math.min(100,n.hunger+r.hunger*q*(p.loadouts?1+H().teamPassive(n,'gourmet')/100:1));if(r.team){if(p.loadouts)H().ids(n).filter(k=>k!==p.loadouts.active&&H().hp(n,k)>0).forEach(k=>H().heal(n,k,teamGain));else p.members.forEach(m=>m.hp=Math.min(memberMax(m),m.hp+teamGain));}if(p.loadouts){H().food(n);G().recipe(n,id);}
     if(r.buff){p.buffs=p.buffs.filter(b=>b.id!==r.buff);p.buffs.push({id:r.buff,floors:3});if(p.buffs.length>2)p.buffs.shift();}
     if(r.ward&&p.loadouts)H().setBuff(n,p.loadouts.active,'meal_'+r.ward,300,1);
-    p.meals[id]--;return {ok:true,message:`享用${r.name}。`};
+    p.meals[id]--;if(special)p.specials[id]--;return {ok:true,message:`享用${r.name}${special?'（廚師特製 +'+bonus+'%）':''}。`,effect:{special,bonus}};
   });}
   const CAMP_MAINTENANCE_RATIO=.1;
   const campGear=run=>(run.party?.loadouts?H().ids(run).flatMap(id=>Object.values(H().equipment(run,id)).filter(Boolean)):Object.values(run.equipment||{}).filter(Boolean)).filter(g=>!H().ROBOT.isCore(g)&&g.durability>0&&g.durability<g.maxDurability);
@@ -201,6 +230,10 @@
     const q=campMaintenanceQuote(n);if(!q.allowed)return {ok:false,message:q.reason};if(!q.affordable)return {ok:false,message:'維護費不足。'};
     n.coins-=q.cost;campGear(n).forEach(g=>g.durability=Math.min(g.maxDurability,g.durability+Math.ceil(g.maxDurability*q.ratio)));p.journey.maintenance.push(n.floor);return {ok:true,message:'本層保養完成：穿戴中的裝備恢復最大耐久的'+Math.round(q.ratio*100)+'%，破損裝備需請鍛匠或對應商人修復。'};
   });}
+  // A travelling smith patches worn gear anywhere it is quiet, paying metal parts instead of camp coins; broken gear still needs a full repair.
+  const FIELD_REPAIR_PARTS=2,FIELD_REPAIR_RATIO=.2;
+  function fieldRepairQuote(run){const gear=run?.party?campGear(run):[];const reason=!run?.party?'尚未選擇冒險職業。':!has(run,'smith')?'需要隊伍中仍能行動的鍛匠。':!gear.length?'沒有可修補的裝備；破損裝備需完整修復。':'';return {parts:FIELD_REPAIR_PARTS,ratio:FIELD_REPAIR_RATIO,allowed:!reason,reason,affordable:!!run?.party&&(run.party.journey?.scrap||0)>=FIELD_REPAIR_PARTS,gearIds:gear.map(g=>g.id)};}
+  function fieldRepair(run,revision){return transact(run,revision,(n,p)=>{const q=fieldRepairQuote(n);if(!q.allowed)return {ok:false,message:q.reason};if(!q.affordable)return {ok:false,message:'金屬零件不足，野外修補需要 '+q.parts+' 份。'};p.journey.scrap-=q.parts;campGear(n).forEach(g=>g.durability=Math.min(g.maxDurability,g.durability+Math.ceil(g.maxDurability*q.ratio)));return {ok:true,message:'鍛匠就地修補：穿戴中的裝備恢復最大耐久的 '+Math.round(q.ratio*100)+'%。',effect:{repaired:q.gearIds}};});}
   const Mat=()=>typeof module==='object'&&module.exports?require('./tower-materials.js'):globalThis.TowerMaterials;
   function defs(){return {...C().MONSTERS,...MONSTERS,...B().defs()};}
   // Use a private definition for every underground combatant. Never mutate the
@@ -252,7 +285,7 @@
     const member=options.memberId?p.members.find(m=>m.id===options.memberId&&m.hp>0):null;
     if(options.memberId&&(!member||member.cooldown>0))return {ok:false,message:'同伴正在調整呼吸。'};
     const w=n.equipment.weapon;let damage=member?6+member.level*2+(member.profession==='mage'?3:0):(w?{bat:15,pan:13,staff:11}[w.kind]+w.bonus*2:7)+(p.profession==='swordsman'?4:0);
-    damage+=p.buffs.some(b=>b.id==='focus')?3:0;
+    damage+=(p.buffs.some(b=>b.id==='focus')?3:0)+(p.buffs.some(b=>b.id==='might')?6:0);
     if(spec.kind==='crab'&&options.front===true)damage=Math.max(1,Math.round(damage*.55));
     if(member)member.cooldown=member.profession==='mage'?3:1.8;
     let broken=null;if(!member&&w){X().wear(n,w);if(w.durability===0){broken=w;n.equipment.weapon=null;}}
@@ -268,20 +301,20 @@
   function skill(run,revision,skillId){if(run.party?.loadouts)return H().cast(run,skillId||H().actor(run).skills[0],{},revision);return transact(run,revision,(n,p)=>{
     if(p.cooldown>0)return {ok:false,message:'技能還在準備中。'};const j=p.profession;
     if(j==='chef'){if(!p.ingredients.root)return {ok:false,message:'需要一份甜根莖。'};if(n.hunger>=100)return {ok:false,message:'肚子還很飽。'};p.ingredients.root--;n.hunger=Math.min(100,n.hunger+25);}
-    if(j==='healer'){if(!p.ingredients.herb)return {ok:false,message:'需要一份香草。'};if(n.hp>=C().MAX_HP)return {ok:false,message:'生命已滿。'};p.ingredients.herb--;n.hp=Math.min(C().MAX_HP,n.hp+20);}
+    if(j==='healer'){if(!p.ingredients.herb)return {ok:false,message:'需要一份藥草。'};if(n.hp>=C().MAX_HP)return {ok:false,message:'生命已滿。'};p.ingredients.herb--;n.hp=Math.min(C().MAX_HP,n.hp+20);}
     if(j==='smith'){const gear=Object.values(n.equipment).filter(g=>g&&!H().ROBOT.isCore(g)&&g.durability<g.maxDurability);if(!gear.length)return {ok:false,message:'沒有需要修補的裝備。'};if(!p.ingredients.shell)return {ok:false,message:'需要一份硬殼。'};p.ingredients.shell--;gear.forEach(g=>g.durability=Math.min(g.maxDurability,g.durability+3));}
     if(j==='swordsman')p.guardLeft=6;
     if(j==='scout'){p.trapWard=6;n.effects.reveal=Math.max(18,n.effects.reveal);}
     p.cooldown=PROFESSIONS[j].cooldown;return {ok:true,message:PROFESSIONS[j].skill,effect:{skill:j}};
   });}
-  function reduceDamage(run,amount,source){const p=run.party;if(!p||source==='hunger')return amount;if(source==='trap'&&p.trapWard>0)return 0;let result=Math.max(0,amount-(p.buffs.some(b=>b.id==='guard')?2:0)-(source==='trap'?X().traits(run).grip:0));if(p.guardLeft>0)result*=.5;if(source==='trap'&&p.buffs.some(b=>b.id==='trail'))result*=.5;if(source==='trap'&&has(run,'scout'))result*=.75;return Math.ceil(result);}
+  function reduceDamage(run,amount,source){const p=run.party;if(!p||source==='hunger')return amount;if(source==='trap'&&p.trapWard>0)return 0;if(source==='trap'&&p.buffs.some(b=>b.id==='featherstep'))return 0;let result=Math.max(0,amount-(p.buffs.some(b=>b.id==='guard')?2:0)-(p.buffs.some(b=>b.id==='bulwark')?4:0)-(source==='trap'?X().traits(run).grip:0));if(p.guardLeft>0)result*=.5;if(source==='trap'&&p.buffs.some(b=>b.id==='trail'))result*=.5;if(source==='trap'&&has(run,'scout'))result*=.75;return Math.ceil(result);}
   function tick(next,dt){const p=next.party;if(!p)return;L()?.tick(next,dt);if(p.loadouts)H().tick(next,dt);for(const k of ['cooldown','guardLeft','trapWard','slowLeft'])p[k]=Math.max(0,p[k]-dt);if(next.expedition.active)return;
     for(const m of p.members){m.cooldown=Math.max(0,m.cooldown-dt);m.hurtLeft=Math.max(0,m.hurtLeft-dt);}
     for(const k of Object.keys(p.poise)){p.poise[k]=Math.max(0,p.poise[k]-dt);if(!p.poise[k])delete p.poise[k];}
     if(p.boss?.started&&!p.boss.done)p.boss.clock+=dt;
   }
-  function advance(next,options){if(!next.party)return;L()?.advance(next);if(next.party.loadouts)H().advance(next,options);const p=next.party;p.health={};p.poise={};p.loot=Loot().fresh();p.reinforcements=Re().fresh();p.foraging=Foraging().fresh(next);p.boss=newBoss(next.floor);p.journey={...X().newJourney(next.floor),scrap:p.journey?.scrap||0,maintenance:[...(p.journey?.maintenance||[])],...(p.journey?.materials?{materials:{...p.journey.materials}}:{})};p.buffs=p.buffs.map(b=>({...b,floors:b.floors-1})).filter(b=>b.floors>0);p.slowLeft=0;}
+  function advance(next,options){if(!next.party)return;L()?.advance(next);if(next.party.loadouts)H().advance(next,options);const p=next.party;p.health={};p.poise={};p.loot=Loot().fresh();p.reinforcements=Re().fresh();p.foraging=Foraging().fresh(next);p.boss=newBoss(next.floor);p.journey={...X().newJourney(next.floor),scrap:p.journey?.scrap||0,maintenance:[...(p.journey?.maintenance||[])],...(p.journey?.materials?{materials:{...p.journey.materials}}:{})};p.buffs=p.buffs.map(b=>({...b,floors:b.floors-1})).filter(b=>b.floors>0);if(p.loadouts)for(const id of H().ids(next))if(H().hp(next,id)>H().maxHp(next,id))H().setHp(next,id,H().maxHp(next,id));p.slowLeft=0;}
   const canDescend=run=>(!run.party?.boss||run.party.boss.done)&&B().defeated(run);
   const bossPhase=run=>X().phase(run),mirrorTarget=(run,index)=>X().target(run,index),bossAction=(run,index,revision)=>X().bossAction(run,index,revision);
-  return Object.freeze({PROFESSIONS,NAMES,person,sex,recruitLimit,INGREDIENTS,RECIPES,BASIC_RECIPES,LEGACY_RECIPES,recipeUnlocked,recipeAvailable,availableRecipes,BUFFS,MONSTERS,BOSS_FLOORS,enable,validate,has,memberMax,VITALITY,ATTRIBUTE_CAP,VIT_HP_STEP,vitalHp,recruitOffer,recruitQuote,archiveMember,recruit,dismiss,gather,cook,eat,CAMP_MAINTENANCE_RATIO,campMaintenanceQuote,camp,defs,monsterPower,monsterSpecs,strike,hurtMember,skill,reduceDamage,tick,advance,canDescend,bossPhase,mirrorTarget,bossAction});
+  return Object.freeze({PROFESSIONS,NAMES,person,sex,recruitLimit,INGREDIENTS,RECIPES,BASIC_RECIPES,LEGACY_RECIPES,recipeUnlocked,recipeAvailable,availableRecipes,BUFFS,MONSTERS,BOSS_FLOORS,enable,validate,has,memberMax,VITALITY,ATTRIBUTE_CAP,VIT_HP_STEP,vitalHp,recruitOffer,recruitQuote,archiveMember,recruit,dismiss,gather,cook,eat,research,discovered,CAMP_MAINTENANCE_RATIO,campMaintenanceQuote,camp,specialBonus,chefLevel,SPECIAL_BONUS_PER_LEVEL,SPECIAL_BONUS_CAP,FIELD_REPAIR_PARTS,FIELD_REPAIR_RATIO,fieldRepairQuote,fieldRepair,defs,monsterPower,monsterSpecs,strike,hurtMember,skill,reduceDamage,tick,advance,canDescend,bossPhase,mirrorTarget,bossAction});
 });

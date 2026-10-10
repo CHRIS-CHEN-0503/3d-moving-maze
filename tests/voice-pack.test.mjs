@@ -59,7 +59,7 @@ test('四位商人的角色覆寫與預設錄音共用新版台詞和音檔',()=
 test('錄音文字與畫面上的固定台詞一致',()=>{
   const opening=narrative.SCENES.find(scene=>scene.id==='scene:99');
   opening.paragraphs.forEach((text,index)=>assert.equal(pack.get(`story.scene99.${index+1}`).text,text));
-  for(const merchant of Object.values(encounters.MERCHANTS))assert.equal(pack.get('merchant.'+merchant.id).text,merchant.greeting);
+  for(const merchant of Object.values(encounters.MERCHANTS)){if(merchant.recordedVoice===false){assert.equal(pack.get('merchant.'+merchant.id),null,merchant.id+' greeting is spoken by the device until recorded');continue;}assert.equal(pack.get('merchant.'+merchant.id).text,merchant.greeting);}
   for(const explorer of Object.values(encounters.EXPLORERS))assert.equal(pack.get('explorer.'+explorer.id).text,explorer.greeting);
 });
 

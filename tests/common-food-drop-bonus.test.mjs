@@ -3,8 +3,8 @@ import assert from 'node:assert/strict';
 import {createRequire} from 'node:module';
 const require=createRequire(import.meta.url),C=require('../story/story-core.js'),P=require('../story/tower-party-core.js'),H=require('../story/tower-heroes-core.js'),L=require('../story/tower-loot.js');
 function fresh(seed){return H.enable(P.enable(C.newRun({seed}),'swordsman','male').run).run;}
-test('only the four common food candidates gain five percentage points',()=>{
-  assert.deepEqual(L.COMMON_FOOD,['root','mushroom','herb','nectar']);
+test('only the five common food candidates gain five percentage points',()=>{
+  assert.deepEqual(L.COMMON_FOOD,['root','mushroom','herb','nectar','dew']);
   for(const key of L.COMMON_FOOD)assert.equal(L.chance({type:'ingredient',key,rarity:'common'}),25);
   for(const key of ['meat','shell','cloudcap','sunseed','emberpepper'])assert.equal(L.chance({type:'ingredient',key,rarity:'common'}),20);
   for(const type of ['item','fuel','material','gear'])for(const rarity of Object.keys(L.CHANCES))assert.equal(L.chance({type,key:'herb',rarity}),L.CHANCES[rarity]);

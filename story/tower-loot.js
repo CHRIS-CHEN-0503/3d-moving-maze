@@ -7,10 +7,10 @@
   const M=()=>typeof module==='object'&&module.exports?require('./tower-materials.js'):globalThis.TowerMaterials;
   const num=(v,a,b)=>Number.isInteger(v)&&v>=a&&v<=b;
   const CHANCES=Object.freeze({common:20,uncommon:12,rare:6,legendary:3}),MAX_GROUND=96,ARROW_DROP_QUANTITY=50;
-  const COMMON_FOOD=Object.freeze(['root','mushroom','herb','nectar']),COMMON_FOOD_BONUS=5;
+  const COMMON_FOOD=Object.freeze(['root','mushroom','herb','nectar','dew']),COMMON_FOOD_BONUS=5;
   // Only the selected common food candidate gets the extra percentage points.
   // Keep ecology, candidate weighting and all equipment/supply rolls intact.
-  function chance(entry){return (CHANCES[entry?.rarity]||0)+(entry?.type==='ingredient'&&COMMON_FOOD.includes(entry.key)?COMMON_FOOD_BONUS:0);}
+  function chance(entry,run){return (CHANCES[entry?.rarity]||0)+(entry?.type==='ingredient'&&COMMON_FOOD.includes(entry.key)?COMMON_FOOD_BONUS:0)+(run?.party?.buffs?.some(b=>b.id==='lucky')?10:0);}
   function hash(seed,text){let h=seed>>>0;for(const c of String(text))h=Math.imul(h^c.charCodeAt(0),16777619)>>>0;
     // Mix all bits before modulo: power-of-two candidate pools otherwise make
     // FNV's low bits correlate the choice with its supposedly independent roll.
@@ -56,7 +56,7 @@
     state.rolled.push(spec.id);const maxCell=C().floorConfig(run.floor,run.seed).size-1,prefix=run.floor+':'+spec.id,cx=num(cell?.x,0,maxCell)?cell.x:0,cy=num(cell?.y,0,maxCell)?cell.y:0,entries=[];
     const choices=pool(run,spec),pick=choices[hash(run.seed,prefix+':kind')%choices.length];
     const boss=spec.lord||spec.elite;
-    if(!boss&&hash(run.seed,prefix+':item')%100<chance(pick))entries.push({...pick,id:prefix+':item',source:spec.id,cx,cy});
+    if(!boss&&hash(run.seed,prefix+':item')%100<chance(pick,run))entries.push({...pick,id:prefix+':item',source:spec.id,cx,cy});
     // A mini lord always leaves one healing draught as well, so the harder fight pays for its own recovery.
     if(spec.elite)entries.push({type:'item',key:'heal',rarity:'uncommon',quantity:1,id:prefix+':bonus',source:spec.id,cx,cy});
     if(spec.lord&&hash(run.seed,prefix+':gear')%100<50){const kinds=run.party.loadouts?H().gearPool(run.floor):['helmet','armor','shield','bat','pan','staff'],kind=kinds[hash(run.seed,prefix+':gear-kind')%kinds.length];entries.push({type:'gear',key:kind,rarity:'rare',quantity:1,id:prefix+':gear',source:spec.id,cx,cy,gear:C().createGear(kind,run.floor,run.seed,'lord-drop',true)});}

@@ -11,7 +11,7 @@ function unchanged(run,operation){const before=JSON.stringify(run),result=operat
 function move(run,floor){run.floor=floor;run.floorsCleared=floor>0?99-floor:99+(-floor-1);run.claimed=[];run.defeatedMonsters=[];run.monsterStuns={};run.adventure=C.newAdventure();if(floor>0)run.chronicle=N.newChronicle(floor);P.advance(run,{reward:false});return run;}
 
 test('six basic recipes stay available; seventeen advanced recipes require an actionable chef',()=>{
-  const run=fresh();assert.equal(Object.keys(P.RECIPES).length,23);assert.equal(Object.values(P.RECIPES).filter(r=>r.requiresChef).length,17);assert.deepEqual(Object.keys(P.availableRecipes(run)),P.BASIC_RECIPES);
+  const run=fresh();assert.equal(Object.values(P.RECIPES).filter(r=>!r.hidden&&!r.research).length,23);assert.equal(Object.values(P.RECIPES).filter(r=>r.requiresChef&&!r.hidden&&!r.research).length,17);assert.deepEqual(Object.keys(P.availableRecipes(run)),P.BASIC_RECIPES);
   for(const id of P.BASIC_RECIPES)assert.ok(P.cook(run,id).ok,id);
   for(const [id,r]of Object.entries(P.RECIPES).filter(([,r])=>r.requiresChef&&!r.requiredDepth)){unchanged(run,()=>P.cook(run,id,run.revision));assert.ok(!Object.hasOwn(P.availableRecipes(run),id));}
   const chef=companion(run,'chef');assert.equal(Object.keys(P.availableRecipes(run)).length,18);assert.ok(P.cook(run,'feast').ok);H.setHp(run,chef,0);assert.equal(P.recipeAvailable(run,'feast'),false);unchanged(run,()=>P.cook(run,'feast'));

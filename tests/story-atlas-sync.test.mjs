@@ -83,7 +83,7 @@ test('reading overview and resource cards share the current natural appearance a
     assert.ok(overview.includes(label+'環境'+chance+'%出現、'+absent+'%不出現'));
     for(const weights of [c.TowerForaging.PROFILES,c.TowerForaging.POWER_PROFILES])assert.equal(weights[profile][0],absent);
   }
-  assert.match(overview,/香草（藥草）、自然礦石與動力石各自獨立抽取/);
+  assert.match(overview,/藥草、自然礦石與動力石各自獨立抽取/);
   assert.match(overview,/舊樓層的生成與已採紀錄保留，新樓層才套用新機率/);
   assert.match(overview,/每處只有\s*(?:1|一)\s*顆/);
   assert.doesNotMatch(overview,/30%／25%／15%|40%／35%／25%|20%／15%／5%/);
@@ -105,7 +105,7 @@ test('all six material affixes document shared art, actual tier quotes and separ
     assert.equal(r.iconHtml,c.TowerAffixes.svg(id));assert.equal(r.material,def.material);assert.equal(r.underground,!!def.underground);
     assert.ok(text.includes(def.description));assert.ok(text.includes(c.TowerMaterials.MATERIALS[def.material]+' ×2'));
     assert.deepEqual(Array.from(r.quotes,q=>q.coins),[14,18,22,26,30]);
-    assert.deepEqual(Array.from(r.quotes,q=>q.chance),[68,71,74,77,80]);
+    assert.deepEqual(Array.from(r.quotes,q=>q.chance),[83,86,89,92,95],'camp quotes carry the smith bonus');assert.match(text,/商人承作各低 15 點/);
     assert.ok(r.quotes.every(q=>q.count===2));assert.match(text,/25%/);assert.match(text,/35%.*最高65%/);
     assert.match(text,/排除機器人機件及動力核心/);assert.match(r.notes.join(' '),/獨立於原工坊.*失敗保留原附魔.*加20%/);
     const material=materials.find(r=>r.id==='material:'+def.material);assert.ok(material.effect.includes(def.name+'材料附魔'));assert.ok(material.sources.includes(c.StoryAtlasItems.SOURCES.affixes));
@@ -132,7 +132,7 @@ test('durability format six, sustained durable savings and percentage emergency 
 });
 
 test('three ailment-protection meals keep actual recipe ingredients and protect only the consumer once',()=>{
-  const c=load(),records=c.StoryAtlasItems.records(),wardRecipes=Object.entries(c.TowerPartyCore.RECIPES).filter(([,r])=>r.ward);
+  const c=load(),records=c.StoryAtlasItems.records(),wardRecipes=Object.entries(c.TowerPartyCore.RECIPES).filter(([,r])=>r.ward&&!r.hidden);
   assert.equal(wardRecipes.length,3);
   for(const [id,recipe] of wardRecipes){
     const card=records.find(r=>r.id==='meal:'+id);assert.equal(card.recipe.ward,recipe.ward);
@@ -164,7 +164,7 @@ test('event choices, six fixed landmarks and eight profession sites use current 
 });
 
 test('new reference modules have release cache keys without importing live gameplay timers',()=>{
-  for(const file of ['tower-affixes.js','tower-adventure-events.js','tower-landmarks.js'])assert.ok(sources.includes('../story/'+file+'?v='+(file==='tower-adventure-events.js'?'1.57.0':'1.55.0')),file);
-  assert.ok(sources.includes('story-atlas-rules.js?v=1.60.0'));assert.ok(sources.includes('story-atlas-items.js?v=1.60.0'));
+  for(const file of ['tower-affixes.js','tower-adventure-events.js','tower-landmarks.js'])assert.ok(sources.includes('../story/'+file+'?v='+(file==='tower-landmarks.js'?'1.55.0':'1.61.0')),file);
+  assert.ok(sources.includes('story-atlas-rules.js?v=1.61.0'));assert.ok(sources.includes('story-atlas-items.js?v=1.61.0'));
   assert.match(html,/持續.*10%.*20%|10%.*20%.*損耗/);assert.match(html,/供能藤.*晶柱/);
 });

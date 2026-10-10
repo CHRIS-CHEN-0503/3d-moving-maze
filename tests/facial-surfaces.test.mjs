@@ -52,7 +52,7 @@ test('one character scene disposal releases only its own skin texture and does n
 test('NPC head-only skin maps remain isolated from the shared skin on hands and preserve hats and props',()=>withCanvas(()=>{
   const e=environment(),V=e.TowerCharacters,models=[...Object.keys(V.MERCHANT_STYLES).map(id=>V.buildMerchant(id,{THREE:T})),...Object.keys(V.EXPLORER_STYLES).map(id=>V.buildExplorer(id,{THREE:T})),...[1,2,3,4,5].map(rank=>V.buildWarrior(rank,{THREE:T}))];
   for(const model of models){const r=resources(model);assert.equal(r.textures.size,1,model.name);assert.ok(model.userData.head.material.map?.userData.originalArt);model.traverse(o=>{if(o!==model.userData.head&&o.material)assert.equal(o.material.map,null,o.name);});F.update(model,.8,'talk');assert.ok(Number.isFinite(model.userData.face.mouth.scale.y));dispose(model);}
-  assert.equal(models.length,14);
+  assert.equal(models.length,15);
 }));
 
 test('the original human cast receives refined faces while robot and cat retain their special appearance',()=>withCanvas(()=>{

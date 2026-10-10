@@ -117,7 +117,7 @@ test('robot dual cores mirror the actual five fixed durabilities, defense and ma
 test('browser adapter is read-only, needs no DOM or storage, and matches CommonJS output',()=>{
   const context=vm.createContext({});
   for(const forbidden of ['document','localStorage','sessionStorage','fetch','setTimeout','requestAnimationFrame'])Object.defineProperty(context,forbidden,{get(){throw new Error('Atlas must not touch '+forbidden);}});
-  for(const name of ['tower-materials','tower-robot-core','tower-ascension-catalog','tower-hero-growth','tower-gear-tiers','tower-heroes-core','tower-expedition-core','tower-party-core','tower-recruitment','story-core','tower-underworld','tower-encounters','tower-field-guide','tower-heroes-icons','tower-forge-icons','tower-party-runtime','tower-affixes'])vm.runInContext(readFileSync(new URL('../story/'+name+'.js',import.meta.url),'utf8'),context,{filename:name+'.js'});
+  for(const name of ['tower-materials','tower-robot-core','tower-ascension-catalog','tower-hero-growth','tower-gear-tiers','tower-heroes-core','tower-expedition-core','tower-recipe-lab','tower-party-core','tower-alchemy','tower-recruitment','story-core','tower-underworld','tower-encounters','tower-field-guide','tower-heroes-icons','tower-forge-icons','tower-party-runtime','tower-affixes'])vm.runInContext(readFileSync(new URL('../story/'+name+'.js',import.meta.url),'utf8'),context,{filename:name+'.js'});
   vm.runInContext(readFileSync(new URL('../docs/story-atlas-rules.js',import.meta.url),'utf8'),context);
   const before=JSON.stringify({jobs:H.JOBS,skills:H.SKILLS,passives:H.PASSIVES,gear:H.GEAR});
   const data=context.StoryAtlasRules.build();assert.deepEqual(JSON.parse(JSON.stringify(data)),JSON.parse(JSON.stringify(D.build())));

@@ -37,7 +37,7 @@
     function cancelPreparation(p){lights.cancel(p.glow);lights.cancel(p.targetGlow);p.stopSound?.();root.TowerCombatMotion?.cancel(actorModel(p.id||p.actorId));}
     const intent=root.TowerCombatIntent.create({active:()=>H.state(r())?.active,position:pos,clear,policy:id=>R.state(r()).policies[id]?.strategy});
     const barks=root.MazeCharacterVoices.create({run:r,paused:ctx.paused});
-    const growth=root.TowerGrowthRuntime.create({...ctx,pos,cast,actors:ctx.actors,engagement:id=>intent.target(id)});
+    const growth=root.TowerGrowthRuntime.create({...ctx,pos,cast,actors:ctx.actors,engagement:id=>intent.target(id),reserved:id=>!!cooperation?.reserved?.(id)});
     const engage=(m,id=H.state(r())?.active)=>{const ok=intent.engage(m,id);if(ok)barks.say('battle',id);return ok;};
     function specialty(job,id){id=id||H.ids(r()).find(k=>H.job(r(),k)===job&&H.hp(r(),k)>0);if(!id)return false;const spoken=barks.say('specialty',id,{allowPaused:true});root.CharacterFace?.react(actorModel(id),spoken?'talk':'happy',spoken?3:1.8);return spoken;}
     const commit=res=>{if(!ctx.transact(res))return false;if(res.message)ctx.toast(res.message,1700,res.effect?.skill?false:res.message);return true;};

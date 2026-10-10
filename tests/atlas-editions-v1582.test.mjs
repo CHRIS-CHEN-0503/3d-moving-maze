@@ -34,7 +34,7 @@ test('the player edition is the default; only the exact 逃生梯 hash opens the
 test('the player guide is short, plain and covers the essentials; every detailed rule stays in the 逃生梯 edition',()=>{
   const guide=block('readingRules'),detailed=block('gmRules');
   assert.match(guide,/^<details class="rules" id="readingRules" data-edition-only="player">/);assert.match(detailed,/^<details class="rules" id="gmRules" data-edition-only="gm" open>/);
-  assert.deepEqual(headings(guide),['職業與技能','升級與同伴','能力值','裝備與修理','機器人','補給、採集與照明','料理、鍛造與附魔','隊友與連攜','戰鬥小技巧','小樓主','討伐裂隙','樓梯、樓主與記憶裂隙','故事與日誌','怎麼使用這本書']);
+  assert.deepEqual(headings(guide),['職業與技能','升級與同伴','能力值','裝備與修理','機器人','補給、採集與照明','料理、鍛造與附魔','食譜研發與魔物獵人','廚師、鍛匠本領與藥水','隊友與連攜','戰鬥小技巧','小樓主','討伐裂隙','樓梯、樓主與記憶裂隙','故事與日誌','怎麼使用這本書']);
   assert.deepEqual(headings(detailed),DETAILED,'the detailed edition keeps every rule section in order');
   for(const section of guide.split('<section>').slice(1))assert.ok(section.replace(/<[^>]+>/g,'').length<260,'each guide section stays short: '+section.slice(0,30));
   for(const jargon of [/存檔驗證|存檔格式|舊存檔|遷移|程式|著色器|重編譯|編號|種子|決定性|累計進度|世界距離單位|%|×|258|SURFACE/])assert.doesNotMatch(guide.replace(/<[^>]+>/g,''),jargon);

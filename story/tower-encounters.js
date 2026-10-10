@@ -5,11 +5,15 @@
   if (root) root.TowerEncounters = api;
 })(typeof globalThis !== 'undefined' ? globalThis : this, function (core) {
   'use strict';
-  const GROCERY = Object.freeze({ merchantId: 'suHe', chance: .4, commonIngredients: Object.freeze(['root', 'mushroom', 'herb', 'nectar']), commonPrice: 2, specialtyPrice: 5, minStock: 1, maxStock: 5 });
+  const GROCERY = Object.freeze({ merchantId: 'suHe', chance: .4, commonIngredients: Object.freeze(['root', 'mushroom', 'herb', 'nectar', 'dew']), commonPrice: 2, specialtyPrice: 5, minStock: 1, maxStock: 5 });
+  // The monster hunter rolls independently of the grocer and brings six regional or exotic ingredients from any floor.
+  const HUNTER = Object.freeze({ merchantId: 'hunter', chance: .4, count: 6, price: 5, minStock: 1, maxStock: 5 });
+  const INGREDIENT_MERCHANTS = Object.freeze([GROCERY.merchantId, HUNTER.merchantId]);
   const MERCHANTS = Object.freeze({
     tieLing: Object.freeze({ id: 'tieLing', name: '鐵嶺', title: '鐵匠', greeting: '我是鐵匠鐵嶺。頭盔與近戰武器，交給我就放心。', equipmentKinds: Object.freeze(['helmet', 'bat']), supplies: Object.freeze([]) }),
     jinHe: Object.freeze({ id: 'jinHe', name: '錦禾', title: '裁甲師', greeting: '我是裁甲師錦禾。合身的盔甲，會陪你走得更遠。', equipmentKinds: Object.freeze(['armor', 'pan']), supplies: Object.freeze([]) }),
     lanZhou: Object.freeze({ id: 'lanZhou', name: '嵐舟', title: '盾匠', greeting: '我是盾匠嵐舟。盾牌與遠行武器，都在這裡。', equipmentKinds: Object.freeze(['shield', 'staff']), supplies: Object.freeze([]) }),
+    hunter: Object.freeze({ id: 'hunter', name: '灰狼', title: '魔物獵人', sex: 'male', greeting: '我是魔物獵人灰狼。各層打來的稀罕食材，看看有沒有你要的。', equipmentKinds: Object.freeze([]), supplies: Object.freeze([]), recordedVoice: false }),
     suHe: Object.freeze({ id: 'suHe', name: '蘇禾', title: '雜貨商', sex: 'female', greeting: '我是雜貨商蘇禾。藥水、食材和旅途補給，都替你備好了。', equipmentKinds: Object.freeze([]), get supplies() { return Object.freeze(Object.keys(core().ITEMS).filter(id => id !== 'coin' && core().ITEMS[id].buyPrice != null)); } }),
   });
   // The same catalogue drives sales and professional maintenance. Every base
@@ -49,23 +53,40 @@
     // Independent stream: adding a grocery never changes the three equipment vendors.
     const random = randomFor(floor, seed, 0x6a09e667);
     if (random() >= GROCERY.chance) return null;
+    random(); // The old specialty draw stays in the stream so common stock rolls are unchanged.
+    const M = materials(), stock = () => 1 + Math.floor(random() * GROCERY.maxStock);
+    return GROCERY.commonIngredients.map(ingredientId => ({ id: `grocery:${floor}:common:${ingredientId}`, ingredientId, name: M.INGREDIENTS[ingredientId], sourceFloor: null, sourceName: '常備食材', specialty: false, price: GROCERY.commonPrice, stock: stock() }));
+  }
+  // The retired specialty shelf is replayed only to validate purchase records from older saves (four common stock draws preceded it).
+  const LEGACY_COMMON_COUNT = 4;
+  function legacySpecialtyOffer(floor, seed) {
+    const random = randomFor(floor, seed, 0x6a09e667);
+    if (random() >= GROCERY.chance) return null;
     const roll = Math.floor(random() * (floor < 0 ? 149 : 99)), sourceFloor = roll < 99 ? roll + 1 : 98 - roll;
-    const M = materials(), specialty = M.signature(sourceFloor), stock = () => 1 + Math.floor(random() * GROCERY.maxStock);
-    return [
-      ...GROCERY.commonIngredients.map(ingredientId => ({ id: `grocery:${floor}:common:${ingredientId}`, ingredientId, name: M.INGREDIENTS[ingredientId], sourceFloor: null, sourceName: '常備食材', specialty: false, price: GROCERY.commonPrice, stock: stock() })),
-      { id: `grocery:${floor}:special:${sourceFloor}:${specialty}`, ingredientId: specialty, name: M.INGREDIENTS[specialty], sourceFloor, sourceName: M.ecology(sourceFloor).name, specialty: true, price: GROCERY.specialtyPrice, stock: stock() },
-    ];
+    for (let i = 0; i < LEGACY_COMMON_COUNT; i++) random();
+    return { id: `grocery:${floor}:special:${sourceFloor}:${materials().signature(sourceFloor)}`, ingredientId: materials().signature(sourceFloor), sourceFloor, stock: 1 + Math.floor(random() * GROCERY.maxStock) };
+  }
+  const hunterPool = () => Object.keys(materials().INGREDIENTS).filter(key => !GROCERY.commonIngredients.includes(key) && !['meat', 'shell'].includes(key));
+  function hunterCatalogue(floor, seed) {
+    const random = randomFor(floor, seed, 0x3c6ef372);
+    if (random() >= HUNTER.chance) return null;
+    const M = materials(), pool = hunterPool();
+    for (let i = pool.length - 1; i > 0; i--) { const j = Math.floor(random() * (i + 1)); [pool[i], pool[j]] = [pool[j], pool[i]]; }
+    return pool.slice(0, HUNTER.count).map(ingredientId => ({ id: `hunter:${floor}:${ingredientId}`, ingredientId, name: M.INGREDIENTS[ingredientId], sourceFloor: null, sourceName: '魔物獵人的獵獲', specialty: false, hunter: true, price: HUNTER.price, stock: 1 + Math.floor(random() * HUNTER.maxStock) }));
   }
   function groceryPurchases(value, floor, seed) {
     if (value === undefined) return {};
-    if (!value || typeof value !== 'object' || Array.isArray(value) || Object.keys(value).length > GROCERY.commonIngredients.length + 1) return null;
+    if (!value || typeof value !== 'object' || Array.isArray(value) || Object.keys(value).length > GROCERY.commonIngredients.length + 1 + HUNTER.count) return null;
     const result = {}, ingredients = materials().INGREDIENTS;
     let specials = 0;
     for (const [id, count] of Object.entries(value)) {
+      const hunt = /^hunter:(-?\d+):([a-z]+)$/.exec(id);
+      if (hunt) { if (!validFloor(Number(hunt[1])) || String(Number(hunt[1])) !== hunt[1] || floor !== undefined && Number(hunt[1]) !== floor || !integer(count, 0, HUNTER.maxStock) || !Object.hasOwn(ingredients, hunt[2])) return null; result[id] = count; continue; }
       const match = /^grocery:(-?\d+):(common|special):(?:(-?\d+):)?([a-z]+)$/.exec(id);
       if (!match || !validFloor(Number(match[1])) || String(Number(match[1])) !== match[1] || floor !== undefined && Number(match[1]) !== floor || !integer(count, 0, GROCERY.maxStock) || !Object.hasOwn(ingredients, match[4])) return null;
       if (match[2] === 'common') { if (match[3] || !GROCERY.commonIngredients.includes(match[4])) return null; }
       else {
+        // Specialty shelves were retired for the hunter; older purchase records still parse.
         const source = Number(match[3]);
         if (++specials > 1 || !validFloor(source) || String(source) !== match[3] || Number(match[1]) > 0 && source < 0 || materials().signature(source) !== match[4]) return null;
       }
@@ -73,16 +94,17 @@
     }
     if (seed !== undefined && Object.keys(result).length) {
       if (!validFloor(floor) || !integer(seed, 1, 0xffffffff)) return null;
-      const offers = groceryCatalogue(floor, seed) || [];
-      if (Object.entries(result).some(([id, count]) => !offers.some(offer => offer.id === id && count <= offer.stock))) return null;
+      const offers = [...(groceryCatalogue(floor, seed) || []), ...(hunterCatalogue(floor, seed) || [])];
+      const legacy = legacySpecialtyOffer(floor, seed);
+      if (Object.entries(result).some(([id, count]) => id.includes(':special:') ? !legacy || legacy.id !== id || count > legacy.stock : !offers.some(offer => offer.id === id && count <= offer.stock))) return null;
     }
     return result;
   }
-  function groceryOffers(run) {
-    if (!run || run.expedition?.active) return [];
+  function groceryOffers(run, merchantId = GROCERY.merchantId) {
+    if (!run || run.expedition?.active || !INGREDIENT_MERCHANTS.includes(merchantId)) return [];
     const purchases = groceryPurchases(run.adventure?.groceryPurchases, run.floor, run.seed);
     if (!purchases) return [];
-    return (groceryCatalogue(run.floor, run.seed) || []).map(offer => ({ ...offer, purchased: purchases[offer.id] || 0, remaining: Math.max(0, offer.stock - (purchases[offer.id] || 0)) }));
+    return ((merchantId === HUNTER.merchantId ? hunterCatalogue(run.floor, run.seed) : groceryCatalogue(run.floor, run.seed)) || []).map(offer => ({ ...offer, purchased: purchases[offer.id] || 0, remaining: Math.max(0, offer.stock - (purchases[offer.id] || 0)) }));
   }
   function newAdventure() { return { version: 1, claimed: [], quest: null, groceryPurchases: {} }; }
   function validateAdventure(value, floor, seed) {
@@ -128,6 +150,8 @@
     });
     const ingredientOffers = groceryCatalogue(floor, seed);
     if (ingredientOffers) shops.push({ ...MERCHANTS.suHe, equipmentKinds: [], supplies: [...MERCHANTS.suHe.supplies].filter(key=>C.ITEMS[key]?.buyPrice!=null&&C.potionAvailable(key,floor)), gear: [], ingredientOffers });
+    const hunterOffers = hunterCatalogue(floor, seed);
+    if (hunterOffers) shops.push({ ...MERCHANTS.hunter, equipmentKinds: [], supplies: [], gear: [], ingredientOffers: hunterOffers });
     return shops;
   }
   function merchant(run, merchantId) { return merchantOffers(run.floor, run.seed,!!run.party?.loadouts).find(entry => entry.id === merchantId); }
@@ -173,8 +197,8 @@
   }
   function buyIngredient(run, merchantId, offerId, quantity = 1, expectedRevision) {
     return transaction(run, expectedRevision, next => {
-      if (!next.party || merchantId !== GROCERY.merchantId || !integer(quantity, 1, GROCERY.maxStock)) return { ok: false, message: '這位商人沒有出售這份食材。' };
-      const offers = groceryOffers(next), offer = offers.find(entry => entry.id === offerId);
+      if (!next.party || !INGREDIENT_MERCHANTS.includes(merchantId) || !integer(quantity, 1, GROCERY.maxStock)) return { ok: false, message: '這位商人沒有出售這份食材。' };
+      const offers = groceryOffers(next, merchantId), offer = offers.find(entry => entry.id === offerId);
       if (!offer) return { ok: false, message: '本層沒有這份食材，請重新確認攤位。' };
       if (quantity > offer.remaining) return { ok: false, message: '這份食材的本層庫存不足。' };
       if (next.party.ingredients[offer.ingredientId] + quantity > 99) return { ok: false, message: '食材袋已滿。' };
@@ -182,7 +206,7 @@
       if (next.coins < cost) return { ok: false, message: '銅幣不足。' };
       next.coins -= cost; next.party.ingredients[offer.ingredientId] += quantity;
       next.adventure.groceryPurchases[offer.id] = offer.purchased + quantity;
-      return { ok: true, message: `向蘇禾購買${offer.name} × ${quantity}。`, effect: { ingredient: offer.ingredientId, quantity, sourceFloor: offer.sourceFloor } };
+      return { ok: true, message: `向${MERCHANTS[merchantId].name}購買${offer.name} × ${quantity}。`, effect: { ingredient: offer.ingredientId, quantity, sourceFloor: offer.sourceFloor, merchantId } };
     });
   }
   function buyMerchantGear(run, merchantId, kind, expectedRevision) {
@@ -340,5 +364,5 @@
       return { ok: true, message: '已放棄本層委託，尚未領取的報酬不會保留。' };
     });
   }
-  return Object.freeze({ MERCHANTS, MERCHANT_SERVICES, GROCERY, groceryOffers, buyIngredient, validateGroceryPurchases: groceryPurchases, merchantHandles, serviceContext, serviceAvailable, EXPLORERS, QUEST_TYPES, SURVEY_ZONES, SURVEY_SETS, surveyTargets, newAdventure, validateAdventure, floorLootCounts, arrowLoot, merchantOffers, buySupply, sellSupply, buyMerchantGear, chestOffer, openChest, questReward, explorerIdentity, explorerOffer, acceptQuest, questProgress, claimQuestReward, abandonQuest });
+  return Object.freeze({ MERCHANTS, MERCHANT_SERVICES, GROCERY, HUNTER, INGREDIENT_MERCHANTS, hunterPool, hunterCatalogue, legacySpecialtyOffer, groceryOffers, buyIngredient, validateGroceryPurchases: groceryPurchases, merchantHandles, serviceContext, serviceAvailable, EXPLORERS, QUEST_TYPES, SURVEY_ZONES, SURVEY_SETS, surveyTargets, newAdventure, validateAdventure, floorLootCounts, arrowLoot, merchantOffers, buySupply, sellSupply, buyMerchantGear, chestOffer, openChest, questReward, explorerIdentity, explorerOffer, acceptQuest, questProgress, claimQuestReward, abandonQuest });
 });

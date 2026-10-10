@@ -46,7 +46,7 @@ test('classic human hairstyles share the continuous sculpt; robot and cat silhou
 
 test('four merchants, five explorers and five guards keep unique props while removing box hair and flat rear belts',()=>{
   const e=environment(),V=e.TowerCharacters,deps={THREE:T},models=[...Object.keys(V.MERCHANT_STYLES).map(id=>V.buildMerchant(id,deps)),...Object.keys(V.EXPLORER_STYLES).map(id=>V.buildExplorer(id,deps)),...[1,2,3,4,5].map(rank=>V.buildWarrior(rank,deps))];
-  assert.equal(models.length,14);
+  assert.equal(models.length,15);
   for(const model of models){finiteGeometry(model);let triangles=0;model.traverse(o=>{if(o.isMesh)triangles+=(o.geometry.index?.count??o.geometry.attributes.position.count)/3;if(o.userData.contouredBelt){assert.equal(o.geometry.type,'TorusGeometry');assert.ok(o.scale.y<1);}if(o.userData.continuousHair)assert.equal(o.geometry.type==='BoxGeometry'||o.geometry.type==='ExtrudeGeometry',false);});assert.ok(triangles<9000,model.name+':'+triangles);assert.ok(model.userData.armL&&model.userData.armR);assert.ok(new T.Box3().setFromObject(model).max.y<2.7);release(model);}
   assert.ok(V.buildMerchant('jinHe',deps).getObjectByName('sewing-pouch'));assert.equal(V.buildExplorer('eve',deps).getObjectByName('traveler-braid').geometry.type,'TubeGeometry');assert.ok(V.buildExplorer('mira',deps).getObjectByName('round-double-bun'));assert.ok(V.buildExplorer('sena',deps).getObjectByName('comet-hairpin-star'));
 });

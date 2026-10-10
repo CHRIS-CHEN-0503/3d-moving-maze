@@ -15,7 +15,7 @@ function originalProfessionals(floor,seed){
 }
 test('independent grocery draw keeps all three professional merchant identities and equipment streams unchanged',()=>{
   for(const floor of [99,92,69,30,1,-1,-41,-50])for(let seed=1;seed<=40;seed++)for(const modern of [false,true]){
-    const shops=E.merchantOffers(floor,seed,modern),pro=shops.filter(m=>m.id!=='suHe');assert.deepEqual(pro.map(m=>m.id),originalProfessionals(floor,seed));
+    const shops=E.merchantOffers(floor,seed,modern),pro=shops.filter(m=>!['suHe','hunter'].includes(m.id));assert.deepEqual(pro.map(m=>m.id),originalProfessionals(floor,seed));
     for(const shop of pro){assert.deepEqual(shop.supplies,[]);const kinds=modern?H.gearPool(floor).filter(k=>E.merchantHandles(shop.id,k)):E.MERCHANTS[shop.id].equipmentKinds;assert.deepEqual(shop.equipmentKinds,[...kinds]);for(const x of shop.gear)assert.deepEqual(x.gear,C.createGear(x.kind,floor,seed,`shop:${floor}:${shop.id}:${x.kind}`,false));}
     assert.deepEqual(E.merchantOffers(floor,seed,modern),shops);
   }
@@ -24,14 +24,15 @@ test('grocery appears around forty percent independently and sells all purchasab
   let count=0;for(let seed=1;seed<=2000;seed++){const m=E.merchantOffers(92,seed,true).find(m=>m.id==='suHe');if(!m)continue;count++;assert.deepEqual(m.supplies,Object.keys(C.ITEMS).filter(k=>C.ITEMS[k].buyPrice>0&&C.potionAvailable(k,92)),'every supply this floor may carry: deeper potions wait for floor 60 or the underground');assert.ok(m.supplies.includes('spirit')&&!m.supplies.includes('heal_mid')&&!m.supplies.includes('arcane'));assert.ok(m.supplies.includes('power_glimmer'));assert.ok(!m.supplies.includes('power_starlight'));assert.ok(!m.supplies.includes('power_sunheart'));assert.deepEqual(m.gear,[]);assert.equal(m.ingredientOffers.length,5);}
   assert.ok(count>720&&count<880,count);const r=fresh();assert.equal(E.serviceContext(r,'suHe'),null);assert.equal(E.merchantHandles('suHe','longsword'),false);assert.equal(E.buyMerchantGear(r,'suHe','longsword').ok,false);
 });
-test('each shelf has four common ingredients and one geographically correct limited specialty',()=>{
-  const underground=new Set();for(const floor of [92,-1])for(let seed=1;seed<=1000;seed++)for(const o of E.groceryOffers({floor,seed})){
+test('each grocer shelf has five common ingredients, the hunter brings six regional ones, and the retired specialty replays only for old records',()=>{
+  const underground=new Set();for(const floor of [92,-1])for(let seed=1;seed<=1000;seed++){const hunted=E.hunterCatalogue(floor,seed);if(hunted){assert.equal(hunted.length,E.HUNTER.count);assert.equal(new Set(hunted.map(o=>o.ingredientId)).size,E.HUNTER.count);for(const o of hunted){assert.ok(o.hunter&&o.price===E.HUNTER.price&&o.stock>=1&&o.stock<=5&&!E.GROCERY.commonIngredients.includes(o.ingredientId)&&!['meat','shell'].includes(o.ingredientId),o.id);}}const legacy=E.legacySpecialtyOffer(floor,seed);if(legacy){if(floor>0)assert.ok(legacy.sourceFloor>0);else underground.add(legacy.sourceFloor<0?'below':'above');}
+  for(const o of E.groceryOffers({floor,seed})){assert.equal(o.specialty,false,'no specialty shelf any more');
     assert.ok(o.stock>=1&&o.stock<=5);assert.equal(o.remaining,o.stock);assert.equal(o.purchased,0);assert.equal(o.name,M.INGREDIENTS[o.ingredientId]);
     if(!o.specialty){assert.ok(E.GROCERY.commonIngredients.includes(o.ingredientId));assert.equal(o.sourceFloor,null);assert.equal(o.price,2);}
     else{assert.equal(o.ingredientId,M.signature(o.sourceFloor));assert.equal(o.sourceName,M.ecology(o.sourceFloor).name);assert.equal(o.price,5);if(floor>0)assert.ok(o.sourceFloor>0);else underground.add(o.sourceFloor<0?'below':'above');}
     assert.ok(!['meat','shell'].includes(o.ingredientId));
-  }
-  assert.deepEqual([...underground].sort(),['above','below']);const rare=E.groceryOffers({floor:92,seed:37}).at(-1);assert.equal(rare.sourceFloor,30);assert.equal(rare.ingredientId,'frostberry');assert.equal(rare.stock,2);
+  }}
+  assert.deepEqual([...underground].sort(),['above','below']);assert.equal(E.groceryOffers({floor:92,seed:37}).length,5);const rare=E.legacySpecialtyOffer(92,37);assert.equal(rare.sourceFloor,30);assert.equal(rare.ingredientId,'frostberry');assert.equal(rare.stock,2);
 });
 test('ingredient purchase charges exact price, persists real transactions and stock never refreshes on reload or maze shifts',()=>{
   let r=fresh(92,37);const o=E.groceryOffers(r).at(-1),before=structuredClone(r),n=r.party.ingredients[o.ingredientId];const bought=E.buyIngredient(r,'suHe',o.id,o.stock,r.revision);assert.ok(bought.ok,bought.message);assert.deepEqual(r,before);r=bought.run;

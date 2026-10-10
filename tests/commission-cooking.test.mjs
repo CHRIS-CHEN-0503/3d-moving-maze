@@ -9,7 +9,7 @@ function underground(floor=-1){let run=fresh();run.floor=1;run.floorsCleared=99;
 
 test('commission fees derive transparent basic, advanced, feast and underground recipe tiers',()=>{
   assert.deepEqual(K.FEES,{basic:2,advanced:5,feast:8,underground:12});
-  for(const [id,r]of Object.entries(P.RECIPES)){const category=r.requiredDepth?'underground':r.requiresChef&&(id==='feast'||r.team>=30)?'feast':r.requiresChef?'advanced':'basic';assert.equal(K.category(id),category);assert.equal(K.fee(id),K.FEES[category]);}
+  for(const [id,r]of Object.entries(P.RECIPES)){if(r.hidden||r.research){assert.equal(K.category(id),null,id+' is never commissioned');assert.equal(K.fee(id),null);continue;}const category=r.requiredDepth?'underground':r.requiresChef&&(id==='feast'||r.team>=30)?'feast':r.requiresChef?'advanced':'basic';assert.equal(K.category(id),category);assert.equal(K.fee(id),K.FEES[category]);}
   for(const id of ['__proto__','constructor','missing']){assert.equal(K.category(id),null);assert.equal(K.fee(id),null);}
 });
 
@@ -34,5 +34,5 @@ test('underground recipes retain depth gates and ready-made quantities remain va
   const surface=fresh();assert.equal(K.quote(surface,'root_banquet').allowed,false);unchanged(surface,()=>K.cook(surface,'root_banquet'));
   let run=underground(-1);assert.equal(K.quote(run,'root_banquet').allowed,true);assert.equal(K.quote(run,'mist_broth').allowed,false);assert.ok(K.recipes(run).some(q=>q.recipeId==='root_banquet'));assert.ok(!K.recipes(run).some(q=>q.recipeId==='mist_broth'));
   const before=run.coins;run=ok(K.cook(run,'root_banquet'));assert.equal(run.coins,before-12);const reload=C.validateSave(JSON.stringify(run));assert.equal(reload.party.meals.root_banquet,run.party.meals.root_banquet);assert.equal(reload.coins,run.coins);
-  run=underground(-41);assert.equal(K.recipes(run).length,Object.keys(P.RECIPES).length);run=ok(K.cook(run,'gate_feast'));assert.equal(run.party.meals.gate_feast,1);
+  run=underground(-41);assert.equal(K.recipes(run).length,Object.values(P.RECIPES).filter(r=>!r.hidden&&!r.research).length,'hidden dishes and the medley are never commissioned');run=ok(K.cook(run,'gate_feast'));assert.equal(run.party.meals.gate_feast,1);
 });

@@ -4,7 +4,7 @@
   const get=(file,name)=>typeof module==='object'&&module.exports?require('./'+file+'.js'):globalThis[name];
   const C=()=>get('story-core','TowerCore'),P=()=>get('tower-party-core','TowerPartyCore'),E=()=>get('tower-encounters','TowerEncounters');
   const FEES=Object.freeze({basic:2,advanced:5,feast:8,underground:12}),LABELS=Object.freeze({basic:'基本料理',advanced:'精製料理',feast:'盛宴料理',underground:'地下料理'});
-  function category(recipeId){const recipe=P().RECIPES[recipeId];if(!Object.hasOwn(P().RECIPES,recipeId))return null;return recipe.requiredDepth?'underground':recipe.requiresChef&&(recipeId==='feast'||recipe.team>=30)?'feast':recipe.requiresChef?'advanced':'basic';}
+  function category(recipeId){const recipe=P().RECIPES[recipeId];if(!Object.hasOwn(P().RECIPES,recipeId)||recipe.hidden||recipe.research)return null;return recipe.requiredDepth?'underground':recipe.requiresChef&&(recipeId==='feast'||recipe.team>=30)?'feast':recipe.requiresChef?'advanced':'basic';}
   function fee(recipeId){const type=category(recipeId);return type?FEES[type]:null;}
   function quote(run,recipeId,merchantId='suHe'){
     const recipe=typeof recipeId==='string'&&Object.hasOwn(P().RECIPES,recipeId)?P().RECIPES[recipeId]:null,type=recipe?category(recipeId):null,cost=recipe?{coins:FEES[type],ingredients:{...recipe.cost}}:null;
@@ -14,7 +14,7 @@
     const affordable=!!cost&&Number.isInteger(run?.coins)&&run.coins>=cost.coins&&!missing.length;
     return {allowed:!reason,reason,affordable,recipeId,name:recipe?.name,merchantId,category:type,categoryName:type?LABELS[type]:null,fee:cost?.coins,costs:cost,quantity:1,owned:run?.party?.meals?.[recipeId]||0,missing};
   }
-  function recipes(run,merchantId='suHe'){return Object.keys(P().RECIPES).filter(id=>P().recipeUnlocked(run,id)).map(id=>quote(run,id,merchantId));}
+  function recipes(run,merchantId='suHe'){return Object.keys(P().RECIPES).filter(id=>category(id)&&P().recipeUnlocked(run,id)).map(id=>quote(run,id,merchantId));}
   function cook(run,recipeId,expectedRevision=run?.revision,merchantId='suHe'){
     return C().transaction(run,expectedRevision,next=>{
       const q=quote(next,recipeId,merchantId);if(!q.allowed)return {ok:false,message:q.reason};if(!q.affordable)return {ok:false,message:'食材或代煮費不足，尚未扣款。'};

@@ -76,7 +76,7 @@ test('fresh recruits advance using their own XP up to ten, never copying a level
   assert.equal(H.level(run,'hero'),15);assert.equal(H.level(run,id),5);assert.equal(H.experience(run,id),G.XP[4]);
   H.gainXp(run,100);assert.equal(H.level(run,id),5);assert.equal(H.experience(run,id),G.XP[4]+100);assert.equal(H.level(run,'hero'),15);
   for(let level=6;level<=10;level++){H.gainXp(run,G.XP[level-1]-H.experience(run,id));assert.equal(H.level(run,id),level);assert.equal(H.experience(run,id),G.XP[level-1]);valid(run);}
-  assert.equal(H.maxHp(run,id),P.vitalHp(H.job(run,id),10,false));assert.equal(G.available(run,id),2);assert.equal(G.availableUltimate(run,id),true);
+  assert.equal(H.maxHp(run,id),P.vitalHp(H.job(run,id),10,false,H.attr(run,id,'vit')));assert.equal(G.available(run,id),2);assert.equal(G.availableUltimate(run,id),true);
   H.gainXp(run,100000);assert.equal(H.level(run,id),10);assert.equal(H.experience(run,id),G.XP[9]);valid(run);
 });
 

@@ -60,8 +60,8 @@ test('archived stories can create an owned default or selected hero without star
 test('reduced-motion stage keeps all own scenery and secondary actor still across every page, without changing the original hero',()=>{
   const f=fixture({reduced:true}),original=poses(f.actor);for(const text of ['伊芙向你指路。','你站在召喚陣中。','星奈告別。']){const page=f.stage.page({text}),before=poses(f.stage.scene);for(const time of [-1,0,1,60,3600])assert.equal(page.frame(time),true);assertPoses(before);assertPoses(original);}assert.equal(f.stage.frame(NaN),false);f.stage.dispose();for(const resource of resources(f.actor))resource.dispose();
 });
-test('all eight real professions and both sexes retain their mapped face/rig across idle, loading, silent, suspension and narration playback',()=>{
-  const env=heroEnvironment(),Actors=require('../story/tower-cinematic-actors.js'),jobs=Object.keys(env.TowerHeroes.JOBS);assert.equal(jobs.length,8);
+test('all nine real professions and both sexes retain their mapped face/rig across idle, loading, silent, suspension and narration playback',()=>{
+  const env=heroEnvironment(),Actors=require('../story/tower-cinematic-actors.js'),jobs=Object.keys(env.TowerHeroes.JOBS);assert.equal(jobs.length,9);
   for(const job of jobs)for(const sex of ['male','female']){
     const original=env.TowerHeroVisuals.base(job,env.buildCharacter,'hero',sex),base=poses(original),borrowed=resources(original),stage=Theater.create({THREE:T,hero:original}),copy=stage.hero,page=stage.page({text:'你望向迷宮，前方的石台安靜發光。'}),actor=Actors.create(page),mouth=copy.userData.face.mouth,mouthScale=mouth.scale.toArray(),mouthVisible=mouth.visible,stageResources=resources(stage.scene);
     assert.notEqual(copy.userData.head,original.userData.head);assert.equal(copy.userData.face.rig,copy.userData.head);assert.equal(page.speechAnimation,false);
@@ -197,7 +197,7 @@ test('full narrative acting keeps all profession faces and hand props above phon
     }
     stage.dispose();assertPoses(before);for(const resource of resources(original))resource.dispose();
   }
-  assert.ok(faceChecks>4000);assert.equal(propChecks,16*2*3);testContext.diagnostic(`${faceChecks} animated face checks, ${propChecks} prop checks; minimum face-caption margin ${minFaceMargin.toFixed(2)}px, prop-caption margin ${minPropMargin.toFixed(2)}px`);
+  assert.ok(faceChecks>4000);assert.equal(propChecks,18*2*3);testContext.diagnostic(`${faceChecks} animated face checks, ${propChecks} prop checks; minimum face-caption margin ${minFaceMargin.toFixed(2)}px, prop-caption margin ${minPropMargin.toFixed(2)}px`);
 });
 test('the approved floor-99 arrival tracks keep their exact authored timing without generic idle motion',()=>{
   const f=fixture(),entry=require('../story/tower-narrative.js').SCENES.find(e=>e.floor===99);

@@ -22,7 +22,7 @@ function load(){
 
 test('reference page loads its real script order without starting timers, graphics, storage or network',()=>{
   const c=load();assert.equal(c.THREE,undefined);
-  assert.equal(c.StoryAtlasRules.build().jobs.length,Object.keys(c.TowerHeroes.JOBS).length);assert.equal(c.StoryAtlasRules.build().jobs.length,8);
+  assert.equal(c.StoryAtlasRules.build().jobs.length,Object.keys(c.TowerHeroes.JOBS).length);assert.equal(c.StoryAtlasRules.build().jobs.length,9);
   assert.ok(c.StoryAtlasItems.records().length);
   assert.ok(c.StoryAtlasCooperation.records().length);
   assert.ok(sources.every(s=>!/^https?:/.test(s)));
@@ -154,7 +154,7 @@ test('event choices, six fixed landmarks and eight profession sites use current 
   for(const [id,name]of Object.entries(c.TowerLandmarks.NAMES)){
     const card=records.find(r=>r.id==='landmark:'+id);assert.equal(card.name,name);assert.equal(c.StoryAtlasItems.iconHtml(card),c.TowerLandmarks.svg(id));assert.match(card.effect,/同層迷宮變形.*位置.*保持不變/);assert.match(card.acquisition,/裂隙副本不生成/);
   }
-  assert.equal(records.filter(r=>r.category==='職業機關').length,8);
+  assert.equal(records.filter(r=>r.category==='職業機關').length,9);
   for(const [job,d] of Object.entries(c.TowerExpedition.SITES)){
     const card=records.find(r=>r.id==='site:'+job);assert.equal(card.description,d.description);assert.ok(card.effect.endsWith(d.reward));assert.equal(c.StoryAtlasItems.iconHtml(card),c.TowerPartyRuntime.portrait(job));assert.match(card.notes.join(' '),/進度條.*已處理外觀.*新樓層才加入射手與機器人/);
   }
@@ -165,6 +165,6 @@ test('event choices, six fixed landmarks and eight profession sites use current 
 
 test('new reference modules have release cache keys without importing live gameplay timers',()=>{
   for(const file of ['tower-affixes.js','tower-adventure-events.js','tower-landmarks.js'])assert.ok(sources.includes('../story/'+file+'?v='+(file==='tower-adventure-events.js'?'1.57.0':'1.55.0')),file);
-  assert.ok(sources.includes('story-atlas-rules.js?v=1.58.7'));assert.ok(sources.includes('story-atlas-items.js?v=1.59.0'));
+  assert.ok(sources.includes('story-atlas-rules.js?v=1.60.0'));assert.ok(sources.includes('story-atlas-items.js?v=1.60.0'));
   assert.match(html,/持續.*10%.*20%|10%.*20%.*損耗/);assert.match(html,/供能藤.*晶柱/);
 });

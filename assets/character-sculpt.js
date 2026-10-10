@@ -92,8 +92,8 @@
   // A continuous scalp-to-nape surface. Crown and lower hair use the same seam
   // positions AND normals so a helmet can hide the crown without floating locks.
   function hair(T,{job='classic',sex='male',detail='hero'}={}){
-    const female=sex==='female',long=female&&['mage','healer','archer'].includes(job),braided=female&&['classic','swordsman','scout','smith'].includes(job),low=detail==='npc',segments=low?18:28,rings=low?10:14,seam=rings/2,braidSegments=low?16:24,braidSides=low?5:7;
-    const knight=job==='swordsman'&&!female,length=long?(job==='archer'?.45:job==='mage'?.73:.67):female?.3:job==='mage'?.33:job==='archer'?.32:.24,positions=[knight?-.018:0,knight?.321:.335,-.018],indices=[],braids=[];
+    const female=sex==='female',long=female&&['mage','healer','archer','cleric'].includes(job),braided=female&&['classic','swordsman','scout','smith'].includes(job),low=detail==='npc',segments=low?18:28,rings=low?10:14,seam=rings/2,braidSegments=low?16:24,braidSides=low?5:7;
+    const knight=job==='swordsman'&&!female,length=long?(job==='archer'?.45:job==='mage'?.73:job==='cleric'?.7:.67):female?.3:job==='mage'?.33:job==='archer'?.32:job==='cleric'?.27:.24,positions=[knight?-.018:0,knight?.321:.335,-.018],indices=[],braids=[];
     for(let row=1;row<=rings;row++)for(let i=0;i<segments;i++){
       const a=i/segments*Math.PI*2,v=row/rings,cap=Math.min(1,v/.5),drop=Math.max(0,(v-.5)/.5),front=Math.max(0,Math.min(1,(Math.cos(a)-.25)/.5)),back=1-front;
       const theta=cap*Math.PI/2,r=Math.sin(theta),wave=(long?.016:.004)*Math.sin(a*7+drop*3)*Math.sin(drop*Math.PI*.8),tip=long?1-.085*Math.sin(a*3)**2-.035*Math.cos(a*5):1;

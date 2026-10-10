@@ -14,14 +14,14 @@ function learn(run,id){const a=H.actor(run,id),known=[...a.skills,...a.passives]
 function enterUnderworld(run){move(run,1);run.chronicle.ending='keeper';run.chronicle.clues.push(N.chapterForFloor(1).clueId);run.party.boss.started=true;run.party.boss.done=true;run.party.boss.seals.fill(true);run.defeatedMonsters.push(B.spec(run).id);return ok(C.startUnderworld(ok(C.descend(run))));}
 
 const fixtures={};
-for(let seed=1;seed<=40&&Object.keys(fixtures).length<16;seed++)for(const floor of [99,97,95,93,91,89,87,85]){
+for(let seed=1;seed<=40&&Object.keys(fixtures).length<18;seed++)for(const floor of [99,97,95,93,91,89,87,85,83]){
   const run=move(fresh(seed),floor),offer=P.recruitOffer(run);if(offer)fixtures[R.identity(offer.profession,offer.sex)]??={seed,floor};
 }
-assert.equal(Object.keys(fixtures).length,16);
+assert.equal(Object.keys(fixtures).length,18);
 
-test('sixteen named traveller profiles retain distinct reasonable agreements and basic meal prerequisites',()=>{
-  assert.equal(Object.keys(R.TERMS).length,16);assert.ok(Object.values(R.TERMS).some(p=>!p.costs.coins));
-  assert.equal(new Set(Object.values(R.TERMS).map(p=>JSON.stringify(p.costs))).size,15,'robot male and smith male share the approved six coins plus two scrap price');
+test('eighteen named traveller profiles retain distinct reasonable agreements and basic meal prerequisites',()=>{
+  assert.equal(Object.keys(R.TERMS).length,18);assert.ok(Object.values(R.TERMS).some(p=>!p.costs.coins));
+  assert.equal(new Set(Object.values(R.TERMS).map(p=>JSON.stringify(p.costs))).size,17,'robot male and smith male share the approved six coins plus two scrap price');
   for(const p of Object.values(R.TERMS)){assert.ok(p.story.length>10);for(const key of Object.keys(p.costs.meals||{}))assert.ok(P.BASIC_RECIPES.includes(key));for(const c of Object.values(p.costs).flatMap(v=>typeof v==='number'?[v]:Object.values(v)))assert.ok(c>0&&c<=10);}
 });
 for(const [identity,{seed,floor}] of Object.entries(fixtures))test(identity+' costs are shown and deducted exactly; insufficient any one requirement is atomic',()=>{

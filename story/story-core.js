@@ -39,14 +39,18 @@
     const loadouts=run?.party?.loadouts,active=loadouts?loadouts.actors?.[id]?.buffs?.some(b=>b.id==='haste'&&b.left>0):run?.effects?.haste>0;
     return active?1+HASTE_PERCENT/100:1;
   }
-  // Every archer contributes a quiver, even while downed or not controlled.
+  // Every bow user (archer or cleric) contributes a quiver, even while downed or not controlled.
+  const BOW_JOBS = ['archer', 'cleric'];
   // Storage validation is deliberately wider: an archer leaving never deletes arrows.
   const itemStorageLimit = id => id === 'arrow' ? 3000 : MAX_STACK;
+  // Spare shovels: three in the bag; one ready shovel at a time (the engine's own cap).
+  const SHOVEL_SPARES = 3, SHOVEL_READY = 1;
   function itemLimit(id,run){
+    if(id==='shovel')return SHOVEL_SPARES;
     if(id!=='arrow')return MAX_STACK;
     const p=run?.party,capacity=(level,max)=>100+50*((Number.isInteger(level)?Math.max(1,Math.min(max,level)):1)-1);
-    let total=p?.profession==='archer'?capacity(p.loadouts?.level,15):0;
-    if(Array.isArray(p?.members))for(const m of p.members)if(m.profession==='archer')total+=capacity(m.level,10);
+    let total=BOW_JOBS.includes(p?.profession)?capacity(p.loadouts?.level,15):0;
+    if(Array.isArray(p?.members))for(const m of p.members)if(BOW_JOBS.includes(m.profession))total+=capacity(m.level,10);
     return Math.max(100,Math.min(itemStorageLimit(id),total));
   }
   // Late lookup keeps the browser's core → narrative → dungeons loading order safe.
@@ -84,6 +88,7 @@
     heal_high: Object.freeze({ id: 'heal_high', name: '高級療癒藥', description: '恢復 150 點生命。地下第一層起出現。', buyPrice: 60, sellPrice: 26, color: '#ff4f9a' }),
     spirit: Object.freeze({ id: 'spirit', name: '精神藥水', description: '恢復 45 點 MP，讓技能能再次施放；機器人改用動力石。', buyPrice: 16, sellPrice: 7, color: '#6ab6ff' }),
     forget: Object.freeze({ id: 'forget', name: '遺忘藥水', description: '退回一位隊員已分配的全部自由點數，可重新分配能力值。只會由第 30 層之後的樓主掉落，商店不販售。', buyPrice: null, sellPrice: null, color: '#8fe3d0' }),
+    shovel: Object.freeze({ id: 'shovel', name: '鐵鍬', description: '使用後裝上一把可用的鐵鍬，按鐵鍬鈕敲開面前一面內牆；一次只能裝一把，背包最多帶 3 把備用。', buyPrice: 25, sellPrice: 10, color: '#c9a56b' }),
     ration: Object.freeze({ id: 'ration', name: '乾糧', description: '恢復 45 點飽食度。', buyPrice: 8, sellPrice: 3, color: '#efc073' }),
     haste: Object.freeze({ id: 'haste', name: '加速藥水', description: '使用者的移動速度與普通攻擊速度提高 '+HASTE_PERCENT+'%，持續五分鐘。不能疊加或刷新，不縮短技能冷卻與準備時間。', buyPrice: 24, sellPrice: 10, color: '#f3bc57' }),
     haste_strong: Object.freeze({ id: 'haste_strong', name: '強力加速藥水', description: '使用者的移動速度與普通攻擊速度提高 '+HASTE_STRONG_PERCENT+'%，持續五分鐘；可取代仍在生效的一般加速藥水。地下第一層起出現。', buyPrice: 45, sellPrice: 20, color: '#ffd24a' }),
@@ -135,7 +140,9 @@
     const depth = 99 - floor;
     // Roll once per journey/floor, never per render, maze shift or reload.
     const sizeStep = (chapter.size - 7) / 2;
-    const monsterMin = 1 + sizeStep, monsterMax = 5 + sizeStep;
+    // v1.60: both population bounds +1. The slot monster-11 belongs to the chapter or mini lord, so the
+    // widest chapter (size 19) keeps its maximum of 11 and only its minimum rises.
+    const monsterMin = 2 + sizeStep, monsterMax = Math.min(11, 6 + sizeStep);
     let roll = (seed ^ Math.imul(floor, 0x9e3779b9)) >>> 0;
     roll = Math.imul(roll ^ roll >>> 16, 0x21f0aaad);
     roll = Math.imul(roll ^ roll >>> 15, 0x735a2d97);
@@ -163,7 +170,7 @@
     const seed = Number.isInteger(opts.seed) && opts.seed > 0 && opts.seed <= 0xffffffff ? opts.seed : ((Date.now() >>> 0) || 1);
     return {
       stateVersion: STATE_VERSION, mode: 'tower', floor: 99, hp: MAX_HP, hunger: 100, coins: 24,
-      bag: { heal: 2, heal_mid: 0, heal_high: 0, spirit: 0, haste_strong: 0, arcane: 0, courage: 0, forget: 0, ration: 2, haste: 0, shield: 0, hourglass: 0, bell: 0, map: 1, feather: 0, arrow: 0, ...Object.fromEntries(Object.keys(ITEMS).filter(k=>ITEMS[k].fuel).map(k=>[k,0])) },
+      bag: { heal: 2, heal_mid: 0, heal_high: 0, spirit: 0, haste_strong: 0, arcane: 0, courage: 0, forget: 0, shovel: 0, ration: 2, haste: 0, shield: 0, hourglass: 0, bell: 0, map: 1, feather: 0, arrow: 0, ...Object.fromEntries(Object.keys(ITEMS).filter(k=>ITEMS[k].fuel).map(k=>[k,0])) },
       effects: { shield: 0, freeze: 0, repel: 0, reveal: 0, haste: 0 },
       engine: { shovels: 1, kites: 0, whistles: 0, shovelCooldownMs: 0, skillCooldownMs: 0 },
       claimed: [], floorElapsed: 0, warrior: null, hiredWarriors: [], defeatedMonsters: [],
@@ -329,8 +336,8 @@
     const bag = {};
     for (const id of Object.keys(ITEMS).filter((key) => key !== 'coin')) {
       // Old journeys get their initial quiver once, without resetting other inventory.
-      if (id === 'arrow' && !Object.hasOwn(run.bag,id)) { bag.arrow=run.party?.loadouts&&(run.party.profession==='archer'||run.party.members?.some(m=>m.profession==='archer'))?30:0; continue; }
-      if (['haste','heal_mid','heal_high','spirit','haste_strong','arcane','courage','forget'].includes(id) && !Object.hasOwn(run.bag,id)) { bag[id]=0; continue; }
+      if (id === 'arrow' && !Object.hasOwn(run.bag,id)) { bag.arrow=run.party?.loadouts&&(BOW_JOBS.includes(run.party.profession)||run.party.members?.some(m=>BOW_JOBS.includes(m.profession)))?50:0; continue; }
+      if (['haste','heal_mid','heal_high','spirit','haste_strong','arcane','courage','forget','shovel'].includes(id) && !Object.hasOwn(run.bag,id)) { bag[id]=0; continue; }
       if (ITEMS[id].fuel && !Object.hasOwn(run.bag,id)) { bag[id]=0; continue; }
       if (!Object.hasOwn(run.bag, id) || !validNumber(run.bag[id], 0, itemStorageLimit(id), true)) return null;
       bag[id] = run.bag[id];
@@ -630,6 +637,7 @@
       if (!Object.hasOwn(next.bag, itemId) || next.bag[itemId] < 1) return { ok: false, message: '背包裡沒有這件道具。' };
       if (itemId === 'feather') return { ok: false, message: '復甦羽會在受到致命傷時自動保護你。' };
       if (itemId === 'arrow') return { ok: false, message: '箭矢會在弓射時自動使用，不需要手動使用。' };
+      if (itemId === 'shovel') { if (next.engine.shovels >= SHOVEL_READY) return { ok: false, message: '已經帶著一把鐵鍬了，用掉後再裝上備用的。' }; next.engine.shovels = SHOVEL_READY; next.bag.shovel -= 1; return { ok: true, message: '裝上了鐵鍬，按鐵鍬鈕可以敲牆。', effect: { id: itemId, shovel: true } }; }
       if (ITEMS[itemId]?.fuel) return {ok:false,message:'動力石只供職業旅程中的機器人使用。'};
       const maximum=next.party?.loadouts?heroRules().maxHp(next):MAX_HP;
       if (Object.hasOwn(HEAL_POTIONS,itemId) && next.hp >= maximum) return { ok: false, message: '生命已滿，先把療癒藥留著吧。' };
@@ -804,5 +812,5 @@
     });
   }
 
-  return Object.freeze({ STATE_VERSION, MAX_HP, MAX_MONSTERS, HASTE_DURATION, HASTE_PERCENT, HASTE_STRONG_PERCENT, POTION_BUFF_SECONDS, POTION_BUFF_PERCENT, HEAL_POTIONS, SPIRIT_MP, POTION_FLOORS, potionAvailable, hasteMultiplier, validMonsterId, HUNT_ID, clearHunt, isFloor, isUnderworld, ITEMS, itemLimit, itemStorageLimit, GEAR, MONSTERS, CHAPTERS, OPENING, ENDING, EXCHANGES, floorConfig, newRun, validateSave, supplyPrice, buy, sell, exchange, useItem, collect, takeDamage, tickEffects, tickEffectsLive, startUnderworld, descend, monsterStrength, warriorOffer, hireWarrior, interceptMonster, createGear, validateGear, originalDurabilityMultiplier, durabilityMultiplier, durabilityMinimumRoll, durabilityForRoll, DURABILITY_VERSION, gearPrice, equipmentStats, receiveGear, grantGear, equipGear, discardGear, buyGear, effectiveMonsterStrength, hitMonster, resolveHeldMonster, transaction, applyDamage, newAdventure, validateAdventure });
+  return Object.freeze({ STATE_VERSION, MAX_HP, MAX_MONSTERS, SHOVEL_SPARES, SHOVEL_READY, HASTE_DURATION, HASTE_PERCENT, HASTE_STRONG_PERCENT, POTION_BUFF_SECONDS, POTION_BUFF_PERCENT, HEAL_POTIONS, SPIRIT_MP, POTION_FLOORS, potionAvailable, hasteMultiplier, validMonsterId, HUNT_ID, clearHunt, isFloor, isUnderworld, ITEMS, itemLimit, itemStorageLimit, GEAR, MONSTERS, CHAPTERS, OPENING, ENDING, EXCHANGES, floorConfig, newRun, validateSave, supplyPrice, buy, sell, exchange, useItem, collect, takeDamage, tickEffects, tickEffectsLive, startUnderworld, descend, monsterStrength, warriorOffer, hireWarrior, interceptMonster, createGear, validateGear, originalDurabilityMultiplier, durabilityMultiplier, durabilityMinimumRoll, durabilityForRoll, DURABILITY_VERSION, gearPrice, equipmentStats, receiveGear, grantGear, equipGear, discardGear, buyGear, effectiveMonsterStrength, hitMonster, resolveHeldMonster, transaction, applyDamage, newAdventure, validateAdventure });
 });

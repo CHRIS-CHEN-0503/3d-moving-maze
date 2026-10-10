@@ -11,7 +11,11 @@
   // mechanical/equipment repairs still use their original independent rules.
   const HEALING=Object.freeze({multiplier:1.5,herbalCooldown:5,feastPercent:30,sanctuaryPercent:60,sanctuaryRevivePercent:45,manyFlavorsPercent:37.5,forestRecoveryPercent:18});
   const healingRanks=values=>values.map(value=>value*HEALING.multiplier);
-  const XP_SCALE=7.5,XP=Object.freeze([... [0,70,180,350,580,860,1220,1660,2190,2810].map(n=>Math.round(n*XP_SCALE)),27500,35000,43500,53000,63000]);
+  const XP_SCALE=7.5,XP_LEGACY=Object.freeze([...[0,70,180,350,580,860,1220,1660,2190,2810].map(n=>Math.round(n*XP_SCALE)),27500,35000,43500,53000,63000]);
+  // v1.59.1 curve: surface thresholds are 1.5x the legacy ones (rounded to 25); the underground keeps its old increments on top.
+  const XP_CURVE=2,XP=Object.freeze([0,800,2025,3950,6525,9675,13725,18675,24650,31625,38050,45550,54050,63550,73550]);
+  // Carry a legacy save's experience into the current curve: same level, same fraction of the way to the next level.
+  function migrateXp(xp,level,curve){if(curve===XP_CURVE)return xp;const l=Math.max(1,Math.min(XP.length,Math.floor(level)||1)),lo=XP_LEGACY[l-1],hi=l<XP_LEGACY.length?XP_LEGACY[l]:lo+(XP_LEGACY[l-1]-XP_LEGACY[l-2]),nlo=XP[l-1],nhi=l<XP.length?XP[l]:nlo+(XP[l-1]-XP[l-2]);const frac=Math.max(0,Math.min(1,((Number(xp)||0)-lo)/(hi-lo)));return Math.round(nlo+frac*(nhi-nlo));}
   const STRATEGIES=Object.freeze({attack:{name:'積極攻擊',description:'優先輸出技能，必要時救援或治療。'},support:{name:'優先輔助',description:'優先治療、護盾與增益，再找機會攻擊。'},survive:{name:'保命優先',description:'優先救援、自保與牽制，再進行攻擊。'}});
   function setStrategy(run,id,strategy){return C().transaction(run,run.revision,n=>{const p=state(n).policies[id];if(!p||!Object.hasOwn(STRATEGIES,strategy))return {ok:false,message:'請選擇有效的隊員與策略。'};p.strategy=strategy;p.thinkLeft=0;return {ok:true,message:'戰鬥策略：'+STRATEGIES[strategy].name};});}
   const active=(id,job,name,attack,power,cooldown,effect,description,cost={})=>({id,job,name,attack,power:Array(6).fill(power),cooldown,effect,description,cost,unique:true});
@@ -24,6 +28,7 @@
     active('dawn_sanctuary','healer','黎明聖域',false,HEALING.sanctuaryPercent,120,'sanctuary','十秒治療領域恢復60%生命，施放時扶起一位隊友至45%生命。',{herb:3}),
     active('moving_fortress','smith','移動堡壘',false,100,90,'fortress','自身100%生命護盾五分鐘；十五秒持續挑釁、抵銷四次耐久消耗。挑釁上限依技能等級：一～二級一隻、三～四級兩隻、五～六級三隻；目標離開可見近處才補選。',{shell:2}),
     active('worldtree_arrow','archer','世界樹之箭',true,480,65,'great_arrow','凝聚精靈之力射出強力箭，傷害480%，並使怪物緩速；不能穿牆。'),
+    {...active('hamaya','cleric','破魔矢',true,500,65,'great_arrow','凝聚神力射出破魔矢，傷害500%，命中後怪物弱化、緩速並被標記六秒；不能穿牆。'),params:{weak:1,markSeconds:6},presentation:{colors:[0xfff4f4,0xe04e4e]}},
     {...active('steel_meteor_fist','robot','鋼鐵隕拳',true,450,65,'robot_meteor','巨拳轟向前方八公尺內可見敵人，最多波及三體，擊退1.5公尺；樓層主不被推動。'),params:{reach:8,radius:2.4,maxTargets:3,knockback:1.5},presentation:{family:'quake',sound:'metal',motion:'ground_slam',colors:[0x93dafa,0xffc784]}},
   ];
   const passives=[
@@ -48,9 +53,10 @@
     passive('life_covenant','healer','守命之約',Array(6).fill(30),'附近隊友受致命怪物或一般陷阱傷害：保留1生命、30%護盾五分鐘；間隔180秒。',true),
     passive('artisan_soul','smith','匠魂刻印',Array(6).fill(20),'營地對修滿裝備花兩零件刻印：20%耐久護層；武器增傷15%或防具防禦+2。每人限一件。',true),
     passive('forest_echo','archer','森靈追擊',Array(6).fill(40),'射擊已被緩速的怪物額外增傷40%；纏枝箭與隊友的緩速都能觸發。',true),
+    passive('shrine_favor','cleric','神籤加護',Array(6).fill(25),'輔助技能的 MP 消耗減少25%。',true),
     passive('kinetic_core','robot','動能護核',Array(6).fill(60),'實際承受怪物傷害後儲能八秒；下次普通拳擊追加60%傷害與20%最大生命護盾五分鐘。間隔三十秒；陷阱、飢餓及完全吸收的傷害不觸發。',true),
   ];
-  const itemIds=['heal','heal_mid','heal_high','spirit','forget','ration','shield','hourglass','bell','map','haste','haste_strong','arcane','courage','power_glimmer','power_starlight','power_sunheart'];
+  const itemIds=['heal','heal_mid','heal_high','spirit','forget','shovel','ration','shield','hourglass','bell','map','haste','haste_strong','arcane','courage','power_glimmer','power_starlight','power_sunheart'];
   const HEALS=['heal','heal_mid','heal_high'];
   function policy(){return {strategy:'support',materials:false,heal:{enabled:false,threshold:30,reserve:2},fuel:{enabled:false,threshold:25,reserve:0},spirit:{enabled:false,threshold:25,reserve:0},shield:false,bell:false,hourglass:false,map:false,haste:false,itemLeft:0,thinkLeft:0};}
   function freshRecord(){return {choices:[],awakening:null,tastes:[],tasteLeft:0,echo:0,defiance:0,covenant:0};}
@@ -102,6 +108,7 @@
     if(fuel){const filled=h.ROBOT.fillFuel(n,key,id);if(!filled.ok)return filled;}
     if(HEALS.includes(key)){if(h.hp(n,id)>=h.maxHp(n,id))return {ok:false,message:'生命已滿。'};h.heal(n,id,C().HEAL_POTIONS[key]);}
     if(key==='spirit'){if(h.mp(n,id)>=h.maxMp(n,id))return {ok:false,message:'MP 已滿。'};h.restoreMp(n,id,C().SPIRIT_MP);}
+    if(key==='shovel'){if(automatic)return {ok:false};if(n.engine.shovels>=C().SHOVEL_READY)return {ok:false,message:'已經帶著一把鐵鍬了，用掉後再裝上備用的。'};n.engine.shovels=C().SHOVEL_READY;}
     let refunded=0;if(key==='forget'){if(automatic)return {ok:false};refunded=h.forgetAttributes(n,id);if(!refunded)return {ok:false,message:'這位隊員還沒有分配任何自由點數。'};}
     if(key==='haste_strong'){if(h.buff(n,'haste',id)?.power>=C().HASTE_STRONG_PERCENT)return {ok:false,message:'強力加速仍在生效，不需重複使用。'};h.actor(n,id).buffs=h.actor(n,id).buffs.filter(b=>b.id!=='haste');h.setBuff(n,id,'haste',C().HASTE_DURATION,C().HASTE_STRONG_PERCENT);}
     if(key==='arcane'||key==='courage'){if(h.buff(n,key,id))return {ok:false,message:C().ITEMS[key].name+'仍在生效，不需重複使用。'};h.setBuff(n,id,key,C().POTION_BUFF_SECONDS,C().POTION_BUFF_PERCENT);}
@@ -109,7 +116,7 @@
     if(key==='shield'){if(h.buff(n,'barrier',id)?.power>=h.maxHp(n,id)*.35)return {ok:false,message:'護盾仍充足。'};shield(n,id,h.maxHp(n,id)*.35);}
     if(key==='haste'){if(h.buff(n,'haste',id))return {ok:false,message:'加速藥水仍在生效，不需重複使用。'};h.setBuff(n,id,'haste',C().HASTE_DURATION,C().HASTE_PERCENT);}
     const timed={hourglass:['freeze',25],bell:['repel',20],map:['reveal',18]};if(timed[key]){const [k,t]=timed[key];if(n.effects[k]>0)return {ok:false,message:'效果仍在持續。'};n.effects[k]=t*(1+h.pv(n,'extension',id)/100);}
-    n.bag[key]--;p.itemLeft=automatic?5:1;return {ok:true,message:refunded?'退回 '+refunded+' 點自由點數，請重新分配能力值。':'使用 '+C().ITEMS[key].name,effect:{item:key,actorId:id,...(refunded?{refunded}:{})}};});}
+    n.bag[key]--;p.itemLeft=automatic?5:1;return {ok:true,message:refunded?'退回 '+refunded+' 點自由點數，請重新分配能力值。':key==='shovel'?'裝上了鐵鍬，按鐵鍬鈕可以敲牆。':'使用 '+C().ITEMS[key].name,effect:{item:key,actorId:id,...(refunded?{refunded}:{}),...(key==='shovel'?{shovel:true}:{})}};});}
   function autoItems(run,threats=[]){const h=H(),g=state(run),order=h.ids(run).filter(id=>h.hp(run,id)>0&&(id!==h.state(run).active||g.useActive)).sort((a,b)=>h.hp(run,a)/h.maxHp(run,a)-h.hp(run,b)/h.maxHp(run,b));
     for(const id of order){const p=g.policies[id];if(p.itemLeft>0)continue;if(h.job(run,id)==='robot'&&p.fuel.enabled&&h.actor(run,id).robot.fuel<=p.fuel.threshold){const key=h.ROBOT.fuelItemIds.find(key=>run.bag[key]>p.fuel.reserve);if(key)return {id,key};}
       // The smallest draught that covers most of the wound, else the strongest one in the bag.
@@ -119,7 +126,7 @@
       if(threats.includes(id)){if(p.shield&&run.bag.shield&&h.hp(run,id)<h.maxHp(run,id)*.5&&!h.buff(run,'barrier',id)?.power)return {id,key:'shield'};for(const [key,e]of [['bell','repel'],['hourglass','freeze']])if(p[key]&&run.bag[key]&&h.hp(run,id)<h.maxHp(run,id)*.3&&!run.effects[e])return {id,key};if(p.haste&&run.bag.haste&&!h.buff(run,'haste',id))return {id,key:'haste'};if(p.map&&run.bag.map&&!run.effects.reveal&&!run.engine.mapKnowledge?.revealed)return {id,key:'map'};}
     }return null;
   }
-  function skillRange(run,id,s){return s.params?.reach||s.params?.radius||(s.job==='archer'?H().stats(run,id).reach:['bolt','weak','slow','mark','thorns','starfall','star_ring'].includes(s.effect)?8:3.5);}
+  function skillRange(run,id,s){return s.params?.reach||s.params?.radius||(H().BOW_JOBS.includes(s.job)?H().stats(run,id).reach:['bolt','weak','slow','mark','thorns','starfall','star_ring'].includes(s.effect)?8:3.5);}
   function ailmentWeight(run,id){return (H().buff(run,'slow',id)?1:0)+(id===H().state(run).active&&run.party.slowLeft>0?1:0)+(F()?.list(run,id)||[]).reduce((n,s)=>n+(['burn','poison','shock'].includes(s.id)?3:2),0);}
   // Observations come from nearby unobstructed enemies. They are transient and
   // never scan the saved floor for enemies the companion cannot see.
@@ -128,16 +135,16 @@
     if(!Number.isFinite(enemy.distance)||enemy.distance>skillRange(run,id,s))return false;
     if(['stun','shock','stagger'].includes(s.effect)&&(stunned||run.party.poise[enemy.id]>0))return false;
     if(['slow','binding'].includes(s.effect)&&(slow||root||enemy.stationary))return false;
-    if(s.effect==='thorns'&&(root||enemy.stationary))return false;
-    if(s.effect==='weak'&&(e.weak>0||e.relayWeak>0))return false;
-    if((s.effect==='mark'&&e.mark>0)||(s.effect==='blind'&&e.blind>0))return false;
+    if((s.effect==='thorns'||s.params?.rootSeconds)&&(root||enemy.stationary))return false;
+    if((s.effect==='weak'||s.params?.weak)&&(e.weak>0||e.relayWeak>0))return false;
+    if(((s.effect==='mark'||s.params?.markSeconds)&&e.mark>0)||((s.effect==='blind'||s.params?.blindSeconds)&&e.blind>0))return false;
     return true;
   }
   function interrupts(run,id,s,enemy){return !!enemy&&enemy.windup>0&&enemy.windup>H().preparationSeconds(s.id)+(skillRange(run,id,s)>4?enemy.distance/16:0)&&(['stun','shock','stagger','decisive'].includes(s.effect)||s.effect==='blind'&&enemy.behind);}
   function aiChoice(run,id,near,threat,combat={}){const h=H(),a=h.actor(run,id),p=state(run).policies[id];if(!p||p.strategy==='manual'||p.thinkLeft>0||h.hp(run,id)<=0)return null;
     if(h.job(run,id)==='robot'&&!h.ROBOT.powered(run,id))return null;
     const low=near.filter(k=>h.organicHealable(run,k)&&h.hp(run,k)>0&&h.hp(run,k)<h.maxHp(run,k)*.5).sort((a,b)=>h.hp(run,a)/h.maxHp(run,a)-h.hp(run,b)/h.maxHp(run,b))[0],down=near.find(k=>h.organicHealable(run,k)&&h.hp(run,k)===0);
-    const priorities=p.strategy==='attack'?['revive','heal','robot_restore','attack','cleanse','barrier','guard','robot_guard','mech_aid']:p.strategy==='survive'?['revive','heal','robot_restore','cleanse','sanctuary','barrier','mech_aid','guard','robot_guard','robot_speed','ward','escape','smoke','stealth','attack']:['revive','heal','robot_restore','soup','sanctuary','cleanse','barrier','mech_aid','fortress','guard','robot_guard','ward','rally','polish','fortify','repair','daylight','feast','meal','stomach','speed','robot_speed','frost','taunt','attack'];
+    const priorities=p.strategy==='attack'?['revive','heal','robot_restore','attack','cleanse','barrier','guard','robot_guard','mech_aid']:p.strategy==='survive'?['revive','heal','robot_restore','cleanse','sanctuary','barrier','mech_aid','guard','robot_guard','robot_speed','ward','escape','smoke','stealth','attack']:['revive','heal','robot_restore','soup','sanctuary','cleanse','barrier','mech_aid','fortress','guard','robot_guard','ward','regen','kami','rally','polish','fortify','repair','daylight','feast','meal','stomach','speed','robot_speed','frost','taunt','attack'];
     const skills=[...a.skills].sort((x,y)=>Number(interrupts(run,id,h.SKILLS[y],combat.enemy))-Number(interrupts(run,id,h.SKILLS[x],combat.enemy))||Number(!!h.SKILLS[y].unique)-Number(!!h.SKILLS[x].unique));
     for(const kind of priorities)for(const key of skills){const s=h.SKILLS[key];if((kind==='attack'?!s.attack:s.effect!==kind)||s.attack&&a.attack>0||a.cooldowns[key]>0||!h.mpReady(run,id,key)||Object.keys(s.cost).length&&!p.materials||['feast','fortress'].includes(s.effect)&&!p.materials)continue;
       let target=id;if(kind==='revive'){if(!down)continue;target=down;}else if(kind==='cleanse'){target=near.filter(k=>h.hp(run,k)>0&&ailmentWeight(run,k)>0).sort((x,y)=>ailmentWeight(run,y)-ailmentWeight(run,x)||h.hp(run,x)/h.maxHp(run,x)-h.hp(run,y)/h.maxHp(run,y))[0];if(!target)continue;}else if(kind==='robot_restore'){if(!p.materials||h.hp(run,id)>=h.maxHp(run,id)*.5)continue;}else if(kind==='mech_aid'){if(!threat&&!low)continue;const aid=Array.isArray(combat.aidNear)?combat.aidNear:near;target=(low&&aid.includes(low)?low:null)||aid.find(k=>k!==id&&h.hp(run,k)>0&&!h.buff(run,'barrier',k))||id;if(h.buff(run,'barrier',target)?.power>=h.maxHp(run,target)*.2&&h.buff(run,'barrier',id)?.power>=h.maxHp(run,id)*.35)continue;}else if(['heal','soup','sanctuary'].includes(kind)){if(!low&&!(kind==='sanctuary'&&down))continue;target=low||down;}else if(kind==='repair'){target=near.find(k=>Object.values(h.equipment(run,k)).some(g=>g&&!h.ROBOT.isCore(g)&&g.durability>0&&g.durability<g.maxDurability*.5));if(!target)continue;}else if(kind==='daylight'){if(run.party.light.daylight>0||run.party.light.cooldown>0)continue;}else if(kind==='meal'){if(run.hunger>40)continue;}else {if(!threat)continue;if(kind==='attack'&&(!h.stats(run,id).weapon||!usefulAttack(run,id,s,combat.enemy)))continue;const keyBuff={polish:'polish',fortify:'fortify',barrier:'barrier',guard:'guard',robot_guard:'robot_guard',robot_speed:'robot_speed',ward:'ward',rally:'rally',stomach:'stomach',stealth:'stealth',smoke:'smoke'}[kind];if(['barrier','ward','polish','fortify'].includes(kind)&&combat.threatened){const candidates=near.filter(k=>h.hp(run,k)>0&&!h.buff(run,keyBuff,k)&&(combat.threatened.includes(k)||h.hp(run,k)<h.maxHp(run,k)*.5)&&(kind!=='polish'||h.stats(run,k).weapon));target=candidates.sort((x,y)=>Number(combat.threatened.includes(y))-Number(combat.threatened.includes(x))||h.hp(run,x)/h.maxHp(run,x)-h.hp(run,y)/h.maxHp(run,y))[0];if(!target)continue;}else if(keyBuff&&h.buff(run,keyBuff,id))continue;if(['frost','smoke'].includes(kind)&&combat.enemies&&!combat.enemies.some(e=>e.distance<=5&&!(h.state(run).enemy[e.id]?.[kind==='frost'?'slow':'blind']>0)))continue;if(kind==='taunt'&&combat.enemies&&!combat.enemies.some(e=>e.distance<=5&&!(h.state(run).enemy[e.id]?.tauntLeft>0)))continue;}
@@ -160,5 +167,5 @@
     if(g.route!==null&&(!g.route||!num(g.route.left,0,12)||!C().isFloor(g.route.floor)||g.route.power!==undefined&&!num(g.route.power,0,100)||!Array.isArray(g.route.points)||g.route.points.length>6||!g.route.points.every(p=>num(p.x,-1000,1000)&&num(p.z,-1000,1000))))return null;
     if(!g.nearby||typeof g.nearby!=='object'||Object.entries(g.nearby).some(([id,list])=>!ids.includes(id)||!Array.isArray(list)||list.length>5||!list.every(k=>ids.includes(k))))return null;return g;
   }
-  return {HEALING,healingRanks,XP,XP_SCALE,STRATEGIES,setStrategy,actives,passives,itemIds,policy,freshRecord,fresh,state,record,progression:record,has,skillLevel,sixth,awaken,available,choose,ultimateOptions,availableUltimate,chooseUltimate,branches,modifiers,power,shield,afterDamage,beforeDamage,strikeMultiplier,consumeCost,afterCast,recipe,imprint,imprintFor,use,autoItems,skillRange,aiChoice,tick,validate};
+  return {HEALING,healingRanks,XP,XP_LEGACY,XP_CURVE,migrateXp,XP_SCALE,STRATEGIES,setStrategy,actives,passives,itemIds,policy,freshRecord,fresh,state,record,progression:record,has,skillLevel,sixth,awaken,available,choose,ultimateOptions,availableUltimate,chooseUltimate,branches,modifiers,power,shield,afterDamage,beforeDamage,strikeMultiplier,consumeCost,afterCast,recipe,imprint,imprintFor,use,autoItems,skillRange,aiChoice,tick,validate};
 });

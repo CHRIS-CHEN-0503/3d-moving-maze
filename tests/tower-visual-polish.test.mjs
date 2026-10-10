@@ -37,7 +37,7 @@ test('every job/sex/tier hides all old waist trim under live armor and restores 
     e.TowerHeroVisuals.dress(T,model,{...equipment,armor:{...equipment.armor,durability:0}},release);assert.ok(model.userData.baseClothing.every(p=>p.visible));
     e.TowerHeroVisuals.dress(T,model,{armor:null,helmet:null,weapon:null,shield:null},release);assert.ok(model.userData.baseClothing.every(p=>p.visible));assert.equal(model.userData.heroPieces.length,0);release(model);variants++;
   }
-  assert.equal(variants,42);
+  assert.equal(variants,48);
 });
 
 test('classic human hairstyles share the continuous sculpt; robot and cat silhouettes retain their special features',()=>{

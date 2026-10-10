@@ -12,9 +12,11 @@ test('experience progress runs from 0 to 1 within each level and is full at the 
   const top=build(5,10,[{job:'mage',level:5}]);assert.equal(H.xpProgress(top,'hero'),1);assert.equal(H.xpProgress(top,H.ids(top)[1]),1,'level-5 surface companions are at their cap');
 });
 
-test('surface companions follow the protagonist; underground companions show their own experience',()=>{
-  const surface=build(80,3,[{job:'swordsman',level:3}]),ally=H.ids(surface)[1];H.gainXp(surface,Math.round((G.XP[3]-G.XP[2])*.3));
-  assert.equal(H.xpProgress(surface,ally),H.xpProgress(surface,'hero'),'they level up together with the hero');
+test('every companion shows its own experience: a surface recruit starts from its own level and never jumps to the hero\'s',()=>{
+  const surface=build(80,3,[{job:'swordsman',level:1}]),ally=H.ids(surface)[1];assert.equal(H.xpProgress(surface,ally),0);
+  const gain=Math.round((G.XP[1]-G.XP[0])*.3);H.gainXp(surface,gain);
+  assert.equal(H.level(surface,ally),1,'no instant catch-up to the hero');assert.ok(Math.abs(H.xpProgress(surface,ally)-gain/(G.XP[1]-G.XP[0]))<1e-9,'its own bar');assert.notEqual(H.xpProgress(surface,ally),H.xpProgress(surface,'hero'));
+  H.gainXp(surface,G.XP[4]*2);assert.equal(H.level(surface,ally),5);assert.equal(H.experience(surface,ally),G.XP[4],'surface companions stop at the level-5 threshold');assert.equal(H.xpProgress(surface,ally),1);
   const deep=build(-10,12,[{job:'mage',level:7}]),member=H.ids(deep)[1];H.gainXp(deep,1000);
   const own=(H.experience(deep,member)-G.XP[6])/(G.XP[7]-G.XP[6]);assert.equal(H.level(deep,member),7);assert.ok(Math.abs(H.xpProgress(deep,member)-own)<1e-9);assert.notEqual(H.xpProgress(deep,member),H.xpProgress(deep,'hero'));
 });

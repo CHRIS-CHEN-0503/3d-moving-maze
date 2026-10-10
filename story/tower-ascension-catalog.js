@@ -57,6 +57,12 @@
   branch('forest_echo','archer','passive','森影追獵',
     ['pursuit_volley','追獵三連矢','volley',true,360,30,'消耗3支箭，向前方最多三名敵人各射一箭，造成360%傷害，緩速35%、持續4秒。對已緩速敵人可接續森靈追擊。',{params:{slowSeconds:4,slowPower:.35},presentation:look('arrow','bow','bow',0x9ee6b4,0xe8fac9)}],
     ['forest_symphony','森影合奏',35,15,'森靈追擊的額外增傷提高35%；追獵三連矢的傷害提高35%、冷卻縮短15%。不增加射擊目標數，也不重複緩速。']);
+  branch('hamaya','cleric','active','破魔弓路',
+    ['kagura_volley','神樂連矢','volley',true,560,40,'連射三支神樂詛咒箭，合計560%，最多擊中三隻怪物並使牠們弱化；不能穿牆。',{params:{weak:1,maxTargets:3},presentation:look('arrow','bow','bow',0xf6e8ff,0xb77be6)}],
+    ['hamaya_mastery','破魔奧義',30,15,'破魔矢、神樂連矢的傷害提高30%，兩招的冷卻縮短15%。詛咒效果不變。']);
+  branch('shrine_favor','cleric','passive','祈願之路',
+    ['kami_descent','神降','kami',false,25,70,'請神降臨：祓除附近隊友的異常，並各授予最大生命25%的護盾。',{preparation:1.3,presentation:look('shield','heal','pray',0xfff6e8,0xe0a26a)}],
+    ['shrine_heart','神心',30,20,'神籤加護的減免提高30%；神降的護盾提高30%、冷卻縮短20%。']);
   branch('steel_meteor_fist','robot','active','巨拳突破',
     ['explosive_fists','爆裂雙拳','robot_double',true,560,45,'雙拳連續轟擊同一名可見敵人，合計560%傷害；僅一次耐久消耗與擊退，不穿牆。',{preparation:1.3,params:{reach:3,maxTargets:1,knockback:1.2},presentation:look('twin_fist','metal','double_punch',0x8dddf6,0xffce83)}],
     ['molten_drive','熔核動力',25,15,'鋼鐵隕拳、爆裂雙拳傷害提高25%、冷卻縮短15%；不增加目標數或控制時間。']);

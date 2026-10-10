@@ -10,7 +10,7 @@ function add(r,job='swordsman',level=1,id='ally'){const m={id,profession:job,sex
 function nextOrdinary(r,id){const a=H.actor(r,id);return Object.values({...H.SKILLS,...H.PASSIVES}).find(s=>s.job===H.job(r,id)&&!s.unique&&![...a.skills,...a.passives].includes(s.id)).id;}
 
 test('expanded levels are underground only and first ten XP thresholds stay identical',()=>{
-  assert.deepEqual(G.XP.slice(0,10),[0,525,1350,2625,4350,6450,9150,12450,16425,21075]);
+  assert.deepEqual(G.XP,[0,800,2025,3950,6525,9675,13725,18675,24650,31625,38050,45550,54050,63550,73550],'v1.59.1 curve: surface 1.5x, underground increments unchanged');assert.deepEqual(G.XP_LEGACY.slice(0,10),[0,525,1350,2625,4350,6450,9150,12450,16425,21075]);assert.equal(G.XP_CURVE,2);
   const surface=fresh();add(surface);H.gainXp(surface,100000);assert.equal(H.level(surface,'hero'),10);assert.equal(H.level(surface,'ally'),5);assert.ok(G.record(surface).awakening);assert.equal(G.available(surface,'ally'),1);assert.equal(G.availableUltimate(surface,'ally'),false);valid(surface);
   const r=underground();add(r);H.gainXp(r,100000);assert.equal(H.level(r,'hero'),15);assert.equal(H.level(r,'ally'),10);assert.equal(H.maxHp(r,'hero'),P.vitalHp(H.job(r,'hero'),15,true));assert.equal(H.maxHp(r,'ally'),P.vitalHp(H.job(r,'ally'),10,false,H.attr(r,'ally','vit')));assert.equal(H.unspentPoints(r,'ally'),0);assert.equal(G.record(r).awakening,null);assert.equal(G.record(r,'ally').awakening,null);assert.equal(G.skillLevel(r,'hero'),6);assert.equal(G.skillLevel(r,'ally'),6);valid(r);
 });
@@ -47,8 +47,8 @@ test('AI may use owned ultimates but never materials without per-actor consent',
 test('underground gear gates tier four and five and never accepts them on the surface',()=>{
   let r=underground('mage');H.gainXp(r,G.XP[6]);const g=C.createGear('arcane_staff_t4',-1,r.seed,'deep');r.gearBag.push(g);assert.equal(H.canEquip(r,'hero',g),false);H.gainXp(r,G.XP[7]-H.experience(r));assert.equal(H.canEquip(r,'hero',g),true);valid(r);const equipped=H.equip(r,'hero',g.id);assert.ok(equipped.ok,equipped.message);r=equipped.run;valid(r);assert.ok(H.gearPool(-1).includes('arcane_staff_t4'));assert.ok(!H.gearPool(-1).includes('arcane_staff_t5'));assert.ok(H.gearPool(-21).includes('arcane_staff_t5'));const s=fresh();H.gainXp(s,G.XP[9]);s.gearBag.push(g);assert.equal(H.canEquip(s,'hero',g),false);assert.equal(C.validateSave(s),null);
 });
-test('ordinary fifty-floor underground campaign reaches fifteen from eight without altering surface XP',()=>{
-  const r=underground();H.gainXp(r,G.XP[7]);const total=50*(9*15*5+360);H.gainXp(r,total);assert.equal(H.level(r,'hero'),15);const surface=fresh();H.advance(surface);assert.equal(H.experience(surface),8);const under=underground();H.advance(under);assert.equal(H.experience(under),360);
+test('ordinary fifty-floor underground campaign reaches fifteen from nine (fourteen from eight) without altering surface XP',()=>{
+  const total=50*(9*15*5+360);const r=underground();H.gainXp(r,G.XP[8]);H.gainXp(r,total);assert.equal(H.level(r,'hero'),15);const late=underground();H.gainXp(late,G.XP[7]);H.gainXp(late,total);assert.equal(H.level(late,'hero'),14,'entering at eight now ends one level short');const surface=fresh();H.advance(surface);assert.equal(H.experience(surface),8);const under=underground();H.advance(under);assert.equal(H.experience(under),360);
 });
 test('level-fifteen tier-five enhanced gear and mastered casts stay inside actual save bounds',t=>{
   let pendingMax=0,buffMax=0,hitMax=0,cases=0;

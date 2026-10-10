@@ -86,6 +86,7 @@
     healer:{name:'受污染的泉眼',verb:'淨化泉水',description:'泉水混著灰色雜質。療癒師能淨化；也可以反覆過濾。',reward:'恢復主角十二點生命、同伴十點生命。'},
     smith:{name:'損壞的機關箱',verb:'修復機關',description:'齒輪箱裡的卡榫斷了。鍛匠能修復；也可以慢慢拆開重組。',reward:'取得四份金屬零件，穿戴裝備恢復兩點耐久。'},
     archer:{name:'斷索箭臺',verb:'重新繫索',description:'高處的箭臺斷了繩索。射手能以弓繩接回；也可以慢慢搬石搭梯。',reward:'取得三十支箭矢，顯示十二秒出口路線；箭袋放不下的部分不會加入。'},
+    cleric:{name:'荒廢的小祠',verb:'淨化小祠',description:'路旁的小祠積滿塵灰。神職能以祝詞淨化；也可以慢慢清掃。',reward:'全隊抵擋下一次異常，取得二十支箭矢；箭袋放不下的部分不會加入。'},
     robot:{name:'沉睡動力閘',verb:'校準動力閘',description:'牆邊的動力閘失去了同步。機器人能重新校準；也可以慢慢調整轉輪。',reward:'取得兩份金屬零件，為所有能行動的機器人補充25%能源。'},
   });
   const emptyMaterials=()=>Object.fromEntries(Object.keys(Materials().MATERIALS).map(k=>[k,0]));
@@ -131,6 +132,7 @@
     if(offer.job==='healer'){if(n.party.loadouts)H().ids(n).forEach(id=>H().heal(n,id,id==='hero'?12:10));else{n.hp=Math.min(C().MAX_HP,n.hp+12);n.party.members.forEach(m=>m.hp=Math.min(P().memberMax(m),m.hp+10));}}
     if(offer.job==='smith'){n.party.journey.scrap=Math.min(99,n.party.journey.scrap+4);Object.values(n.equipment).filter(g=>g&&!H().ROBOT.isCore(g)&&g.durability>0).forEach(g=>g.durability=Math.min(g.maxDurability,g.durability+2));}
     if(offer.job==='archer'){n.bag.arrow=Math.max(n.bag.arrow,Math.min(C().itemLimit('arrow',n),n.bag.arrow+30));n.effects.reveal=Math.max(n.effects.reveal,12);}
+    if(offer.job==='cleric'){if(n.party.loadouts)H().ids(n).filter(id=>H().hp(n,id)>0).forEach(id=>H().setBuff(n,id,'ward',60,1));n.bag.arrow=Math.max(n.bag.arrow,Math.min(C().itemLimit('arrow',n),n.bag.arrow+20));}
     if(offer.job==='robot'){n.party.journey.scrap=Math.min(99,n.party.journey.scrap+2);if(n.party.loadouts)for(const actorId of H().ids(n))if(H().job(n,actorId)==='robot'&&H().hp(n,actorId)>0)H().ROBOT.fillFuel(n,'power_glimmer',actorId);}
     return {ok:true,message:'完成探索，獲得八枚銅幣。'+offer.reward,effect:{passage:['swordsman','scout'].includes(offer.job)}};
   });}

@@ -9,8 +9,9 @@
     healer:{male:['別怕，我會照顧大家！','我也受傷了，需要幫忙！','危險過了，讓我看看傷口。'],female:['我在這裡，大家互相照應！','請掩護我，先處理傷口！','都平安就好，繼續前進吧。']},
     smith:{male:['輪到我出手了！','先保護我，我得站穩！','解決了，檢查一下裝備吧。'],female:['我來敲開這條路！','我需要幫忙，再打一次！','安全了，裝備還撐得住。']},
     archer:{male:['目標看見了，準備放箭！','幫我掩護，我先退後！','目標倒下了，繼續前進。'],female:['弓箭準備好了，開始攻擊！','別讓牠靠近，幫我一下！','怪物倒下了，路上安全了。']},
+    cleric:{male:['祓厄之矢，去吧！','請護住我，我要祈禱了！','邪氣已散，前路清淨。'],female:['神明在上，箭矢請去！','幫我擋一下，我來祈禱！','穢氣退散了，大家平安。']},
   };
-  const voices={swordsman:{male:'dylan',female:'vivian'},mage:{male:'dylan',female:'serena'},scout:{male:'dylan',female:'vivian'},chef:{male:'uncle_fu',female:'serena'},healer:{male:'dylan',female:'serena'},smith:{male:'uncle_fu',female:'vivian'},archer:{male:'dylan',female:'serena'}};
+  const voices={swordsman:{male:'dylan',female:'vivian'},mage:{male:'dylan',female:'serena'},scout:{male:'dylan',female:'vivian'},chef:{male:'uncle_fu',female:'serena'},healer:{male:'dylan',female:'serena'},smith:{male:'uncle_fu',female:'vivian'},archer:{male:'dylan',female:'serena'},cleric:{male:'dylan',female:'serena'}};
   const specialties={
     swordsman:{male:'我會守住大家，放心前進！',female:'靠近我，我來保護大家！'},
     mage:{male:'日光術，照亮前方的路。',female:'讓光陪著我們，別怕黑。'},
@@ -19,6 +20,7 @@
     healer:{male:'慢慢呼吸，我來治療你。',female:'傷口會好的，我陪著你。'},
     smith:{male:'鍛造完成，試試這份手藝！',female:'裝備做好了，更可靠了！'},
     archer:{male:'拉弓，放箭！',female:'弓箭準備好了，發射！'},
+    cleric:{male:'祓除，清淨。',female:'神樂祝詞，請加護我們。'},
   };
   const events=['battle','danger','victory','specialty'],tracks={};
   for(const [job,sexes]of Object.entries(lines))for(const [gender,sentences]of Object.entries(sexes))sentences.forEach((text,i)=>{

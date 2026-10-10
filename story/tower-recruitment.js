@@ -22,6 +22,8 @@
     'smith:female':{costs:{materials:{ironore:1},ingredients:{root:1}},story:'鐵薇對精鐵礦比銅幣有興趣，再帶一份根莖就能精神飽滿地出發。'},
     'archer:male':{costs:{bag:{arrow:10},ingredients:{root:1}},story:'風梢希望補足箭袋與口糧，願意用精靈的目光守住遠處。'},
     'archer:female':{costs:{coins:3,meals:{salad:1}},story:'嵐羽想要清爽的香草沙拉與少許旅費，同行時會照看後方。'},
+    'cleric:male':{costs:{coins:6,ingredients:{herb:1}},story:'伊吹想為小祠備一束香草，願以祝詞與弓箭守護隊伍。'},
+    'cleric:female':{costs:{coins:4,meals:{soup:1}},story:'緋鈴剛結束神樂，想先喝一碗熱湯，再與你同行。'},
     'robot:male':{costs:{coins:6,scrap:2},story:'鐵衡想補足維護費和零件，願意用厚實機殼守住隊伍前方。'},
     'robot:female':{costs:{materials:{ironore:1},scrap:1},story:'鈴芯需要一份精鐵礦與一個可用零件；修好關節後，她願意和你一起探索。'},
   });
@@ -70,13 +72,14 @@
     if(value===undefined)return [];
     if(!Array.isArray(value)||value.length>16||new Set(value.map(t=>t?.identity)).size!==value.length||new Set(value.map(t=>t?.id)).size!==value.length)return null;
     const result=[];for(const t of value){
-      if(!t||typeof t!=='object'||Array.isArray(t)||t.identity!==identity(t.profession,t.sex)||!Object.hasOwn(TERMS,t.identity)||typeof t.id!=='string'||!t.id||t.id==='hero'||t.id.length>80||!party.joined.includes(t.id)||!C().isFloor(t.departedFloor)||t.departedFloor<floor||!Number.isInteger(t.departures)||t.departures<1||t.departures>149||!Number.isInteger(t.level)||t.level<1||t.level>(t.departedFloor<0&&party.loadouts?10:5)||!Number.isInteger(t.xp)||t.xp<G().XP[t.level-1]||t.xp>G().XP[9])return null;
+      if(!t||typeof t!=='object'||Array.isArray(t)||t.identity!==identity(t.profession,t.sex)||!Object.hasOwn(TERMS,t.identity)||typeof t.id!=='string'||!t.id||t.id==='hero'||t.id.length>80||!party.joined.includes(t.id)||!C().isFloor(t.departedFloor)||t.departedFloor<floor||!Number.isInteger(t.departures)||t.departures<1||t.departures>149||!Number.isInteger(t.level)||t.level<1||t.level>(t.departedFloor<0&&party.loadouts?10:5)||!Number.isInteger(t.xp))return null;
+      const xp=G().migrateXp(t.xp,t.level,party.loadouts?.xpCurve);if(xp<G().XP[t.level-1]||xp>G().XP[9])return null;
       const current=party.members.find(m=>m.id===t.id),same=party.members.find(m=>identity(m.profession,m.sex)===t.identity);
       if(current&&(current.profession!==t.profession||current.sex!==t.sex)||same&&same.id!==t.id)return null;
       if(typeof t.legacy!=='boolean'||t.legacy!==(t.loadout===null))return null;
       const loadout=t.loadout===null?null:H().validateRecruitSnapshot(t.loadout,t.profession,t.level,t.departedFloor);
       if(t.loadout!==null&&!loadout||!party.loadouts&&loadout)return null;
-      result.push({identity:t.identity,id:t.id,profession:t.profession,sex:t.sex,level:t.level,xp:t.xp,departedFloor:t.departedFloor,departures:t.departures,legacy:t.legacy,loadout});
+      result.push({identity:t.identity,id:t.id,profession:t.profession,sex:t.sex,level:t.level,xp,departedFloor:t.departedFloor,departures:t.departures,legacy:t.legacy,loadout});
     }return result;
   }
   return Object.freeze({TERMS,profiles:TERMS,identity,label,stock,archive,remembered,select,quote,pay,remember,restore,validate});

@@ -29,7 +29,7 @@ test('actual cap triangles cover every visible indexed hair seam and fit the sca
   assert.equal(checked,50);
 });
 
-test('all seventy organic headgear variants follow four animated head orientations without moving relative to hair or allocating surfaces',()=>{
+test('all eighty organic headgear variants follow four animated head orientations without moving relative to hair or allocating surfaces',()=>{
   let checked=0;
   for(const job of jobs)for(const sex of sexes)for(let tier=1;tier<=5;tier++){
     const {model,hat}=figure(job,sex,tier),head=model.userData.head,baseline=inHead(hat,head),original=resources(model),label=`${job} ${sex} tier ${tier}`,session=Actors.create({actor:model,performance:'guide',speechAnimation:false});
@@ -37,7 +37,7 @@ test('all seventy organic headgear variants follow four animated head orientatio
     for(const seconds of [.5,1.8,3.6,6.9]){session.sample(seconds,{phase:'playing',speaking:false});closeMatrix(inHead(hat,head),baseline,label+' cinema');}
     assert.deepEqual(resources(model),original,label+' gestures allocate no mesh resources');session.restore();checked++;release(model);
   }
-  assert.equal(checked,70);
+  assert.equal(checked,80);
 });
 
 test('physical headgear leaves both eyes and mouth visible from the local front at every profession, sex and tier',()=>{

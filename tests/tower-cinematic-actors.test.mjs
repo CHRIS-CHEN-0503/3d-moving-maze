@@ -80,8 +80,8 @@ test('all fifteen real surface/underground guardians animate their original scul
     before.forEach(resource=>resource.dispose());
   }
 });
-test('all eight real professions and both sexes reuse their existing face/limb rigs and return to their exact pre-dialogue pose',()=>{
-  const env=heroEnvironment(),jobs=Object.keys(env.TowerHeroes.JOBS);assert.equal(jobs.length,8);
+test('all nine real professions and both sexes reuse their existing face/limb rigs and return to their exact pre-dialogue pose',()=>{
+  const env=heroEnvironment(),jobs=Object.keys(env.TowerHeroes.JOBS);assert.equal(jobs.length,9);
   for(const job of jobs)for(const sex of ['male','female']){
     const actor=env.TowerHeroVisuals.base(job,env.buildCharacter,'hero',sex),base=snapshot(actor),before=resources(actor),face=actor.userData.face,faceState={mood:face.mood,time:face.time,left:face.left,reaction:face.reaction};
     const scene=Actors.create({target:actor,performance:'guide'});for(let frame=0;frame<90;frame++)scene.sample(frame/30,{speaking:true});

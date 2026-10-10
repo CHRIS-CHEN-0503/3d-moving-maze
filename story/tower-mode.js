@@ -467,8 +467,8 @@
   }
   function chooseProfession(value,upgrade=false) {
     pendingProfession=value;upgradingProfession=upgrade;
-    const introductions={swordsman:'持劍近戰，重裝與護盾保護同伴。',mage:'雙手法杖，擅長遠程法術與結界。',scout:'身形輕巧，雙短刃與陷阱探索。',chef:'體態厚實，鐵鍋與料理補給。',healer:'手持法書，治療、救援及弱化。',smith:'肩背壯實，短鎚或重錘與裝備修理。',archer:'修長精靈，長弓遠程射擊與牽制。',robot:'機殼守護與雙拳近戰，可用鍛造材料強化機體；不穿一般裝備。'};
-    dialog('高塔遠征 · 建立角色','你想如何走出這座塔？','先選外觀與職業，下一步揭曉技能；男女能力相同。'+(value.warrior?'原有護衛會直接轉成劍士隊友，進度與費用保留。':''),'<div class="hero-create-fields"><label>冒險者稱呼 <input id="heroNameInput" maxlength="24" value="'+text(value.name)+'" aria-label="冒險者稱呼"></label><div class="hero-sex-picker" aria-label="角色外觀">'+['male','female'].map(s=>'<button type="button" class="tower-btn" data-tower="hero-sex" data-item="'+s+'" aria-pressed="'+(pendingSex===s)+'">'+(s==='male'?'男性外觀':'女性外觀')+'</button>').join('')+'</div></div><div class="tower-grid party-professions">'+Object.entries(P.PROFESSIONS).filter(([id])=>!(upgrade&&value.floor<0&&['archer','robot'].includes(id))).map(([id,job])=>'<article class="tower-item hero-profession-card">'+HeroVisual.portrait(id,pendingSex)+'<h3>'+text(job.name)+'</h3><p>'+text(introductions[id])+'</p>'+action('選擇'+job.name,'profession',id)+'</article>').join('')+'</div>',action('稍後再選','profession-cancel'),{heroCreation:true,summary:'請先選男女外觀，再選職業。'});
+    const introductions={swordsman:'持劍近戰，重裝與護盾保護同伴。',mage:'雙手法杖，擅長遠程法術與結界。',scout:'身形輕巧，雙短刃與陷阱探索。',chef:'體態厚實，鐵鍋與料理補給。',healer:'手持法書，治療、救援及弱化。',smith:'肩背壯實，短鎚或重錘與裝備修理。',archer:'修長精靈，長弓遠程射擊與牽制。',cleric:'神社神職，弓箭附加詛咒，祈禱強化隊友。',robot:'機殼守護與雙拳近戰，可用鍛造材料強化機體；不穿一般裝備。'};
+    dialog('高塔遠征 · 建立角色','你想如何走出這座塔？','先選外觀與職業，下一步揭曉技能；男女能力相同。'+(value.warrior?'原有護衛會直接轉成劍士隊友，進度與費用保留。':''),'<div class="hero-create-fields"><label>冒險者稱呼 <input id="heroNameInput" maxlength="24" value="'+text(value.name)+'" aria-label="冒險者稱呼"></label><div class="hero-sex-picker" aria-label="角色外觀">'+['male','female'].map(s=>'<button type="button" class="tower-btn" data-tower="hero-sex" data-item="'+s+'" aria-pressed="'+(pendingSex===s)+'">'+(s==='male'?'男性外觀':'女性外觀')+'</button>').join('')+'</div></div><div class="tower-grid party-professions">'+Object.entries(P.PROFESSIONS).filter(([id])=>!(upgrade&&value.floor<0&&['archer','cleric','robot'].includes(id))).map(([id,job])=>'<article class="tower-item hero-profession-card">'+HeroVisual.portrait(id,pendingSex)+'<h3>'+text(job.name)+'</h3><p>'+text(introductions[id])+'</p>'+action('選擇'+job.name,'profession',id)+'</article>').join('')+'</div>',action('稍後再選','profession-cancel'),{heroCreation:true,summary:'請先選男女外觀，再選職業。'});
   }
   function revealHero(){const value=pendingHero;if(!value)return;const a=value.party.loadouts?.actors.hero,job=value.party.profession;
     const list=a?[...a.skills,...a.passives].map(k=>{const s=Heroes.SKILLS[k]||Heroes.PASSIVES[k];return '<article>'+window.TowerHeroIcons.svg(k)+'<div><b>'+text(s.name)+'</b><small>'+(Heroes.SKILLS[k]?'主動技能':'被動技能')+'</small><p>'+text(s.description)+'</p></div></article>';}).join(''):'<p>'+text(P.PROFESSIONS[job].description)+'</p>';
@@ -1909,8 +1909,12 @@
     // through the atomic core API so deliberate repeated bag taps can finish.
     // Live quick slots and automatic items still use their normal cooldowns.
     const bagFuel=paused&&modern()&&Heroes.ROBOT.fuelItemIds.includes(id);
-    if(!transact(bagFuel?Heroes.ROBOT.useFuel(run,id):C.useItem(run,id)))return;
+    const result=bagFuel?Heroes.ROBOT.useFuel(run,id):C.useItem(run,id),readyShovels=result.ok&&id==='shovel'?result.run.engine.shovels:null;
+    if(!transact(result))return;
     AudioEng.sfxAction?.(window.CombatAudio?.itemKind(id)||'device');
+    // A spare shovel becomes the ready one on the HUD at once. Saving rebuilds run.engine from G, so the
+    // count is taken from the transaction result rather than from the copy that was just overwritten.
+    if(readyShovels!==null){G.shovels=readyShovels;run.engine.shovels=readyShovels;if(typeof updateShovelBtn==='function')updateShovelBtn();}
     const mul=run.party?1:CH().itemDurMul||1;for(const key of Object.keys(run.effects))if(key!=='haste'&&run.effects[key]>before[key])run.effects[key]*=mul;
     if(!run.party&&id==='ration'&&CH().foodMul)G.satiety=run.hunger=Math.min(100,run.hunger+45*(CH().foodMul-1));
     if(id==='map'){window.MagicMap?.reveal();const p=worldToCell(G.px,G.pz);G.solutionPath=solveMaze(p.x,p.y);G.mapUntil=performance.now()+run.effects.reveal*1000;}
@@ -2013,7 +2017,7 @@
   function handleAction(key,id) {
     if(cinema?.active)return;
     if(pendingDungeonShift){if(key==='dungeon-shift-retry')saveDungeonShift();return;}
-    if(key==='profession'&&upgradingProfession&&pendingProfession?.floor<0&&['archer','robot'].includes(id)){showToast('這份舊旅程沿用原裝備規則；射手與機器人請在新故事建立，避免替換既有裝備。');return;}
+    if(key==='profession'&&upgradingProfession&&pendingProfession?.floor<0&&['archer','cleric','robot'].includes(id)){showToast('這份舊旅程沿用原裝備規則；射手、神職與機器人請在新故事建立，避免替換既有裝備。');return;}
     if(key==='profession-cancel'){pendingProfession=pendingHero=null;upgradingProfession=false;open();return;}
     if(key==='hero-sex'&&pendingProfession){pendingProfession.name=(el('heroNameInput')?.value||pendingProfession.name).trim().slice(0,24)||'冒險者';if(['male','female'].includes(id))pendingSex=id;chooseProfession(pendingProfession,upgradingProfession);return;}
     if(key==='hero-create-back'&&pendingProfession){chooseProfession(pendingProfession,upgradingProfession);return;}

@@ -518,7 +518,7 @@
     }
     function mountProp(part,actor,hand){
       const bowHand=actor?.userData?.bowArms?.[hand==='armL'?'left':'right']?.hand,arm=bowHand||actor?.userData?.[hand];if(!arm)return false;
-      part.position.set(0,bowHand?-.015:-.34,.22);part.rotation.set(hand==='armL'?-.4:-.75,0,hand==='armL'?.1:0);part.visible=false;arm.add(part);return true;
+      part.position.set(0,bowHand?.02:-.34,.22);part.rotation.set(hand==='armL'?-.4:-.75,0,hand==='armL'?.1:0);part.visible=false;arm.add(part);return true;
     }
     function configureProps(index){
       const props=ensureFilmProps();scene.add(props.warm);pageProps=props;

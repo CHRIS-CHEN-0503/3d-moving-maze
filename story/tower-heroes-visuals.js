@@ -215,6 +215,18 @@
       meshDestination=g;box(.035,.025,.33,gold,0,0,.08).name='book-flexible-spine';
       if(tier>=3){meshDestination=g.getObjectByName('book-right-leaf');const tab=box(.065,.025,.21,look.accent,.16,.028,.35);tab.rotation.x=-.3-(tier-3)*.2;meshDestination=g;}
     }
+    else if(kind==='elven_bow'&&job==='cleric'){
+      // A lacquered yumi: longer, asymmetric limbs gripped below the middle, a red-and-white wrapped grip and paper
+      // shide hanging from the upper limb. Same contact points, string and nocked arrow as the elven bow.
+      g.userData.contact={kind:'projectile',center:[0,0,.455],normal:[0,0,1],axis:[0,0,1],grip:[0,0,0],nock:[0,0,-BOW_NOCK]};
+      const curve=new T.CatmullRomCurve3([new T.Vector3(0,-.5,-BOW_NOCK),new T.Vector3(0,-.42,-.09),new T.Vector3(0,-.22,-.02),new T.Vector3(0,0,.01),new T.Vector3(0,.4,-.02),new T.Vector3(0,.7,-.09),new T.Vector3(0,.86,-BOW_NOCK)]);
+      mesh(new T.TubeGeometry(curve,18,.032+tier*.005,6,false),0x2a2024).name='yumi-lacquered-limbs';
+      [-.1,-.04,.02,.08].forEach((y,i)=>{const wrap=mesh(new T.TorusGeometry(.038,.008,4,10),i%2?0xf2ede4:0xc03d3d,0,y,-.004);wrap.rotation.x=Math.PI/2;wrap.name='yumi-wrapped-grip';});
+      rod(.007,1.36,0xe4dfc8,0,.18,-BOW_NOCK).name='bow-taut-string';for(const y of [-.5,.86]){const tip=mesh(new T.SphereGeometry(.05,8,5),gold,0,y,-.12);tip.scale.set(.5,.5,1);}
+      for(let i=0;i<3;i++){const shide=box(.05,.07,.012,0xfaf6ee,.06+(i%2)*.025,.52-i*.075,-.1);shide.rotation.z=(i%2?-1:1)*.35;shide.name='yumi-shide';}
+      g.rotation.z=.12;
+      const arrow=box(.012,.015,.36+BOW_NOCK,0xcfb38a,0,0,(.36-BOW_NOCK)/2);arrow.name='bow-nocked-arrow';const arrowhead=mesh(new T.ConeGeometry(.035,.11,4),iron,0,0,.4);arrowhead.rotation.x=Math.PI/2;arrowhead.name='bow-forward-arrowhead';
+    }
     else if(kind==='elven_bow'){
       // The limbs and taut string share the YZ shooting plane. The grip is
       // centered in the hand; the arrow nock touches the rear string.
@@ -237,6 +249,20 @@
     else if(['buckler','round_shield','tower_shield'].includes(kind)){const big=kind==='tower_shield';if(big){box(.5,.75,.08,dark);box(.045,.72,.1,gold);box(.5,.045,.1,gold,0,.12);}else{const disk=rod(kind==='buckler'?.26:.31,.08,kind==='buckler'?wood:iron);disk.rotation.x=Math.PI/2;mesh(new T.TorusGeometry(kind==='buckler'?.24:.29,.025,4,12),gold,0,0,.055);mesh(new T.SphereGeometry(.075,8,6),iron,0,0,.08);}box(.16,.05,.11,wood,0,0,-.08);}
     else if(kind==='heavy_helm'){const cap=mesh(new T.SphereGeometry(female?.285:.315,12,6,0,Math.PI*2,0,Math.PI/2),iron,0,female?1.75:1.68);cap.scale.set(1,female?.86:1,.9);for(const side of [-1,1])soft(female?.065:.09,female?.2:.27,.28,iron,side*(female?.25:.275),female?1.68:1.63,-.025);if(female){for(const side of [-1,1]){const wing=soft(.15,.045,.12,gold,side*.245,1.84,.14);wing.rotation.z=-side*.3;}}else box(.055,.14,.49,gold,0,1.91);}
     else if(kind==='light_hood'){const cap=mesh(new T.SphereGeometry(female?.285:.325,12,6,0,Math.PI*2,0,Math.PI/2),female?look.cloak:wood,0,female?1.74:1.66);cap.scale.set(1,female?.75:1,.9);soft(female?.54:.63,.055,.23,female?look.accent:0xae875e,0,female?1.8:1.73,.23);if(female){const fold=soft(.15,.12,.28,look.cloak,.25,1.73,-.055);fold.rotation.z=-.25;soft(.07,.09,.04,gold,-.21,1.78,.2);}else for(const side of [-1,1])soft(.09,.27,.29,wood,side*.285,1.58,-.07);}
+    else if(kind==='rune_crown'&&job==='cleric'){
+      if(female){
+        // Kanzashi hairpin above the right ear: a gold stem, a red blossom and two hanging beads.
+        const stem=rod(.012,.26,gold,.2,1.86,.08);stem.rotation.z=-.95;stem.name='kanzashi-stem';
+        const blossom=mesh(new T.SphereGeometry(.055,8,6),0xd94848,.3,1.9,.08);blossom.scale.set(1.2,.7,1.2);blossom.name='kanzashi-blossom';
+        for(const i of [0,1]){const bead=mesh(new T.SphereGeometry(.018,6,4),tier>1?gold:0xf2ede4,.33,1.82-i*.06,.1);bead.name='kanzashi-bead';}
+      }else{
+        // Lacquered black eboshi: a tall soft cap leaning back, with a white cord at the brow.
+        const cap=mesh(new T.CylinderGeometry(.13,.2,.4,10),0x1f1b22,0,2.0,-.04);cap.rotation.x=-.28;cap.scale.set(1,1,.8);cap.name='eboshi-cap';
+        const brim=mesh(new T.TorusGeometry(.26,.025,5,16),0x1f1b22,0,1.8,0);brim.rotation.x=Math.PI/2;brim.scale.z=.9;brim.name='eboshi-brim';
+        const cord=mesh(new T.TorusGeometry(.265,.008,4,16),0xf2ede4,0,1.78,0);cord.rotation.x=Math.PI/2;cord.scale.z=.9;cord.name='eboshi-cord';
+      }
+      if(tier>=3)herald(female?.31:0,female?1.97:2.16,female?.1:-.03,.035);
+    }
     else if(kind==='rune_crown'){
       // Low circlet: open headband, inset forehead jewel and rounded filigree, never spikes.
       for(const y of [1.75,1.82]){const band=mesh(new T.TorusGeometry(female?.3:.31,female?.014:.018,4,20),gold,0,y);band.rotation.x=Math.PI/2;band.scale.x=1.05;}
@@ -253,6 +279,14 @@
       const crest=soft(female?.085:knight?.105:.12,.15,.035,gold,0,1.12,.25);crest.name=female?'female-leaf-crest':'male-shield-crest';coat(look.cloak,female?.58:.62);
     }
     else if(kind==='light_armor'){const leather=female?look.leather:0x89664a;body(female?.63:.7,female?.65:.63,.42,leather,1.0);for(const side of [-1,1]){const strap=box(.045,.57,.043,female?look.accent:0xc1a17b,side*(female?.1:.14),1,.215);strap.rotation.z=side*(female?.26:.16);}const belt=mesh(new T.TorusGeometry(female?.235:.31,.035,4,12),wood,0,.77);belt.rotation.x=Math.PI/2;belt.scale.y=.72;coat(female?look.cloak:leather,.6);if(female){neck(look.skin,1.26,.24);soft(.085,.07,.028,gold,0,1.1,.245);}else{const sash=box(.065,.61,.04,look.accent,0,1.0,.225);sash.rotation.z=-.6;}}
+    else if(kind==='robe'&&job==='cleric'){
+      // Kariginu (male) or kosode (female): a white top with wide hanging sleeves and a crossed collar. The hakama
+      // belongs to the body, so the robe set ends at the waist with a red breast cord.
+      const white=0xf6f1ea;body(female?.62:.68,female?.6:.56,.43,white,1.06);
+      for(const side of [-1,1]){const sleeve=soft(.3,.46,.3,white,side*(female?.4:.44),1.0,-.02);sleeve.name='wide-hanging-sleeve';const lapel=box(.11,.3,.04,0xe9e1d2,side*.085,1.2,.235);lapel.rotation.z=-side*.42;lapel.name='crossed-collar';}
+      const cord=mesh(new T.TorusGeometry(.03,.009,4,10),0xc03d3d,0,1.12,.25);cord.name='breast-cord';for(const side of [-1,1])box(.012,.16,.012,0xc03d3d,side*.03,1.0,.245);
+      if(tier>1)for(const side of [-1,1])inlay([[side*.08,.78],[side*.2,.84],[side*.28,.78]],look.accent,0,0,.23,'kariginu-hem-pattern',.006);
+    }
     else if(kind==='robe'){const cloth=look.cloak;if(female){const back=mesh(new T.CylinderGeometry(.25,.35,.85,14,1,true,Math.PI/2,Math.PI),cloth,0,.59,-.04);back.scale.z=.74;back.name='continuous-robe-back';for(const side of [-1,1]){const panel=box(.22,.79,.07,cloth,side*.22,.61,.17);panel.rotation.z=side*.095;panel.name='female-slit-robe';}}else{const skirt=mesh(new T.CylinderGeometry(.27,.37,.74,14),cloth,0,.66);skirt.scale.z=.75;}body(female?.64:.7,female?.64:.58,.43,cloth,1.06);for(const side of [-1,1])box(.035,female?.64:.79,.03,gold,side*(female?.13:.18),female?1.02:.91,.225);const belt=mesh(new T.TorusGeometry(female?.23:.3,.025,4,12),gold,0,female?.85:.92);belt.rotation.x=Math.PI/2;belt.scale.y=.75;if(female)neck(look.skin,1.3,.24);else{for(const side of [-1,1]){const lapel=box(.12,.26,.05,look.accent,side*.09,1.23,.23);lapel.rotation.z=-side*.3;}}}
     // Readable construction details sit flush to the silhouette. Surface grain,
     // fine engraving and stitching live in the atlas; only larger seams/crests
@@ -268,7 +302,7 @@
       // silhouette-independent crafted spine and restrained illuminated cover.
       for(const side of [-1,1]){meshDestination=g.getObjectByName(side<0?'book-left-leaf':'book-right-leaf');box(.04,.018,.13,gold,side*.245,.04,.12).name='book-engraved-clasp';for(const z of [-.055,.16])inlay([[-.08,0,0],[0,.012,0],[.08,0,0]],0xab9672,side*.15,.086,z,'book-illuminated-margin',.003);const seal=herald(side*.14,-.036,.13,.05);seal.rotation.x=Math.PI/2;}
       meshDestination=g;
-    }else if(kind==='elven_bow'){
+    }else if(kind==='elven_bow'&&job!=='cleric'){
       for(const side of [-1,1]){inlay([[.035,side*.51,-.16],[.035,side*.36,-.06],[.035,side*.15,-.01]],gold,0,0,0,'bow-leaf-inlay',.006);const leaf=herald(.05,side*.35,-.07,.037);leaf.rotation.set(side*.5,Math.PI/2,0);}
     }else if(['smith_hammer','warhammer'].includes(kind)){
       const big=kind==='warhammer',y=big?.8:.55,w=big?.22:.15,x=big?.183:.14;
@@ -329,7 +363,7 @@
     return batchGear(T,g);
   }
   function bookPose(book,open=0){open=Math.max(0,Math.min(1,open));book.userData.bookOpen=open;for(const leaf of book.children){const side=leaf.userData.bookSide;if(!side)continue;leaf.rotation.z=side*(Math.PI/2+(.12-Math.PI/2)*open);leaf.position.x=side*.082*(1-open);}}
-  const STYLES=Object.freeze({swordsman:{shirt:0x577c99,hair:0x614832,skin:0xdcb38e,width:1.07,height:1.08,face:1.04,eyes:0x314a63,shape:'square'},mage:{shirt:0x796396,hair:0xd0c2da,skin:0xdfc1b2,width:.91,height:1.03,face:.95,eyes:0x614f92,shape:'slender'},scout:{shirt:0x498a78,hair:0x95533d,skin:0xd5a383,width:.88,height:.93,face:.9,eyes:0x30604c,shape:'petite'},chef:{shirt:0xa68156,hair:0x634330,skin:0xe4b087,width:1.18,height:.99,face:1.06,eyes:0x573e2d,shape:'round'},healer:{shirt:0x6d9982,hair:0xe0ce98,skin:0xe9c1a6,width:.94,height:1.01,face:.94,eyes:0x3f7766,shape:'soft'},smith:{shirt:0x796957,hair:0x4d3631,skin:0xbb8b6f,width:1.25,height:1.02,face:1.08,eyes:0x594337,shape:'stocky'},archer:{shirt:0x5f7f52,hair:0xdcc893,skin:0xedd5bc,width:.85,height:1.16,face:.89,eyes:0x2f7d5d,shape:'elf'}});
+  const STYLES=Object.freeze({cleric:{shirt:0xf4efe6,hair:0x2b2429,skin:0xe3c6b0,width:.93,height:1.04,face:.96,eyes:0x3b2f33,shape:'slender'},swordsman:{shirt:0x577c99,hair:0x614832,skin:0xdcb38e,width:1.07,height:1.08,face:1.04,eyes:0x314a63,shape:'square'},mage:{shirt:0x796396,hair:0xd0c2da,skin:0xdfc1b2,width:.91,height:1.03,face:.95,eyes:0x614f92,shape:'slender'},scout:{shirt:0x498a78,hair:0x95533d,skin:0xd5a383,width:.88,height:.93,face:.9,eyes:0x30604c,shape:'petite'},chef:{shirt:0xa68156,hair:0x634330,skin:0xe4b087,width:1.18,height:.99,face:1.06,eyes:0x573e2d,shape:'round'},healer:{shirt:0x6d9982,hair:0xe0ce98,skin:0xe9c1a6,width:.94,height:1.01,face:.94,eyes:0x3f7766,shape:'soft'},smith:{shirt:0x796957,hair:0x4d3631,skin:0xbb8b6f,width:1.25,height:1.02,face:1.08,eyes:0x594337,shape:'stocky'},archer:{shirt:0x5f7f52,hair:0xdcc893,skin:0xedd5bc,width:.85,height:1.16,face:.89,eyes:0x2f7d5d,shape:'elf'}});
   // All playable/recruitable job variants are adult adventurers. Appearance only:
   // no item duplication, gender equip locks, stat changes or save migration.
   const VARIANTS=Object.freeze({
@@ -341,6 +375,7 @@
     healer:{male:{hair:0x715440,cloak:0x325e52,accent:0xb6d7b5,leather:0x625c42,description:'栗色短髮、寬領綠袍與療護肩巾'},female:{hair:0xe0be74,shirt:0x94b49b,cloak:0x648d79,accent:0xe9d6a0,leather:0x7b8060,description:'金色長側髮、垂墜開衩療護袍'}},
     smith:{male:{hair:0x332a27,cloak:0x4b3532,accent:0xd1a078,leather:0x574234,description:'厚鬚、寬肩金屬鎧與短工匠戰袍'},female:{skin:0xdab098,hair:0x824832,eyes:0x74563e,shirt:0x9c7857,cloak:0x806344,accent:0xe4c48e,leather:0x8d6245,description:'柔和圓臉、赤棕雙辮與實用工匠護甲'}},
     archer:{male:{hair:0xdcc893,cloak:0x2f4c3a,accent:0xc9d98f,leather:0x6b4f3a,description:'俊美精靈：淡金層次髮、側掃瀏海與低馬尾，修長身形與皮革護臂'},female:{width:.98,height:1.03,face:.95,hair:0xe2b65c,eyes:0x2e8a66,shirt:0x9bb974,cloak:0x5e8a4a,accent:0xf0d79c,leather:0x8a6a45,ribbon:0xc8505c,description:'俏麗精靈：紅緞帶高馬尾、修飾臉型的側髮與大眼，輕盈葉片輕甲'}},
+    cleric:{male:{hair:0x2a2426,eyes:0x3b2f33,shirt:0xf4efe6,cloak:0x6c5aa0,accent:0xf1e9dc,leather:0x4a3a5a,description:'神主：烏帽子、白狩衣與紫袴，手持大幣祈禱'},female:{width:.95,height:1.03,face:.95,hair:0x1f1a1d,eyes:0x4a3338,shirt:0xf6f1ea,cloak:0xc03d3d,accent:0xf3ede4,leather:0x7a3b3b,ribbon:0xd94848,description:'巫女：白小袖、緋袴與紅白髮繩的黑長直髮'}},
   });
   const style=(job,sex='male')=>({...STYLES[job],...VARIANTS[job]?.[sex]});
   // Only archers need an elbow to hold a bow and reach its string without
@@ -532,6 +567,24 @@
     f.baseEyeY=female?.8:.6;f.eyeWhiteY=female?1.08:.86;f.width=female?.8:.74;
     for(const cheek of f.cheeks)cheek.material.opacity=female?.2:.06;for(const lip of f.lips)lip.material.color.setHex(female?0xc77884:0xaa7d70);
   }
+  // Shrine cleric: a kannushi (male) or miko (female). The body wears pleated hakama from the waist down in the
+  // variant's cloak colour; the kariginu/kosode top, eboshi hat, hairpin and yumi come from the shared gear.
+  function clericLook(T,m,s,female){
+    const head=m.userData.head,phong=(color,shininess=18)=>new T.MeshPhongMaterial({color,specular:0x3a3030,shininess});
+    const mesh=(name,parts,material,parent=head)=>{const o=new T.Mesh(mergeParts(T,parts),material);o.name=name;parent.add(o);return o;};
+    // Low segment counts keep both sexes inside the shared 7000-triangle figure budget.
+    mesh('cleric-hakama',[placed(T,new T.CylinderGeometry(.24,.4,.8,10,1,true),[0,.55,0]),...[-1.5,-.5,.5,1.5].map(i=>placed(T,new T.BoxGeometry(.045,.76,.02),[i*.09,.55,.25+Math.abs(i)*.03]))],phong(s.cloak,12),m);
+    mesh('cleric-hakama-belt',[placed(T,new T.TorusGeometry(.27,.03,4,8),[0,.96,0],[Math.PI/2,0,0],[1,1,.8])],phong(0xf2ede4,8),m);
+    const hair=head.children.find(c=>c.name==='hair-crown')?.material||phong(s.hair,24);
+    if(female){
+      // Long straight hair tied low with a red-and-white band, and two face-framing locks.
+      mesh('cleric-hair-lock',[-1,1].map(side=>lock(T,[[side*.17,.2,.2],[side*.235,.04,.19],[side*.245,-.14,.15],[side*.23,-.3,.1]],.03,6,4,.5)),hair);
+      mesh('cleric-ribbon',[placed(T,new T.CylinderGeometry(.078,.078,.05,8,1,true),[0,-.1,-.3],[-.45,0,0]),placed(T,new T.TorusGeometry(.08,.01,3,10),[0,-.085,-.3],[Math.PI/2-.45,0,0])],phong(s.ribbon,30));
+    }else mesh('cleric-nape-tail',[lock(T,[[0,.02,-.25],[0,-.1,-.3],[0,-.22,-.3]],.05,8,5,.55)],hair);
+    const f=m.userData.face;if(!f)return;
+    for(let i=0;i<f.eyes.length;i++){f.eyes[i].scale.x=female?.74:.7;f.brows[i].scale.set(female?.85:1.05,female?.55:.72,.65);}
+    for(const cheek of f.cheeks)cheek.material.opacity=female?.22:.08;for(const lip of f.lips)lip.material.color.setHex(female?0xc9545e:0xa87a6f);
+  }
   function base(job,build,identity='hero',sex=root.TowerPartyCore?.PROFESSIONS[job]?.gender||'male'){
     if(job==='robot')return robotBase(root.THREE,sex,identity);
     const s=style(job,sex),female=sex==='female',m=build({shirt:s.shirt,pants:0x354351,skin:s.skin,hair:s.hair,type:female?'girl':'boy',heroJob:job,heroSex:sex}),T=root.THREE;
@@ -540,7 +593,7 @@
     const head=m.userData.head;if(!T||!head)return m;head.scale.set(s.face*(female?.87:1.03),female?.94:job==='chef'?.96:job==='archer'?1.07:1,1);if(female)head.position.y+=.07;
     // Preserve the character-owned complexion map when upgrading surface response.
     const replaced=new Map();m.traverse(o=>{if(!o.isMesh||o.material?.type!=='MeshLambertMaterial')return;const old=o.material;if(!replaced.has(old)){const isHair=old.color.getHex()===s.hair,isSkin=old.color.getHex()===s.skin,mat=new T.MeshPhongMaterial({color:old.color,map:old.map,bumpMap:old.bumpMap,bumpScale:old.bumpScale,specular:isHair?0x313038:isSkin?0x332521:0x171c22,shininess:isHair?27:isSkin?13:5,transparent:old.transparent,opacity:old.opacity,side:old.side});mat.userData={...old.userData};replaced.set(old,mat);}o.material=replaced.get(old);});for(const old of replaced.keys())old.dispose();
-    const knight=job==='swordsman'&&!female,jaw=({swordsman:knight?1.06:1.14,mage:.94,scout:.95,chef:1.1,healer:1.0,smith:1.18,archer:.9}[job])*(female?.85:1),faceMesh=m.userData.headMesh;
+    const knight=job==='swordsman'&&!female,jaw=({swordsman:knight?1.06:1.14,mage:.94,scout:.95,chef:1.1,healer:1.0,smith:1.18,archer:.9,cleric:.95}[job])*(female?.85:1),faceMesh=m.userData.headMesh;
     if(faceMesh&&root.CharacterSculpt?.head){faceMesh.geometry.dispose();faceMesh.geometry=knight&&root.CharacterSculpt.knightHead?root.CharacterSculpt.knightHead(T):root.CharacterSculpt.head(T,.54,.55,.48,job==='archer'?{jaw:female?.72:.84,cheek:female?1.32:1,chin:female?.8:.95,detail:'hero'}:{jaw:female&&job==='smith'?.94:jaw,cheek:job==='chef'?1.45:female&&job==='smith'?1.45:female?1.2:1,chin:female?.86:job==='smith'?1.12:1,detail:'hero'});}
     for(const child of [...head.children]){if(job==='archer'&&child.name==='human-ear'){head.remove(child);child.geometry.dispose();}else if(child.name==='hair-side')child.visible=false;}
     if(m.children.find(c=>c.name==='base-skirt'))m.children.find(c=>c.name==='base-skirt').visible=false;
@@ -553,6 +606,7 @@
     const face=m.userData.face;if(face){const eyeMaterial=new T.MeshLambertMaterial({color:s.eyes});for(const eye of face.eyes){eye.material=eyeMaterial;eye.scale.x=female&&job==='smith'?.96:female?.88:.76;}for(const b of face.brows){b.scale.x=(job==='smith'?(female?.86:1.2):job==='healer'?.8:1)*(female?.9:1.1);b.scale.y=female?.7:1.2;}face.width=(job==='chef'?1.15:job==='archer'?.85:1)*(female?.9:1);for(const lip of face.lips||[])lip.material.color.setHex(female?0xb3747b:0xae8170);for(const cheek of face.cheeks)cheek.material.opacity=female?.34:.24;}
     root.CharacterFace?.refine(T,m,{job,sex,skin:s.skin,hair:s.hair,eyes:s.eyes});
     if(job==='archer')archerLook(T,m,s,female);
+    if(job==='cleric')clericLook(T,m,s,female);
     if(knight)fitKnightFace(T,m);
     // A real short neck overlaps chin and collar, avoiding floating female heads.
     const neckMesh=new T.Mesh(root.CharacterSculpt.capsule(T,female?.19:.22,.23,.19),new T.MeshPhongMaterial({color:s.skin,specular:0x332521,shininess:13}));neckMesh.name='anatomical-neck';neckMesh.position.set(0,1.35,-.015);m.add(neckMesh);
@@ -565,15 +619,15 @@
     for(const arm of [m.userData.armL,m.userData.armR]){const sleeve=arm.children.find(c=>c.geometry?.type==='LatheGeometry');if(sleeve){sleeve.scale.set(1.12,female?.86:1.04,1.12);sleeve.name='connected-shoulder-sleeve';}const cuff=arm.children.find(c=>c.geometry?.type==='BoxGeometry');if(cuff){cuff.scale.set(1.06,1.1,1.06);cuff.name='tailored-wrist-cuff';}}
     if(job==='smith')smithDwarfBody(T,m);
     if(knight)knightBody(T,m,s);
-    if(job==='archer'){const old=m.userData.armR.geometry;bowArmRig(T,m,s);old.dispose();}
+    if(job==='archer'||job==='cleric'){const old=m.userData.armR.geometry;bowArmRig(T,m,s);old.dispose();}
     joinHumanShoulders(T,m);
     return m;
   }
   function portrait(job,sex='male'){
     if(job==='robot'){const l=ROBOT_LOOKS[sex==='female'?'female':'male'],hex=c=>'#'+c.toString(16).padStart(6,'0'),female=sex==='female';return '<svg class="hero-portrait" viewBox="0 0 96 112" role="img" aria-label="機器人 · '+l.name+'"><rect x="2" y="2" width="92" height="108" rx="20" fill="#1b333d"/><path d="M14 110V93q0-18 34-18t34 18v17" fill="'+hex(l.metal)+'" stroke="'+hex(l.trim)+'" stroke-width="3"/><circle cx="48" cy="94" r="10" fill="'+hex(l.dark)+'" stroke="'+hex(l.trim)+'" stroke-width="4"/><circle cx="48" cy="94" r="6" fill="'+hex(l.core)+'"/><path d="M23 44V31q0-23 25-23t25 23v22q-1 22-25 22T23 53Z" fill="'+hex(l.metal)+'" stroke="'+hex(l.trim)+'" stroke-width="3"/><path d="M29 36q19-10 38 0v20q0 13-19 15T29 56Z" fill="'+hex(l.face)+'"/><path d="M32 27 48 16l16 11M34 40h10m8 0h10" fill="none" stroke="'+hex(l.trim)+'" stroke-width="3"/><g fill="'+hex(l.dark)+'" stroke="'+hex(l.trim)+'" stroke-width="3"><ellipse cx="23" cy="44" rx="7" ry="11"/><ellipse cx="73" cy="44" rx="7" ry="11"/></g><g fill="'+hex(l.core)+'"><ellipse cx="38" cy="48" rx="'+(female?4.5:4)+'" ry="'+(female?6:4.5)+'"/><ellipse cx="58" cy="48" rx="'+(female?4.5:4)+'" ry="'+(female?6:4.5)+'"/></g><path d="M39 61q9 '+(female?6:3)+' 18 0" fill="none" stroke="'+hex(l.dark)+'" stroke-width="2" stroke-linecap="round"/></svg>';}
-    const s=style(job,sex),female=sex==='female',hex=c=>'#'+c.toString(16).padStart(6,'0'),ears=job==='archer'?'<path data-ears="swept-elf" d="m25 40-9-19 5 21 5 2m46-4 9-19-5 21-5 2" fill="'+hex(s.skin)+'"/>':'',long=['mage','healer','archer'].includes(job),archerHair=job==='archer'?(female?'<path data-hair="high-ponytail" d="M60 12q24-2 22 24t-8 42" fill="none" stroke="'+hex(s.hair)+'" stroke-width="11" stroke-linecap="round"/><path d="M57 16l12-7v13zm0 0-12-7v13z" fill="'+hex(s.ribbon)+'"/>':'<path data-hair="low-ponytail" d="M66 44q12 10 8 32" fill="none" stroke="'+hex(s.hair)+'" stroke-width="8" stroke-linecap="round"/>'):'',hair=archerHair+(female?'<path d="M23 28q2-24 25-24t25 24v'+(long&&job!=='archer'?55:40)+'l-12-8H32l-11 8Z" fill="'+hex(s.hair)+'"/>':'<path d="M23 30q1-25 25-25 27 3 25 25v13H23Z" fill="'+hex(s.hair)+'"/>'),face=female?'M27 29q21-15 42 0v24q-2 15-21 23-19-8-21-23Z':'M24 29q24-17 48 0v27l-9 15-15 6-15-6-9-15Z';
+    const s=style(job,sex),female=sex==='female',hex=c=>'#'+c.toString(16).padStart(6,'0'),ears=job==='archer'?'<path data-ears="swept-elf" d="m25 40-9-19 5 21 5 2m46-4 9-19-5 21-5 2" fill="'+hex(s.skin)+'"/>':'',long=['mage','healer','archer','cleric'].includes(job),clericHat=job==='cleric'?(female?'<path data-hair="miko-ribbon" d="M62 52q6 14 2 30" fill="none" stroke="'+hex(s.hair)+'" stroke-width="10" stroke-linecap="round"/><path d="M56 48h14v9H56z" fill="'+hex(s.ribbon)+'"/><path d="M56 52h14" stroke="#f6f1ea" stroke-width="2"/>':'<path data-hat="eboshi" d="M33 31q5-27 23-27 11 0 15 11l-9 20Z" fill="#1f1b22"/><path d="M24 32h48" stroke="#f2ede4" stroke-width="3"/>'):'',archerHair=job==='archer'?(female?'<path data-hair="high-ponytail" d="M60 12q24-2 22 24t-8 42" fill="none" stroke="'+hex(s.hair)+'" stroke-width="11" stroke-linecap="round"/><path d="M57 16l12-7v13zm0 0-12-7v13z" fill="'+hex(s.ribbon)+'"/>':'<path data-hair="low-ponytail" d="M66 44q12 10 8 32" fill="none" stroke="'+hex(s.hair)+'" stroke-width="8" stroke-linecap="round"/>'):'',hair=archerHair+(female?'<path d="M23 28q2-24 25-24t25 24v'+(long&&job!=='archer'?55:40)+'l-12-8H32l-11 8Z" fill="'+hex(s.hair)+'"/>':'<path d="M23 30q1-25 25-25 27 3 25 25v13H23Z" fill="'+hex(s.hair)+'"/>'),face=female?'M27 29q21-15 42 0v24q-2 15-21 23-19-8-21-23Z':'M24 29q24-17 48 0v27l-9 15-15 6-15-6-9-15Z';
     const braids=female&&job==='smith'?'<g data-hair="twin-braids" fill="none" stroke="'+hex(s.hair)+'" stroke-width="8" stroke-linecap="round"><path d="M24 51q-10 8-4 18t-1 17"/><path d="M72 51q10 8 4 18t1 17"/></g><path d="M14 84h12m44 0h12" stroke="'+hex(s.accent)+'" stroke-width="4"/>':female&&!long?'<path d="M72 50q11 7 3 21t-1 17" fill="none" stroke="'+hex(s.hair)+'" stroke-width="8" stroke-linecap="round"/>':'';
-    return '<svg class="hero-portrait" viewBox="0 0 96 112" role="img" aria-label="'+H.JOBS[job].name+' · 成年'+(female?'女性':'男性')+' · '+s.description+'"><rect x="2" y="2" width="92" height="108" rx="20" fill="#1b333d"/>'+hair+ears+'<path d="'+face+'" fill="'+hex(s.skin)+'"/><path d="M'+(female?'19':'12')+' 110V92q0-20 '+(female?'29':'36')+'-20t'+(female?'29':'36')+' 20v18" fill="'+hex(s.cloak)+'"/>'+(job==='archer'&&!female?'<path data-hair="swept-bangs" d="M26 34q12-26 46-8-14 0-24 8-8-6-22 0Z" fill="'+hex(s.hair)+'"/>':'<path d="M27 32q17-28 43-4l-16 7-11-8-16 16Z" fill="'+hex(s.hair)+'"/>')+'<path d="M30 42h12m12 0h12" stroke="'+hex(s.hair)+'" stroke-width="'+(female?2:3)+'" stroke-linecap="round"/><ellipse cx="36" cy="49" rx="3" ry="4" fill="'+hex(s.eyes)+'"/><ellipse cx="60" cy="49" rx="3" ry="4" fill="'+hex(s.eyes)+'"/><path d="m48 49-3 8h5m-9 7q7 4 14 0" fill="none" stroke="'+(female?'#aa6672':'#936f60')+'" stroke-width="2" stroke-linecap="round"/>'+braids+(!female&&['chef','mage','smith'].includes(job)?'<path '+(job==='smith'?'data-beard="long-dwarf" d="M34 65q14 10 28 0 1 21-14 36-15-15-14-36Z"':'d="m34 65 14 4 14-4-5 11H39Z"')+' fill="'+hex(s.hair)+'"/>':'')+'<path d="M'+(female?'32 83 48 98 64 83':'27 85h42m-33 0 12 16 12-16')+'" fill="none" stroke="'+hex(s.accent)+'" stroke-width="3"/></svg>';
+    return '<svg class="hero-portrait" viewBox="0 0 96 112" role="img" aria-label="'+H.JOBS[job].name+' · 成年'+(female?'女性':'男性')+' · '+s.description+'"><rect x="2" y="2" width="92" height="108" rx="20" fill="#1b333d"/>'+hair+ears+clericHat+'<path d="'+face+'" fill="'+hex(s.skin)+'"/><path d="M'+(female?'19':'12')+' 110V92q0-20 '+(female?'29':'36')+'-20t'+(female?'29':'36')+' 20v18" fill="'+hex(s.cloak)+'"/>'+(job==='archer'&&!female?'<path data-hair="swept-bangs" d="M26 34q12-26 46-8-14 0-24 8-8-6-22 0Z" fill="'+hex(s.hair)+'"/>':'<path d="M27 32q17-28 43-4l-16 7-11-8-16 16Z" fill="'+hex(s.hair)+'"/>')+'<path d="M30 42h12m12 0h12" stroke="'+hex(s.hair)+'" stroke-width="'+(female?2:3)+'" stroke-linecap="round"/><ellipse cx="36" cy="49" rx="3" ry="4" fill="'+hex(s.eyes)+'"/><ellipse cx="60" cy="49" rx="3" ry="4" fill="'+hex(s.eyes)+'"/><path d="m48 49-3 8h5m-9 7q7 4 14 0" fill="none" stroke="'+(female?'#aa6672':'#936f60')+'" stroke-width="2" stroke-linecap="round"/>'+braids+(!female&&['chef','mage','smith'].includes(job)?'<path '+(job==='smith'?'data-beard="long-dwarf" d="M34 65q14 10 28 0 1 21-14 36-15-15-14-36Z"':'d="m34 65 14 4 14-4-5 11H39Z"')+' fill="'+hex(s.hair)+'"/>':'')+'<path d="M'+(female?'32 83 48 98 64 83':'27 85h42m-33 0 12 16 12-16')+'" fill="none" stroke="'+hex(s.accent)+'" stroke-width="3"/></svg>';
   }
   function mountHeadwear(T,model,piece){
     const head=model.userData.head;
@@ -641,7 +695,17 @@
     if(appearance.job==='robot'){model.userData.heroWeapon='robot_fists';model.userData.hasShield=false;for(const side of ['armR','armL'])if(model.userData[side+'BareFist'])model.userData[side+'BareFist'].visible=!equipment.weapon;poseRobotLegArmor(model);colorRobotEnergy(model,info);}
     if(['spellbook','twin_daggers'].includes(model.userData.heroWeapon))pose(model,0,1,false,0);
   }
-  function pose(model,remaining,interval,fp=false,dt=0){const right=model.userData.armR,left=model.userData.armL,kind=model.userData.heroWeapon;if(!right||!left)return;
+  // The cleric's prayer wand (onusa): a wooden rod with a crossbar and zigzag paper streamers. It shows in the right
+  // hand only while a prayer plays; the bow hides for that moment and the arms follow the pray gesture.
+  function pray(model,seconds=1.1){const T=root.THREE;if(!T||!model?.userData)return null;const hand=model.userData.bowArms?.right.hand||model.userData.armR;if(!hand)return null;
+    let wand=model.userData.prayerWand;
+    if(!wand){wand=new T.Group();wand.name='prayer-wand';const wood=new T.MeshPhongMaterial({color:0xe8dcc0,specular:0x332521,shininess:10}),paper=new T.MeshLambertMaterial({color:0xfaf6ee,side:T.DoubleSide});
+      const rod=new T.Mesh(new T.CylinderGeometry(.014,.014,.58,8),wood);rod.position.y=.2;rod.name='prayer-wand-rod';wand.add(rod);
+      const bar=new T.Mesh(new T.BoxGeometry(.2,.018,.018),wood);bar.position.y=.46;bar.name='prayer-wand-crossbar';wand.add(bar);
+      for(let i=0;i<6;i++){const strip=new T.Mesh(new T.BoxGeometry(.045,.085,.004),paper);strip.position.set(-.08+(i%2)*.16,.42-Math.floor(i/2)*.075,(i%2?-1:1)*.012);strip.rotation.z=(i%2?-1:1)*.3;strip.name='prayer-wand-shide';wand.add(strip);}
+      wand.position.set(0,-.02,.05);wand.rotation.set(-.35,0,0);wand.visible=false;hand.add(wand);model.userData.prayerWand=wand;}
+    model.userData.prayerUntil=(root.performance?.now?.()??Date.now())+Math.max(.2,seconds)*1000;return wand;}
+  function pose(model,remaining,interval,fp=false,dt=0){const right=model.userData.armR,left=model.userData.armL,praying=model.userData.prayerUntil>(root.performance?.now?.()??Date.now()),kind=praying?'prayer_wand':model.userData.heroWeapon;if(!right||!left)return;if(model.userData.prayerWand)model.userData.prayerWand.visible=praying;
     if(root.TowerCombatMotion){
       const p=root.TowerCombatMotion.update(model,dt),T=root.THREE,q=model.userData.heroWrist||(model.userData.heroWrist=new T.Quaternion()),e=model.userData.heroWristEuler||(model.userData.heroWristEuler=new T.Euler()),offset=model.userData.heroWristOffset||(model.userData.heroWristOffset=new T.Vector3());
       right.rotation.set(p.rx,p.ry,p.rz);left.rotation.set(p.lx,p.ly,p.lz);
@@ -649,7 +713,7 @@
       // Heading stays outermost, so the torso leans toward its own target at
       // every compass direction instead of pitching around the world's X axis.
       model.rotation.order='YXZ';model.rotation.x=p.lean;model.rotation.z=p.tilt;
-      for(const part of model.userData.heroPieces||[]){part.visible=!fp||part.parent===right||part.parent===left||part.parent===bow?.right.hand||part.userData.baseKind==='spellbook';
+      for(const part of model.userData.heroPieces||[]){part.visible=(!fp||part.parent===right||part.parent===left||part.parent===bow?.right.hand||part.userData.baseKind==='spellbook')&&!(praying&&part.userData.baseKind==='elven_bow');
         if(part.userData.baseKind===kind){if(kind==='spellbook'){part.position.set(0,-.36,.13);e.set(p.bookTilt,0,0);q.setFromEuler(e);part.quaternion.copy(right.quaternion).invert().multiply(q);bookPose(part,p.bookOpen);}else if(kind==='elven_bow'&&bow){part.position.set(0,0,0);part.quaternion.identity();}else{const l=part.parent===left;offset.set(l?p.lpx:p.wpx,l?p.lpy:p.wpy,l?p.lpz:p.wpz).applyQuaternion(q.copy(part.parent.quaternion).invert());if(model.userData.heroGrip&&!l)part.position.fromArray(model.userData.heroGrip);else part.position.set(0,kind==='robot_fists'?-.53:-.36,kind==='robot_fists'?.07:.13);part.position.add(offset);e.set(l?p.lwx:p.wx,l?p.lwy:p.wy,l?p.lwz:p.wz);q.setFromEuler(e);part.quaternion.copy(part.parent.quaternion).invert().multiply(q);}}
       }
       if(model.userData.knightRightHand){const hand=model.userData.knightRightHand;e.set(p.wx,p.wy,p.wz);q.setFromEuler(e);hand.quaternion.copy(right.quaternion).invert().multiply(q);offset.set(p.wpx,p.wpy,p.wpz).applyQuaternion(q.copy(right.quaternion).invert());hand.position.fromArray(model.userData.heroGrip).add(offset);}
@@ -668,5 +732,5 @@
       if(p.userData.baseKind===kind&&p.parent!==model){const phase=p.parent===left?swing*.8:swing;if(kind==='spellbook'){e.set(-swing*.2,0,0);bookPose(p,swing);}else if(kind==='twin_daggers')e.set(Math.PI/2-2.7*phase,Math.PI/2,p.parent===left?.15:-.15);else e.set(.25+1.35*phase,.16*phase,.12-.3*phase);q.setFromEuler(e);p.quaternion.copy(p.parent.quaternion).invert().multiply(q);}
     }
   }
-  root.TowerHeroVisuals={gear,STYLES,VARIANTS,ROBOT_LOOKS,ROBOT_CORE_COLORS,syncRobotLight:colorRobotEnergy,style,base,portrait,dress,pose,bookPose};
+  root.TowerHeroVisuals={gear,pray,STYLES,VARIANTS,ROBOT_LOOKS,ROBOT_CORE_COLORS,syncRobotLight:colorRobotEnergy,style,base,portrait,dress,pose,bookPose};
 })(globalThis);

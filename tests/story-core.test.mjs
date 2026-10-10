@@ -41,17 +41,17 @@ test('all 99 floors grow toward the bottom while walls change progressively fast
   for (const invalid of [0, 100, 1.5, NaN, '50']) assert.throws(() => core.floorConfig(invalid), RangeError);
 });
 
-test('every map size step adds one to both monster population bounds', () => {
+test('every map size step adds one to both monster population bounds (v1.60: both bounds +1, the widest chapter capped at 11 for the lord slot)', () => {
   const observed=new Map();
   for(let floor=99;floor>=1;floor--)for(let seed=1;seed<=80;seed++){
-    const config=core.floorConfig(floor,seed),min=1+(config.size-7)/2,max=min+4;
+    const config=core.floorConfig(floor,seed),min=2+(config.size-7)/2,max=Math.min(11,min+4);
     assert.equal(config.monsterMin,min);assert.equal(config.monsterMax,max);
     assert.ok(config.monsterCount>=min&&config.monsterCount<=max);
     assert.deepEqual(config,core.floorConfig(floor,seed),'Reloading does not reroll the population');
     if(!observed.has(config.size))observed.set(config.size,new Set());observed.get(config.size).add(config.monsterCount);
   }
-  for(const [size,counts]of observed)assert.deepEqual([...counts].sort((a,b)=>a-b),Array.from({length:5},(_,i)=>i+1+(size-7)/2));
-  assert.equal(core.floorConfig(1).monsterMax,11,'Initial population keeps the original 1..5 plus size-step rule');
+  for(const [size,counts]of observed){const min=2+(size-7)/2,max=Math.min(11,min+4);assert.deepEqual([...counts].sort((a,b)=>a-b),Array.from({length:max-min+1},(_,i)=>min+i));}
+  assert.equal(core.floorConfig(99).monsterMin,2);assert.equal(core.floorConfig(99).monsterMax,6,'the first chapter rolls 2..6');assert.equal(core.floorConfig(1).monsterMin,8);assert.equal(core.floorConfig(1).monsterMax,11,'the widest chapter keeps 11 so monster-11 stays the lord slot');
   assert.equal(core.MAX_MONSTERS,32,'Save validation reserves stable originals, a lord and finite reinforcement IDs');
   assert.deepEqual(core.floorConfig(99).monsterTypes,['clockmite']);
   assert.equal(core.floorConfig(1).monsterTypes.length, 5);

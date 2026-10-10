@@ -3,11 +3,11 @@
    Real light comes from the floor's one permanent flash slot (ctx.flash), and heavy
    landings nudge the view (ctx.kick); both are optional and skipped when absent. */
 (function(root){'use strict';
-  const PALETTES={swordsman:[0xffe5af,0xffa46c],mage:[0xc6b5ff,0x86e4ff],scout:[0xa3ffe0,0x54cda2],chef:[0xffd6a0,0xff9a64],healer:[0xd9ffe4,0x79edba],smith:[0xffdea9,0xffa465],archer:[0xffe6ac,0x99ddb2],robot:[0xbff3ff,0xffbd73]};
+  const PALETTES={swordsman:[0xffe5af,0xffa46c],mage:[0xc6b5ff,0x86e4ff],scout:[0xa3ffe0,0x54cda2],chef:[0xffd6a0,0xff9a64],healer:[0xd9ffe4,0x79edba],smith:[0xffdea9,0xffa465],archer:[0xffe6ac,0x99ddb2],robot:[0xbff3ff,0xffbd73],cleric:[0xfff3f0,0xe05a5a]};
   const FAMILIES={arrow:'arrow',binding:'arrow',volley:'arrow',great_arrow:'arrow',decisive:'slash',star_ring:'meteor',escape:'scan',feast:'steam',sanctuary:'heal',fortress:'shield',cleave:'slash',circle:'spin',blind:'slash',stun:'impact',stagger:'impact',splash:'splash',bolt:'cast',weak:'cast',slow:'slash',mark:'cast',shock:'storm',thorns:'thorns',repel:'wave',starfall:'meteor',guard:'shield',barrier:'shield',ward:'shield',fortify:'shield',rally:'aura',speed:'aura',polish:'forge',stealth:'smoke',smoke:'smoke',stomach:'steam',meal:'steam',soup:'heal',heal:'heal',revive:'heal',cleanse:'cleanse',reveal:'scan',disarm:'scan',daylight:'sun',repair:'forge',frost:'frost',taunt:'wave',barricade:'forge'};
   const THEMES={shock:[0xebfaff,0x459fff],thorns:[0xd5f697,0x6aab43],starfall:[0xfff1cc,0xff8242],star_ring:[0xfff1cc,0xea92ff],frost:[0xe1fbff,0x72cdff],splash:[0xffd090,0xfb714a],weak:[0xe4fff2,0x8be8bd],mark:[0xfff0be,0xfa9e62]};
   const ROBOT_FAMILIES=Object.freeze({flying_fist:'rocket_fist',iron_charge:'ram',shoulder_quake:'quake',folded_guard:'shield',joint_oil:'lubricate',parts_restore:'rebuild',steel_meteor_fist:'quake',explosive_fists:'twin_fist',mech_aid:'shield'});
-  Object.assign(FAMILIES,{robot_fist:'rocket_fist',robot_charge:'ram',robot_quake:'quake',robot_guard:'shield',robot_speed:'lubricate',robot_restore:'rebuild',robot_meteor:'quake',robot_double:'twin_fist',mech_aid:'shield',levelup:'levelup',critical:'critical'});
+  Object.assign(FAMILIES,{robot_fist:'rocket_fist',robot_charge:'ram',robot_quake:'quake',robot_guard:'shield',robot_speed:'lubricate',robot_restore:'rebuild',robot_meteor:'quake',robot_double:'twin_fist',mech_aid:'shield',levelup:'levelup',critical:'critical',regen:'heal',kami:'shield'});
   const visualFamilies=new Set(Object.values(FAMILIES));
   const familyFor=skill=>ROBOT_FAMILIES[skill?.id]||(visualFamilies.has(skill?.presentation?.family)?skill.presentation.family:FAMILIES[skill?.effect]);
   const colorsFor=skill=>Array.isArray(skill?.presentation?.colors)&&skill.presentation.colors.length===2&&skill.presentation.colors.every(n=>Number.isInteger(n)&&n>=0&&n<=0xffffff)?skill.presentation.colors:THEMES[skill?.effect]||PALETTES[skill?.job]||PALETTES.swordsman;
@@ -21,7 +21,8 @@
     healer:Object.freeze({name:'花瓣與復甦',attack:.18,peak:.48,ground:.17}),
     smith:Object.freeze({name:'熔金與金屬火星',attack:.045,peak:.19,ground:.16}),
     archer:Object.freeze({name:'葉羽與箭芒',attack:.055,peak:.23,ground:.11}),
-    robot:Object.freeze({name:'機械壓力與核心脈衝',attack:.065,peak:.22,ground:.18})
+    robot:Object.freeze({name:'機械壓力與核心脈衝',attack:.065,peak:.22,ground:.18}),
+    cleric:Object.freeze({name:'紙垂與破魔箭芒',attack:.06,peak:.24,ground:.12})
   });
   const signatureFor=skill=>SIGNATURES[skill?.job]||SIGNATURES.swordsman;
   // One filled, locally bounded energy surface replaces the old blurred floor

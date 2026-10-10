@@ -21,7 +21,7 @@ function withCanvas(work){const old=globalThis.document;globalThis.document=canv
 function resources(model){const geometries=new Set(),materials=new Set(),textures=new Set();model.traverse(o=>{if(o.geometry&&!o.isSprite)geometries.add(o.geometry);for(const m of Array.isArray(o.material)?o.material:[o.material])if(m){materials.add(m);for(const value of Object.values(m))if(value?.isTexture)textures.add(value);}});return {geometries,materials,textures};}
 function dispose(model){const r=resources(model);r.geometries.forEach(x=>x.dispose());r.materials.forEach(x=>x.dispose());r.textures.forEach(x=>x.dispose());}
 
-test('fourteen profession faces own a single original 128-square complexion map, never mapped onto hands or body',()=>withCanvas(doc=>{
+test('sixteen profession faces own a single original 128-square complexion map, never mapped onto hands or body',()=>withCanvas(doc=>{
   const e=environment(),textures=new Set();
   for(const job of Object.keys(H.JOBS).filter(job=>job!=='robot'))for(const sex of ['male','female']){
     const model=e.TowerHeroVisuals.base(job,e.buildCharacter,'hero',sex),face=model.userData.face,head=model.userData.headMesh;
@@ -33,7 +33,7 @@ test('fourteen profession faces own a single original 128-square complexion map,
     assert.equal(face.mouth.geometry.type,'BufferGeometry');assert.ok(face.mouth.geometry.attributes.position.count<=24);
     dispose(model);
   }
-  assert.equal(textures.size,14);assert.equal(doc.canvases.length,14,'style refinement must reuse its own map, not create another');
+  assert.equal(textures.size,16);assert.equal(doc.canvases.length,16,'style refinement must reuse its own map, not create another');
 }));
 
 test('native authored maps differ by sex and include original scout freckles and smith scar without external image access',()=>withCanvas(()=>{

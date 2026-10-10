@@ -17,8 +17,8 @@ test('lightning has a low thunder body, frost is crystalline, healing retains a 
   assert.ok(band(heal,515,540)+band(heal,650,675)+band(heal,775,800)>band(heal,1200,2000)*3,'healing chord remains gentle and tonal');
   for(const kind of ['robot','robot-drive','robot-impact'])assert.notDeepEqual(A.render(kind),A.render('metal'));assert.notDeepEqual(A.render('thorns'),thunder);assert.notDeepEqual(A.render('slash'),A.render('bow'));
 });
-test('all eight professions, preparation, ordinary hits, supplies, hazards and existing literal action hooks resolve to real audio',()=>{
-  const jobs=new Set();for(const skill of Object.values(H.SKILLS)){jobs.add(skill.job);assert.ok(A.ACTIONS[A.skillKind(skill)],skill.id);}assert.equal(jobs.size,8);
+test('all nine professions, preparation, ordinary hits, supplies, hazards and existing literal action hooks resolve to real audio',()=>{
+  const jobs=new Set();for(const skill of Object.values(H.SKILLS)){jobs.add(skill.job);assert.ok(A.ACTIONS[A.skillKind(skill)],skill.id);}assert.equal(jobs.size,9);
   assert.equal(A.skillKind(H.SKILLS.flying_fist),'robot');assert.equal(A.skillKind(H.SKILLS.iron_charge),'robot-drive');assert.equal(A.skillKind(H.SKILLS.shoulder_quake),'robot-impact');
   assert.equal(A.skillKind({...H.SKILLS.flying_fist,presentation:{sound:'thunder'}}),'thunder');
   assert.equal(A.skillKind(H.SKILLS.herbal_heal),'heal');assert.equal(A.skillKind(H.SKILLS.arcane_bolt),'magic');

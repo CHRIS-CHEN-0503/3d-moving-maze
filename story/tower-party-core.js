@@ -22,8 +22,9 @@
     smith:{name:'鍛匠',person:'砧岳',gender:'male',color:0xbf936e,skill:'應急修補',description:'矮人族裝備修復專家。技能：用一份硬殼修復穿戴的裝備。隊中有鍛匠時，營地修理與鍛造費減半。',cooldown:25},
     archer:{name:'射手',person:'嵐羽',gender:'female',color:0xc8bc79,skill:'鷹眼巡望',description:'精靈弓手，擅長遠程射擊、牽制怪物與帶領隊伍穿行迷宮。弓是雙手武器，不能配盾。',cooldown:25},
     robot:{name:'機器人',person:'鐵衡',gender:'male',color:0x9dc5d7,skill:'摺甲防禦',description:'重防禦拳鬥者，以飛拳與衝撞替隊伍開路；不穿一般裝備，可用礦石和零件進階自身機殼、拳臂。',cooldown:28},
+    cleric:{name:'神職',person:'緋鈴',gender:'female',color:0xe6a3a3,skill:'結界',description:'神社神職：神主與巫女。以弓箭附加詛咒，並手持大幣祈禱為隊友加持與結界。弓是雙手武器，不能配盾。',cooldown:24},
   });
-  const NAMES=Object.freeze({swordsman:{male:'蒼衡',female:'瑟琳'},mage:{male:'星嵐',female:'露彌'},scout:{male:'逐杉',female:'巧栗'},chef:{male:'禾谷',female:'杏桃'},healer:{male:'沐川',female:'澄音'},smith:{male:'砧岳',female:'鐵薇'},archer:{male:'風梢',female:'嵐羽'},robot:{male:'鐵衡',female:'鈴芯'}});
+  const NAMES=Object.freeze({swordsman:{male:'蒼衡',female:'瑟琳'},mage:{male:'星嵐',female:'露彌'},scout:{male:'逐杉',female:'巧栗'},chef:{male:'禾谷',female:'杏桃'},healer:{male:'沐川',female:'澄音'},smith:{male:'砧岳',female:'鐵薇'},archer:{male:'風梢',female:'嵐羽'},cleric:{male:'伊吹',female:'緋鈴'},robot:{male:'鐵衡',female:'鈴芯'}});
   const person=(job,gender=PROFESSIONS[job]?.gender)=>NAMES[job]?.[gender]||PROFESSIONS[job]?.person||'旅人';
   const sex=(run,id='hero')=>id==='hero'?(run.party.sex||PROFESSIONS[run.party.profession].gender):run.party.members.find(m=>m.id===id)?.sex||PROFESSIONS[run.party.members.find(m=>m.id===id)?.profession]?.gender;
   const recruitLimit=run=>C().isUnderworld(run)?4:run.party?.loadouts?Math.min(3,H().level(run,'hero')):3;
@@ -88,7 +89,7 @@
   // closer to the protagonist (a level-10 companion still matches a level-10
   // hero, as before). Every value is at least the earlier formula (60+3/level
   // hero, 28+6/level companion, levels 1-10), so no saved health exceeds its cap.
-  const VITALITY=Object.freeze({swordsman:1.35,smith:1.3,robot:1.2,chef:1.15,scout:1.05,archer:1,healer:1,mage:1});
+  const VITALITY=Object.freeze({swordsman:1.35,smith:1.3,robot:1.2,chef:1.15,scout:1.05,archer:1,healer:1,cleric:1,mage:1});
   // Each free constitution point adds 2% life; free points per ability score stop at ATTRIBUTE_CAP.
   const ATTRIBUTE_CAP=10,VIT_HP_STEP=.02,vitPoints=v=>Number.isInteger(v)?Math.max(0,Math.min(ATTRIBUTE_CAP,v)):0;
   const vitalHp=(profession,level,hero,vit=0)=>Math.round((hero?60+(level-1)*3:40+level*5)*(VITALITY[profession]||1)*(1+VIT_HP_STEP*vitPoints(vit)));
@@ -113,7 +114,7 @@
     if(!Array.isArray(value.joined)||value.joined.length>150||new Set(value.joined).size!==value.joined.length||!value.joined.every(id=>typeof id==='string'&&id.length>0&&id.length<=80))return null;
     if(!Array.isArray(value.members)||value.members.length>(floor<0?4:3)||new Set(value.members.map(m=>m?.id)).size!==value.members.length)return null;
     const members=[];
-    for(const m of value.members){const bonus=m?.profession==='robot'&&value.loadouts?.actors?.[m.id]?.passives?.includes('robot_body')?5*(m.level>=10?6:Math.min(5,m.level)):0;if(!m||!value.joined.includes(m.id)||!own(PROFESSIONS,m.profession)||m.sex!==undefined&&!['male','female'].includes(m.sex)||!num(m.level,1,floor<0&&value.loadouts?10:5,true)||!num(m.hp,0,(value.loadouts?vitalHp(m.profession,m.level,false,value.loadouts.actors?.[m.id]?.attrs?.vit):memberMax(m))+bonus)||!num(m.cooldown,0,30)||!num(m.hurtLeft,0,2))return null;const xp=m.xp??G().XP[m.level-1];if(value.loadouts&&!num(xp,G().XP[m.level-1],G().XP[9],true))return null;members.push({id:m.id,profession:m.profession,sex:m.sex||PROFESSIONS[m.profession].gender,level:m.level,...(value.loadouts?{xp}:{}),hp:m.hp,cooldown:m.cooldown,hurtLeft:m.hurtLeft});}
+    for(const m of value.members){const bonus=m?.profession==='robot'&&value.loadouts?.actors?.[m.id]?.passives?.includes('robot_body')?5*(m.level>=10?6:Math.min(5,m.level)):0;if(!m||!value.joined.includes(m.id)||!own(PROFESSIONS,m.profession)||m.sex!==undefined&&!['male','female'].includes(m.sex)||!num(m.level,1,floor<0&&value.loadouts?10:5,true)||!num(m.hp,0,(value.loadouts?vitalHp(m.profession,m.level,false,value.loadouts.actors?.[m.id]?.attrs?.vit):memberMax(m))+bonus)||!num(m.cooldown,0,30)||!num(m.hurtLeft,0,2))return null;const xp=m.xp===undefined?G().XP[m.level-1]:G().migrateXp(m.xp,m.level,value.loadouts?.xpCurve);if(value.loadouts&&!num(xp,G().XP[m.level-1],G().XP[floor<0?9:4],true))return null;members.push({id:m.id,profession:m.profession,sex:m.sex||PROFESSIONS[m.profession].gender,level:m.level,...(value.loadouts?{xp}:{}),hp:m.hp,cooldown:m.cooldown,hurtLeft:m.hurtLeft});}
     if(!Array.isArray(value.buffs)||value.buffs.length>2||new Set(value.buffs.map(b=>b?.id)).size!==value.buffs.length||!value.buffs.every(b=>b&&own(BUFFS,b.id)&&num(b.floors,1,3,true)))return null;
     for(const k of ['cooldown','guardLeft','trapWard','slowLeft'])if(!num(value[k],0,30))return null;
     const dict=(v,max)=>v&&typeof v==='object'&&!Array.isArray(v)&&Object.keys(v).length<=C().MAX_MONSTERS&&Object.keys(v).every(id=>C().validMonsterId(id,floor)&&!defeated.includes(id)&&num(v[id],0,max));
@@ -132,9 +133,9 @@
   }
   function transact(run,revision,fn){return C().transaction(run,revision,next=>!next.party?{ok:false,message:'尚未選擇冒險職業。'}:fn(next,next.party));}
   function recruitOffer(run){
-    const modern=!!run.party?.loadouts,h=hash(run.seed,`recruit:${run.floor}`), early=modern?[99,97,95,93,91,89,87,85]:[99,97,95,93,91,89];
+    const modern=!!run.party?.loadouts,h=hash(run.seed,`recruit:${run.floor}`), early=modern?[99,97,95,93,91,89,87,85,83]:[99,97,95,93,91,89];
     if(!early.includes(run.floor)&&h%100>=45)return null;
-    const jobs=Object.keys(PROFESSIONS).filter(j=>modern||!['archer','robot'].includes(j)),job=jobs[early.includes(run.floor)?early.indexOf(run.floor):h%jobs.length];
+    const jobs=Object.keys(PROFESSIONS).filter(j=>modern||!['archer','cleric','robot'].includes(j)),job=jobs[early.includes(run.floor)?early.indexOf(run.floor):h%jobs.length];
     // Underground recruits always start at five, independent of depth or leader level.
     // Existing members keep their earned levels; the original surface scaling is unchanged.
     const level=C().isUnderworld(run)?5:Math.min(5,1+Math.floor((99-run.floor)/22));

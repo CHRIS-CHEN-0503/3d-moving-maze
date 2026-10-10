@@ -28,6 +28,7 @@
     smith:{name:'鍛匠',description:'矮人族鍛匠；男女均為矮人族，外觀不同，職業能力相同。',armor:'heavy',starter:'smith_hammer',color:'#d7ab83',charIdx:4},
     archer:{name:'射手',armor:'light',starter:'elven_bow',color:'#e4d796',charIdx:1},
     robot:{name:'機器人',armor:'robot',starter:'robot_fists',color:'#a7dce8',charIdx:4},
+    cleric:{name:'神職',description:'神社神職；男性為神主、女性為巫女，外觀不同，職業能力相同。以弓箭附加詛咒，並以祈禱強化隊友。',armor:'robe',starter:'elven_bow',color:'#f0a9a9',charIdx:1},
   });
   const gear=(kind,name,slot,type,jobs,hands,damage,interval,reach,defense,price,magicDamage=0,support=0)=>Object.freeze({kind,name,slot,type,jobs:Object.freeze(jobs),hands,damage,interval,reach,defense,buyPrice:price,magicDamage,support,stunSeconds:0});
   const BASE_GEAR=Object.freeze([
@@ -39,13 +40,13 @@
     gear('warhammer','山岩重錘','weapon','hammer',['smith'],2,13,1.45,3,0,26),
     gear('cooking_pan','旅人鐵鍋','weapon','pan',['chef'],1,6,.85,2.5,0,16),
     gear('twin_daggers','逐風雙短刃','weapon','daggers',['scout'],2,8,.75,2.4,0,21),
-    gear('elven_bow','青葉獵弓','weapon','bow',['archer'],2,11,.95,9.5,0,22),
+    gear('elven_bow','青葉獵弓','weapon','bow',['archer','cleric'],2,11,.95,9.5,0,22),
     gear('heavy_helm','鉚釘重盔','helmet','heavy',['swordsman','smith'],0,0,0,0,3,18),
     gear('heavy_armor','分層板甲','armor','heavy',['swordsman','smith'],0,0,0,0,6,28),
     gear('light_hood','旅行皮帽','helmet','light',['chef','scout','archer'],0,0,0,0,2,14),
     gear('light_armor','遊俠輕甲','armor','light',['chef','scout','archer'],0,0,0,0,4,21),
-    gear('rune_crown','星線法冠','helmet','robe',['mage','healer'],0,0,0,0,1,14),
-    gear('robe','織光法袍','armor','robe',['mage','healer'],0,0,0,0,2,20),
+    gear('rune_crown','星線法冠','helmet','robe',['mage','healer','cleric'],0,0,0,0,1,14),
+    gear('robe','織光法袍','armor','robe',['mage','healer','cleric'],0,0,0,0,2,20),
     gear('buckler','木紋小圓盾','shield','shield',['swordsman','smith','chef'],1,0,0,0,2,13),
     gear('round_shield','包鐵圓盾','shield','shield',['swordsman','smith','chef'],1,0,0,0,3,19),
     gear('tower_shield','守門塔盾','shield','shield',['swordsman','smith','chef'],1,0,0,0,5,28),
@@ -63,7 +64,9 @@
   // paces the extra casts: each costs 4 + half its ORIGINAL cooldown (capped), so a full
   // bar allows a burst at the new pace and regeneration settles back near the old.
   // Robots spend their power-stone energy instead; the mage's innate daylight is free.
-  const COOLDOWN_SCALE=.5,SPIRIT=Object.freeze({mage:1.4,healer:1.35,archer:1.1,chef:1.05,scout:1,smith:.95,swordsman:.9,robot:0});
+  const COOLDOWN_SCALE=.5,SPIRIT=Object.freeze({mage:1.4,healer:1.35,cleric:1.3,archer:1.1,chef:1.05,scout:1,smith:.95,swordsman:.9,robot:0});
+  // Jobs that draw a bow: they share the quiver, its arrow drops and the per-shot ammo rule.
+  const BOW_JOBS=Object.freeze(['archer','cleric']);
   // Ability scores. Every level past the first adds three automatic points by profession (the
   // life, MP and attack growth the professions already had) and two free points. Only free
   // points change numbers, each by a small step, at most ATTRIBUTE_CAP per score, so a journey
@@ -71,12 +74,12 @@
   const ATTRIBUTES=Object.freeze(['str','int','vit','agi','luk']),ATTRIBUTE_NAMES=Object.freeze({str:'力量',int:'智力',vit:'體質',agi:'敏捷',luk:'幸運'});
   const FREE_POINTS_PER_LEVEL=2,AUTO_POINTS_PER_LEVEL=3,ATTRIBUTE_STEP=Object.freeze({str:.015,int:.015,intMp:.02,intHeal:.01,vit:.02,agi:.01,luk:1});
   const deep=o=>Object.freeze(Object.fromEntries(Object.entries(o).map(([k,v])=>[k,Object.freeze(v)])));
-  const ATTRIBUTE_BASE=deep({swordsman:{str:7,int:2,vit:7,agi:5,luk:4},smith:{str:6,int:3,vit:8,agi:3,luk:5},robot:{str:6,int:0,vit:9,agi:5,luk:5},archer:{str:5,int:3,vit:4,agi:8,luk:5},scout:{str:4,int:3,vit:4,agi:8,luk:6},mage:{str:2,int:9,vit:4,agi:4,luk:6},healer:{str:2,int:8,vit:6,agi:4,luk:5},chef:{str:5,int:5,vit:6,agi:4,luk:5}});
-  const ATTRIBUTE_GROWTH=deep({swordsman:{str:2,vit:1},smith:{vit:2,str:1},robot:{vit:2,agi:1},archer:{agi:2,str:1},scout:{agi:2,luk:1},mage:{int:2,luk:1},healer:{int:2,vit:1},chef:{vit:1,int:1,luk:1}});
+  const ATTRIBUTE_BASE=deep({swordsman:{str:7,int:2,vit:7,agi:5,luk:4},smith:{str:6,int:3,vit:8,agi:3,luk:5},robot:{str:6,int:0,vit:9,agi:5,luk:5},archer:{str:5,int:3,vit:4,agi:8,luk:5},scout:{str:4,int:3,vit:4,agi:8,luk:6},mage:{str:2,int:9,vit:4,agi:4,luk:6},healer:{str:2,int:8,vit:6,agi:4,luk:5},chef:{str:5,int:5,vit:6,agi:4,luk:5},cleric:{str:3,int:7,vit:5,agi:5,luk:5}});
+  const ATTRIBUTE_GROWTH=deep({swordsman:{str:2,vit:1},smith:{vit:2,str:1},robot:{vit:2,agi:1},archer:{agi:2,str:1},scout:{agi:2,luk:1},mage:{int:2,luk:1},healer:{int:2,vit:1},chef:{vit:1,int:1,luk:1},cleric:{int:2,agi:1}});
   // Automatic spending follows this repeating order, skipping a full or unusable score.
-  const ATTRIBUTE_PLAN=deep({swordsman:['str','vit','str','agi'],smith:['vit','str','vit','agi'],robot:['vit','str','agi','vit'],archer:['agi','str','agi','luk'],scout:['agi','luk','agi','str'],mage:['int','luk','int','agi'],healer:['int','vit','int','agi'],chef:['vit','int','luk','agi']});
+  const ATTRIBUTE_PLAN=deep({swordsman:['str','vit','str','agi'],smith:['vit','str','vit','agi'],robot:['vit','str','agi','vit'],archer:['agi','str','agi','luk'],scout:['agi','luk','agi','str'],mage:['int','luk','int','agi'],healer:['int','vit','int','agi'],chef:['vit','int','luk','agi'],cleric:['int','agi','int','luk']});
   // Luck: a critical hit deals 1.5x; each free luck point adds 1 percentage point to the job's base chance.
-  const CRIT_BASE=Object.freeze({scout:8,archer:6,robot:3}),CRIT_DEFAULT=4,CRIT_MULTIPLIER=1.5;
+  const CRIT_BASE=Object.freeze({scout:8,archer:6,cleric:5,robot:3}),CRIT_DEFAULT=4,CRIT_MULTIPLIER=1.5;
   // Saved preparation and flight damage stay below the old 250 bound times the strongest free-point bonus.
   const DAMAGE_RECORD_LIMIT=250*(1+ATTRIBUTE_STEP.str*10);
   // Capped (30, or 45 for awakening and advanced moves) so a long-cooldown rescue such as revive stays castable early.
@@ -124,7 +127,13 @@
     skill('keen_sight','archer','鷹眼巡望',false,[3,4,5,6,7],25,'reveal','短暫辨識附近陷阱與路徑。'),
     skill('woodland_stride','archer','林間疾步',false,[8,11,14,17,20],35,'speed','附近隊友二十秒內移動加快。'),
     skill('ranger_ward','archer','葉幕守護',false,[15,20,25,30,35],35,'guard','八秒內以葉幕減輕自己受到的傷害。'),
-  ].concat(ROBOT.actives,G.actives,A.actives).map(s=>{const value=G.sixth(s),seconds=preparationSeconds(s.id),ammo=s.job==='archer'&&s.attack?(['volley','great_arrow'].includes(s.effect)?3:1):0;return [s.id,Object.freeze({...value,preparation:seconds,ammo,cooldown:value.cooldown*COOLDOWN_SCALE,mp:mpCostFor(value,value.cooldown),power:s.effect==='disarm'?Object.freeze(value.power.map(n=>shorterPreparation(n+.5))):s.effect==='cleanse'?Object.freeze(value.power.map(n=>n*COOLDOWN_SCALE)):value.power,description:value.description+(ammo?' 消耗箭矢 '+ammo+' 支。':'')+(seconds?' 準備 '+seconds+' 秒後生效。':'')})];})));
+    {...skill('hex_arrow','cleric','祓厄之矢',true,[120,135,150,165,180],12,'arrow','射出祓厄之矢，不能穿牆；命中的怪物下一次攻擊變弱，六秒內多受一成傷害。'),params:{weak:1,markSeconds:6},presentation:{colors:[0xf4e6ff,0xa26fe0]}},
+    {...skill('seal_arrow','cleric','縛靈之矢',true,[90,105,120,135,150],16,'arrow','箭上繫著封靈符，命中後束縛怪物兩秒；怪物仍可攻擊。'),params:{rootSeconds:2},presentation:{colors:[0xfff2d6,0xd9534f]}},
+    {...skill('whistling_arrow','cleric','鳴鏑',true,[160,185,210,235,260],22,'arrow','鳴響的信號箭，命中後使怪物失去方向四秒。'),params:{blindSeconds:4},presentation:{colors:[0xfff8e6,0xe0b24a]}},
+    {...skill('norito','cleric','神樂祝詞',false,[6,9,12,15,18],40,'rally','誦唱祝詞，附近隊友二十秒內攻擊增強。'),params:{duration:20},presentation:{motion:'pray'}},
+    {...skill('kaji','cleric','加持',false,[2,3,4,5,6],35,'regen','加持十秒，指定隊友每秒恢復生命。'),params:{duration:10},presentation:{motion:'pray',sound:'heal'}},
+    {...skill('kekkai','cleric','結界',false,[15,20,25,30,35],36,'guard','張開結界，附近隊友八秒內減輕受到的傷害。'),params:{area:true,duration:8},presentation:{motion:'pray'}},
+  ].concat(ROBOT.actives,G.actives,A.actives).map(s=>{const value=G.sixth(s),seconds=preparationSeconds(s.id),ammo=BOW_JOBS.includes(s.job)&&s.attack?(['volley','great_arrow'].includes(s.effect)?3:1):0;return [s.id,Object.freeze({...value,preparation:seconds,ammo,cooldown:value.cooldown*COOLDOWN_SCALE,mp:mpCostFor(value,value.cooldown),power:s.effect==='disarm'?Object.freeze(value.power.map(n=>shorterPreparation(n+.5))):s.effect==='cleanse'?Object.freeze(value.power.map(n=>n*COOLDOWN_SCALE)):value.power,description:value.description+(ammo?' 消耗箭矢 '+ammo+' 支。':'')+(seconds?' 準備 '+seconds+' 秒後生效。':'')})];})));
   const passive=(id,job,name,power,description)=>Object.freeze({id,job,name,power:Object.freeze(power),description});
   const PASSIVES=Object.freeze(Object.fromEntries([
     passive('might','swordsman','剛力',[4,6,8,10,12],'本人的普通攻擊更有力。'),
@@ -148,8 +157,13 @@
     passive('steady_aim','archer','穩弦',[4,7,10,13,16],'弓箭與射手攻擊技能傷害增加。'),
     passive('nimble_shot','archer','快箭',[3,5,7,9,11],'弓箭普通攻擊間隔縮短。'),
     passive('leaf_steps','archer','輕葉步',[3,5,7,9,11],'本人移動速度增加。'),
+    passive('sacred_bow','cleric','破魔弓術',[4,7,10,13,16],'弓箭與神職攻擊技能傷害增加。'),
+    passive('spirit_flow','cleric','神氣',[10,15,20,25,30],'MP 回復加快。'),
+    passive('kiyome','cleric','清祓',[10,15,20,25,30],'本人受到的緩速等負面狀態較短。'),
+    passive('shrine_blessing','cleric','守護祈願',[.5,1,1.5,2,2.5],'持有者存活時，全隊防禦增加。'),
+    passive('ofuda_ward','cleric','符咒護身',[5,10,15,20,25],'本人受到的一般陷阱傷害減少。'),
   ].concat(ROBOT.passives,G.passives,A.passives).map(s=>[s.id,Object.freeze(G.sixth(s))])));
-  function scale(skill){const s=typeof skill==='string'?(SKILLS[skill]||PASSIVES[skill]):skill;if(s.attack)return {label:'傷害倍率',unit:'%'};const units={escape:['沿線加速','%'],feast:['恢復飽食','點'],sanctuary:['恢復最大生命','%'],fortress:['最大生命護盾','%'],guard:['減傷','%'],taunt:['持續','秒'],rally:['增傷','%'],frost:['緩速','%'],barrier:['吸收傷害','點'],daylight:['照明半徑','格'],reveal:['探查半徑','格'],disarm:['拆除作業','秒'],stealth:['持續','秒'],smoke:['持續','秒'],meal:['恢復飽食','點'],soup:['恢復生命','點'],speed:['加速','%'],stomach:['降低飽食消耗','%'],weak:['弱化','%'],heal:['恢復生命','點'],cleanse:['冷卻','秒'],revive:['恢復最大生命','%'],ward:['保護時限','秒'],repair:['恢復耐久','點'],fortify:['保護耐久消耗','次'],barricade:['路障生命','點'],polish:['增傷','%']},special={iron_wall:['增加防禦','點'],sturdy_gear:['增加防禦','點'],steadfast:['全隊防禦','點'],gentle_care:['增加治療','點'],food_sharing:['全隊恢復生命','點'],intuition:['路線提示','秒'],rescue:['自動救援間隔','秒'],tool_supply:['工具補充間隔','秒'],nourishment:['十秒合計恢復生命','點']};const v=units[s.effect]||special[s.id]||['效果','%'];return {label:v[0],unit:v[1]};}
+  function scale(skill){const s=typeof skill==='string'?(SKILLS[skill]||PASSIVES[skill]):skill;if(s.attack)return {label:'傷害倍率',unit:'%'};const units={escape:['沿線加速','%'],feast:['恢復飽食','點'],sanctuary:['恢復最大生命','%'],fortress:['最大生命護盾','%'],guard:['減傷','%'],regen:['每秒恢復生命','點'],kami:['最大生命護盾','%'],taunt:['持續','秒'],rally:['增傷','%'],frost:['緩速','%'],barrier:['吸收傷害','點'],daylight:['照明半徑','格'],reveal:['探查半徑','格'],disarm:['拆除作業','秒'],stealth:['持續','秒'],smoke:['持續','秒'],meal:['恢復飽食','點'],soup:['恢復生命','點'],speed:['加速','%'],stomach:['降低飽食消耗','%'],weak:['弱化','%'],heal:['恢復生命','點'],cleanse:['冷卻','秒'],revive:['恢復最大生命','%'],ward:['保護時限','秒'],repair:['恢復耐久','點'],fortify:['保護耐久消耗','次'],barricade:['路障生命','點'],polish:['增傷','%']},special={iron_wall:['增加防禦','點'],sturdy_gear:['增加防禦','點'],steadfast:['全隊防禦','點'],gentle_care:['增加治療','點'],food_sharing:['全隊恢復生命','點'],intuition:['路線提示','秒'],rescue:['自動救援間隔','秒'],tool_supply:['工具補充間隔','秒'],nourishment:['十秒合計恢復生命','點']};const v=units[s.effect]||special[s.id]||['效果','%'];return {label:v[0],unit:v[1]};}
   const robotScale=s=>({robot_body:['最大生命增加','點'],robot_restore:['恢復生命','點'],robot_guard:['減傷','%'],robot_speed:['自身加速','%'],mech_aid:['最大生命護盾','%']})[s.id]||({robot_restore:['恢復生命','點'],robot_guard:['減傷','%'],robot_speed:['自身加速','%'],mech_aid:['最大生命護盾','%']})[s.effect];
   const readScale=s=>{const def=typeof s==='string'?(SKILLS[s]||PASSIVES[s]):s,robot=robotScale(def);return def.id==='repair'?{label:'恢復最大耐久',unit:'%'}:robot?{label:robot[0],unit:robot[1]}:scale(def);};
   const state=run=>run?.party?.loadouts||null,enabled=run=>!!state(run);
@@ -159,13 +173,11 @@
   const level=(run,id=state(run)?.active||'hero')=>id==='hero'?state(run)?.level||1:run.party.members.find(m=>m.id===id)?.level||1;
   const maxLevel=(run,id='hero')=>id==='hero'?(C().isUnderworld(run)?15:10):(C().isUnderworld(run)?10:5);
   const experience=(run,id='hero')=>id==='hero'?state(run)?.xp||0:run.party.members.find(m=>m.id===id)?.xp??G.XP[level(run,id)-1];
-  // Progress toward the next level, 0-1 (1 at the level cap). Surface companions
-  // level up together with the protagonist, so their bar follows the hero's;
-  // underground companions earn their own experience.
+  // Progress toward the next level, 0-1 (1 at the level cap). Every companion earns the same
+  // experience as the protagonist from the moment they join (cap 5 on the surface, 10 below).
   function xpProgress(run,id='hero'){
     if(!enabled(run))return 0;const l=level(run,id);if(l>=maxLevel(run,id))return 1;
-    if(id!=='hero'&&!C().isUnderworld(run))return xpProgress(run,'hero');
-    const lo=G.XP[l-1],hi=G.XP[l];return Math.max(0,Math.min(1,(experience(run,id)-lo)/(hi-lo)));
+        const lo=G.XP[l-1],hi=G.XP[l];return Math.max(0,Math.min(1,(experience(run,id)-lo)/(hi-lo)));
   }
   const actor=(run,id=state(run)?.active)=>state(run)?.actors[id];
   // Free ability points; a missing record (a save from before ability scores) counts as none spent.
@@ -179,8 +191,9 @@
   const mpMax=(profession,lvl,int=0)=>Math.round((40+5*lvl)*(SPIRIT[profession]??1)*(1+ATTRIBUTE_STEP.intMp*(Number.isInteger(int)?Math.max(0,Math.min(P().ATTRIBUTE_CAP,int)):0)));
   const maxMp=(run,id=state(run)?.active||'hero')=>mpMax(job(run,id),level(run,id),attr(run,id,'int'));
   const mp=(run,id=state(run)?.active||'hero')=>{const a=actor(run,id);return a?Math.min(maxMp(run,id),a.mp??maxMp(run,id)):0;};
-  const mpRegen=(run,id)=>maxMp(run,id)?1.2+maxMp(run,id)*.015:0;
-  const mpReady=(run,id,skillId)=>mp(run,id)>=(SKILLS[skillId]?.mp||0);
+  const mpRegen=(run,id)=>maxMp(run,id)?(1.2+maxMp(run,id)*.015)*(1+pv(run,'spirit_flow',id)/100):0;
+  const mpCost=(run,id,s)=>Math.round((s?.mp||0)*(!s?.attack&&G.has(run,'shrine_favor',id)?Math.max(0,1-.25*G.modifiers(run,id,'shrine_favor').power):1));
+  const mpReady=(run,id,skillId)=>mp(run,id)>=mpCost(run,id,SKILLS[skillId]);
   function restoreMp(run,id,amount){const a=actor(run,id),max=maxMp(run,id);if(!a||!max)return 0;const before=mp(run,id),next=Math.min(max,before+Math.max(0,amount));if(next>=max)delete a.mp;else a.mp=next;return next-before;}
   const maxHp=(run,id=state(run)?.active||'hero')=>P().vitalHp(job(run,id),level(run,id),id==='hero',attr(run,id,'vit'))+pv(run,'robot_body',id);
   const hp=(run,id)=>id===state(run)?.active?run.hp:id==='hero'?state(run).heroHp:run.party.members.find(m=>m.id===id)?.hp||0;
@@ -247,16 +260,16 @@
   function preview(run,offer){if(offer.returning){const saved=R().remembered(run,offer.profession,offer.sex)?.loadout;return {...(saved?clone(saved):draft(run.seed,offer.profession,offer.profession)),equipment:offer.profession==='robot'&&saved?.robotEquipment?clone(saved.robotEquipment):Object.fromEntries(SLOTS.map(k=>[k,null]))};}return makeActor(run,offer.id,offer.profession);}
   function enable(run){return C().transaction(run,run.revision,n=>{
     if(!n.party||state(n))return {ok:false,message:'請先選職業，或繼續既有職業旅程。'};
-    n.party.loadouts={version:1,xpScale:G.XP_SCALE,active:'hero',level:1,xp:0,heroHp:n.hp,switchLeft:0,actors:{},enemy:{},removedTraps:[]};
+    n.party.loadouts={version:1,xpScale:G.XP_SCALE,xpCurve:G.XP_CURVE,active:'hero',level:1,xp:0,heroHp:n.hp,switchLeft:0,actors:{},enemy:{},removedTraps:[]};
     for(const id of ids(n))state(n).actors[id]=makeActor(n,id,job(n,id));
     state(n).growth=G.fresh(ids(n));
     n.equipment=actor(n,'hero').equipment;actor(n,'hero').equipment=null;n.charIdx=JOBS[job(n)].charIdx;
     if(job(n)==='robot')setHp(n,'hero',maxHp(n,'hero'));
     n.gearBag=[];n.engine.shovels=0;n.engine.shovelCooldownMs=0;
-    if(ids(n).some(id=>job(n,id)==='archer'))n.bag.arrow=Math.max(n.bag.arrow,30);
+    if(ids(n).some(id=>BOW_JOBS.includes(job(n,id))))n.bag.arrow=Math.max(n.bag.arrow,50);
     return {ok:true,message:'三個主動、兩個被動技能已確定。',effect:{loadouts:true}};
   });}
-  function addMember(run,member){if(enabled(run)){member.xp=G.XP[member.level-1];state(run).actors[member.id]=makeActor(run,member.id,member.profession);G.state(run).policies[member.id]=G.policy();G.state(run).members[member.id]=G.freshRecord();if(member.profession==='robot')member.hp=maxHp(run,member.id);settleAttributes(run,member.id);if(member.profession==='archer')run.bag.arrow=Math.max(run.bag.arrow,Math.min(C().itemLimit('arrow',run),run.bag.arrow+15));}}
+  function addMember(run,member){if(enabled(run)){member.xp=G.XP[member.level-1];state(run).actors[member.id]=makeActor(run,member.id,member.profession);G.state(run).policies[member.id]=G.policy();G.state(run).members[member.id]=G.freshRecord();if(member.profession==='robot')member.hp=maxHp(run,member.id);settleAttributes(run,member.id);if(BOW_JOBS.includes(member.profession))run.bag.arrow=Math.max(run.bag.arrow,Math.min(C().itemLimit('arrow',run),run.bag.arrow+15));}}
   // Returning travellers keep learned talents, not a second starter kit or
   // expired combat effects. The save validator below shares the live rules.
   function recruitSnapshot(run,id){const a=actor(run,id),g=G.record(run,id);return a?{skills:[...a.skills],passives:[...a.passives],learned:a.learned??null,showHelmet:a.showHelmet!==false,roll:a.roll,growth:{choices:[...g.choices],awakening:g.awakening},attrs:{...attrs(run,id)},attrAuto:a.attrAuto===true,...(job(run,id)==='robot'?{robotEquipment:clone(equipment(run,id)),robotResources:{fuel:a.robot.fuel,repairClock:a.robot.repairClock}}:{} )}:null;}
@@ -370,8 +383,8 @@
   });}
   function stats(run,id=state(run)?.active){
     const e=equipment(run,id)||{},w=e.weapon?.durability>0?e.weapon:null,d=GEAR[w?.kind],armor=Object.values(e).filter(g=>g&&g.durability>0).reduce((n,g)=>n+g.defense+X().traitPower(g,'defense'),0)+(job(run,id)==='robot'&&!(e.armor?.durability>0)?4:0),robes=Object.values(e).filter(g=>g&&g.durability>0&&GEAR[g.kind]?.type==='robe').length;
-    const mark=G.imprintFor(run,id,w),bonusArmor=pv(run,'iron_wall',id)+(armor?pv(run,'sturdy_gear',id):0)+teamPassive(run,'steadfast')+Object.values(e).filter(g=>g&&g.slot!=='weapon').reduce((n,g)=>{const m=G.imprintFor(run,id,g);return n+(m?2*(m.boost||1):0);},0),totalArmor=armor+bonusArmor;
-    const growth=(id==='hero'?1+.02*(level(run,id)-1):1)*(F()?.offense(run,id)??1),offense=1+(pv(run,'tempered_edge',id)+pv(run,'steady_aim',id)+pv(run,'fist_drive',id)+(hp(run,id)<maxHp(run,id)*.5?pv(run,'last_stand',id):0))/100,bonus=w?.bonus||0,imprint=mark?1+.15*(mark.boost||1):1;
+    const mark=G.imprintFor(run,id,w),bonusArmor=pv(run,'iron_wall',id)+(armor?pv(run,'sturdy_gear',id):0)+teamPassive(run,'steadfast')+teamPassive(run,'shrine_blessing')+Object.values(e).filter(g=>g&&g.slot!=='weapon').reduce((n,g)=>{const m=G.imprintFor(run,id,g);return n+(m?2*(m.boost||1):0);},0),totalArmor=armor+bonusArmor;
+    const growth=(id==='hero'?1+.02*(level(run,id)-1):1)*(F()?.offense(run,id)??1),offense=1+(pv(run,'tempered_edge',id)+pv(run,'steady_aim',id)+pv(run,'sacred_bow',id)+pv(run,'fist_drive',id)+(hp(run,id)<maxHp(run,id)*.5?pv(run,'last_stand',id):0))/100,bonus=w?.bonus||0,imprint=mark?1+.15*(mark.boost||1):1;
     // Courage and arcane draughts: +30% physical / spell attack while they last.
     const courage=1+(buff(run,'courage',id)?.power||0)/100,arcane=1+(buff(run,'arcane',id)?.power||0)/100;
     // Free ability points: strength and intellect raise physical and spell attack, agility shortens the swing.
@@ -388,7 +401,7 @@
     if(buff(run,'robot_guard',id))reduction=1-(1-reduction)*(1-buff(run,'robot_guard',id).power/100);
     if(source==='monster'&&amount>0)amount=Math.max(1,amount-Math.min(4,Object.values(equipment(run,id)).reduce((sum,g)=>sum+X().traitPower(g,'monsterFlat')+(g?.durability>0?GEAR[g.kind]?.monsterFlat||0:0),0)));
     if(source==='trap')amount=Math.max(0,amount-Object.values(equipment(run,id)).filter(g=>g?.durability>0&&g.forge?.trait==='grip').reduce((s,g)=>s+g.forge.level,0));
-    if(source==='trap')reduction=1-(1-reduction)*(1-teamPassive(run,'trap_sense')/100)*(1-pv(run,'forest_cover',id)/100)*(run.party.buffs.some(b=>b.id==='trail')?.5:1);
+    if(source==='trap')reduction=1-(1-reduction)*(1-teamPassive(run,'trap_sense')/100)*(1-pv(run,'forest_cover',id)/100)*(1-pv(run,'ofuda_ward',id)/100)*(run.party.buffs.some(b=>b.id==='trail')?.5:1);
     if(run.party.buffs.some(b=>b.id==='guard'))amount=Math.max(0,amount-2);
     let result=Math.max(amount>0?1:0,Math.ceil(amount*(1-Math.min(.65,reduction))));
     const shield=buff(run,'barrier',id);if(shield){const absorbed=Math.min(result,shield.power);result-=absorbed;shield.power-=absorbed;}
@@ -417,12 +430,12 @@
   const organicHealable=(run,id)=>!!actor(run,id)&&job(run,id)!=='robot';
   function heal(run,id,amount,options={}){if(!actor(run,id)||!Number.isFinite(amount)||amount<=0||hp(run,id)<=0||!organicHealable(run,id)&&options.mechanical!==true)return 0;const before=hp(run,id);setHp(run,id,before+amount*(F()?.offense(run,id)??1));return hp(run,id)-before;}
   function finishMonster(run,spec,lootCell){if(run.defeatedMonsters.includes(spec.id))return [];run.defeatedMonsters.push(spec.id);delete run.party.health[spec.id];delete run.party.poise[spec.id];delete run.monsterStuns[spec.id];delete state(run).enemy[spec.id];if(F()?.state(run))delete F().state(run).enemies[spec.id];if(!spec.hunt)run.coins=Math.min(999999,run.coins+8+spec.strength*2);const Loot=typeof module==='object'&&module.exports?require('./tower-loot.js'):globalThis.TowerLoot,drops=spec.hunt?(spec.champion?Loot.huntSpoils(run,spec):[]):Loot.recordKill(run,spec,lootCell);gainXp(run,killXp(run,spec));return drops;}
-  // Kill experience. Deeper surface floors pay more (x1 at 99F to x2.4 at 1F), so a hero who clears about 85% of
-  // the tower reaches level 10 by the last floor; the underground keeps its own x5. Hunt rift foes give half.
+  // Kill experience. Deeper surface floors pay more (x1 at 99F to x2.4 at 1F). On the v1.59.1 curve a hero who clears about 85% of
+  // the tower is level 9 at its last floor and reaches 10 around B5; the underground keeps its own x5. Hunt rift foes give half.
   const SURFACE_XP_DEPTH=52,HUNT_XP=.5;
   function killXp(run,spec){const under=C().isUnderworld(run),lords=B(),base=5+spec.strength*2+(spec.elite?lords.MINI_XP[under?'underworld':'surface']:spec.lord&&!under?lords.LORD_XP:0),scaled=under?base*5:base*(1+(99-run.floor)/SURFACE_XP_DEPTH);return Math.round(scaled*(spec.hunt?HUNT_XP:1));}
   function gainXp(run,amount){if(!enabled(run)||!Number.isFinite(amount)||amount<0)return;if(amount===0){G.awaken(run);sync(run);return;}const s=state(run),heroLevel=s.level,beforeHero=hp(run,'hero'),heroMax=maxHp(run,'hero'),memberMax=Object.fromEntries(run.party.members.map(m=>[m.id,maxHp(run,m.id)])),gain=Math.floor(amount),under=C().isUnderworld(run);s.xp=Math.min(G.XP[maxLevel(run)-1],s.xp+gain);const next=Math.min(maxLevel(run),G.XP.filter(x=>s.xp>=x).length);s.level=Math.max(s.level,next);// A level up raises current life by exactly the maximum it adds, and refills MP.
-    if(beforeHero>0)setHp(run,'hero',beforeHero+maxHp(run,'hero')-heroMax);for(const m of run.party.members){const old=m.level,before=hp(run,m.id);if(under){m.xp=Math.min(G.XP[9],experience(run,m.id)+gain);m.level=Math.max(old,Math.min(10,G.XP.filter(x=>m.xp>=x).length));}else{m.level=Math.max(old,Math.min(5,next));m.xp=G.XP[m.level-1];}if(before>0&&m.level!==old)setHp(run,m.id,before+maxHp(run,m.id)-memberMax[m.id]);if(m.level!==old)delete actor(run,m.id)?.mp;}if(s.level!==heroLevel)delete actor(run,'hero')?.mp;G.awaken(run);sync(run);}
+    if(beforeHero>0)setHp(run,'hero',beforeHero+maxHp(run,'hero')-heroMax);for(const m of run.party.members){const old=m.level,before=hp(run,m.id),cap=under?10:5;m.xp=Math.min(G.XP[cap-1],experience(run,m.id)+gain);m.level=Math.max(old,Math.min(cap,G.XP.filter(x=>m.xp>=x).length));if(before>0&&m.level!==old)setHp(run,m.id,before+maxHp(run,m.id)-memberMax[m.id]);if(m.level!==old)delete actor(run,m.id)?.mp;}if(s.level!==heroLevel)delete actor(run,'hero')?.mp;G.awaken(run);sync(run);}
   const ranged=(run,id=state(run)?.active)=>!!actor(run,id)&&['bow','staff','book'].includes(GEAR[stats(run,id).weapon?.kind]?.type);
   function fireProjectile(run,id,monsterId=null,revision=run.revision){return C().transaction(run,revision,n=>{
     const a=actor(n,id),st=a?stats(n,id):null,type=GEAR[st?.weapon?.kind]?.type;
@@ -471,7 +484,7 @@
     const enemy=state(n).enemy[monsterId]||(state(n).enemy[monsterId]={}),duration=(2+l*.4)*(1+pv(n,'resonance',id)/100);
     if(['slow','splash','binding','great_arrow'].includes(effect)||skill?.params?.slowSeconds){enemy.slow=skill?.params?.slowSeconds??duration;enemy.slowPower=skill?.params?.slowPower??(.2+l*.04);}
     if(effect==='thorns'||skill?.params?.rootSeconds)enemy.root=skill?.params?.rootSeconds??3;
-    if(effect==='blind')enemy.blind=duration;if(effect==='weak')enemy.weak=.15+l*.04;if(effect==='mark')enemy.mark=skill.params?.markSeconds??6;
+    if(effect==='blind'||skill?.params?.blindSeconds)enemy.blind=skill?.params?.blindSeconds??duration;if(effect==='weak'||skill?.params?.weak)enemy.weak=.15+l*.04;if(effect==='mark'||skill?.params?.markSeconds)enemy.mark=skill?.params?.markSeconds??6;
     let drops=[];if(remaining===0)drops=finishMonster(n,spec,options.lootCell);else if(damage>0)F()?.weaponHit(n,id,spec,imprint||null);
     const spoils=drops.filter(d=>d.direct).map(d=>d.label);
     return {ok:true,message:remaining===0?'擊敗 '+spec.def.name+(spoils.length?'，獲得 '+spoils.join('、'):''):'命中 '+spec.def.name,effect:{target:'monster',targetId:monsterId,damage,hp:remaining,dead:remaining===0,drops,lord:!!spec.lord,stunned,rooted:enemy.root>0&&remaining>0,repel:!spec.lord&&(effect==='repel'||skill?.params?.knockback>0),knockback:!spec.lord?skill?.params?.knockback||0:0,kinetic,crit,broken:w?.durability===0?w:null}};
@@ -483,15 +496,15 @@
     if(job(n,id)==='robot'&&!ROBOT.powered(n,id))return {ok:false,message:'能源耗盡，先使用動力石補能。'};
     if(s.attack&&a.attack>0)return {ok:false,message:'正在收招，稍等一下。'};
     if(a.cooldowns[skillId]>0)return {ok:false,message:'技能還在準備中。'};
-    if(!mpReady(n,id,skillId))return {ok:false,message:'MP 不足：需要 '+s.mp+' 點，目前 '+Math.floor(mp(n,id))+' 點。'};
+    if(!mpReady(n,id,skillId))return {ok:false,message:'MP 不足：需要 '+mpCost(n,id,s)+' 點，目前 '+Math.floor(mp(n,id))+' 點。'};
     const l=G.skillLevel(n,id),power=G.power(n,id,s),near=(options.nearby||ids(n)).filter(k=>ids(n).includes(k)),target=options.targetId||id;
     if(!near.includes(target))return {ok:false,message:'隊友太遠，請先靠近。'};
     if(s.attack&&!stats(n,id).weapon)return {ok:false,message:'武器已損壞，先換上專用武器。'};
     if(s.ammo&&n.bag.arrow<s.ammo)return {ok:false,message:'需要 '+s.ammo+' 支箭矢，先補滿箭袋吧。'};
     if(Object.entries(s.cost).some(([k,v])=>n.party.ingredients[k]<v))return {ok:false,message:'材料不足：'+Object.entries(s.cost).map(([k,v])=>P().INGREDIENTS[k]+' '+v).join('、')};
     const effect={skill:skillId,kind:s.effect,actorId:id,targetId:target,power,level:l,attack:s.attack};
-    if(['heal','barrier','ward','fortify','polish','repair','mech_aid'].includes(s.effect)&&hp(n,target)<=0)return {ok:false,message:'這位隊友需要先被扶起。'};
-    if(['heal','revive'].includes(s.effect)&&!organicHealable(n,target))return {ok:false,message:'機器人不能接受一般治療，請使用動力核心或零件回補。'};
+    if(['heal','barrier','ward','fortify','polish','repair','mech_aid','regen'].includes(s.effect)&&hp(n,target)<=0)return {ok:false,message:'這位隊友需要先被扶起。'};
+    if(['heal','revive','regen'].includes(s.effect)&&!organicHealable(n,target))return {ok:false,message:'機器人不能接受一般治療，請使用動力核心或零件回補。'};
     if(s.effect==='meal'&&!organicHealable(n,id))return {ok:false,message:'機器人不需要食物。'};
     if(s.effect==='meal'&&n.hunger>=100)return {ok:false,message:'大家還很飽，先留著食材。'};
     if(s.effect==='heal'&&hp(n,target)>=maxHp(n,target))return {ok:false,message:'生命已滿，不需要消耗香草。'};
@@ -506,20 +519,22 @@
     if(s.effect==='robot_restore'&&hp(n,id)>=maxHp(n,id))return {ok:false,message:'機體生命已滿，不需要消耗零件。'};
     if(s.effect==='feast'&&Object.values(n.party.ingredients).filter(v=>v>0).length<3)return {ok:false,message:'需要三種不同食材各一份。'};
     G.consumeCost(n,id,s.cost);
-    if(s.mp){const left=mp(n,id)-s.mp;a.mp=left;}
+    const spentMp=mpCost(n,id,s);if(spentMp){a.mp=mp(n,id)-spentMp;}
     if(s.scrapCost)n.party.journey.scrap-=s.scrapCost;
     if(s.ammo)n.bag.arrow-=s.ammo;
     a.cooldowns[skillId]=s.effect==='daylight'?600:(s.effect==='cleanse'?power:s.cooldown)*(1-pv(n,'recovery',id)/100)*G.modifiers(n,id,s.id).cooldown;
-    if(s.attack){const st=stats(n,id),paid=['mage','healer','archer'].includes(job(n,id));a.pending={id:skillId,left:3,damage:['mage','healer'].includes(job(n,id))?st.spellDamage:st.damage,targets:[],worn:paid,attunement:F()?.attunement(st.weapon)||null};a.attack=st.interval;if(paid)wear(n,id,st.weapon);}
+    if(s.attack){const st=stats(n,id),paid=['mage','healer','archer','cleric'].includes(job(n,id));a.pending={id:skillId,left:3,damage:['mage','healer'].includes(job(n,id))?st.spellDamage:st.damage,targets:[],worn:paid,attunement:F()?.attunement(st.weapon)||null};a.attack=st.interval;if(paid)wear(n,id,st.weapon);}
     const healing=(1+pv(n,'herbalism',id)/100+stats(n,id).heal)*(id==='hero'?1+.02*(level(n,id)-1):1);
     const support=1+stats(n,id).support;
-    if(s.effect==='guard')setBuff(n,id,'guard',s.params?.duration??8,power*support);
+    if(s.effect==='guard')(s.params?.area?near.filter(k=>hp(n,k)>0):[id]).forEach(k=>setBuff(n,k,'guard',s.params?.duration??8,power*support));
     if(s.effect==='robot_guard')setBuff(n,id,'robot_guard',6,power);
     if(s.effect==='robot_speed')setBuff(n,id,'robot_speed',8,power);
     if(s.effect==='robot_restore')heal(n,id,power,{mechanical:true});
     if(s.effect==='mech_aid'){G.shield(n,id,maxHp(n,id)*.35*G.modifiers(n,id,s.id).power,id);if(target!==id)G.shield(n,target,maxHp(n,target)*.2*G.modifiers(n,id,s.id).power,id);}
     if(s.effect==='barrier')G.shield(n,target,power*support*(id==='hero'?1+.02*(level(n,id)-1):1),id);
     if(s.effect==='ward')setBuff(n,target,'ward',power*support,1);
+    if(s.effect==='regen')setBuff(n,target,'regen',s.params?.duration??10,power*healing);
+    if(s.effect==='kami')near.filter(k=>hp(n,k)>0).forEach(k=>{purge(n,k);G.shield(n,k,maxHp(n,k)*power/100*(id==='hero'?1+.02*(level(n,id)-1):1),id);});
     if(s.effect==='rally')near.filter(k=>hp(n,k)>0).forEach(k=>setBuff(n,k,'rally',s.params?.duration??10,power));
     if(s.effect==='speed')near.filter(k=>hp(n,k)>0).forEach(k=>setBuff(n,k,'speed',s.params?.duration??20,power));
     if(s.effect==='polish')setBuff(n,target,'polish',s.params?.duration??20,power);
@@ -532,14 +547,16 @@
     if(s.effect==='revive')setHp(n,target,Math.ceil(maxHp(n,target)*power/100));
     if(s.effect==='repair')repairGear.durability=Math.min(repairGear.maxDurability,repairGear.durability+(s.id==='repair'?X().emergencyRepairAmount(repairGear,8+2*(l-1)):Math.round(power)));
     if(s.effect==='reveal')setBuff(n,id,'path_eye',8,power);
-    if(s.effect==='cleanse'){actor(n,target).buffs=actor(n,target).buffs.filter(b=>b.id!=='slow');F()?.clear(n,target);setBuff(n,target,'ward',3,1);if(target===state(n).active)n.party.slowLeft=0;}
+    if(s.effect==='cleanse')purge(n,target);
     if(s.effect==='daylight'){n.party.light.daylight=600;n.party.light.cooldown=600;setBuff(n,id,'daylight',600,power);}
     G.afterCast(n,id,s,near);
     sync(n);return {ok:true,message:s.name,effect};
   });}
+  // Strip slow and every affliction from one actor and ward the next few seconds (cleanse, harae, kami).
+  function purge(run,k){actor(run,k).buffs=actor(run,k).buffs.filter(b=>b.id!=='slow');F()?.clear(run,k);setBuff(run,k,'ward',3,1);if(k===state(run).active)run.party.slowLeft=0;}
   function food(run,id=state(run)?.active){const power=pv(run,'nourishment',id);if(power)setBuff(run,id,'regen',10,power/10);}
   function speed(run,id=state(run)?.active){const light=Object.values(equipment(run,id)||{}).filter(g=>g&&g.durability>0&&g.slot!=='weapon'&&g.forge?.trait==='light').reduce((sum,g)=>sum+g.forge.level,0);return (job(run,id)==='robot'?.9*(ROBOT.powered(run,id)?1:ROBOT.EMPTY_SPEED):1)*(buff(run,'robot_guard',id)?.5:1)*(1+(pv(run,'fleet',id)+pv(run,'leaf_steps',id))/100+(buff(run,'speed',id)?.power||0)/100+(buff(run,'robot_speed',id)?.power||0)/100+(buff(run,'escape',id)?.power||0)/100)*(buff(run,'slow',id)?.power||1)*(1+Math.min(2,light)*.03)*C().hasteMultiplier(run,id)*(F()?.movement(run,id)??1);}
-  function inflict(run,id,key,seconds,power){const ward=buff(run,'ward',id);if(ward?.power>0){ward.power=0;ward.left=0;return false;}setBuff(run,id,key,seconds*(1-(pv(run,'purity',id)+(key==='slow'?pv(run,'stable_feet',id):0))/100),power);return true;}
+  function inflict(run,id,key,seconds,power){const ward=buff(run,'ward',id);if(ward?.power>0){ward.power=0;ward.left=0;return false;}setBuff(run,id,key,seconds*(1-(pv(run,'purity',id)+pv(run,'kiyome',id)+(key==='slow'?pv(run,'stable_feet',id):0))/100),power);return true;}
   function noteMovement(run,id,moving,dt){const a=actor(run,id);if(!a?.robot||!Number.isFinite(dt)||dt<0||dt>.5)return;if(moving||hp(run,id)<=0){a.robot.stationary=0;a.robot.calibrationReady=false;}else if(pv(run,'power_calibration',id)&&a.robot.calibrationLeft<=0){a.robot.stationary=Math.min(1,a.robot.stationary+dt);if(a.robot.stationary>=1)a.robot.calibrationReady=true;}}
   function hungerScale(run){if(ids(run).every(id=>job(run,id)==='robot'||hp(run,id)<=0))return 0;return Math.max(.4,(1-teamPassive(run,'endurance')/100)*(1-Math.max(0,...ids(run).filter(id=>hp(run,id)>0).map(id=>buff(run,'stomach',id)?.power||0))/100));}
   function toolSpent(run){if(!enabled(run))return;run.engine.shovels=Math.max(0,run.engine.shovels-1);for(const id of ids(run)){const cd=pv(run,'tool_supply',id);if(cd)actor(run,id).tool=cd;}}
@@ -572,7 +589,7 @@
   }
   function validate(value,party){
     const bodyBonus=party.profession==='robot'&&value?.actors?.hero?.passives?.includes('robot_body')?5*(value.level>=10?6:Math.min(5,value.level)):0;
-    if(!value||value.version!==1||!(value.xpScale===undefined||value.xpScale===10||value.xpScale===G.XP_SCALE)||!num(value.level,1,party.floor<0?15:10,true)||!num(value.xp,0,100000,true)||!num(value.heroHp,0,P().vitalHp(party.profession,value.level,true,value.actors?.hero?.attrs?.vit)+bodyBonus)||!num(value.switchLeft,0,1))return null;
+    if(!value||value.version!==1||!(value.xpScale===undefined||value.xpScale===10||value.xpScale===G.XP_SCALE)||!(value.xpCurve===undefined||value.xpCurve===G.XP_CURVE)||!num(value.level,1,party.floor<0?15:10,true)||!num(value.xp,0,100000,true)||!num(value.heroHp,0,P().vitalHp(party.profession,value.level,true,value.actors?.hero?.attrs?.vit)+bodyBonus)||!num(value.switchLeft,0,1))return null;
     // Replace the retired random skill without deleting a save, changing order,
     // refunding resources or retaining its old ten-minute skill cooldown.
     value=clone(value);
@@ -614,10 +631,10 @@
     const enemy={};for(const[k,e]of Object.entries(value.enemy)){if(!C().validMonsterId(k,party.floor)||!e||Object.keys(e).some(key=>!['slow','slowPower','root','blind','weak','mark','tauntLeft','tauntId','relay','relayCooldown','relayWeak','relayOwner'].includes(key))||Object.entries(e).some(([key,v])=>['tauntId','relayOwner'].includes(key)?!expected.includes(v):!num(v,0,key==='root'?3:60)))return null;enemy[k]={...e};}
     if(!Array.isArray(value.removedTraps)||value.removedTraps.length>30||!value.removedTraps.every(s=>typeof s==='string'&&s.length<100))return null;
     // Migrate existing progress once; preserve levels/skills and fractional progress.
-    const xp=Math.min(100000,value.xp*(value.xpScale===undefined?10:1));
+    const xp=Math.min(100000,G.migrateXp(value.xp*(value.xpScale===undefined?10:1),value.level,value.xpCurve));
     const afflictions=F()?.validate(value.afflictions,{actors:expected,floor:party.floor});if(afflictions===null)return null;
-    return {removedTraps:[...value.removedTraps],version:1,xpScale:G.XP_SCALE,active:value.active,level:value.level,xp,heroHp:value.heroHp,switchLeft:value.switchLeft,actors,enemy,growth,...(afflictions?{afflictions}:{})};
+    return {removedTraps:[...value.removedTraps],version:1,xpScale:G.XP_SCALE,xpCurve:G.XP_CURVE,active:value.active,level:value.level,xp,heroHp:value.heroHp,switchLeft:value.switchLeft,actors,enemy,growth,...(afflictions?{afflictions}:{})};
   }
   function validEquipment(run){if(!enabled(run))return true;const seen=new Set();for(const g of allGear(run)){if(seen.has(g.id)||(GEAR[g.kind]?.tier>3||X().TRAITS[g.forge?.trait]?.underground)&&!C().isUnderworld(run))return false;seen.add(g.id);}if(run.gearBag.some(ROBOT.isPart)||Object.values(G.state(run).imprints).some(mark=>ROBOT.isCore(allGear(run).find(g=>g.id===mark.gearId))))return false;return ids(run).every(id=>!!validateActorEquipment(equipment(run,id),job(run,id),level(run,id),run.floor));}
-  return Object.freeze({ATTRIBUTES,ATTRIBUTE_NAMES,FREE_POINTS_PER_LEVEL,AUTO_POINTS_PER_LEVEL,ATTRIBUTE_STEP,ATTRIBUTE_BASE,ATTRIBUTE_GROWTH,ATTRIBUTE_PLAN,CRIT_BASE,CRIT_DEFAULT,CRIT_MULTIPLIER,DAMAGE_RECORD_LIMIT,attrs,attr,freePoints,unspentPoints,attributeAllowed,critChance,autoSpend,validAttrs,settleAttributes,allocate,setAttributeAuto,forgetAttributes,attributeSheet,COOLDOWN_SCALE,SPIRIT,mpMax,maxMp,mp,mpRegen,mpReady,restoreMp,xpProgress,hpCeiling,upgradeFor,upgradeGain,finishMonster,killXp,SURFACE_XP_DEPTH,HUNT_XP,switchRaw,ROBOT,robotUpgradeQuote:ROBOT.upgradeQuote,upgradeRobot:ROBOT.upgrade,JOBS,GEAR,BASE_GEAR,TIER_NAMES,tierKind,gearPool,SKILLS,PASSIVES,SLOTS,PREPARATION,PREPARATION_REDUCTION,preparationSeconds,scale:readScale,state,enabled,ids,job,sex,level,maxLevel,experience,actor,maxHp,hp,equipment,equipmentSlots,validateActorEquipment,pv,teamPassive,buff,tauntTargetLimit,applyTaunt,setBuff,draft,reorderSkills,showHeadgear,preview,enable,addMember,recruitSnapshot,restoreMember,validateRecruitSnapshot,removeMember,sync,setHp,returnToHero,switchActor,followerRecords,canLearn,learnCompanion,allGear,canEquip,equip,unequip,stats,wear,durabilityWarnings,hurt,heal,organicHealable,gainXp,ranged,fireProjectile,fireArrow,strike,cast,food,speed,inflict,noteMovement,hungerScale,toolSpent,rescueChoice,tick,advance,validate,validEquipment,roll});
+  return Object.freeze({ATTRIBUTES,ATTRIBUTE_NAMES,FREE_POINTS_PER_LEVEL,AUTO_POINTS_PER_LEVEL,ATTRIBUTE_STEP,ATTRIBUTE_BASE,ATTRIBUTE_GROWTH,ATTRIBUTE_PLAN,CRIT_BASE,CRIT_DEFAULT,CRIT_MULTIPLIER,DAMAGE_RECORD_LIMIT,attrs,attr,freePoints,unspentPoints,attributeAllowed,critChance,autoSpend,validAttrs,settleAttributes,allocate,setAttributeAuto,forgetAttributes,attributeSheet,COOLDOWN_SCALE,SPIRIT,BOW_JOBS,mpCost,mpMax,maxMp,mp,mpRegen,mpReady,restoreMp,xpProgress,hpCeiling,upgradeFor,upgradeGain,finishMonster,killXp,SURFACE_XP_DEPTH,HUNT_XP,switchRaw,ROBOT,robotUpgradeQuote:ROBOT.upgradeQuote,upgradeRobot:ROBOT.upgrade,JOBS,GEAR,BASE_GEAR,TIER_NAMES,tierKind,gearPool,SKILLS,PASSIVES,SLOTS,PREPARATION,PREPARATION_REDUCTION,preparationSeconds,scale:readScale,state,enabled,ids,job,sex,level,maxLevel,experience,actor,maxHp,hp,equipment,equipmentSlots,validateActorEquipment,pv,teamPassive,buff,tauntTargetLimit,applyTaunt,setBuff,draft,reorderSkills,showHeadgear,preview,enable,addMember,recruitSnapshot,restoreMember,validateRecruitSnapshot,removeMember,sync,setHp,returnToHero,switchActor,followerRecords,canLearn,learnCompanion,allGear,canEquip,equip,unequip,stats,wear,durabilityWarnings,hurt,heal,organicHealable,gainXp,ranged,fireProjectile,fireArrow,strike,cast,food,speed,inflict,noteMovement,hungerScale,toolSpent,rescueChoice,tick,advance,validate,validEquipment,roll});
 });

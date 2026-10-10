@@ -5,8 +5,8 @@ import {provisionTravellers} from './recruit-fixtures.mjs';
 const require=createRequire(import.meta.url),C=require('../story/story-core.js'),P=require('../story/tower-party-core.js'),N=require('../story/tower-narrative.js'),D=require('../story/tower-dungeons.js');
 const fresh=(job='swordsman')=>P.enable(C.newRun({seed:31415,name:'遠征者'}),job).run;
 function floor(run,f){run.floor=f;run.floorsCleared=99-f;run.chronicle=N.newChronicle(f);run.expedition=D.newExpedition();run.claimed=[];run.defeatedMonsters=[];run.monsterStuns={};P.advance(run);assert.ok(C.validateSave(run));return run;}
-test('eight profession definitions upgrade once and preserve paid guard as one of three companions',()=>{
-  assert.equal(Object.keys(P.PROFESSIONS).length,8);
+test('nine profession definitions upgrade once and preserve paid guard as one of three companions',()=>{
+  assert.equal(Object.keys(P.PROFESSIONS).length,9);
   let old=C.newRun({seed:31415});old=C.hireWarrior(old,C.warriorOffer(99,old.seed).id).run;
   const before=JSON.stringify(old),next=P.enable(old,'chef');assert.equal(next.ok,true);assert.equal(JSON.stringify(old),before);
   assert.equal(next.run.party.members.length,1);assert.equal(next.run.party.members[0].profession,'swordsman');assert.equal(next.run.party.members[0].level,old.warrior.strength);assert.equal(next.run.warrior,null);

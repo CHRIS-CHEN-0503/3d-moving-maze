@@ -3,8 +3,8 @@ import assert from 'node:assert/strict';
 import {C,P,H,G,Co,fixture,add} from './tower-cooperation-fixtures.mjs';
 import F from '../story/tower-affixes.js';
 
-test('eleven read-only cooperations retain the original eight and include all eight jobs with real owned skill icons',()=>{
-  assert.equal(Co.DEFINITIONS.length,11);assert.equal(Co.DEFINITIONS.filter(d=>d.underground&&d.participants.length===3).length,3);
+test('twelve read-only cooperations retain the original eight and include all nine jobs with real owned skill icons',()=>{
+  assert.equal(Co.DEFINITIONS.length,12);assert.equal(Co.DEFINITIONS.filter(d=>d.underground&&d.participants.length===3).length,3);
   assert.deepEqual(Co.DEFINITIONS.slice(0,8).map(d=>d.id),['thunder_blades','cross_hunt','forged_opening','warm_radiance','leaf_return','starforge_guard','dawn_breach','forest_recovery']);
   assert.deepEqual([...new Set(Co.DEFINITIONS.flatMap(d=>d.participants.map(p=>p.job)))].sort(),Object.keys(H.JOBS).sort());
   for(const d of Co.DEFINITIONS){assert.ok(Object.isFrozen(d));assert.ok(Object.isFrozen(d.participants));assert.equal(d.iconKeys.length,d.participants.length);assert.equal(d.preparation,d.participants.length===3?.9:.5);assert.ok(d.cooldown<=55);for(const p of d.participants)assert.equal(H.SKILLS[p.skill].job,p.job);}

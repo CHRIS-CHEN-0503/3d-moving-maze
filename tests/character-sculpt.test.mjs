@@ -2,7 +2,7 @@ import test from 'node:test';import assert from 'node:assert/strict';import {cre
 const require=createRequire(import.meta.url),T=require('../lib/three.min.js'),S=require('../assets/character-sculpt.js'),F=require('../assets/character-face.js'),H=require('../story/tower-heroes-core.js'),P=require('../story/tower-party-core.js'),html=readFileSync(new URL('../index.html',import.meta.url),'utf8');
 function env(){const e=vm.createContext({THREE:T,CharacterSculpt:S,CharacterFace:F,TowerHeroes:H,TowerPartyCore:P});e.window=e;const start=html.indexOf('function buildCharacter(cd)'),end=html.indexOf('\n}',start)+2;vm.runInContext(html.slice(start,end),e);vm.runInContext(readFileSync(new URL('../story/tower-heroes-visuals.js',import.meta.url),'utf8'),e);return e;}
 function budget(model){let triangles=0,meshes=0;model.traverse(o=>{if(o.isMesh){meshes++;triangles+=(o.geometry.index?.count??o.geometry.attributes.position.count)/3;assert.equal(o.material.map,null);}assert.ok(!o.isLight);});return {triangles,meshes};}
-test('seven male/female job silhouettes have sculpted heads, torsos and limbs without heavy textures',()=>{
+test('eight male/female job silhouettes have sculpted heads, torsos and limbs without heavy textures',()=>{
   const e=env(),shapes=new Set();for(const job of Object.keys(H.JOBS).filter(job=>job!=='robot'))for(const sex of ['male','female']){const model=e.TowerHeroVisuals.base(job,e.buildCharacter,'hero',sex);assert.equal(model.userData.headMesh.geometry.type,'SphereGeometry');assert.equal(model.userData.body.geometry.type,'LatheGeometry');assert.equal(model.userData.armR.geometry.type,'LatheGeometry');assert.equal(model.userData.legR.geometry.type,'LatheGeometry');assert.equal(model.userData.heroSex,sex);shapes.add(model.userData.heroShape);assert.ok(budget(model).triangles<7000);assert.ok(budget(model).meshes<65);model.updateMatrixWorld(true);const b=new T.Box3().setFromObject(model);assert.ok(b.max.y<3&&b.min.y>-.1);}
   assert.equal(shapes.size,7);assert.ok(html.indexOf('character-sculpt.js')<html.indexOf('function buildCharacter'));
 });
@@ -13,14 +13,14 @@ test('all three armor families have shaped body volume and rounded helmets, reta
   const e=env();for(const kind of ['heavy_armor','light_armor','robe']){const gear=e.TowerHeroVisuals.gear(T,kind);assert.ok(gear.children.some(o=>o.geometry?.type==='LatheGeometry'));assert.ok(budget(gear).triangles<4000);}for(const kind of ['heavy_helm','light_hood']){const gear=e.TowerHeroVisuals.gear(T,kind);assert.ok(gear.children.some(o=>o.geometry?.type==='SphereGeometry'));assert.equal(gear.userData.baseKind,kind);}
 });
 function fingerprint(model){const parts=[];model.traverse(o=>{if(o.isMesh)parts.push([o.name,o.geometry.type,Array.from(o.geometry.attributes.position.array),o.material.color.getHex(),o.position.toArray(),o.scale.toArray()]);});return createHash('sha256').update(JSON.stringify(parts)).digest('hex');}
-test('fourteen adult variants have different facial sculpture, eyebrows, hair and palettes, including with helmets',()=>{
+test('sixteen adult variants have different facial sculpture, eyebrows, hair and palettes, including with helmets',()=>{
   const e=env(),faces=new Set(),looks=new Set();for(const job of Object.keys(H.JOBS).filter(job=>job!=='robot')){
     const models=['male','female'].map(sex=>e.TowerHeroVisuals.base(job,e.buildCharacter,'traveller',sex));
     for(const model of models){const head=model.userData.head;faces.add(JSON.stringify(Array.from(model.userData.headMesh.geometry.attributes.position.array)));looks.add(fingerprint(head));assert.equal(model.userData.adultDesign,true);assert.equal(model.userData.face.lids.length,2);assert.equal(model.userData.face.lips.length,2);assert.ok(head.children.find(c=>c.name==='nose-bridge'));assert.equal(head.children.filter(c=>c.name==='nostril').length,2);}
     assert.notDeepEqual(models[0].scale.toArray(),models[1].scale.toArray(),job);assert.notEqual(e.TowerHeroVisuals.style(job,'male').hair,e.TowerHeroVisuals.style(job,'female').hair,job);
     const helmet=H.JOBS[job].armor==='heavy'?'heavy_helm':H.JOBS[job].armor==='robe'?'rune_crown':'light_hood';
     for(const model of models){e.TowerHeroVisuals.dress(T,model,{helmet:{kind:helmet,slot:'helmet',durability:9},armor:null,weapon:null,shield:null},()=>{});assert.equal(model.userData.heroPieces[0].userData.wearVariant,model.userData.heroSex);const hair=model.userData.head.children.find(c=>c.name==='profession-hair');assert.ok(hair);assert.equal(hair.visible,!model.userData.knightSculpt,'only the male knight short cut fits fully under his helmet');}
-  }assert.ok(faces.size>=10);assert.equal(looks.size,14);
+  }assert.ok(faces.size>=10);assert.equal(looks.size,16);
 });
 test('all three tiers of clothing adapt male/female geometry without mutating equipment or adding equip locks',()=>{
   const e=env();for(const [base,job]of [['heavy_armor','swordsman'],['light_armor','scout'],['robe','mage'],['heavy_helm','smith'],['light_hood','chef'],['rune_crown','healer']])for(const tier of [1,2,3]){

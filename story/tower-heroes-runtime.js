@@ -114,7 +114,7 @@
       return true;
     }
     function targets(origin,range,angle=-1,actorId=H.state(r()).active){const facing=actorId===H.state(r()).active?(ctx.player()?.rotation.y||0):(ctx.actors().find(a=>a.id===actorId)?.model.rotation.y||0);return ctx.monsters().filter(m=>m.alive&&distance(origin,m.model.position)<=range&&clear(origin,m.model.position)&&Math.cos(Math.atan2(m.model.position.x-origin.x,m.model.position.z-origin.z)-facing)>=angle);}
-    const skillRange=(s,id)=>s.params?.reach||s.params?.radius||(s.job==='archer'?H.stats(r(),id).reach:['bolt','weak','slow','mark','thorns','starfall','star_ring'].includes(s.effect)?8:3.5);
+    const skillRange=(s,id)=>s.params?.reach||s.params?.radius||(H.BOW_JOBS.includes(s.job)?H.stats(r(),id).reach:['bolt','weak','slow','mark','thorns','starfall','star_ring'].includes(s.effect)?8:3.5);
     function faceTarget(point){const player=ctx.player();if(!player)return;const angle=Math.atan2(point.x-G.px,point.z-G.pz);if(!Number.isFinite(angle))return;G.heading=angle;player.rotation.y=angle;}
     // Opt-in aim assistance never moves the actor/camera and never controls an
     // AI companion. Both current visibility and unobstructed range are required.
@@ -125,7 +125,7 @@
       if(target)faceTarget(target.model.position);return target||null;
     }
     function hit(m,id,skillId,shot=false){const result=ctx.hit(m,id===H.state(r()).active?null:id,skillId,shot);if(result?.effect?.repel&&m.alive&&!m.lord){const p=m.model.position,o=pos(id),d=distance(p,o)||1,total=result.effect.knockback||1.7,dx=(p.x-o.x)/d,dz=(p.z-o.z)/d;for(let step=0;step<total;step+=.15){const length=Math.min(.15,total-step),n={x:p.x+dx*length,z:p.z+dz*length};if(!clear(p,n)||!ctx.walkClear(p,n))break;p.x=n.x;p.z=n.z;}m.path=[];m.windup=0;}return result;}
-    function projectile(m,id,skillId=null,shot=false,range=8){const o=pos(id),s=H.SKILLS[skillId],arrow=(shot?H.actor(r(),id).shot?.kind==='arrow':s?.job==='archer'),robot=s?.job==='robot',job=s?.job||H.job(r(),id),model=new T.Group(),kit=projectileKit(T),color=arrow?0xead9a7:robot?0xe4be76:job==='healer'?0xffe6a0:0xbcb3ff,material=kit.body(color);
+    function projectile(m,id,skillId=null,shot=false,range=8){const o=pos(id),s=H.SKILLS[skillId],arrow=(shot?H.actor(r(),id).shot?.kind==='arrow':H.BOW_JOBS.includes(s?.job)),robot=s?.job==='robot',job=s?.job||H.job(r(),id),model=new T.Group(),kit=projectileKit(T),color=arrow?0xead9a7:robot?0xe4be76:job==='healer'?0xffe6a0:0xbcb3ff,material=kit.body(color);
       if(robot){const fist=new T.Mesh(kit.fist,material);fist.scale.set(1,.85,1.15);model.add(fist);for(let i=0;i<3;i++){const knuckle=new T.Mesh(kit.knuckle,material);knuckle.position.set((i-1)*.12,.06,.22);model.add(knuckle);}const cuff=new T.Mesh(kit.cuff,kit.cuffMaterial);cuff.rotation.x=Math.PI/2;cuff.position.z=-.23;model.add(cuff);}else if(arrow){const shaft=new T.Mesh(kit.shaft,material);shaft.rotation.x=Math.PI/2;model.add(shaft);const tip=new T.Mesh(kit.tip,kit.tipMaterial);tip.rotation.x=Math.PI/2;tip.position.z=.43;model.add(tip);}else{model.add(new T.Mesh(kit.core,material));for(let i=0;i<2;i++)model.add(new T.Mesh(kit.haloGeometry[i],kit.haloMaterial(color,i)));}
       const angle=m?Math.atan2(m.model.position.x-o.x,m.model.position.z-o.z):actorModel(id)?.rotation.y||0;
       model.name=robot?'robot-flying-fist':arrow?'elven-arrow-projectile':'light-orb-projectile';model.position.set(o.x,1.12,o.z);model.rotation.y=angle;ctx.world().add(model);if(fx.length>=24){const old=fx.shift();old.model.parent?.remove(old.model);}fx.push({model,left:1.5,total:1.5,target:m,id,skillId,shot,straight:robot,range,dx:Math.sin(angle),dz:Math.cos(angle)});return model;
@@ -189,6 +189,7 @@
         pending.push({id:actorId,skillId,targetId:targetId||actorId,enemyId:preferred?.id||null,left:seconds,total:seconds,at,controlled:actorId===H.state(r()).active,glow:glow(skillId,origin,{stage:'charge',duration:seconds}),targetGlow:aimed&&s.effect!=='decisive'?glow(skillId,at,{duration:seconds}):null,stopSound:actionSound(s,actorId,'charge',seconds)});motion(actorId,'charge',seconds,s);hud(true);return true;
       }
       if(!commit(result))return;actionSound(s,actorId);const e=result.effect;motion(actorId,e.kind==='disarm'?'charge':'skill',e.kind==='disarm'?e.power:.85,s);
+      if(!s.attack&&H.job(r(),actorId)==='cleric')root.TowerHeroVisuals?.pray?.(actorModel(actorId),1.1);
       if(['heal','revive','sanctuary'].includes(e.kind))specialty('healer',actorId);
       if(['guard','taunt'].includes(e.kind)&&s.job==='swordsman')specialty('swordsman',actorId);
       if(e.kind==='escape')growth.startRoute(actorId);if(e.attack)attackSkill(actorId,skillId,preferred);else glow(skillId,pos(e.targetId||actorId)||origin);

@@ -67,8 +67,8 @@ test('twenty apply/restore cycles leave no private material or UV geometry alive
   }
   assert.equal(maps.size,3);const mapCounts=watch(maps),pending=session.apply(f.model),privateCounts=watch([...resources(f.model)].filter(r=>!borrowed.has(r)&&!r.isTexture));assert.equal(session.dispose(),true);assert.equal(session.dispose(),false);assert.equal(pending.restore(),false);assertRows(before);assert.ok([...mapCounts.values()].every(n=>n===1));assert.ok([...privateCounts.values()].every(n=>n===1));assert.ok([...borrowedCounts.values()].every(n=>n===0));for(const resource of borrowed)resource.dispose();
 });
-test('all sixteen true profession/sex actor variants preserve original sculpture and face while stage surfaces restore safely',()=>{
-  const env=trueHeroes(),jobs=Object.keys(env.TowerHeroes.JOBS);assert.equal(jobs.length,8);const session=Look.create({THREE:T});
+test('all eighteen true profession/sex actor variants preserve original sculpture and face while stage surfaces restore safely',()=>{
+  const env=trueHeroes(),jobs=Object.keys(env.TowerHeroes.JOBS);assert.equal(jobs.length,9);const session=Look.create({THREE:T});
   for(const job of jobs)for(const sex of ['male','female']){
     const actor=env.TowerHeroVisuals.base(job,env.buildCharacter,'hero',sex),before=rows(actor),original=resources(actor),counts=watch(original),face=actor.userData.face,eyeMaterials=face.eyes.map(node=>node.material),mouth=face.mouth.material,handle=session.apply(actor);
     for(let i=0;i<face.eyes.length;i++)assert.equal(face.eyes[i].material,eyeMaterials[i],job+sex+' eye');assert.equal(face.mouth.material,mouth);assert.equal(actor.userData.heroJob,job);assert.equal(actor.userData.heroSex,sex);

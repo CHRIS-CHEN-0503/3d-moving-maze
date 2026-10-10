@@ -65,12 +65,16 @@ function surfaceLevels(share,seed=777){
 }
 // The first floor reached at the surface cap of level 10.
 const capFloor=levels=>{for(let floor=99;floor>=1;floor--)if(levels[floor]===10)return floor;return 0;};
-test('pacing: clearing 85% of the tower reaches level 10 around floor 10; full clears a little sooner, 60% only near the end; the early chapters keep their pace',()=>{
+// The first floor at or above a level.
+const firstAt=(levels,l)=>{for(let floor=99;floor>=1;floor--)if(levels[floor]>=l)return floor;return 0;};
+test('pacing (v1.59.1 curve, 1.5x thresholds): 85% clear is level 3 near floor 79, level 9 near floor 3 and never 10 on the surface; full clears run a few floors ahead, 60% ends at 8',()=>{
   for(const seed of [777,1031,4242,90210,31337]){
     const all=surfaceLevels(1,seed),most=surfaceLevels(.85,seed),some=surfaceLevels(.6,seed);
-    const at=capFloor(most);assert.ok(at>=8&&at<=13,seed+': 85% clear reaches the surface cap around floor 10, not '+at);
-    assert.ok(capFloor(all)>at&&capFloor(all)<=17,seed+': a full clear gets there a few floors sooner');assert.ok(capFloor(some)<at&&capFloor(some)<=5,seed+': 60% clear only near the end');
-    for(const levels of [most,some]){assert.ok(levels[90]>=2&&levels[85]<=3,seed+' early');assert.ok(levels[80]>=3,seed+': three companions for the floor 80 queen');}
+    assert.equal(capFloor(most),0,seed+': level 10 waits for the underground');assert.equal(capFloor(all),0,seed+': even a full clear ends the surface at 9');
+    const two=firstAt(most,2),three=firstAt(most,3),five=firstAt(most,5),nine=firstAt(most,9);
+    assert.ok(two>=86&&two<=92,seed+': level 2 near floor 89, not '+two);assert.ok(three>=75&&three<=82,seed+': level 3 near floor 79, not '+three);assert.ok(five>=49&&five<=57,seed+': level 5 near floor 53, not '+five);assert.ok(nine>=1&&nine<=8,seed+': level 9 in the last chapter, not '+nine);
+    assert.equal(most[1],9,seed+': 85% clear walks out of the tower at 9');assert.ok(firstAt(all,9)>nine,seed+': a full clear gets to 9 a few floors sooner');assert.equal(some[1],8,seed+': 60% clear ends at 8');assert.equal(firstAt(some,9),0);
+    for(const levels of [most,some]){assert.ok(levels[90]>=1&&levels[85]<=2,seed+' early');assert.ok(levels[80]>=2,seed+': at least two companions for the floor 80 queen');}
   }
 });
 test('pacing: the underground from level 10 reaches level 15 by its last floor at 85% clear',()=>{

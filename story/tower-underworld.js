@@ -79,7 +79,7 @@
   function chapterForFloor(floor){if(!isFloor(floor))throw new RangeError('地下樓層必須為 -1 至 -50。');return CHAPTERS.find(c=>floor<=c.high&&floor>=c.low);}
   function floorConfig(floor,seed=1){
     const chapter=chapterForFloor(floor);if(!Number.isInteger(seed)||seed<1||seed>0xffffffff)throw new RangeError('無效的旅程種子。');
-    const depth=-floor,monsterMin=chapter.size===21?8:7,monsterMax=monsterMin+4;
+    const depth=-floor,monsterMin=chapter.size===21?9:8,monsterMax=Math.min(12,monsterMin+4);
     let roll=(seed^Math.imul(floor,0x9e3779b9))>>>0;roll=Math.imul(roll^roll>>>16,0x21f0aaad);roll=Math.imul(roll^roll>>>15,0x735a2d97);
     const monsterCount=monsterMin+((roll^roll>>>15)>>>0)%(monsterMax-monsterMin+1);
     // Underground pacing is independent: 51s at B1, minus 0.5s per floor,

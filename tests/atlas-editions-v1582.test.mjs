@@ -38,7 +38,7 @@ test('the player guide is short, plain and covers the essentials; every detailed
   assert.deepEqual(headings(detailed),DETAILED,'the detailed edition keeps every rule section in order');
   for(const section of guide.split('<section>').slice(1))assert.ok(section.replace(/<[^>]+>/g,'').length<260,'each guide section stays short: '+section.slice(0,30));
   for(const jargon of [/存檔驗證|存檔格式|舊存檔|遷移|程式|著色器|重編譯|編號|種子|決定性|累計進度|世界距離單位|%|×|258|SURFACE/])assert.doesNotMatch(guide.replace(/<[^>]+>/g,''),jargon);
-  for(const fact of ['第 10 層前後','「獵」','12 枚銅幣','技能光影預覽.html','本頁不會讀取或改動你的存檔'])assert.ok(guide.includes(fact),fact);
+  for(const fact of ['地下第 3 層前後','各自累積經驗','「獵」','12 枚銅幣','技能光影預覽.html','本頁不會讀取或改動你的存檔'])assert.ok(guide.includes(fact),fact);
   assert.match(block('gmData'),/<details class="rules gm-data" id="gmData" data-edition-only="gm" open>/);assert.match(html,/<aside class="gm-banner" data-edition-only="gm"[^>]*>[\s\S]*?<a href="職業裝備圖鑑.html">切換到玩家版<\/a><\/aside>/);
 });
 

@@ -45,13 +45,13 @@ test('malformed journey, boss charge and forged gear fail closed',()=>{
   for(const change of [r=>r.party.journey.scrap=-1,r=>r.party.journey.site.done=true,r=>r.party.journey.site.progress=13,r=>r.party.boss=null,r=>r.party.boss.charges[0]=3,r=>r.party.boss.lastCycles[0]=10]){const r=fresh(20);change(r);assert.equal(C.validateSave(r),null);}
   for(const f of [{trait:'grip',level:1,reserve:0},{trait:'__proto__',level:1,reserve:0},{trait:'durable',level:3,reserve:6},{trait:'durable',level:1,reserve:3}]){const r=fresh();r.equipment.weapon.forge=f;assert.equal(C.validateSave(r),null);}
 });
-test('all eight optional sites have profession and no-cost time alternatives; rewards never repeat',()=>{
+test('all nine optional sites have profession and no-cost time alternatives; rewards never repeat',()=>{
   const seen=new Set();for(let seed=1;seed<60;seed++){
     let r=fresh(99,'swordsman',seed),site=X.siteOffer(r);seen.add(site.job);r.party.profession=site.job;
     const result=X.explore(r,site.id,'profession',r.revision);assert.equal(result.ok,true);assert.equal(result.run.party.journey.site.done,true);assert.equal(X.explore(result.run,site.id,'profession').ok,false);
     r=fresh(99,site.job==='mage'?'chef':'mage',seed);assert.equal(X.explore(r,site.id,'profession').ok,false);assert.equal(X.explore(r,site.id,'work').ok,false);
     r.party.journey.site.progress=12;assert.equal(X.explore(r,site.id,'work').ok,true);assert.equal(r.party.journey.site.done,false);assert.equal(X.siteOffer(fresh(90)),null);
-  }assert.equal(seen.size,8);
+  }assert.equal(seen.size,9);
 });
 test('forging is revision guarded, class-discounted, one immutable trait and two ranks only',()=>{
   let r=fresh(99,'smith');r.coins=100;r.party.journey.scrap=30;r.party.journey.materials.ironore=3;const id=r.equipment.weapon.id,rev=r.revision;

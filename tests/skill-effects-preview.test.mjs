@@ -19,8 +19,8 @@ function setup(reduced=false){
   return {env,elements,refs,events,raf,get disposed(){return disposed;},frame(ms=50){time+=ms;const row=raf.entries().next().value;assert.ok(row);raf.delete(row[0]);row[1](time);},click(id){elements.get(id).listeners.click();}};
 }
 
-test('skill preview loads real catalog dependencies, offers eight professions and every current active skill without the removed daylight skill',()=>{
-  const f=setup(),H=f.env.TowerHeroes,all=Object.values(H.SKILLS),preview=f.env.skillPreview;assert.equal(all.length,72);assert.equal(preview.skills.length,all.length);assert.equal(f.elements.get('choices').children.length,Object.keys(H.JOBS).length);assert.equal(f.elements.get('count').textContent,'8 職業 · 72 招');assert.equal(preview.skills.includes('daylight'),false);
+test('skill preview loads real catalog dependencies, offers nine professions and every current active skill without the removed daylight skill',()=>{
+  const f=setup(),H=f.env.TowerHeroes,all=Object.values(H.SKILLS),preview=f.env.skillPreview;assert.equal(all.length,81);assert.equal(preview.skills.length,all.length);assert.equal(f.elements.get('choices').children.length,Object.keys(H.JOBS).length);assert.equal(f.elements.get('count').textContent,'9 職業 · 81 招');assert.equal(preview.skills.includes('daylight'),false);
   for(const skill of all){assert.equal(preview.selectSkill(skill.id),true);assert.equal(preview.current,skill.id);assert.equal(f.elements.get('skill-select').value,skill.id);assert.equal(f.elements.get('skill-select').options.length,all.filter(row=>row.job===skill.job).length);assert.ok(f.elements.get('skill-select').options.every(option=>H.SKILLS[option.value].job===skill.job));assert.ok(preview.stats().groups>0,skill.id+' emits actual game effects');assert.equal(f.elements.get('description').textContent,skill.description);assert.ok(f.env.TowerHeroIcons.svg(skill.id),skill.id+' has game icon');}
   assert.equal(preview.selectSkill('daylight'),false);assert.equal(preview.show(-1),false);assert.equal(preview.show(0),true);assert.equal(preview.current,all[0].id);preview.destroy();
 });
@@ -33,6 +33,6 @@ test('each profession card selects its live representative, and replay/pause con
 });
 
 test('preview stays silent and isolated, supports reduced motion and releases the renderer and shared effects on exit',()=>{
-  assert.doesNotMatch(html,/localStorage|sessionStorage|\bfetch\s*\(|WebSocket|AudioContext|new\s+Audio\b/);assert.match(html,/靶柱不是角色造型/);assert.match(html,/目前靜音/);assert.match(html,/min-height:44px/);assert.match(html,/tower-skill-effects\.js\?v=1\.59\.0/);
+  assert.doesNotMatch(html,/localStorage|sessionStorage|\bfetch\s*\(|WebSocket|AudioContext|new\s+Audio\b/);assert.match(html,/靶柱不是角色造型/);assert.match(html,/目前靜音/);assert.match(html,/min-height:44px/);assert.match(html,/tower-skill-effects\.js\?v=1\.60\.0/);
   const f=setup(true);assert.equal(f.env.skillPreview.reducedMotion,true);assert.ok(f.env.skillPreview.stats().particles<=12);f.events.get('pagehide')({persisted:true});assert.equal(f.disposed,0);f.events.get('pagehide')({persisted:false});assert.equal(f.disposed,1);assert.equal(f.raf.size,0);assert.equal(f.env.skillPreview.stats().groups,0);assert.equal(f.env.skillPreview.stats().textureBytes,0);assert.equal(f.env.skillPreview.destroy(),false);
 });

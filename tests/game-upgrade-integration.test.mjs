@@ -41,5 +41,5 @@ test('leaving a room clears visible old tag banner and its owned timeout',()=>{
 });
 test('atlas explains new observed-only notes, safe companion tactics and effects without changing skill count',()=>{
   const atlas=readFileSync(new URL('docs/職業裝備圖鑑.html',root),'utf8');
-  for(const text of ['把線索連起來','事件紀錄未保存選項時會明示','不猜測當時選擇','淨化會尋找真正需要','不穿牆、不擠到隊友','八職業特效','減少動態時隱藏'])assert.ok(atlas.includes(text),text);
+  for(const text of ['把線索連起來','事件紀錄未保存選項時會明示','不猜測當時選擇','淨化會尋找真正需要','不穿牆、不擠到隊友','九職業特效','減少動態時隱藏'])assert.ok(atlas.includes(text),text);
 });

@@ -19,13 +19,13 @@ test('all fifty underground floors are deterministic, correctly sized and indepe
     assert.equal(config.size,depth<=40?19:21);assert.equal(config.chapter,10+Math.ceil(depth/10));assert.equal(config.environmentId,chapter.environmentId);
     assert.equal(config.shiftSeconds,Math.max(30,51-(depth-1)*.5));assert.equal(config.monsterStrengthBonus,4);
     assert.deepEqual(config.monsterTypes,['clockmite','sentinel','wisp','hound','shardseer']);
-    assert.equal(config.monsterMin,depth<=40?7:8);assert.equal(config.monsterMax,depth<=40?11:12);
+    assert.equal(config.monsterMin,depth<=40?8:9,'v1.60: one more at the low end');assert.equal(config.monsterMax,12,'the high end is capped at 12 because monster-12 is the lord slot');
     assert.ok(config.monsterCount>=config.monsterMin&&config.monsterCount<=config.monsterMax);assert.equal(config.count,config.monsterCount);
     assert.deepEqual(U.floorConfig(floor,31),config);assert.deepEqual(C.floorConfig(floor,31),config);
     assert.equal(config.merchant,floor===chapter.high||depth%5===0);assert.equal(config.rewardCoins,15+Math.floor((depth-1)/10)*2);
     for(let seed=1;seed<=30;seed++)(depth<=40?lows:highs).add(U.floorConfig(floor,seed).monsterCount);
   }
-  assert.deepEqual([...lows].sort((a,b)=>a-b),[7,8,9,10,11]);assert.deepEqual([...highs].sort((a,b)=>a-b),[8,9,10,11,12]);
+  assert.deepEqual([...lows].sort((a,b)=>a-b),[8,9,10,11,12]);assert.deepEqual([...highs].sort((a,b)=>a-b),[9,10,11,12]);
   for(const floor of [99,90,35,1])assert.equal(C.floorConfig(floor).shiftSeconds,150-(99-floor));
   for(const floor of [0,1,-51,-1.5,'-1',NaN])assert.throws(()=>U.floorConfig(floor),RangeError);
   for(const seed of [0,-1,1.5,0x100000000])assert.throws(()=>U.floorConfig(-1,seed),RangeError);

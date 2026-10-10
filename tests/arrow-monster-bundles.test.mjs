@@ -28,7 +28,7 @@ test('quiver capacity adds each archer level, ignores other jobs and retains a b
   a.level=3;a.xp=G.XP[2];assert.equal(C.itemLimit('arrow',r),200);
   const own=fresh();add(own,'archer',3);assert.equal(C.itemLimit('arrow',own),300);assert.ok(C.validateSave(own));
   for(let level=1;level<=10;level++){const one=fresh();H.gainXp(one,G.XP[level-1]);assert.equal(C.itemLimit('arrow',one),100+50*(level-1));}
-  for(const id of Object.keys(C.ITEMS).filter(id=>id!=='arrow'))assert.equal(C.itemLimit(id,own),99);
+  for(const id of Object.keys(C.ITEMS).filter(id=>id!=='arrow'&&id!=='shovel'))assert.equal(C.itemLimit(id,own),99);assert.equal(C.itemLimit('shovel',own),C.SHOVEL_SPARES,'spare shovels are capped');assert.equal(C.SHOVEL_SPARES,3);
   assert.equal(C.itemLimit('arrow'),100);assert.equal(C.itemStorageLimit('arrow'),3000);assert.equal(C.itemStorageLimit('ration'),99);
 });
 test('control changes and downed archers never shrink quivers; leaving retains over-cap saved arrows',()=>{
@@ -45,7 +45,7 @@ test('underground hero and four companion level bounds fit the hard storage limi
 });
 test('real monster arrow drops are 50, keep their rarity and archer gate, and do not reroll',()=>{
   const {run,id}=arrowKill();assert.equal(L.ARROW_DROP_QUANTITY,50);assert.deepEqual(L.CHANCES,{common:20,uncommon:12,rare:6,legendary:3});
-  const spec=P.monsterSpecs(run).find(m=>m.id==='monster-3'),entry=run.party.loot.entries.find(e=>e.id===id);
+  const entry=run.party.loot.entries.find(e=>e.id===id),spec=P.monsterSpecs(run).find(m=>m.id===entry.source);
   assert.equal(entry.rarity,'common');assert.equal(entry.type,'item');assert.deepEqual(L.recordKill(run,spec,{x:2,y:2}),[]);
   const mage=fresh('mage');assert.ok(!L.pool(mage,P.monsterSpecs(mage)[0]).some(e=>e.key==='arrow'));
   assert.equal(L.pool(run,spec).find(e=>e.key==='arrow').quantity,50);

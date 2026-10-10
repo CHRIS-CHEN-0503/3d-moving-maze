@@ -18,7 +18,7 @@ test('profession invitations and repair-all documentation use the current shared
 });
 
 test('atlas covers every current job, weapon, armor and skill exactly once with its real game icon',()=>{
-  const data=D.build();assert.equal(data.jobs.length,Object.keys(H.JOBS).length);assert.equal(data.jobs.length,8);assert.equal(data.skills.length,Object.keys(H.SKILLS).length+Object.keys(H.PASSIVES).length);assert.equal(data.weapons.length,Object.values(H.GEAR).filter(g=>g.slot==='weapon').length);assert.equal(data.armor.length,Object.values(H.GEAR).filter(g=>g.slot!=='weapon').length);assert.equal(data.forging.length,Object.keys(X.TRAITS).length+4+Object.keys(H.ROBOT.CORES).length+Object.keys(A.EFFECTS).length);
+  const data=D.build();assert.equal(data.jobs.length,Object.keys(H.JOBS).length);assert.equal(data.jobs.length,9);assert.equal(data.skills.length,Object.keys(H.SKILLS).length+Object.keys(H.PASSIVES).length);assert.equal(data.weapons.length,Object.values(H.GEAR).filter(g=>g.slot==='weapon').length);assert.equal(data.armor.length,Object.values(H.GEAR).filter(g=>g.slot!=='weapon').length);assert.equal(data.forging.length,Object.keys(X.TRAITS).length+4+Object.keys(H.ROBOT.CORES).length+Object.keys(A.EFFECTS).length);
   assert.equal(data.entries.length,data.jobs.length+data.skills.length+data.gear.length+data.forging.length);assert.equal(new Set(data.entries.map(e=>e.category+':'+e.id)).size,data.entries.length);
   assert.deepEqual(data.skills.map(s=>s.id).sort(),[...Object.keys(H.SKILLS),...Object.keys(H.PASSIVES)].sort());
   assert.deepEqual(data.gear.map(s=>s.id).sort(),Object.keys(H.GEAR).sort());

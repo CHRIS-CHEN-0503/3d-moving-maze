@@ -6,8 +6,8 @@ import vm from 'node:vm';
 import {provisionTravellers} from './recruit-fixtures.mjs';
 const require=createRequire(import.meta.url),A=require('../assets/combat-audio.js'),H=require('../story/tower-heroes-core.js'),C=require('../story/story-core.js'),P=require('../story/tower-party-core.js'),R=require('../story/tower-hero-growth.js'),N=require('../story/tower-narrative.js'),T=require('../lib/three.min.js');
 const code=file=>readFileSync(new URL('../'+file,import.meta.url),'utf8');
-test('all 72 surface and underground active skills map to bounded audio; sound families are distinct',()=>{
-  assert.equal(Object.keys(H.SKILLS).length,72);
+test('all 81 surface and underground active skills map to bounded audio; sound families are distinct',()=>{
+  assert.equal(Object.keys(H.SKILLS).length,81);
   for(const s of Object.values(H.SKILLS)){assert.ok(A.SKILL_SOUNDS[s.effect],s.id);assert.ok(A.ACTIONS[A.skillKind(s)],s.id);}
   for(const id of R.itemIds)assert.ok(A.ACTIONS[A.itemKind(id)],id);
   const waves=[];
@@ -38,14 +38,14 @@ function fixture(skill,options={}){
       H.gainXp(run,R.XP[8]);run.floor=1;run.floorsCleared=99;run.status='won';run.chronicle=N.newChronicle(1);run.chronicle.clues=N.CHAPTERS.map(c=>c.clueId);run.chronicle.ending='release';P.advance(run,{reward:false});
       run=C.startUnderworld(run).run;H.gainXp(run,100000);const result=R.chooseUltimate(run,'hero',skill.ascension.base);assert.ok(result.ok);run=result.run;break;
     }
-    if(skill.unique)H.gainXp(run,28100);
+    if(skill.unique)H.gainXp(run,R.XP[9]);
     if(H.actor(run).skills.includes(skill.id))break;
   }
   assert.ok(H.actor(run).skills.includes(skill.id),skill.id);
   let target='hero',actors=[];
   if(skill.effect==='revive'){
     run.coins=9999;
-    if(C.isUnderworld(run))for(let floor=-1;floor>=-50;floor--){run.floor=floor;run.floorsCleared=99+(-floor-1);P.advance(run,{reward:false});if(P.recruitOffer(run))break;}
+    if(C.isUnderworld(run))for(let floor=-1;floor>=-50;floor--){run.floor=floor;run.floorsCleared=99+(-floor-1);P.advance(run,{reward:false});if(P.recruitOffer(run)&&P.recruitOffer(run).profession!=='robot')break;} // revive cannot target the mechanical traveller
     provisionTravellers(run);run=P.recruit(run,P.recruitOffer(run).id).run;target=run.party.members[0].id;H.setHp(run,target,0);
     const model=new T.Group();model.position.set(1,0,0);actors=[{id:target,model}];
   }

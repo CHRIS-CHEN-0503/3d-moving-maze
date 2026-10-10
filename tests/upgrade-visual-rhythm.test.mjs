@@ -5,8 +5,8 @@ import {readFileSync} from 'node:fs';
 import vm from 'node:vm';
 const require=createRequire(import.meta.url),T=require('../lib/three.min.js'),H=require('../story/tower-heroes-core.js'),F=require('../assets/character-face.js');
 function effects(){const e=vm.createContext({});vm.runInContext(readFileSync(new URL('../story/tower-skill-effects.js',import.meta.url),'utf8'),e);return e.TowerSkillEffects;}
-test('eight visual identities have bounded independent onset and recovery envelopes',()=>{
-  const V=effects();assert.equal(Object.keys(V.SIGNATURES).length,8);
+test('nine visual identities have bounded independent onset and recovery envelopes',()=>{
+  const V=effects();assert.equal(Object.keys(V.SIGNATURES).length,9);
   for(const job of Object.keys(H.JOBS)){const p=V.signatureFor({job});assert.ok(p.name.length>3);for(const t of [0,.02,.1,.3,.6,1])for(const kind of ['body','spark','ground','charge'])assert.ok(V.envelope(t,p,kind)>=0&&V.envelope(t,p,kind)<=1);assert.ok(V.envelope(.2,p,'ground')>V.envelope(.85,p,'ground'));assert.ok(V.envelope(.1,p,'spark')>V.envelope(.7,p,'spark'));assert.equal(V.envelope(1,p),0);}
 });
 test('warm soup mist, cleansing petals, physical strike and arcane cores differ without more draw calls',()=>{

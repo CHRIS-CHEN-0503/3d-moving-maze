@@ -26,7 +26,7 @@ test('all archer attack skills spend arrows and durability once, auxiliary skill
   assert.equal(H.SKILLS.arrow_volley.ammo,3);assert.equal(H.SKILLS.worldtree_arrow.ammo,3);
 });
 test('legacy saves migrate ammo once; explicit zero remains empty and corrupt counts are rejected',()=>{
-  for(const job of ['mage','archer']){const r=fresh(job);delete r.bag.arrow;const restored=C.validateSave(r);assert.ok(restored);assert.equal(restored.bag.arrow,job==='archer'?30:0);assert.deepEqual(C.validateSave(restored),restored);restored.bag.arrow=0;assert.equal(C.validateSave(restored).bag.arrow,0);for(const v of [-1,3001,1.5,null]){restored.bag.arrow=v;assert.equal(C.validateSave(restored),null);}}
+  for(const job of ['mage','archer']){const r=fresh(job);delete r.bag.arrow;const restored=C.validateSave(r);assert.ok(restored);assert.equal(restored.bag.arrow,job==='archer'?50:0);assert.deepEqual(C.validateSave(restored),restored);restored.bag.arrow=0;assert.equal(C.validateSave(restored).bag.arrow,0);for(const v of [-1,3001,1.5,null]){restored.bag.arrow=v;assert.equal(C.validateSave(restored),null);}}
   const legacy=C.newRun({seed:43});delete legacy.bag.arrow;assert.equal(C.validateSave(legacy).bag.arrow,0);
 });
 test('AI never selects unaffordable arrow skills; recruiting brings ammunition only on the confirmed join',()=>{

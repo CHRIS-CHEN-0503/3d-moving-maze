@@ -1,7 +1,7 @@
 /* Original low-poly expedition presentation. Uses the existing render/update loop. */
 (function(root){
   'use strict';
-  function portrait(job){if(job==='robot')return root.TowerHeroIcons.svg('job_robot').replace('class="hero-icon"','class="party-glyph"');const colors={swordsman:'#83b5dc',mage:'#b99bff',scout:'#82dfbf',chef:'#ffd69c',healer:'#b9e6c4',smith:'#cca383',archer:'#e4d796'},c=colors[job];const paths={swordsman:'M25 5 10 22l-4 5m4-9 9 8m-7-5 4 4',mage:'m12 26 9-18m-2-4 2 4 5 1-4 3 1 5-4-3-4 1 2-5-2-4Z',scout:'M6 14h20M8 14l4-7h8l5 7M9 18v6h14v-6m-10 1v2m6-2v2',chef:'M9 18c-9-7 1-14 7-8 6-6 16 1 7 8v9H9Zm1 6h12',healer:'M16 28V10M16 20C4 23 3 9 14 13m2 3C28 17 29 4 18 8',smith:'m7 27 13-14M14 8l5-5 10 10-5 5Z M6 23l4 4',archer:'M9 3q20 13 0 26V3M3 16h25m-5-4 5 4-5 4'};return '<svg class="party-glyph" viewBox="0 0 32 32" aria-hidden="true" style="color:'+c+'"><path d="'+paths[job]+'"/></svg>';}
+  function portrait(job){if(job==='robot')return root.TowerHeroIcons.svg('job_robot').replace('class="hero-icon"','class="party-glyph"');const colors={swordsman:'#83b5dc',mage:'#b99bff',scout:'#82dfbf',chef:'#ffd69c',healer:'#b9e6c4',smith:'#cca383',archer:'#e4d796',cleric:'#f0a9a9'},c=colors[job];const paths={swordsman:'M25 5 10 22l-4 5m4-9 9 8m-7-5 4 4',mage:'m12 26 9-18m-2-4 2 4 5 1-4 3 1 5-4-3-4 1 2-5-2-4Z',scout:'M6 14h20M8 14l4-7h8l5 7M9 18v6h14v-6m-10 1v2m6-2v2',chef:'M9 18c-9-7 1-14 7-8 6-6 16 1 7 8v9H9Zm1 6h12',healer:'M16 28V10M16 20C4 23 3 9 14 13m2 3C28 17 29 4 18 8',smith:'m7 27 13-14M14 8l5-5 10 10-5 5Z M6 23l4 4',archer:'M9 3q20 13 0 26V3M3 16h25m-5-4 5 4-5 4',cleric:'M5 9h22M8 13h16M11 9v18m10-18v18'};return '<svg class="party-glyph" viewBox="0 0 32 32" aria-hidden="true" style="color:'+c+'"><path d="'+paths[job]+'"/></svg>';}
   function baseFoodArt(id){const mushroom=id==='mushroom',herb=id==='herb',root=id==='root',shell=id==='shell',meat=id==='meat',nectar=id==='nectar';return '<svg class="party-food" viewBox="0 0 64 48" aria-hidden="true">'+(mushroom?'<path fill="#f0dbc6" d="M27 19h10v23H27z"/><path fill="#c88fae" d="M8 23C9 0 54 0 56 23Z"/><circle fill="#ffeacd" cx="23" cy="16" r="3"/>':herb?'<path stroke="#4eaf81" stroke-width="4" d="M30 44 36 8"/><ellipse fill="#88cf9a" cx="22" cy="24" rx="13" ry="7"/><ellipse fill="#b8e29e" cx="42" cy="13" rx="12" ry="7"/>':root?'<path fill="#d6ac68" d="M14 18Q54 5 49 27T10 39Z"/><path stroke="#649b69" stroke-width="4" d="m47 16 10-8m-9 8 0-12"/>':shell?'<path fill="#bba690" d="M9 39Q3 1 32 5q29-4 23 34Z"/><path stroke="#816e59" fill="none" d="M32 7v29M17 12l8 23m22-23-8 23"/>':meat?'<path fill="#d7836c" d="M9 34Q5 8 29 10t26 24Q27 49 9 34"/><path stroke="#f9d5b9" fill="none" stroke-width="5" d="M18 27q9-12 24 2"/>':nectar?'<path fill="#e9b750" d="M31 3Q5 31 18 40t26 0Q57 31 31 3"/><path stroke="#ffeb9d" stroke-width="4" d="M24 30q-4 7 3 9"/>':'<ellipse fill="#dfb775" cx="32" cy="26" rx="26" ry="10"/><path fill="#7da3b1" d="M6 26q4 21 26 20 22 1 26-20Z"/><circle fill="#86c69b" cx="22" cy="23" r="5"/><circle fill="#e3a273" cx="39" cy="26" r="6"/><path stroke="#d8e9e1" fill="none" stroke-width="2" d="M22 14q-5-5 0-10m12 10q-5-5 0-10m12 10q-5-5 0-10"/>')+'</svg>';}
   // Complete, original ingredient silhouettes are shared by kitchen and atlas.
   function foodArt(id){
@@ -141,7 +141,7 @@
     }
     function memberModel(job,level,identity='companion',gender=P.PROFESSIONS[job].gender){
       if(modern()&&ctx.makeHero){const m=ctx.makeHero(job,identity,gender);m.userData.partyProfession=job;return m;}
-      const model=job==='swordsman'?V.buildWarrior(level,{THREE:T}):V.buildExplorer({mage:'sena',scout:'eve',chef:'rowan',healer:'mira',smith:'oren',archer:'eve'}[job],{THREE:T});
+      const model=job==='swordsman'?V.buildWarrior(level,{THREE:T}):V.buildExplorer({mage:'sena',scout:'eve',chef:'rowan',healer:'mira',smith:'oren',archer:'eve',cleric:'mira'}[job],{THREE:T});
       model.userData.partyProfession=job;
       if(job==='swordsman')return model;
       const color=P.PROFESSIONS[job].color;
@@ -192,7 +192,7 @@
       }
       return model;
     }
-    const SITE_RESOLVED_NAMES={swordsman:'石門已撐起',mage:'符文已穩定',scout:'暗門已開啟',chef:'食材箱已處理',healer:'泉水已淨化',smith:'機關箱已修復',archer:'箭臺已校正',robot:'動力閘已啟動'};
+    const SITE_RESOLVED_NAMES={swordsman:'石門已撐起',mage:'符文已穩定',scout:'暗門已開啟',chef:'食材箱已處理',healer:'泉水已淨化',smith:'機關箱已修復',archer:'箭臺已校正',cleric:'小祠已淨化',robot:'動力閘已啟動'};
     function siteModel(job){const model=new T.Group(),c=P.PROFESSIONS[job].color,pending=new T.Group(),resolved=new T.Group();
       pending.name='site-unfinished';resolved.name='site-resolved';model.add(pending,resolved);
       if(['swordsman','scout'].includes(job)){
@@ -227,6 +227,12 @@
         const rope=box(resolved,.85,.04,.05,0xe6d5a2,0,1.16,-.15);rope.name='retensioned-arrow-line';
         for(const s of [-1,1]){const arrow=new T.Group();arrow.position.set(s*.2,.58,.12);arrow.rotation.z=s*.18;resolved.add(arrow);box(arrow,.027,.68,.027,0xd5b27c,0,0,0);part(arrow,new T.ConeGeometry(.07,.16,4),0xaacbb9,0,.42,0);}
         const marker=part(resolved,new T.ConeGeometry(.13,.22,4),0x97d4bb,0,.38,.34);marker.rotation.x=Math.PI/2;
+      }else if(job==='cleric'){
+        // A roadside shrine: stone step, two posts and a small roof. Dust and cobwebs clear into red posts and paper streamers.
+        box(model,1.05,.14,.8,0x8c8f8a,0,.07,0);for(const s of [-1,1])box(model,.1,1.05,.1,0x7d6f6a,s*.36,.62,.1);box(model,1.2,.08,.62,0x5b5451,0,1.2,.05);box(model,1.0,.06,.5,0x6a615d,0,1.1,.05);
+        const dust=box(pending,.62,.36,.34,0x8e8b84,0,.5,.1);dust.name='dusty-shrine';for(let i=0;i<3;i++){const web=box(pending,.3,.012,.012,0xd9d6cf,(i-1)*.3,.95-i*.08,.1);web.rotation.z=.3*(i-1);}
+        const lit=box(resolved,.62,.36,.34,0xf2ede4,0,.5,.1);lit.name='purified-shrine';for(const s of [-1,1])box(resolved,.1,1.05,.1,0xc03d3d,s*.36,.62,.1);for(let i=0;i<4;i++){const shide=box(resolved,.06,.1,.01,0xfaf6ee,-.3+i*.2,.98,.33);shide.rotation.z=(i%2?-1:1)*.3;}
+        const bell=part(resolved,new T.SphereGeometry(.07,8,6),0xd8b35a,0,.86,.36);bell.name='shrine-bell';
       }else if(job==='robot'){
         box(model,.95,.16,.75,0x637a7d,0,.08,0);box(model,.74,.68,.56,0x42575f,0,.48,0);for(const s of [-1,1])box(model,.12,.9,.16,0x8e9b9b,s*.4,.55,0);
         const dead=part(pending,new T.IcosahedronGeometry(.2,0),0x687673,0,.48,.3);dead.name='dormant-generator';box(pending,.43,.06,.06,0x9b7052,0,.77,.31);

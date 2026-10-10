@@ -40,7 +40,7 @@
     }
     if(targetEffects.includes(s.effect))return '先點技能，再點左側隊友；需在六個世界距離單位內，且牆壁不阻擋視線。';
     if(s.attack){
-      if(s.job==='archer')return (s.effect==='volley'?'前方最多三隻怪物':'前方最近一隻怪物')+'；射程沿用已裝備弓，不穿牆。';
+      if(['archer','cleric'].includes(s.job))return (s.effect==='volley'?'前方最多三隻怪物':'前方最近一隻怪物')+'；射程沿用已裝備弓，不穿牆。';
       if(['starfall','star_ring'].includes(s.effect))return '前方可見區域蓄力落點，落點周圍三個世界距離單位內；攻擊者到怪物不得超過九，牆壁阻擋。';
       if(s.effect==='decisive')return '前方三點五個世界距離單位內，斬擊落點周圍的可見敵人；牆壁阻擋。';
       if(['circle','shock','repel'].includes(s.effect))return '自身周圍三點五個世界距離單位內的可見怪物，不穿牆。';
@@ -73,7 +73,7 @@
     if(s.effect==='cleanse')return '立即清除一般緩速，並給三秒一次異常保護；必要機關不取消。';
     if(['stun','shock','stagger'].includes(s.effect))return '暈眩 '+(p.stunSeconds?fmt(p.stunSeconds):series(a.map(l=>Math.min(2.4,1+l*.25)),''))+' 秒；怪物的抗連控期間不能重複暈眩。';
     if(s.effect==='thorns')return '束縛三秒，只限制移動，怪物仍可攻擊。';
-    if(p.rootSeconds||p.slowSeconds)return (p.rootSeconds?'束縛 '+p.rootSeconds+' 秒；':'')+(p.slowSeconds?'緩速 '+p.slowPower*100+'% 持續 '+p.slowSeconds+' 秒。':'');
+    if(p.rootSeconds||p.slowSeconds)return (p.rootSeconds?'束縛 '+p.rootSeconds+' 秒'+(p.slowSeconds?'；':'。'):'')+(p.slowSeconds?'緩速 '+p.slowPower*100+'% 持續 '+p.slowSeconds+' 秒。':'');
     if(['slow','splash','binding','great_arrow'].includes(s.effect))return '一至六級緩速 '+series(a.map(l=>20+l*4),'%')+'；持續 '+series(a.map(l=>2+l*.4),' 秒')+'，元素共鳴可延長。';
     if(s.effect==='blind')return '干擾轉向 '+series(a.map(l=>2+l*.4),' 秒')+'，元素共鳴可延長；背後命中另增傷25%。';
     if(s.effect==='weak')return '使下一次攻擊傷害降低 '+series(a.map(l=>15+l*4),'%')+'；攻擊後消耗，不是固定持續秒數。';
@@ -97,7 +97,7 @@
       details.push(row('冷卻',s.effect==='cleanse'?'一至六級：'+series(s.power,' 秒'):s.cooldown+' 秒'),row('MP 消耗',s.mp?s.mp+' 點（施放時扣除；不足時不能施放）':s.job==='robot'?'不消耗 MP（機器人改用動力石能源）':'不消耗 MP'),row('準備時間',prep?prep+' 秒':s.effect==='disarm'?'依下方作業秒數；本身無額外蓄力':'立即施放'),row('消耗',materials.join('、')||'不耗食材或箭矢'),row('作用對象',skillTarget(s)),row('持續／附帶效果',timing(s)));
       if(['taunt','fortress'].includes(s.effect))details.push(row('挑釁數量上限','技能一至六級：'+series(Array.from({length:6},(_,i)=>h.tauntTargetLimit(i+1)),' 隻')+'；每名施放者分開計算，主角與同伴遵循同一規則。'));
       if(s.effect==='repair')details.push(row('修補上限','從指定角色尚未損壞、非核心的裝備中，優先修補剩餘比例最低的一件，恢復最大耐久 '+series(s.power,'%')+'；每次最多30點，不超過全滿。無法重建破損裝備，也不會恢復核心耐久。'));
-      if(s.attack)notes.push(['mage','healer','archer'].includes(s.job)?'施放攻擊技能就扣一次武器耐久，空放或撞牆不退；同次命中不再重扣。':'近戰攻擊技能確認命中才扣一次武器耐久；同次多目標不重扣。');
+      if(s.attack)notes.push(['mage','healer','archer','cleric'].includes(s.job)?'施放攻擊技能就扣一次武器耐久，空放或撞牆不退；同次命中不再重扣。':'近戰攻擊技能確認命中才扣一次武器耐久；同次多目標不重扣。');
       notes.push('所列為未計裝備、被動與地下分支精通的基礎數值；實際效果會受其加成。');
     }else{
       if(s.modifiers)details.push(row('強化對象',s.modifiers.targets.map(k=>(h.SKILLS[k]||h.PASSIVES[k]).name).join('、')),row('冷卻縮短',s.modifiers.cooldownPct+'%'));

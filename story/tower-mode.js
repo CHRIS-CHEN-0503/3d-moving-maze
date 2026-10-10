@@ -992,7 +992,7 @@
   // cross, matching the bag icon. (The 🧴 emoji sprite was the grab mode's
   // laundry detergent bottle.) Owned meshes, released with the drop.
   // Floor drops of every potion share this bottle, tinted by kind.
-  const POTION_TINTS={heal:[0xe2384f,0x8a1424],heal_mid:[0xff5f2e,0x8a2a10],heal_high:[0xff3f9a,0x8a1050],spirit:[0x4f9df0,0x123e7a],haste_strong:[0xffcf3a,0x8a6410],arcane:[0xa77bff,0x3c2280],courage:[0xff7a2e,0x8a3410]};
+  const POTION_TINTS={heal:[0xe2384f,0x8a1424],heal_mid:[0xff5f2e,0x8a2a10],heal_high:[0xff3f9a,0x8a1050],spirit:[0x4f9df0,0x123e7a],haste_strong:[0xffcf3a,0x8a6410],arcane:[0xa77bff,0x3c2280],courage:[0xff7a2e,0x8a3410],forget:[0x5fd8c0,0x1c6458]};
   function potionModel(key='heal'){
     const tint=POTION_TINTS[key]||POTION_TINTS.heal,group=new THREE.Group();group.name='healing-draught';group.userData.potion=key;
     const glass=new THREE.MeshPhongMaterial({color:0xd8f0ff,transparent:true,opacity:.38,shininess:90,specular:0xffffff,depthWrite:false}),liquid=new THREE.MeshLambertMaterial({color:tint[0],emissive:tint[1],emissiveIntensity:.45}),cork=new THREE.MeshLambertMaterial({color:0x9a6b43}),band=new THREE.MeshLambertMaterial({color:0xe8c66a});

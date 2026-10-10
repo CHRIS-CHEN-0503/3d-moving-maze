@@ -10,7 +10,7 @@
     tieLing: Object.freeze({ id: 'tieLing', name: '鐵嶺', title: '鐵匠', greeting: '我是鐵匠鐵嶺。頭盔與近戰武器，交給我就放心。', equipmentKinds: Object.freeze(['helmet', 'bat']), supplies: Object.freeze([]) }),
     jinHe: Object.freeze({ id: 'jinHe', name: '錦禾', title: '裁甲師', greeting: '我是裁甲師錦禾。合身的盔甲，會陪你走得更遠。', equipmentKinds: Object.freeze(['armor', 'pan']), supplies: Object.freeze([]) }),
     lanZhou: Object.freeze({ id: 'lanZhou', name: '嵐舟', title: '盾匠', greeting: '我是盾匠嵐舟。盾牌與遠行武器，都在這裡。', equipmentKinds: Object.freeze(['shield', 'staff']), supplies: Object.freeze([]) }),
-    suHe: Object.freeze({ id: 'suHe', name: '蘇禾', title: '雜貨商', sex: 'female', greeting: '我是雜貨商蘇禾。藥水、食材和旅途補給，都替你備好了。', equipmentKinds: Object.freeze([]), get supplies() { return Object.freeze(Object.keys(core().ITEMS).filter(id => id !== 'coin')); } }),
+    suHe: Object.freeze({ id: 'suHe', name: '蘇禾', title: '雜貨商', sex: 'female', greeting: '我是雜貨商蘇禾。藥水、食材和旅途補給，都替你備好了。', equipmentKinds: Object.freeze([]), get supplies() { return Object.freeze(Object.keys(core().ITEMS).filter(id => id !== 'coin' && core().ITEMS[id].buyPrice != null)); } }),
   });
   // The same catalogue drives sales and professional maintenance. Every base
   // weapon belongs to exactly one merchant, across all five equipment tiers.
@@ -127,7 +127,7 @@
       }) };
     });
     const ingredientOffers = groceryCatalogue(floor, seed);
-    if (ingredientOffers) shops.push({ ...MERCHANTS.suHe, equipmentKinds: [], supplies: [...MERCHANTS.suHe.supplies].filter(key=>!['power_starlight','power_sunheart'].includes(key)&&C.potionAvailable(key,floor)), gear: [], ingredientOffers });
+    if (ingredientOffers) shops.push({ ...MERCHANTS.suHe, equipmentKinds: [], supplies: [...MERCHANTS.suHe.supplies].filter(key=>C.ITEMS[key]?.buyPrice!=null&&C.potionAvailable(key,floor)), gear: [], ingredientOffers });
     return shops;
   }
   function merchant(run, merchantId) { return merchantOffers(run.floor, run.seed,!!run.party?.loadouts).find(entry => entry.id === merchantId); }

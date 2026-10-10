@@ -113,6 +113,7 @@
     // Battle draughts: a gold double bolt, a violet star, an orange blade.
     item_haste_strong:'<path fill="#ffd24a" fill-opacity=".85" stroke="none" d="M18 40h28v15H18Z"/>'+p('M28 5h17v8H28Zm2 8v9C16 30 14 48 25 56h20c11-8 9-26-3-34v-9')+'<path fill="#ffe27a" stroke="#fff3c9" d="m30 28-8 12h6l-3 10 11-14h-7l3-8Zm12 0-8 12h6l-3 10 11-14h-7l3-8Z"/>',
     item_arcane:'<path fill="#b28cff" fill-opacity=".8" stroke="none" d="M17 38h30v17H17Z"/>'+p('M27 5h10v8H27Zm1 8v10L14 36v20h36V36L36 23V13')+g(star,'translate(20 30) scale(.38)'),
+    item_forget:'<path fill="#8fe3d0" fill-opacity=".8" stroke="none" d="M16 40c1 10 6 15 16 15s15-5 16-15Z"/>'+p('M27 5h10v8H27Zm1 8v9C15 28 13 46 22 55h20c9-9 7-27-6-33v-9M32 46a5 5 0 1 1 5-5a9 9 0 1 1-9-9'),
     item_courage:'<path fill="#ff8a4a" fill-opacity=".8" stroke="none" d="M17 38h30v17H17Z"/>'+p('M27 5h10v8H27Zm1 8v10L14 36v20h36V36L36 23V13M32 31v20M27 47h10M32 51v4'),
     item_haste:p('M28 5h17v8H28Zm2 8v9C16 30 14 48 25 56h20c11-8 9-26-3-34v-9M22 35q11-5 24 0M17 20H5m9 9H2m10 13H4m10 10H8')+'<path fill="#f3bc57" fill-opacity=".95" stroke="#ffe5a4" d="m37 29-10 14h8l-3 12 13-17h-9l4-9Z"/>',
     item_ration:p('M8 24Q8 8 32 8t24 16v31H8ZM8 28h48M19 17l-4 7m15-10-4 9m15-9-4 9M13 47h38'),

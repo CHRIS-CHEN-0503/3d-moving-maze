@@ -70,7 +70,9 @@ test('cooking cards preserve real costs and distinguish self, party healing and 
 
 test('grocery supplies and regional ingredients document the same prices, haste duration and availability',()=>{
   const E=require('../story/tower-encounters.js');
-  for(const id of Object.keys(C.ITEMS).filter(id=>id!=='coin'&&!(Robot.FUEL_ITEMS[id]?.fuel>25))){assert.match(find('item:'+id).acquisition,/雜貨商・蘇禾/);assert.doesNotMatch(find('item:'+id).acquisition,/鐵匠・鐵嶺|裁甲師・錦禾|盾匠・嵐舟/);}
+  // The forgetting draught is the one supply that only chapter lords leave; no shop carries it.
+  assert.doesNotMatch(find('item:forget').acquisition,/雜貨商|販售；/);assert.match(find('item:forget').acquisition,/商店不販售/);
+  for(const id of Object.keys(C.ITEMS).filter(id=>id!=='coin'&&id!=='forget'&&!(Robot.FUEL_ITEMS[id]?.fuel>25))){assert.match(find('item:'+id).acquisition,/雜貨商・蘇禾/);assert.doesNotMatch(find('item:'+id).acquisition,/鐵匠・鐵嶺|裁甲師・錦禾|盾匠・嵐舟/);}
   assert.match(find('item:haste').effect,new RegExp(C.HASTE_DURATION+' 秒'));assert.match(find('item:haste').effect,new RegExp(C.HASTE_PERCENT+'%'));assert.equal(find('item:haste').drop,null);assert.match(find('item:haste').effect,/不疊加/);
   for(const key of E.GROCERY.commonIngredients)assert.match(find('ingredient:'+key).notes.join(' '),/雜貨商販售常用食材/);
   assert.match(find('ingredient:frostberry').notes.join(' '),/可早於原產地/);assert.match(find('light:torch').acquisition,/雜貨商/);assert.doesNotMatch(find('light:torch').acquisition,/三位行商皆售/);

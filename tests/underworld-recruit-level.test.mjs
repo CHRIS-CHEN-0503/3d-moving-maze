@@ -38,7 +38,7 @@ test('every underground floor recruits level-five travellers across seeds and al
       const before=structuredClone(H.actor(run,'hero')),xp=H.experience(run,'hero'),base=H.preview(run,offer),result=P.recruit(run,offer.id,run.revision);assert.ok(result.ok,result.message);
       const member=result.run.party.members.find(m=>m.id===offer.id);
       const bodyBonus=member.profession==='robot'&&H.actor(result.run,member.id).passives.includes('robot_body')?25:0;
-      assert.equal(member.level,5);assert.equal(member.xp,G.XP[4]);assert.equal(member.hp,P.vitalHp(member.profession,5,false)+bodyBonus);assert.equal(H.maxHp(result.run,member.id),P.vitalHp(member.profession,5,false)+bodyBonus);
+      assert.equal(member.level,5);assert.equal(member.xp,G.XP[4]);const vit=H.attr(result.run,member.id,'vit');assert.equal(H.unspentPoints(result.run,member.id),0,'a new companion arrives with its free points spent');assert.equal(member.hp,P.vitalHp(member.profession,5,false,vit)+bodyBonus,'and at full life');assert.equal(H.maxHp(result.run,member.id),P.vitalHp(member.profession,5,false,vit)+bodyBonus);
       assert.equal(H.level(result.run,'hero'),1);assert.equal(H.experience(result.run,'hero'),xp);assert.deepEqual(H.actor(result.run,'hero'),before);
       const a=H.actor(result.run,member.id),all=[...a.skills,...a.passives],reward=H.SKILLS[a.learned]||H.PASSIVES[a.learned];
       assert.equal(all.length,6);assert.equal(new Set(all).size,6);assert.ok([...base.skills,...base.passives].every(k=>all.includes(k)));
@@ -87,7 +87,7 @@ test('surface recruitment keeps its original floor-based levels one through five
     const expected=Math.min(5,1+Math.floor((99-floor)/22));assert.equal(offer.level,expected);
     const result=P.recruit(run,offer.id,run.revision);assert.ok(result.ok,result.message);const member=result.run.party.members[0];
     const bodyBonus=member.profession==='robot'&&H.actor(result.run,member.id).passives.includes('robot_body')?5*expected:0;
-    assert.equal(member.level,expected);assert.equal(member.xp,G.XP[expected-1]);assert.equal(member.hp,P.vitalHp(member.profession,expected,false)+bodyBonus);assert.equal(H.actor(result.run,member.id).learned,null);assert.deepEqual(G.record(result.run,member.id).choices,[]);assert.equal(G.available(result.run,member.id),expected>=4?1:0);valid(result.run);levels.add(expected);count++;
+    assert.equal(member.level,expected);assert.equal(member.xp,G.XP[expected-1]);assert.equal(member.hp,P.vitalHp(member.profession,expected,false,H.attr(result.run,member.id,'vit'))+bodyBonus);assert.equal(H.unspentPoints(result.run,member.id),0);assert.equal(H.actor(result.run,member.id).learned,null);assert.deepEqual(G.record(result.run,member.id).choices,[]);assert.equal(G.available(result.run,member.id),expected>=4?1:0);valid(result.run);levels.add(expected);count++;
   }
   assert.deepEqual([...levels].sort(),[1,2,3,4,5]);t.diagnostic(JSON.stringify({surfaceRecruitments:count}));
 });
@@ -98,6 +98,7 @@ test('loading and recruiting preserve existing lower- and higher-level companion
   // These records model valid pre-change saves, not newly issued offers.
   removeRecruitBonus(run,low.id);
   Object.assign(low,{level:2,xp:G.XP[1]+120,hp:13});Object.assign(high,{level:9,xp:G.XP[8]+100,hp:47});
+  for(const m of [low,high])H.actor(run,m.id).attrs=H.autoSpend({},m.profession,m.level);
   const before=Object.fromEntries([low,high].map(m=>[m.id,{member:structuredClone(m),actor:structuredClone(H.actor(run,m.id)),growth:structuredClone(G.record(run,m.id))}]));
   run=valid(run);H.gainXp(run,0);run=valid(run);
   const third=recruitNext(run);run=third.run;assert.equal(H.level(run,third.id),5);
@@ -108,6 +109,6 @@ test('loading and recruiting preserve existing lower- and higher-level companion
 test('legacy lower-level XP migration preserves level rather than applying the new recruit default',()=>{
   const recruited=recruitNext(underground(31)),run=recruited.run,id=recruited.id,member=run.party.members[0];
   removeRecruitBonus(run,id);
-  member.level=3;member.hp=21;delete member.xp;G.state(run).version=1;delete G.state(run).members;
+  member.level=3;member.hp=21;delete member.xp;H.actor(run,id).attrs=H.autoSpend({},member.profession,3);G.state(run).version=1;delete G.state(run).members;
   const restored=valid(run);assert.equal(H.level(restored,id),3);assert.equal(H.experience(restored,id),G.XP[2]);assert.equal(H.hp(restored,id),21);assert.deepEqual(H.actor(restored,id),H.actor(run,id));
 });

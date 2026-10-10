@@ -68,6 +68,7 @@
       spirit:'為使用者恢復 '+C.SPIRIT_MP+' 點 MP，不超過個人上限；MP 已滿不能使用。機器人沒有 MP，技能改由動力石能源驅動。可放入快捷欄，或在自動行動設定中依 MP 門檻自動使用。',
       haste_strong:'為使用者提高移動速度與普通攻擊速度各 '+C.HASTE_STRONG_PERCENT+'%，持續 '+C.HASTE_DURATION+' 秒（五分鐘）；可取代仍在生效的一般加速藥水，強力加速仍在生效時不能再喝。不縮短技能冷卻或準備時間。',
       arcane:'使用者的法術攻擊力（法杖、法書光彈與法術技能）提高 '+C.POTION_BUFF_PERCENT+'%，持續 '+C.POTION_BUFF_SECONDS+' 秒（三分鐘）；仍在生效時不能再喝，切換角色不轉移。',
+      forget:'退回一位隊員已分配的全部自由點數（每級 '+heroes().FREE_POINTS_PER_LEVEL+' 點），能力值回到職業基礎加等級成長，可立即重新分配；該隊員的自動配點同時關閉。沒有分配過點數時不能使用，也不會被自動喝下。請在隊伍管理的「能力值」分頁選擇隊員後使用。',
       courage:'使用者的物理攻擊力（近戰、弓箭與物理技能）提高 '+C.POTION_BUFF_PERCENT+'%，持續 '+C.POTION_BUFF_SECONDS+' 秒（三分鐘）；仍在生效時不能再喝，切換角色不轉移。',
       haste:'為使用者提高移動速度與普通攻擊速度各 '+C.HASTE_PERCENT+'%，持續 '+C.HASTE_DURATION+' 秒（五分鐘）。不縮短技能冷卻或準備時間；同效果不疊加、不刷新，仍在生效時不消耗第二瓶。不因延效被動延長，切換角色也不會轉給別人；暫停、閱讀與離線不扣時間。可放入快捷欄，或在自動道具設定中允許隊友遇敵時使用（預設關閉）。',
       ration:'恢復全隊共用飽食度 45 點，上限 100；不會恢復生命。營地不再提供乾糧全隊回滿的休息捷徑。',
@@ -92,6 +93,7 @@
       if (['heal','ration','shield','hourglass'].includes(key)) acquisition.push('探索者委託的隨機補給報酬；乾糧為 2 份，其餘 1 份。');
       if (['heal','ration'].includes(key)) acquisition.push('開局各 2 份；地上裂隙完成時也可能取得補給。');
       if (key === 'map') acquisition.push('開局 1 張。');
+      if (key === 'forget') acquisition.push('商店不販售。第 '+L.FORGET_FLOOR+' 層（含）之後的樓主與地下每一位樓主，擊敗時另外以 '+L.FORGET_CHANCE+'% 機率掉落 1 瓶，不佔樓主 2～5 樣掉落的名額；只在職業旅程出現，初始持有零瓶。');
       if (key === 'arrow') acquisition.push('射手主角開局帶 30 支；首次招募射手補充 15 支，不超過當前容量，重招不重送。沒有射手時保留 100 支基礎容量。怪物掉落箭束需有足夠空間整堆拾取，否則留在地上。目前不再自然生成地面箭束。');
       if (key === 'coin') acquisition.push('開局 24 枚；討伐、下樓、探索點、章末機關、委託／裂隙報酬，以及售出補給或裝備。');
       const guide = fieldGuide().item(key, {party:{loadouts:{}}});

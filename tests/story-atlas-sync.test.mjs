@@ -165,6 +165,6 @@ test('event choices, six fixed landmarks and eight profession sites use current 
 
 test('new reference modules have release cache keys without importing live gameplay timers',()=>{
   for(const file of ['tower-affixes.js','tower-adventure-events.js','tower-landmarks.js'])assert.ok(sources.includes('../story/'+file+'?v='+(file==='tower-adventure-events.js'?'1.57.0':'1.55.0')),file);
-  assert.ok(sources.includes('story-atlas-rules.js?v=1.58.7'));assert.ok(sources.includes('story-atlas-items.js?v=1.58.7'));
+  assert.ok(sources.includes('story-atlas-rules.js?v=1.58.7'));assert.ok(sources.includes('story-atlas-items.js?v=1.59.0'));
   assert.match(html,/持續.*10%.*20%|10%.*20%.*損耗/);assert.match(html,/供能藤.*晶柱/);
 });

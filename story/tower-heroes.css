@@ -63,6 +63,15 @@
 #heroLevelBanner{position:absolute;left:50%;top:22%;transform:translateX(-50%);z-index:30;display:grid;justify-items:center;gap:2px;padding:8px 22px 9px;border:2px solid #ffd66b;border-radius:16px;background:radial-gradient(ellipse at 50% 30%,#5a4614f2,#24190af0);color:#fff3c9;pointer-events:none;opacity:0;text-shadow:0 1px 2px #000}
 #heroLevelBanner[hidden],body:not(.story-active) #heroLevelBanner{display:none!important}
 #heroLevelBanner b{font-size:26px;letter-spacing:4px;color:#ffd66b}#heroLevelBanner span{font-size:14px}
+#heroLevelBanner small{font-size:12px;color:#ffe7a6}
 #heroLevelBanner.is-playing{animation:hero-level-banner 2.4s ease-out 1 forwards}
 @keyframes hero-level-banner{0%{opacity:0;transform:translate(-50%,14px) scale(.8)}12%{opacity:1;transform:translate(-50%,0) scale(1.06);box-shadow:0 0 26px 6px rgba(255,214,107,.8)}25%{transform:translate(-50%,0) scale(1)}75%{opacity:1;box-shadow:0 0 10px 2px rgba(255,214,107,.4)}100%{opacity:0;transform:translate(-50%,-10px)}}
 @media(prefers-reduced-motion:reduce){#heroLevelBanner.is-playing{animation:hero-level-banner-calm 2.4s linear 1 forwards}@keyframes hero-level-banner-calm{0%,85%{opacity:1;transform:translateX(-50%)}100%{opacity:0;transform:translateX(-50%)}}}
+/* Ability scores: five rows with a one-tap plus, the crit line and the two actions below. */
+.hero-attributes{display:grid;gap:8px}.hero-attr-head{display:flex;align-items:center;justify-content:space-between;gap:8px}.hero-attr-head p{margin:0;font-size:15px}.hero-attr-head b{color:#ffd36e;font-size:20px}
+.hero-attr-list{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:8px}
+.hero-attr-row{display:grid;grid-template-columns:auto auto minmax(0,1fr) auto;align-items:center;gap:4px 10px;background:#21384a;border:1px solid #52687c;border-radius:12px;padding:6px 8px 6px 12px}
+.hero-attr-row b{font-size:16px;color:#f0d49a}.hero-attr-row strong{font-size:22px;color:#fff2ce;min-width:2ch;text-align:right}.hero-attr-row small{font-size:12px;line-height:1.4;color:#c4d6df}.hero-attr-row.is-locked{opacity:.62}
+.hero-attr-row .hero-attr-plus{min-width:44px;min-height:44px;padding:0;font-size:22px;line-height:1}
+.hero-attr-crit{margin:0;font-size:14px;color:#ffd99a}.hero-attr-actions{display:flex;flex-wrap:wrap;gap:8px}
+@media(max-height:500px){.hero-attr-list{grid-template-columns:repeat(2,minmax(0,1fr));gap:6px}.hero-attr-row{padding:4px 6px 4px 10px}.hero-attr-row strong{font-size:19px}}

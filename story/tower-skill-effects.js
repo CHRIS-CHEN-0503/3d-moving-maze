@@ -7,7 +7,7 @@
   const FAMILIES={arrow:'arrow',binding:'arrow',volley:'arrow',great_arrow:'arrow',decisive:'slash',star_ring:'meteor',escape:'scan',feast:'steam',sanctuary:'heal',fortress:'shield',cleave:'slash',circle:'spin',blind:'slash',stun:'impact',stagger:'impact',splash:'splash',bolt:'cast',weak:'cast',slow:'slash',mark:'cast',shock:'storm',thorns:'thorns',repel:'wave',starfall:'meteor',guard:'shield',barrier:'shield',ward:'shield',fortify:'shield',rally:'aura',speed:'aura',polish:'forge',stealth:'smoke',smoke:'smoke',stomach:'steam',meal:'steam',soup:'heal',heal:'heal',revive:'heal',cleanse:'cleanse',reveal:'scan',disarm:'scan',daylight:'sun',repair:'forge',frost:'frost',taunt:'wave',barricade:'forge'};
   const THEMES={shock:[0xebfaff,0x459fff],thorns:[0xd5f697,0x6aab43],starfall:[0xfff1cc,0xff8242],star_ring:[0xfff1cc,0xea92ff],frost:[0xe1fbff,0x72cdff],splash:[0xffd090,0xfb714a],weak:[0xe4fff2,0x8be8bd],mark:[0xfff0be,0xfa9e62]};
   const ROBOT_FAMILIES=Object.freeze({flying_fist:'rocket_fist',iron_charge:'ram',shoulder_quake:'quake',folded_guard:'shield',joint_oil:'lubricate',parts_restore:'rebuild',steel_meteor_fist:'quake',explosive_fists:'twin_fist',mech_aid:'shield'});
-  Object.assign(FAMILIES,{robot_fist:'rocket_fist',robot_charge:'ram',robot_quake:'quake',robot_guard:'shield',robot_speed:'lubricate',robot_restore:'rebuild',robot_meteor:'quake',robot_double:'twin_fist',mech_aid:'shield',levelup:'levelup'});
+  Object.assign(FAMILIES,{robot_fist:'rocket_fist',robot_charge:'ram',robot_quake:'quake',robot_guard:'shield',robot_speed:'lubricate',robot_restore:'rebuild',robot_meteor:'quake',robot_double:'twin_fist',mech_aid:'shield',levelup:'levelup',critical:'critical'});
   const visualFamilies=new Set(Object.values(FAMILIES));
   const familyFor=skill=>ROBOT_FAMILIES[skill?.id]||(visualFamilies.has(skill?.presentation?.family)?skill.presentation.family:FAMILIES[skill?.effect]);
   const colorsFor=skill=>Array.isArray(skill?.presentation?.colors)&&skill.presentation.colors.length===2&&skill.presentation.colors.every(n=>Number.isInteger(n)&&n>=0&&n<=0xffffff)?skill.presentation.colors:THEMES[skill?.effect]||PALETTES[skill?.job]||PALETTES.swordsman;
@@ -86,7 +86,7 @@
   // The damage of a falling star is dealt on release, so the rock lands quickly: it falls from 3.5 to rest
   // at .12 within METEOR_FALL seconds, and its light and view kick come at that moment.
   const METEOR_FALL=.32;
-  const POOL_CAP=16,IMPACTS_PER_FRAME=3,SPARK_MODES=new Set(['contact','spark','electric']),INK_LIMIT=256;
+  const POOL_CAP=16,IMPACTS_PER_FRAME=3,CRITS_PER_FRAME=2,SPARK_MODES=new Set(['contact','spark','electric']),INK_LIMIT=256;
   const smooth=n=>{const t=Math.max(0,Math.min(1,n));return t*t*(3-2*t);};
   function envelope(t,signature,kind='body'){
     if(kind==='charge')return .2+.65*smooth(t);
@@ -128,7 +128,7 @@
     data=[['position',Float32Array.from(positions),3],['velocity',Float32Array.from(velocities),3],['seed',Float32Array.from(seeds),1],['pointSize',Float32Array.from(sizes),1],['tone',Float32Array.from(tones),1]];cloudData.set(key,data);return data;
   }
   function create(T,ctx){
-    let effects=[],destroyed=false,impacts=0;const inks=new Map(),templates=new Map();
+    let effects=[],destroyed=false,impacts=0,crits=0;const inks=new Map(),templates=new Map();
     // Silhouettes are fixed by their key. Triangulating and tessellating them once is enough: each effect
     // receives its own geometry object holding a private copy of the arrays.
     function shape(key,make){
@@ -170,18 +170,23 @@
       // A sweep that hits a whole pack in one frame shows the first few contacts; the damage itself
       // was already applied by the caller, so dropping the rest changes only what is drawn.
       if(options.impact&&impacts++>=IMPACTS_PER_FRAME)return null;
+      // A sweep that crits on a whole pack still shows only the first two bursts in one frame.
+      if(familyFor(skill)==='critical'&&crits++>=CRITS_PER_FRAME)return null;
       if(effects.length>=limit)dispose(effects.shift());
       const baseFamily=familyFor(skill),family=options.impact?(skill.job==='robot'?'mechanical_hit':['storm','thorns'].includes(baseFamily)?baseFamily:'hit'):options.stage==='charge'?'charge':options.stage==='land'?(skill.job==='robot'?'quake':baseFamily==='meteor'?'meteor':'burst'):baseFamily;
       const colors=colorsFor(skill),signature=signatureFor(skill),group=new T.Group();group.name='skill-vfx-'+skill.id;group.userData.signature=signature.name;group.position.set(at.x,.04,at.z);group.rotation.y=angle;
-      const total=family==='levelup'?(reduced?1.2:1.8):family==='thorns'&&options.impact?3:family==='storm'?.92:family==='hit'?.42:family==='charge'||family==='meteor'?Math.min(4,Math.max(.1,Number(options.duration)||.85)):reduced?.65:['heal','shield','sun'].includes(family)?1.6:1.15;
+      const total=family==='critical'?(reduced?.4:.55):family==='levelup'?(reduced?1.2:1.8):family==='thorns'&&options.impact?3:family==='storm'?.92:family==='hit'?.42:family==='charge'||family==='meteor'?Math.min(4,Math.max(.1,Number(options.duration)||.85)):reduced?.65:['heal','shield','sun'].includes(family)?1.6:1.15;
       const parts=[],mats=[],count=reduced?2:4,power=skill.unique?1.18:1;
       // Surfaces with identical settings inside one effect share a single material, leased from the pool by shader
       // variant. Colour, opacity and envelope are set at lease time, and nothing mutates the material afterwards.
       const owned=new Map();
+      // A critical burst draws over the attacker's own body (the camera usually sits behind them); its floor light keeps
+      // normal depth. It leases from its own pool variant, so no shared material ever changes its depth test.
+      const overlay=family==='critical';
       function material(color,opacity=.8,map=null,sprite=false,{vertexColors=false,blending=T.AdditiveBlending,spark=false,ground=false,slash=false}={}){
-        const key=[color,opacity,map?map.uuid:'',sprite,vertexColors,blending,spark,ground,slash].join();let m=owned.get(key);if(m)return m;
-        m=lease(ground?'ground':[sprite?'sprite':'mesh',map?map.uuid:'',vertexColors,blending].join(),()=>{
-          const opts={color,transparent:true,opacity,depthWrite:false,blending,toneMapped:false,...(map?{map}:{}),...(vertexColors?{vertexColors:true}:{}),...(!sprite?{side:T.DoubleSide,forceSinglePass:true}:{})},made=sprite?new T.SpriteMaterial(opts):new T.MeshBasicMaterial(opts);
+        const above=overlay&&!ground,key=[color,opacity,map?map.uuid:'',sprite,vertexColors,blending,spark,ground,slash,above].join();let m=owned.get(key);if(m)return m;
+        m=lease(ground?'ground':[sprite?'sprite':'mesh',map?map.uuid:'',vertexColors,blending,above?'above':''].join(),()=>{
+          const opts={color,transparent:true,opacity,depthWrite:false,...(above?{depthTest:false}:{}),blending,toneMapped:false,...(map?{map}:{}),...(vertexColors?{vertexColors:true}:{}),...(!sprite?{side:T.DoubleSide,forceSinglePass:true}:{})},made=sprite?new T.SpriteMaterial(opts):new T.MeshBasicMaterial(opts);
           if(ground)finishEnergy(made,{age:{value:0},style:{value:0},tint:{value:new T.Color()},quiet:{value:reduced?1:0}});
           return made;
         });
@@ -295,6 +300,13 @@
         for(let i=0;i<2;i++){const halo=solid(shape('levelup-halo',()=>new T.TorusGeometry(.7,.028,6,36)),0,.2+i*.45,0,i%2,'climb',.6);halo.rotation.x=Math.PI/2;halo.name='level-up-rising-halo';}
         soft(0,.08,0,2,1,'pop',false,glow,.55);const star=soft(0,2.5,0,1.1,0,'flare');star.name='level-up-crest-star';
         for(let i=0;i<(reduced?2:7);i++){const a=i*Math.PI*2/7;const spark=soft(Math.sin(a)*.62,.25+(i%3)*.3,Math.cos(a)*.62,.3,i%2,'stream');spark.name='level-up-rising-spark';}
+      }else if(family==='critical'){
+        // A critical hit reads without any text: a white-gold star snaps open on the contact point,
+        // light rays shoot outward and a ring flicks wide around it, all facing the attacker.
+        const core=soft(0,1.05,0,1.15,0,'crit');core.name='critical-core-flash';
+        const star=solid(shape('crit-star',()=>{const s=new T.Shape();for(let i=0;i<8;i++){const a=i*Math.PI/4,r=i%2?.12:.62,x=Math.sin(a)*r,y=Math.cos(a)*r;if(i)s.lineTo(x,y);else s.moveTo(x,y);}s.closePath();return new T.ShapeGeometry(s);}),0,1.05,.12,0,'crit',.95);star.name='critical-star-burst';
+        const ring=solid(shape('crit-ring',()=>new T.TorusGeometry(.4,.03,6,40)),0,1.05,.1,1,'snap',.85);ring.name='critical-shock-ring';
+        const rays=reduced?3:6;for(let i=0;i<rays;i++){const a=i*Math.PI*2/rays+.26,ray=solid(shape('crit-ray',()=>{const s=new T.Shape();s.moveTo(0,0);s.lineTo(.04,.24);s.lineTo(0,.6);s.lineTo(-.04,.24);s.closePath();return new T.ShapeGeometry(s);}),Math.sin(a)*.16,1.05+Math.cos(a)*.16,.1,i%2,'ray',.9);ray.rotation.z=-a;ray.name='critical-light-ray';}
       }else if(['hit','burst','impact','forge'].includes(family)){
         soft(0,1.05,0,family==='burst'?2.4:1.7,0,'pop');
         const bladeHit=family==='hit'&&['blade','daggers'].includes(options.weapon);
@@ -315,21 +327,25 @@
       group.scale.setScalar(power);ctx.world().add(group);
       // Real coloured light on the floor, walls and actors, strongest where something lands.
       const heavy=!options.defeat&&(options.stage==='land'||family==='quake'&&!options.impact),support=SUPPORT.includes(family)||['cleanse','steam','smoke'].includes(family);
-      const lightPower=(family==='levelup'?3.4:options.defeat?3:options.impact?(skill.unique?3.4:2.4):heavy?6:family==='charge'?0:support?2:3.2)*(reduced?.6:1);
-      const kick=!reduced&&(heavy||skill.unique&&skill.attack&&!options.impact&&family!=='charge');
-      const cue=()=>{if(lightPower>0)ctx.flash?.({x:at.x,y:options.impact||options.defeat?1.15:1.4,z:at.z},colors[1],lightPower,family==='levelup'?.9:options.defeat?.38:options.impact?.2:heavy?.55:support?.75:.34);if(kick)ctx.kick?.(heavy?.14:.08,heavy?.3:.22);};
+      const lightPower=(family==='critical'?4.2:family==='levelup'?3.4:options.defeat?3:options.impact?(skill.unique?3.4:2.4):heavy?6:family==='charge'?0:support?2:3.2)*(reduced?.6:1);
+      const kick=!reduced&&(heavy||family==='critical'||skill.unique&&skill.attack&&!options.impact&&family!=='charge');
+      const cue=()=>{if(lightPower>0)ctx.flash?.({x:at.x,y:options.impact||options.defeat||family==='critical'?1.15:1.4,z:at.z},colors[1],lightPower,family==='critical'?.3:family==='levelup'?.9:options.defeat?.38:options.impact?.2:heavy?.55:support?.75:.34);if(kick)ctx.kick?.(heavy?.14:family==='critical'?.05:.08,heavy?.3:family==='critical'?.14:.22);};
       // A falling star lights the room and shakes the view when it reaches the floor, not while it is still high up.
       const landsAt=family==='meteor'?Math.min(total,METEOR_FALL):0;
       const f={group,total,left:total,parts,mats,family,signature,at:{x:at.x,z:at.z},skill:skill.id,cue:landsAt>0?{left:landsAt,fire:cue}:null};if(!f.cue)cue();
       effects.push(f);return f;
     }
-    function tick(dt){impacts=0;if(!Number.isFinite(dt)||dt<0)return;for(let i=effects.length-1;i>=0;i--){const f=effects[i];f.left-=dt;if(f.cue){f.cue.left-=dt;if(f.cue.left<=0){const fire=f.cue.fire;f.cue=null;fire();}}if(f.left<=0){dispose(f);effects.splice(i,1);continue;}if(ctx.visible)f.group.visible=ctx.visible(f.at);
+    function tick(dt){impacts=0;crits=0;if(!Number.isFinite(dt)||dt<0)return;for(let i=effects.length-1;i>=0;i--){const f=effects[i];f.left-=dt;if(f.cue){f.cue.left-=dt;if(f.cue.left<=0){const fire=f.cue.fire;f.cue=null;fire();}}if(f.left<=0){dispose(f);effects.splice(i,1);continue;}if(ctx.visible)f.group.visible=ctx.visible(f.at);
       const t=1-f.left/f.total,fade=envelope(t,f.signature),travel=reduced?.25:1;for(const m of f.mats)if(m.userData.baseOpacity!==undefined)m.opacity=m.userData.baseOpacity*envelope(t,f.signature,m.userData.envelope||(f.family==='charge'?'charge':'body'));
       for(const p of f.parts){const{m,base,mode,scale}=p;if(mode==='particles'){m.userData.phase.age=f.total-f.left;continue;}if(mode==='energy'){p.phase.age.value=t;continue;}if(m.userData.filledShield){m.userData.opacity=fade;m.userData.age=t;}let size=1;
         if(mode==='rise')m.position.y=base.y+t*.85*travel;
         // Level up: the column grows up from the floor, halos climb, the star flares, sparks stream to the crest.
         if(mode==='ascend'){const grow=smooth(Math.min(1,t/.22));m.scale.set(scale.x*(.7+.3*grow),scale.y*(.15+.85*grow),scale.z*(.7+.3*grow));m.position.y=base.y*(.15+.85*grow);continue;}
         if(mode==='climb'){m.position.y=base.y+t*1.9*travel;size=1-t*.35;}
+        // Critical: the star and core snap to full size almost at once, then shrink away; rays fly out; the ring flicks wide.
+        if(mode==='crit')size=t<.16?.3+.95*smooth(t/.16):1.25-.95*smooth((t-.16)/.84);
+        if(mode==='ray'){const out=1+t*4.5*travel;m.position.x=base.x*out;m.position.y=1.05+(base.y-1.05)*out;size=1-t*.7;}
+        if(mode==='snap')size=.4+1.6*smooth(Math.min(1,t/.5));
         if(mode==='flare'){const on=smooth(Math.max(0,Math.min(1,(t-.18)/.12)));size=.001+on*(1.3-.4*smooth(Math.max(0,(t-.3)/.5)));}
         if(mode==='stream'){m.position.y=base.y+t*2.3*travel;m.position.x=base.x*(1-.6*t);m.position.z=base.z*(1-.6*t);size=1-t*.5;}
         if(mode==='fall'){m.position.y=Math.max(.12,base.y-(f.total-f.left)/METEOR_FALL*(base.y-.12));m.rotation.z+=dt*1.2*travel;}
@@ -349,7 +365,7 @@
         m.scale.copy(scale).multiplyScalar(size);
       }
     }}
-    function reset(){effects.forEach(dispose);effects=[];impacts=0;}
+    function reset(){effects.forEach(dispose);effects=[];impacts=0;crits=0;}
     function cancel(f){const i=effects.indexOf(f);if(i>=0)dispose(effects.splice(i,1)[0]);}
     function destroy(){if(destroyed)return;reset();inks.clear();templates.clear();for(const m of members.keys())m.dispose();members.clear();pool.clear();leased.clear();for(const map of [glow,petal,mist])map.dispose();particleMaterial.dispose();shieldMaterial?.dispose();destroyed=true;}
     return {emit,tick,reset,cancel,destroy,stats:()=>({groups:effects.length,max:limit,meshes:effects.reduce((n,f)=>n+f.group.children.length,0),particles:effects.reduce((n,f)=>n+f.parts.filter(p=>p.mode==='particles').reduce((s,p)=>s+p.m.geometry.attributes.position.count,0),0),textureBytes:destroyed?0:49152})};

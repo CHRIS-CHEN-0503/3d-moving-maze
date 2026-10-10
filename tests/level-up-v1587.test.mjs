@@ -40,7 +40,7 @@ test('the team HUD celebrates every rise in level once, from any experience sour
   assert.match(runtime,/ups=seenLevels&&key===seenKey\?ids\.filter\(id=>seenLevels\[id\]!==undefined&&levels\[id\]>seenLevels\[id\]\):\[\]/,'only a rise on the same floor of the same journey, for an actor already seen');
   assert.match(runtime,/lights\.emit\(LEVEL_UP,\{x:at\.x,z:at\.z\},0\);root\.CharacterFace\?\.react\(actorModel\(id\),'happy',2\.2\);/);
   assert.match(runtime,/ctx\.audio\.sfxAction\?\.\('levelup'\);/);assert.match(runtime,/升到 '\+levels\[ups\[0\]\]\+' 級'/);
-  assert.match(runtime,/banner\.innerHTML='<b>升級！<\/b><span>'\+esc\(text\)\+'<\/span>';banner\.hidden=false;banner\.classList\.remove\('is-playing'\);void banner\.offsetWidth;banner\.classList\.add\('is-playing'\);/,'its own banner, which a kill message cannot cover');
+  assert.match(runtime,/banner\.innerHTML='<b>升級！<\/b><span>'\+esc\(text\)\+'<\/span>'\+hint;banner\.hidden=false;banner\.classList\.remove\('is-playing'\);void banner\.offsetWidth;banner\.classList\.add\('is-playing'\);/,'its own banner, which a kill message cannot cover');
   assert.match(runtime,/levelBanner\.id='heroLevelBanner';levelBanner\.hidden=true;levelBanner\.setAttribute\('role','status'\)/);assert.match(runtime,/function reset\(\)\{[^}]*seenLevels=null;seenKey='';/);
   const css=read('story/tower-heroes.css');assert.match(css,/\.just-leveled>button\{animation:hero-level-up 1\.8s ease-out 1\}/);assert.match(css,/#heroLevelBanner\.is-playing\{animation:hero-level-banner 2\.4s ease-out 1 forwards\}/);assert.match(css,/prefers-reduced-motion:reduce\)\{#heroTeamBar \.hero-team-member\.just-leveled>button\{animation:none/);
 });

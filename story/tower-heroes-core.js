@@ -64,6 +64,21 @@
   // bar allows a burst at the new pace and regeneration settles back near the old.
   // Robots spend their power-stone energy instead; the mage's innate daylight is free.
   const COOLDOWN_SCALE=.5,SPIRIT=Object.freeze({mage:1.4,healer:1.35,archer:1.1,chef:1.05,scout:1,smith:.95,swordsman:.9,robot:0});
+  // Ability scores. Every level past the first adds three automatic points by profession (the
+  // life, MP and attack growth the professions already had) and two free points. Only free
+  // points change numbers, each by a small step, at most ATTRIBUTE_CAP per score, so a journey
+  // that never spends one keeps today's balance. Robots have no MP or spells: no intellect.
+  const ATTRIBUTES=Object.freeze(['str','int','vit','agi','luk']),ATTRIBUTE_NAMES=Object.freeze({str:'力量',int:'智力',vit:'體質',agi:'敏捷',luk:'幸運'});
+  const FREE_POINTS_PER_LEVEL=2,AUTO_POINTS_PER_LEVEL=3,ATTRIBUTE_STEP=Object.freeze({str:.015,int:.015,intMp:.02,intHeal:.01,vit:.02,agi:.01,luk:1});
+  const deep=o=>Object.freeze(Object.fromEntries(Object.entries(o).map(([k,v])=>[k,Object.freeze(v)])));
+  const ATTRIBUTE_BASE=deep({swordsman:{str:7,int:2,vit:7,agi:5,luk:4},smith:{str:6,int:3,vit:8,agi:3,luk:5},robot:{str:6,int:0,vit:9,agi:5,luk:5},archer:{str:5,int:3,vit:4,agi:8,luk:5},scout:{str:4,int:3,vit:4,agi:8,luk:6},mage:{str:2,int:9,vit:4,agi:4,luk:6},healer:{str:2,int:8,vit:6,agi:4,luk:5},chef:{str:5,int:5,vit:6,agi:4,luk:5}});
+  const ATTRIBUTE_GROWTH=deep({swordsman:{str:2,vit:1},smith:{vit:2,str:1},robot:{vit:2,agi:1},archer:{agi:2,str:1},scout:{agi:2,luk:1},mage:{int:2,luk:1},healer:{int:2,vit:1},chef:{vit:1,int:1,luk:1}});
+  // Automatic spending follows this repeating order, skipping a full or unusable score.
+  const ATTRIBUTE_PLAN=deep({swordsman:['str','vit','str','agi'],smith:['vit','str','vit','agi'],robot:['vit','str','agi','vit'],archer:['agi','str','agi','luk'],scout:['agi','luk','agi','str'],mage:['int','luk','int','agi'],healer:['int','vit','int','agi'],chef:['vit','int','luk','agi']});
+  // Luck: a critical hit deals 1.5x; each free luck point adds 1 percentage point to the job's base chance.
+  const CRIT_BASE=Object.freeze({scout:8,archer:6,robot:3}),CRIT_DEFAULT=4,CRIT_MULTIPLIER=1.5;
+  // Saved preparation and flight damage stay below the old 250 bound times the strongest free-point bonus.
+  const DAMAGE_RECORD_LIMIT=250*(1+ATTRIBUTE_STEP.str*10);
   // Capped (30, or 45 for awakening and advanced moves) so a long-cooldown rescue such as revive stays castable early.
   const mpCostFor=(s,base)=>s.job==='robot'||s.effect==='daylight'?0:Math.min(s.unique?45:30,Math.round(4+base/2));
   const SKILLS=Object.freeze(Object.fromEntries([
@@ -153,14 +168,21 @@
     const lo=G.XP[l-1],hi=G.XP[l];return Math.max(0,Math.min(1,(experience(run,id)-lo)/(hi-lo)));
   }
   const actor=(run,id=state(run)?.active)=>state(run)?.actors[id];
-  // MP: (40 + 5 per level) x the job's spirit; robots have none. A missing value means full.
-  const mpMax=(profession,lvl)=>Math.round((40+5*lvl)*(SPIRIT[profession]??1));
-  const maxMp=(run,id=state(run)?.active||'hero')=>mpMax(job(run,id),level(run,id));
+  // Free ability points; a missing record (a save from before ability scores) counts as none spent.
+  const NO_ATTRIBUTES=Object.freeze(Object.fromEntries(ATTRIBUTES.map(k=>[k,0])));
+  const attrs=(run,id=state(run)?.active)=>actor(run,id)?.attrs||NO_ATTRIBUTES,attr=(run,id,key)=>attrs(run,id)[key]||0;
+  const freePoints=lvl=>FREE_POINTS_PER_LEVEL*(Math.max(1,lvl)-1),spentPoints=a=>ATTRIBUTES.reduce((n,k)=>n+(a?.[k]||0),0);
+  const attributeAllowed=(profession,key)=>ATTRIBUTES.includes(key)&&!(profession==='robot'&&key==='int');
+  const unspentPoints=(run,id=state(run)?.active)=>Math.max(0,freePoints(level(run,id))-spentPoints(attrs(run,id)));
+  const critChance=(run,id=state(run)?.active)=>(CRIT_BASE[job(run,id)]??CRIT_DEFAULT)+attr(run,id,'luk')*ATTRIBUTE_STEP.luk;
+  // MP: (40 + 5 per level) x the job's spirit, +2% per free intellect point; robots have none. A missing value means full.
+  const mpMax=(profession,lvl,int=0)=>Math.round((40+5*lvl)*(SPIRIT[profession]??1)*(1+ATTRIBUTE_STEP.intMp*(Number.isInteger(int)?Math.max(0,Math.min(P().ATTRIBUTE_CAP,int)):0)));
+  const maxMp=(run,id=state(run)?.active||'hero')=>mpMax(job(run,id),level(run,id),attr(run,id,'int'));
   const mp=(run,id=state(run)?.active||'hero')=>{const a=actor(run,id);return a?Math.min(maxMp(run,id),a.mp??maxMp(run,id)):0;};
   const mpRegen=(run,id)=>maxMp(run,id)?1.2+maxMp(run,id)*.015:0;
   const mpReady=(run,id,skillId)=>mp(run,id)>=(SKILLS[skillId]?.mp||0);
   function restoreMp(run,id,amount){const a=actor(run,id),max=maxMp(run,id);if(!a||!max)return 0;const before=mp(run,id),next=Math.min(max,before+Math.max(0,amount));if(next>=max)delete a.mp;else a.mp=next;return next-before;}
-  const maxHp=(run,id=state(run)?.active||'hero')=>P().vitalHp(job(run,id),level(run,id),id==='hero')+pv(run,'robot_body',id);
+  const maxHp=(run,id=state(run)?.active||'hero')=>P().vitalHp(job(run,id),level(run,id),id==='hero',attr(run,id,'vit'))+pv(run,'robot_body',id);
   const hp=(run,id)=>id===state(run)?.active?run.hp:id==='hero'?state(run).heroHp:run.party.members.find(m=>m.id===id)?.hp||0;
   const equipment=(run,id=state(run)?.active)=>id===state(run)?.active?run.equipment:actor(run,id)?.equipment;
   const pv=(run,key,id=state(run)?.active)=>actor(run,id)?.passives.includes(key)?PASSIVES[key].power[G.skillLevel(run,id)-1]:0;
@@ -204,6 +226,7 @@
   }
   function setBuff(run,id,key,left,power=0){const a=actor(run,id),old=buff(run,key,id);if(old&&['rally','speed','polish','barrier','fortify','stomach','ward','path_eye','daylight'].includes(key)){left=Math.max(left,old.left);power=Math.max(power,old.power);}a.buffs=a.buffs.filter(b=>b.id!==key);a.buffs.push({id:key,left,power});}
   function hash(seed,text){let h=seed>>>0;for(const c of String(text))h=Math.imul(h^c.charCodeAt(0),16777619)>>>0;return h;}
+  const mix=h=>{h=Math.imul(h^(h>>>16),0x85ebca6b);h=Math.imul(h^(h>>>13),0xc2b2ae35);return (h^(h>>>16))>>>0;};
   function roll(run,id,salt){const a=actor(run,id);return hash(run.seed,id+':'+salt+':'+a.roll++)%100;}
   function draft(seed,profession,identity){
     const skills=Object.values(SKILLS).filter(s=>s.job===profession&&!s.unique),sets=[];
@@ -219,7 +242,7 @@
   function makeActor(run,id,profession){
     const draw=draft(run.seed,profession,id==='hero'?'hero':profession),j=JOBS[profession],head={heavy:'heavy_helm',light:'light_hood',robe:'rune_crown'}[j.armor],body={heavy:'heavy_armor',light:'light_armor',robe:'robe'}[j.armor];
     const make=kind=>C().createGear(kind,run.floor,run.seed,id+':starter:'+kind);
-    return {...draw,learned:null,showHelmet:true,equipment:profession==='robot'?{helmet:null,armor:make('robot_shell'),weapon:make('robot_fists'),shield:null,core1:make('robot_core'),core2:null}:{helmet:make(head),armor:make(body),weapon:make(j.starter),shield:GEAR[j.starter].hands===1?make('buckler'):null},cooldowns:Object.fromEntries(draw.skills.map(s=>[s,0])),buffs:[],attack:0,hurt:0,tool:0,autoLeft:0,autoRescue:false,roll:0,pending:null,shot:null,...(profession==='robot'?{robot:ROBOT.freshState()}:{} )};
+    return {...draw,learned:null,showHelmet:true,attrs:{...NO_ATTRIBUTES},attrAuto:id!=='hero',equipment:profession==='robot'?{helmet:null,armor:make('robot_shell'),weapon:make('robot_fists'),shield:null,core1:make('robot_core'),core2:null}:{helmet:make(head),armor:make(body),weapon:make(j.starter),shield:GEAR[j.starter].hands===1?make('buckler'):null},cooldowns:Object.fromEntries(draw.skills.map(s=>[s,0])),buffs:[],attack:0,hurt:0,tool:0,autoLeft:0,autoRescue:false,roll:0,pending:null,shot:null,...(profession==='robot'?{robot:ROBOT.freshState()}:{} )};
   }
   function preview(run,offer){if(offer.returning){const saved=R().remembered(run,offer.profession,offer.sex)?.loadout;return {...(saved?clone(saved):draft(run.seed,offer.profession,offer.profession)),equipment:offer.profession==='robot'&&saved?.robotEquipment?clone(saved.robotEquipment):Object.fromEntries(SLOTS.map(k=>[k,null]))};}return makeActor(run,offer.id,offer.profession);}
   function enable(run){return C().transaction(run,run.revision,n=>{
@@ -233,25 +256,56 @@
     if(ids(n).some(id=>job(n,id)==='archer'))n.bag.arrow=Math.max(n.bag.arrow,30);
     return {ok:true,message:'三個主動、兩個被動技能已確定。',effect:{loadouts:true}};
   });}
-  function addMember(run,member){if(enabled(run)){member.xp=G.XP[member.level-1];state(run).actors[member.id]=makeActor(run,member.id,member.profession);G.state(run).policies[member.id]=G.policy();G.state(run).members[member.id]=G.freshRecord();if(member.profession==='robot')member.hp=maxHp(run,member.id);if(member.profession==='archer')run.bag.arrow=Math.max(run.bag.arrow,Math.min(C().itemLimit('arrow',run),run.bag.arrow+15));}}
+  function addMember(run,member){if(enabled(run)){member.xp=G.XP[member.level-1];state(run).actors[member.id]=makeActor(run,member.id,member.profession);G.state(run).policies[member.id]=G.policy();G.state(run).members[member.id]=G.freshRecord();if(member.profession==='robot')member.hp=maxHp(run,member.id);settleAttributes(run,member.id);if(member.profession==='archer')run.bag.arrow=Math.max(run.bag.arrow,Math.min(C().itemLimit('arrow',run),run.bag.arrow+15));}}
   // Returning travellers keep learned talents, not a second starter kit or
   // expired combat effects. The save validator below shares the live rules.
-  function recruitSnapshot(run,id){const a=actor(run,id),g=G.record(run,id);return a?{skills:[...a.skills],passives:[...a.passives],learned:a.learned??null,showHelmet:a.showHelmet!==false,roll:a.roll,growth:{choices:[...g.choices],awakening:g.awakening},...(job(run,id)==='robot'?{robotEquipment:clone(equipment(run,id)),robotResources:{fuel:a.robot.fuel,repairClock:a.robot.repairClock}}:{} )}:null;}
+  function recruitSnapshot(run,id){const a=actor(run,id),g=G.record(run,id);return a?{skills:[...a.skills],passives:[...a.passives],learned:a.learned??null,showHelmet:a.showHelmet!==false,roll:a.roll,growth:{choices:[...g.choices],awakening:g.awakening},attrs:{...attrs(run,id)},attrAuto:a.attrAuto===true,...(job(run,id)==='robot'?{robotEquipment:clone(equipment(run,id)),robotResources:{fuel:a.robot.fuel,repairClock:a.robot.repairClock}}:{} )}:null;}
   function restoreMember(run,member,snapshot){if(!enabled(run))return;
-    const saved=snapshot||{...draft(run.seed,member.profession,member.profession),learned:null,showHelmet:true,roll:0,growth:{choices:[],awakening:null}},a={skills:[...saved.skills],passives:[...saved.passives],learned:saved.learned,showHelmet:saved.showHelmet,roll:saved.roll,equipment:Object.fromEntries(SLOTS.map(k=>[k,null])),cooldowns:Object.fromEntries(saved.skills.map(k=>[k,0])),buffs:[],attack:0,hurt:0,tool:0,autoLeft:0,autoRescue:false,pending:null,shot:null};
+    const saved=snapshot||{...draft(run.seed,member.profession,member.profession),learned:null,showHelmet:true,roll:0,growth:{choices:[],awakening:null}},a={skills:[...saved.skills],passives:[...saved.passives],learned:saved.learned,showHelmet:saved.showHelmet,roll:saved.roll,attrs:{...NO_ATTRIBUTES},attrAuto:saved.attrAuto??true,equipment:Object.fromEntries(SLOTS.map(k=>[k,null])),cooldowns:Object.fromEntries(saved.skills.map(k=>[k,0])),buffs:[],attack:0,hurt:0,tool:0,autoLeft:0,autoRescue:false,pending:null,shot:null};
     if(member.profession==='robot'){a.equipment=saved.robotEquipment?clone(saved.robotEquipment):ROBOT.normalizeEquipment({helmet:null,armor:C().createGear('robot_shell',run.floor,run.seed,member.id+':restored-shell'),weapon:C().createGear('robot_fists',run.floor,run.seed,member.id+':restored-fists'),shield:null});a.robot={...ROBOT.freshState(),...(saved.robotResources||{})};}
     state(run).actors[member.id]=a;G.state(run).policies[member.id]=G.policy();G.state(run).members[member.id]={...G.freshRecord(),choices:[...saved.growth.choices],awakening:saved.growth.awakening};
+    if(saved.attrs)withLife(run,member.id,()=>{a.attrs={...saved.attrs};});settleAttributes(run,member.id);
   }
   function validateRecruitSnapshot(value,profession,actorLevel,floor){
-    if(!value||typeof value!=='object'||Array.isArray(value)||Object.keys(value).some(k=>!['skills','passives','learned','showHelmet','roll','growth','robotEquipment','robotResources'].includes(k))||typeof value.showHelmet!=='boolean'||!num(value.roll,0,Number.MAX_SAFE_INTEGER-1,true))return null;
+    if(!value||typeof value!=='object'||Array.isArray(value)||Object.keys(value).some(k=>!['skills','passives','learned','showHelmet','roll','growth','attrs','attrAuto','robotEquipment','robotResources'].includes(k))||typeof value.showHelmet!=='boolean'||!num(value.roll,0,Number.MAX_SAFE_INTEGER-1,true))return null;
     const g=value.growth;if(!g||typeof g!=='object'||Array.isArray(g)||Object.keys(g).some(k=>!['choices','awakening'].includes(k))||!Array.isArray(g.choices)||g.choices.length>3||new Set(g.choices).size!==g.choices.length||!(g.awakening===null||typeof g.awakening==='string'))return null;
     if(!validTalents(value,profession,actorLevel,g,'returning',floor))return null;
+    const remembered=value.attrs===undefined?null:validAttrs(value.attrs,profession,actorLevel);if(value.attrs!==undefined&&!remembered||value.attrAuto!==undefined&&typeof value.attrAuto!=='boolean')return null;
     let robotEquipment,robotResources;if(profession==='robot'){robotEquipment=validateActorEquipment(value.robotEquipment,profession,actorLevel,floor);if(!robotEquipment)return null;const old=Object.keys(value.robotEquipment).length===4;robotResources=value.robotResources??(old?{fuel:100,repairClock:0}:null);if(!robotResources||Object.keys(robotResources).length!==2||!num(robotResources.fuel,0,100)||!num(robotResources.repairClock,0,ROBOT.REPAIR_SECONDS)||robotResources.repairClock===ROBOT.REPAIR_SECONDS)return null;robotResources={...robotResources};}else if(value.robotEquipment!==undefined||value.robotResources!==undefined)return null;
-    return {skills:[...value.skills],passives:[...value.passives],learned:value.learned??null,showHelmet:value.showHelmet,roll:value.roll,growth:{choices:[...g.choices],awakening:g.awakening},...(robotEquipment?{robotEquipment,robotResources}:{} )};
+    return {skills:[...value.skills],passives:[...value.passives],learned:value.learned??null,showHelmet:value.showHelmet,roll:value.roll,growth:{choices:[...g.choices],awakening:g.awakening},...(remembered?{attrs:remembered}:{}),...(value.attrAuto!==undefined?{attrAuto:value.attrAuto}:{}),...(robotEquipment?{robotEquipment,robotResources}:{} )};
   }
   function removeMember(run,id){if(!enabled(run))return true;if(id===state(run).active)return false;F()?.clear(run,id);for(const list of Object.values(F()?.state(run)?.enemies||{}))for(const s of list)if(s.owner===id)s.owner=null;delete state(run).actors[id];const growth=G.state(run);delete growth.policies[id];delete growth.members[id];delete growth.imprints[id];delete growth.nearby[id];for(const k of Object.keys(growth.nearby))growth.nearby[k]=growth.nearby[k].filter(x=>x!==id);for(const e of Object.values(state(run).enemy)){if(e.tauntId===id){delete e.tauntId;delete e.tauntLeft;}if(e.relayOwner===id){delete e.relayOwner;delete e.relay;}}return true;}
-  function sync(run){if(!enabled(run))return;const s=state(run);run.hp=Math.min(maxHp(run),run.hp);if(s.active==='hero')s.heroHp=run.hp;else{const m=run.party.members.find(m=>m.id===s.active);if(m)m.hp=run.hp;}}
+  function sync(run){if(!enabled(run))return;for(const id of ids(run))settleAttributes(run,id);const s=state(run);run.hp=Math.min(maxHp(run),run.hp);if(s.active==='hero')s.heroHp=run.hp;else{const m=run.party.members.find(m=>m.id===s.active);if(m)m.hp=run.hp;}}
   function setHp(run,id,value){value=Math.max(0,Math.min(maxHp(run,id),value));if(id===state(run).active)run.hp=value;if(id==='hero')state(run).heroHp=value;else run.party.members.find(m=>m.id===id).hp=value;}
+  // Pure: spend every unspent free point along the profession's plan (used for automatic actors and old saves).
+  function autoSpend(free,profession,lvl){
+    const out={...NO_ATTRIBUTES,...free},plan=ATTRIBUTE_PLAN[profession]||ATTRIBUTES,open=k=>attributeAllowed(profession,k)&&out[k]<P().ATTRIBUTE_CAP;
+    for(let left=freePoints(lvl)-spentPoints(out);left>0;left--){const start=spentPoints(out)%plan.length,key=[...plan.slice(start),...plan.slice(0,start)].find(open)||ATTRIBUTES.find(open);if(!key)break;out[key]++;}
+    return out;
+  }
+  function validAttrs(value,profession,lvl){
+    if(!value||typeof value!=='object'||Array.isArray(value)||Object.keys(value).length!==ATTRIBUTES.length||!ATTRIBUTES.every(k=>num(value[k],0,attributeAllowed(profession,k)?P().ATTRIBUTE_CAP:0,true))||spentPoints(value)>freePoints(lvl))return null;
+    return Object.fromEntries(ATTRIBUTES.map(k=>[k,value[k]]));
+  }
+  // A raised life ceiling raises current life by the same amount, exactly like a level up.
+  function withLife(run,id,change){const before=hp(run,id),max=maxHp(run,id);change();if(before>0)setHp(run,id,before+maxHp(run,id)-max);}
+  function settleAttributes(run,id){const a=actor(run,id);if(!a)return;if(!a.attrs)a.attrs={...NO_ATTRIBUTES};if(typeof a.attrAuto!=='boolean')a.attrAuto=id!=='hero';if(a.attrAuto&&unspentPoints(run,id)>0)withLife(run,id,()=>{a.attrs=autoSpend(a.attrs,job(run,id),level(run,id));});}
+  function allocate(run,id,key,revision=run.revision){return C().transaction(run,revision,n=>{
+    const a=actor(n,id);if(!a||!ATTRIBUTES.includes(key))return {ok:false,message:'找不到這位隊員或能力值。'};
+    if(!attributeAllowed(job(n,id),key))return {ok:false,message:'機器人沒有 MP 與法術，不能分配智力。'};
+    if(unspentPoints(n,id)<=0)return {ok:false,message:'沒有可分配的自由點數；每升一級可得 '+FREE_POINTS_PER_LEVEL+' 點。'};
+    if(attr(n,id,key)>=P().ATTRIBUTE_CAP)return {ok:false,message:ATTRIBUTE_NAMES[key]+'的自由點數已達上限 '+P().ATTRIBUTE_CAP+' 點。'};
+    withLife(n,id,()=>{a.attrs={...attrs(n,id),[key]:attr(n,id,key)+1};});
+    return {ok:true,message:ATTRIBUTE_NAMES[key]+' +1',effect:{attribute:key,actorId:id}};
+  });}
+  function setAttributeAuto(run,id,on,revision=run.revision){return C().transaction(run,revision,n=>{const a=actor(n,id);if(!a||typeof on!=='boolean')return {ok:false,message:'找不到這位隊員。'};a.attrAuto=on;settleAttributes(n,id);return {ok:true,message:on?'自動配點：開，剩餘與之後的點數依職業建議分配。':'自動配點：關，之後的點數由你分配。'};});}
+  // The forgetting draught returns every free point; the actor then waits for a manual choice.
+  function forgetAttributes(run,id){const a=actor(run,id);if(!a||spentPoints(attrs(run,id))<=0)return 0;const refunded=spentPoints(attrs(run,id));a.attrs={...NO_ATTRIBUTES};a.attrAuto=false;setHp(run,id,hp(run,id));if(a.mp!==undefined&&a.mp>=maxMp(run,id))delete a.mp;return refunded;}
+  function attributeSheet(run,id=state(run)?.active){
+    const profession=job(run,id),lvl=level(run,id),base=ATTRIBUTE_BASE[profession],growth=ATTRIBUTE_GROWTH[profession],free=attrs(run,id);
+    return {points:freePoints(lvl),unspent:unspentPoints(run,id),auto:actor(run,id)?.attrAuto===true,crit:critChance(run,id),cap:P().ATTRIBUTE_CAP,
+      scores:ATTRIBUTES.map(key=>{const natural=base[key]+(growth[key]||0)*(lvl-1);return {key,name:ATTRIBUTE_NAMES[key],natural,free:free[key]||0,total:natural+(free[key]||0),allowed:attributeAllowed(profession,key)};})};
+  }
   function switchRaw(run,id){const s=state(run);sync(run);const nextHp=hp(run,id);actor(run).equipment=run.equipment;run.equipment=actor(run,id).equipment;actor(run,id).equipment=null;s.active=id;run.hp=nextHp;run.charIdx=JOBS[job(run,id)].charIdx;s.switchLeft=1;sync(run);}
   function returnToHero(run){if(!enabled(run))return;if(state(run).active!=='hero')switchRaw(run,'hero');state(run).switchLeft=0;setHp(run,'hero',Math.max(1,hp(run,'hero')));sync(run);}
   function switchActor(run,id,revision){return C().transaction(run,revision,n=>{
@@ -284,7 +338,7 @@
   // the shield a two-hand weapon displaces all count. Read only: nothing changes.
   // An outer bound on anyone's life in a hero journey (the exact cap per actor is maxHp):
   // the sturdiest hero or companion at the level cap, plus the robot body talent's 30.
-  function hpCeiling(under){const jobs=Object.keys(P().VITALITY);return Math.max(...jobs.map(j=>P().vitalHp(j,under?15:10,true)),...jobs.map(j=>P().vitalHp(j,under?10:5,false)))+30;}
+  function hpCeiling(under){const jobs=Object.keys(P().VITALITY),vit=P().ATTRIBUTE_CAP;return Math.max(...jobs.map(j=>P().vitalHp(j,under?15:10,true,vit)),...jobs.map(j=>P().vitalHp(j,under?10:5,false,vit)))+30;}
   // Any rise counts: suggest it whenever attack per second or defense goes up,
   // even if the other one drops (a two-hand weapon displacing a shield); the
   // comparison shows both. Only floating-point noise is ignored.
@@ -320,7 +374,9 @@
     const growth=(id==='hero'?1+.02*(level(run,id)-1):1)*(F()?.offense(run,id)??1),offense=1+(pv(run,'tempered_edge',id)+pv(run,'steady_aim',id)+pv(run,'fist_drive',id)+(hp(run,id)<maxHp(run,id)*.5?pv(run,'last_stand',id):0))/100,bonus=w?.bonus||0,imprint=mark?1+.15*(mark.boost||1):1;
     // Courage and arcane draughts: +30% physical / spell attack while they last.
     const courage=1+(buff(run,'courage',id)?.power||0)/100,arcane=1+(buff(run,'arcane',id)?.power||0)/100;
-    return {damage:((d?.damage||3)+bonus*2)*growth*offense*imprint*(1+X().traitPower(w,'physicalPct'))*courage,spellDamage:((d?.magicDamage||d?.damage||3)+bonus*2)*growth*(1+pv(run,'spell_precision',id)/100)*imprint*(1+X().traitPower(w,'spellPct'))*arcane,interval:Math.max(.35,((d?.interval||.9)-(w?.forge?.trait==='light'?w.forge.level*.08:0))*(1-(pv(run,'quick_hands',id)+pv(run,'nimble_shot',id))/100))/C().hasteMultiplier(run,id),reach:d?.reach||2.3,hands:d?.hands||0,armor:totalArmor,mitigation:Math.min(.45,totalArmor/(totalArmor+20)),magic:robes*.04,heal:robes*.05+(d?.support||0)+X().traitPower(w,'support'),support:(d?.support||0)+X().traitPower(w,'support'),weapon:w};
+    // Free ability points: strength and intellect raise physical and spell attack, agility shortens the swing.
+    const might=1+attr(run,id,'str')*ATTRIBUTE_STEP.str,wits=1+attr(run,id,'int')*ATTRIBUTE_STEP.int,quick=1-attr(run,id,'agi')*ATTRIBUTE_STEP.agi;
+    return {damage:((d?.damage||3)+bonus*2)*growth*offense*imprint*(1+X().traitPower(w,'physicalPct'))*courage*might,spellDamage:((d?.magicDamage||d?.damage||3)+bonus*2)*growth*(1+pv(run,'spell_precision',id)/100)*imprint*(1+X().traitPower(w,'spellPct'))*arcane*wits,interval:Math.max(.35,((d?.interval||.9)-(w?.forge?.trait==='light'?w.forge.level*.08:0))*(1-(pv(run,'quick_hands',id)+pv(run,'nimble_shot',id))/100)*quick)/C().hasteMultiplier(run,id),reach:d?.reach||2.3,hands:d?.hands||0,armor:totalArmor,mitigation:Math.min(.45,totalArmor/(totalArmor+20)),magic:robes*.04,heal:robes*.05+(d?.support||0)+X().traitPower(w,'support')+attr(run,id,'int')*ATTRIBUTE_STEP.intHeal,support:(d?.support||0)+X().traitPower(w,'support'),weapon:w};
   }
   function wear(run,id,g){if(!g||g.durability<=0)return;const protect=buff(run,'fortify',id);if(protect?.power>0){protect.power--;return;}const imprint=G.imprintFor(run,id,g);if(imprint){imprint.left--;return;}if(roll(run,id,'wear')<pv(run,'care',id))return;if(GEAR[g.kind]?.baseKind==='robot_shell'&&roll(run,id,'robot-shell-wear')<pv(run,'shock_absorber',id))return;X().wear(run,g);}
   function durabilityWarnings(run,id){return equipmentSlots(run,id).map(slot=>equipment(run,id)?.[slot]).filter(g=>g&&g.durability/g.maxDurability<=.2).map(g=>({kind:g.kind,name:g.name,slot:g.slot,durability:g.durability,maxDurability:g.maxDurability,severity:g.durability/g.maxDurability<=.1?'critical':'warning',broken:g.durability===0}));}
@@ -403,6 +459,8 @@
     if(spec.kind==='crab'&&options.front===true)damage*=.55;
     if(skill?.effect==='blind'&&options.front===false)damage*=1.25;
     damage*=G.strikeMultiplier(n,id,monsterId,skill,options.front);
+    // Luck: the critical roll comes from this exact attack, so reloading or replaying it never rerolls.
+    const crit=mix(hash(n.seed,id+':crit:'+monsterId+':'+n.revision+':'+(skill?skill.id:options.shot?'shot':'swing')))%100<critChance(n,id);if(crit)damage*=CRIT_MULTIPLIER;
     damage=Events()?.limitLordDamage?.(n,monsterId,Math.max(1,Math.round(damage)),spec.maxHp)??Math.max(1,Math.round(damage));if(!options.shot)a.attack=st.interval;a.buffs=a.buffs.filter(b=>b.id!=='stealth');
     const w=st.weapon;if(w&&!options.shot&&(!skill||!a.pending.worn)){if(!skill&&job(n,id)==='robot'){a.robot.fistHits=(a.robot.fistHits+1)%4;if(a.robot.fistHits===0)wear(n,id,w);}else wear(n,id,w);}if(skill){a.pending.worn=true;a.pending.targets.push(monsterId);}if(options.shot)a.shot=null;
     const remaining=Math.max(0,(n.party.health[monsterId]??spec.maxHp)-damage);n.party.health[monsterId]=remaining;
@@ -416,7 +474,7 @@
     if(effect==='blind')enemy.blind=duration;if(effect==='weak')enemy.weak=.15+l*.04;if(effect==='mark')enemy.mark=skill.params?.markSeconds??6;
     let drops=[];if(remaining===0)drops=finishMonster(n,spec,options.lootCell);else if(damage>0)F()?.weaponHit(n,id,spec,imprint||null);
     const spoils=drops.filter(d=>d.direct).map(d=>d.label);
-    return {ok:true,message:remaining===0?'擊敗 '+spec.def.name+(spoils.length?'，獲得 '+spoils.join('、'):''):'命中 '+spec.def.name,effect:{target:'monster',targetId:monsterId,damage,hp:remaining,dead:remaining===0,drops,lord:!!spec.lord,stunned,rooted:enemy.root>0&&remaining>0,repel:!spec.lord&&(effect==='repel'||skill?.params?.knockback>0),knockback:!spec.lord?skill?.params?.knockback||0:0,kinetic,broken:w?.durability===0?w:null}};
+    return {ok:true,message:remaining===0?'擊敗 '+spec.def.name+(spoils.length?'，獲得 '+spoils.join('、'):''):'命中 '+spec.def.name,effect:{target:'monster',targetId:monsterId,damage,hp:remaining,dead:remaining===0,drops,lord:!!spec.lord,stunned,rooted:enemy.root>0&&remaining>0,repel:!spec.lord&&(effect==='repel'||skill?.params?.knockback>0),knockback:!spec.lord?skill?.params?.knockback||0:0,kinetic,crit,broken:w?.durability===0?w:null}};
   });}
   function cast(run,skillId,options={},revision){return C().transaction(run,revision,n=>{
     const id=options.actorId||state(n)?.active,a=actor(n,id),s=SKILLS[skillId];
@@ -514,7 +572,7 @@
   }
   function validate(value,party){
     const bodyBonus=party.profession==='robot'&&value?.actors?.hero?.passives?.includes('robot_body')?5*(value.level>=10?6:Math.min(5,value.level)):0;
-    if(!value||value.version!==1||!(value.xpScale===undefined||value.xpScale===10||value.xpScale===G.XP_SCALE)||!num(value.level,1,party.floor<0?15:10,true)||!num(value.xp,0,100000,true)||!num(value.heroHp,0,P().vitalHp(party.profession,value.level,true)+bodyBonus)||!num(value.switchLeft,0,1))return null;
+    if(!value||value.version!==1||!(value.xpScale===undefined||value.xpScale===10||value.xpScale===G.XP_SCALE)||!num(value.level,1,party.floor<0?15:10,true)||!num(value.xp,0,100000,true)||!num(value.heroHp,0,P().vitalHp(party.profession,value.level,true,value.actors?.hero?.attrs?.vit)+bodyBonus)||!num(value.switchLeft,0,1))return null;
     // Replace the retired random skill without deleting a save, changing order,
     // refunding resources or retaining its old ten-minute skill cooldown.
     value=clone(value);
@@ -535,7 +593,11 @@
       if(id!=='hero'&&legacyGrowth&&learned)progress.choices=[learned];
       if(!validTalents(a,profession,actorLevel,progress,id,party.floor))return null;
       if(!a.cooldowns||Object.keys(a.cooldowns).length!==a.skills.length||!a.skills.every(s=>own(a.cooldowns,s)&&num(a.cooldowns[s],0,600)))return null;
-      if(a.mp!==undefined&&(profession==='robot'||!num(a.mp,0,mpMax(profession,actorLevel))))return null;
+      // Saves from before ability scores have none spent; automatic companions spend theirs at the next sync,
+      // where the higher ceilings also lift current life exactly as a level up does.
+      const spent=a.attrs===undefined?{...NO_ATTRIBUTES}:validAttrs(a.attrs,profession,actorLevel);if(!spent||a.attrAuto!==undefined&&typeof a.attrAuto!=='boolean')return null;
+      const attrAuto=a.attrAuto??id!=='hero';
+      if(a.mp!==undefined&&(profession==='robot'||!num(a.mp,0,mpMax(profession,actorLevel,spent.int))))return null;
       if(!num(a.attack,0,5)||!num(a.hurt,0,2)||!num(a.tool,0,90)||!num(a.autoLeft,0,180)||!num(a.roll,0,Number.MAX_SAFE_INTEGER-1,true)||typeof a.autoRescue!=='boolean')return null;
       if(!Array.isArray(a.buffs)||a.buffs.length>BUFFS.length||new Set(a.buffs.map(b=>b.id)).size!==a.buffs.length||!a.buffs.every(b=>BUFFS.includes(b.id)&&num(b.left,0,600)&&num(b.power,0,200)))return null;
       if(a.buffs.some(b=>b.id==='haste'&&(b.left>C().HASTE_DURATION||![C().HASTE_PERCENT,C().HASTE_STRONG_PERCENT].includes(b.power))))return null;
@@ -544,9 +606,9 @@
       const robot=profession==='robot'?ROBOT.validateState(a.robot):null;if(profession==='robot'&&!robot||profession!=='robot'&&a.robot!==undefined)return null;
       let gear=null;if(id!==value.active){gear=validateActorEquipment(a.equipment,profession,actorLevel,party.floor);if(!gear)return null;}else if(a.equipment!==null)return null;
       if(profession==='robot'&&gear&&(gear.helmet!==null||gear.shield!==null||!ROBOT.isPart(gear.armor)||!ROBOT.isPart(gear.weapon)))return null;
-      const p=a.pending;if(p&&(!a.skills.includes(p.id)||!SKILLS[p.id].attack||!num(p.left,0,3)||!num(p.damage,0,250)||typeof p.worn!=='boolean'||!F()?.validAttunement(p.attunement)||!Array.isArray(p.targets)||p.targets.length>(SKILLS[p.id].params?.maxTargets||C().MAX_MONSTERS)||new Set(p.targets).size!==p.targets.length||!p.targets.every(id=>C().validMonsterId(id,party.floor))))return null;
-      const shot=a.shot?{...a.shot,kind:a.shot.kind??'arrow'}:null;if(shot&&(!(shot.target===null||C().validMonsterId(shot.target,party.floor))||!num(shot.left,0,2)||!num(shot.damage,0,250)||!F()?.validAttunement(shot.attunement)||!['arrow','orb'].includes(shot.kind)||(shot.kind==='arrow'?profession!=='archer':!['mage','healer'].includes(profession))))return null;
-      actors[id]={skills:[...a.skills],passives:[...a.passives],learned,showHelmet:a.showHelmet!==false,equipment:gear,cooldowns:{...a.cooldowns},buffs:a.buffs.map(b=>({id:b.id,left:b.left,power:b.power})),attack:a.attack,hurt:a.hurt,tool:a.tool,autoLeft:a.autoLeft,autoRescue:a.autoRescue,roll:a.roll,pending:p?clone(p):null,shot:shot?clone(shot):null,...(a.mp!==undefined?{mp:a.mp}:{}),...(robot?{robot}:{})};
+      const p=a.pending;if(p&&(!a.skills.includes(p.id)||!SKILLS[p.id].attack||!num(p.left,0,3)||!num(p.damage,0,DAMAGE_RECORD_LIMIT)||typeof p.worn!=='boolean'||!F()?.validAttunement(p.attunement)||!Array.isArray(p.targets)||p.targets.length>(SKILLS[p.id].params?.maxTargets||C().MAX_MONSTERS)||new Set(p.targets).size!==p.targets.length||!p.targets.every(id=>C().validMonsterId(id,party.floor))))return null;
+      const shot=a.shot?{...a.shot,kind:a.shot.kind??'arrow'}:null;if(shot&&(!(shot.target===null||C().validMonsterId(shot.target,party.floor))||!num(shot.left,0,2)||!num(shot.damage,0,DAMAGE_RECORD_LIMIT)||!F()?.validAttunement(shot.attunement)||!['arrow','orb'].includes(shot.kind)||(shot.kind==='arrow'?profession!=='archer':!['mage','healer'].includes(profession))))return null;
+      actors[id]={skills:[...a.skills],passives:[...a.passives],learned,showHelmet:a.showHelmet!==false,equipment:gear,cooldowns:{...a.cooldowns},buffs:a.buffs.map(b=>({id:b.id,left:b.left,power:b.power})),attack:a.attack,hurt:a.hurt,tool:a.tool,autoLeft:a.autoLeft,autoRescue:a.autoRescue,roll:a.roll,attrs:spent,attrAuto,pending:p?clone(p):null,shot:shot?clone(shot):null,...(a.mp!==undefined?{mp:a.mp}:{}),...(robot?{robot}:{})};
     }
     if(!value.enemy||Array.isArray(value.enemy)||Object.keys(value.enemy).length>C().MAX_MONSTERS)return null;
     const enemy={};for(const[k,e]of Object.entries(value.enemy)){if(!C().validMonsterId(k,party.floor)||!e||Object.keys(e).some(key=>!['slow','slowPower','root','blind','weak','mark','tauntLeft','tauntId','relay','relayCooldown','relayWeak','relayOwner'].includes(key))||Object.entries(e).some(([key,v])=>['tauntId','relayOwner'].includes(key)?!expected.includes(v):!num(v,0,key==='root'?3:60)))return null;enemy[k]={...e};}
@@ -557,5 +619,5 @@
     return {removedTraps:[...value.removedTraps],version:1,xpScale:G.XP_SCALE,active:value.active,level:value.level,xp,heroHp:value.heroHp,switchLeft:value.switchLeft,actors,enemy,growth,...(afflictions?{afflictions}:{})};
   }
   function validEquipment(run){if(!enabled(run))return true;const seen=new Set();for(const g of allGear(run)){if(seen.has(g.id)||(GEAR[g.kind]?.tier>3||X().TRAITS[g.forge?.trait]?.underground)&&!C().isUnderworld(run))return false;seen.add(g.id);}if(run.gearBag.some(ROBOT.isPart)||Object.values(G.state(run).imprints).some(mark=>ROBOT.isCore(allGear(run).find(g=>g.id===mark.gearId))))return false;return ids(run).every(id=>!!validateActorEquipment(equipment(run,id),job(run,id),level(run,id),run.floor));}
-  return Object.freeze({COOLDOWN_SCALE,SPIRIT,mpMax,maxMp,mp,mpRegen,mpReady,restoreMp,xpProgress,hpCeiling,upgradeFor,upgradeGain,finishMonster,killXp,SURFACE_XP_DEPTH,HUNT_XP,switchRaw,ROBOT,robotUpgradeQuote:ROBOT.upgradeQuote,upgradeRobot:ROBOT.upgrade,JOBS,GEAR,BASE_GEAR,TIER_NAMES,tierKind,gearPool,SKILLS,PASSIVES,SLOTS,PREPARATION,PREPARATION_REDUCTION,preparationSeconds,scale:readScale,state,enabled,ids,job,sex,level,maxLevel,experience,actor,maxHp,hp,equipment,equipmentSlots,validateActorEquipment,pv,teamPassive,buff,tauntTargetLimit,applyTaunt,setBuff,draft,reorderSkills,showHeadgear,preview,enable,addMember,recruitSnapshot,restoreMember,validateRecruitSnapshot,removeMember,sync,setHp,returnToHero,switchActor,followerRecords,canLearn,learnCompanion,allGear,canEquip,equip,unequip,stats,wear,durabilityWarnings,hurt,heal,organicHealable,gainXp,ranged,fireProjectile,fireArrow,strike,cast,food,speed,inflict,noteMovement,hungerScale,toolSpent,rescueChoice,tick,advance,validate,validEquipment,roll});
+  return Object.freeze({ATTRIBUTES,ATTRIBUTE_NAMES,FREE_POINTS_PER_LEVEL,AUTO_POINTS_PER_LEVEL,ATTRIBUTE_STEP,ATTRIBUTE_BASE,ATTRIBUTE_GROWTH,ATTRIBUTE_PLAN,CRIT_BASE,CRIT_DEFAULT,CRIT_MULTIPLIER,DAMAGE_RECORD_LIMIT,attrs,attr,freePoints,unspentPoints,attributeAllowed,critChance,autoSpend,validAttrs,settleAttributes,allocate,setAttributeAuto,forgetAttributes,attributeSheet,COOLDOWN_SCALE,SPIRIT,mpMax,maxMp,mp,mpRegen,mpReady,restoreMp,xpProgress,hpCeiling,upgradeFor,upgradeGain,finishMonster,killXp,SURFACE_XP_DEPTH,HUNT_XP,switchRaw,ROBOT,robotUpgradeQuote:ROBOT.upgradeQuote,upgradeRobot:ROBOT.upgrade,JOBS,GEAR,BASE_GEAR,TIER_NAMES,tierKind,gearPool,SKILLS,PASSIVES,SLOTS,PREPARATION,PREPARATION_REDUCTION,preparationSeconds,scale:readScale,state,enabled,ids,job,sex,level,maxLevel,experience,actor,maxHp,hp,equipment,equipmentSlots,validateActorEquipment,pv,teamPassive,buff,tauntTargetLimit,applyTaunt,setBuff,draft,reorderSkills,showHeadgear,preview,enable,addMember,recruitSnapshot,restoreMember,validateRecruitSnapshot,removeMember,sync,setHp,returnToHero,switchActor,followerRecords,canLearn,learnCompanion,allGear,canEquip,equip,unequip,stats,wear,durabilityWarnings,hurt,heal,organicHealable,gainXp,ranged,fireProjectile,fireArrow,strike,cast,food,speed,inflict,noteMovement,hungerScale,toolSpent,rescueChoice,tick,advance,validate,validEquipment,roll});
 });

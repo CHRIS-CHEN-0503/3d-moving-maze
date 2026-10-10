@@ -50,7 +50,7 @@
     passive('forest_echo','archer','森靈追擊',Array(6).fill(40),'射擊已被緩速的怪物額外增傷40%；纏枝箭與隊友的緩速都能觸發。',true),
     passive('kinetic_core','robot','動能護核',Array(6).fill(60),'實際承受怪物傷害後儲能八秒；下次普通拳擊追加60%傷害與20%最大生命護盾五分鐘。間隔三十秒；陷阱、飢餓及完全吸收的傷害不觸發。',true),
   ];
-  const itemIds=['heal','heal_mid','heal_high','spirit','ration','shield','hourglass','bell','map','haste','haste_strong','arcane','courage','power_glimmer','power_starlight','power_sunheart'];
+  const itemIds=['heal','heal_mid','heal_high','spirit','forget','ration','shield','hourglass','bell','map','haste','haste_strong','arcane','courage','power_glimmer','power_starlight','power_sunheart'];
   const HEALS=['heal','heal_mid','heal_high'];
   function policy(){return {strategy:'support',materials:false,heal:{enabled:false,threshold:30,reserve:2},fuel:{enabled:false,threshold:25,reserve:0},spirit:{enabled:false,threshold:25,reserve:0},shield:false,bell:false,hourglass:false,map:false,haste:false,itemLeft:0,thinkLeft:0};}
   function freshRecord(){return {choices:[],awakening:null,tastes:[],tasteLeft:0,echo:0,defiance:0,covenant:0};}
@@ -102,13 +102,14 @@
     if(fuel){const filled=h.ROBOT.fillFuel(n,key,id);if(!filled.ok)return filled;}
     if(HEALS.includes(key)){if(h.hp(n,id)>=h.maxHp(n,id))return {ok:false,message:'生命已滿。'};h.heal(n,id,C().HEAL_POTIONS[key]);}
     if(key==='spirit'){if(h.mp(n,id)>=h.maxMp(n,id))return {ok:false,message:'MP 已滿。'};h.restoreMp(n,id,C().SPIRIT_MP);}
+    let refunded=0;if(key==='forget'){if(automatic)return {ok:false};refunded=h.forgetAttributes(n,id);if(!refunded)return {ok:false,message:'這位隊員還沒有分配任何自由點數。'};}
     if(key==='haste_strong'){if(h.buff(n,'haste',id)?.power>=C().HASTE_STRONG_PERCENT)return {ok:false,message:'強力加速仍在生效，不需重複使用。'};h.actor(n,id).buffs=h.actor(n,id).buffs.filter(b=>b.id!=='haste');h.setBuff(n,id,'haste',C().HASTE_DURATION,C().HASTE_STRONG_PERCENT);}
     if(key==='arcane'||key==='courage'){if(h.buff(n,key,id))return {ok:false,message:C().ITEMS[key].name+'仍在生效，不需重複使用。'};h.setBuff(n,id,key,C().POTION_BUFF_SECONDS,C().POTION_BUFF_PERCENT);}
     if(key==='ration'){if(n.hunger>=100)return {ok:false,message:'飽食度已滿。'};n.hunger=Math.min(100,n.hunger+45*(1+h.teamPassive(n,'gourmet')/100));h.food(n,id);}
     if(key==='shield'){if(h.buff(n,'barrier',id)?.power>=h.maxHp(n,id)*.35)return {ok:false,message:'護盾仍充足。'};shield(n,id,h.maxHp(n,id)*.35);}
     if(key==='haste'){if(h.buff(n,'haste',id))return {ok:false,message:'加速藥水仍在生效，不需重複使用。'};h.setBuff(n,id,'haste',C().HASTE_DURATION,C().HASTE_PERCENT);}
     const timed={hourglass:['freeze',25],bell:['repel',20],map:['reveal',18]};if(timed[key]){const [k,t]=timed[key];if(n.effects[k]>0)return {ok:false,message:'效果仍在持續。'};n.effects[k]=t*(1+h.pv(n,'extension',id)/100);}
-    n.bag[key]--;p.itemLeft=automatic?5:1;return {ok:true,message:'使用 '+C().ITEMS[key].name,effect:{item:key,actorId:id}};});}
+    n.bag[key]--;p.itemLeft=automatic?5:1;return {ok:true,message:refunded?'退回 '+refunded+' 點自由點數，請重新分配能力值。':'使用 '+C().ITEMS[key].name,effect:{item:key,actorId:id,...(refunded?{refunded}:{})}};});}
   function autoItems(run,threats=[]){const h=H(),g=state(run),order=h.ids(run).filter(id=>h.hp(run,id)>0&&(id!==h.state(run).active||g.useActive)).sort((a,b)=>h.hp(run,a)/h.maxHp(run,a)-h.hp(run,b)/h.maxHp(run,b));
     for(const id of order){const p=g.policies[id];if(p.itemLeft>0)continue;if(h.job(run,id)==='robot'&&p.fuel.enabled&&h.actor(run,id).robot.fuel<=p.fuel.threshold){const key=h.ROBOT.fuelItemIds.find(key=>run.bag[key]>p.fuel.reserve);if(key)return {id,key};}
       // The smallest draught that covers most of the wound, else the strongest one in the bag.

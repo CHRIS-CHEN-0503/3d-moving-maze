@@ -62,7 +62,8 @@ test('forced underground farewell is archived and can rejoin without erasing the
   let run=recruit(fresh(43)),id=run.party.members[0].id;H.gainXp(run,G.XP[3]);run=learn(run,id);const talents=H.recruitSnapshot(run,id);run=enterUnderworld(run);
   assert.equal(run.underworld.departed.id,id);assert.equal(run.party.travellers[0].departedFloor,1);const ending=clone(run.underworld),gear=H.allGear(run).map(g=>g.id).sort();
   const offered=P.recruitOffer(run);if(!offered?.returning||offered.id!==id)nextReturn(run,id);fund(run);run=ok(P.recruit(run,id));
-  assert.equal(H.level(run,id),5);assert.deepEqual(H.recruitSnapshot(run,id),talents);assert.deepEqual(run.underworld,ending);assert.deepEqual(H.allGear(run).map(g=>g.id).sort(),gear);assert.equal(G.available(run,id),0);
+  const {attrs:after,...kept}=H.recruitSnapshot(run,id),{attrs:remembered,...was}=talents;
+  assert.equal(H.level(run,id),5);assert.deepEqual(kept,was);assert.ok(H.ATTRIBUTES.every(k=>after[k]>=remembered[k]),'remembered free points stay');assert.equal(H.unspentPoints(run,id),0);assert.deepEqual(run.underworld,ending);assert.deepEqual(H.allGear(run).map(g=>g.id).sort(),gear);assert.equal(G.available(run,id),0);
 });
 
 test('underground newcomers learn their random fourth-level skill once, and level ten reunions retain their chosen ultimate',()=>{

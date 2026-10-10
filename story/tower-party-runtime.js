@@ -456,7 +456,7 @@
       const dx=source.x-m.model.position.x,dz=source.z-m.model.position.z,front=Math.cos(Math.atan2(dx,dz)-m.model.rotation.y)>.45;
       const result=P.strike(r(),m.id,{memberId,front,skillId,shot,lootCell:ctx.worldToCell(m.model.position.x,m.model.position.z)},r().revision);if(!commit(result,false))return;
       ctx.monsterEngaged?.(m);
-      if(modern())heroes.impact(m,memberId||H.state(r()).active,skillId);else ctx.audio.sfxHit();if(result.effect.stunned){m.windup=0;ctx.quest('stun',{monsterId:m.id});}
+      if(modern())heroes.impact(m,memberId||H.state(r()).active,skillId,result.effect.crit===true);else ctx.audio.sfxHit();if(result.effect.stunned){m.windup=0;ctx.quest('stun',{monsterId:m.id});}
       if(result.effect.rooted)ctx.quest('root',{monsterId:m.id});
       if(result.effect.dead){if(modern())heroes.defeat?.(m,memberId||H.state(r()).active);m.alive=false;m.model.visible=false;ctx.quest('defeat',{monsterId:m.id});ctx.toast(result.message,2600,modern()?false:result.message);ctx.monsterDefeated?.(m,result.effect);if(modern()&&!result.effect.lord)heroes.victory(memberId||H.state(r()).active);if(memberId){ctx.audio.sfxGuardDefeat?.();if(!modern()&&r().party.members.find(x=>x.id===memberId)?.profession==='swordsman')root.GameVoice?.announceAsset('guard.defeat','怪物已經打倒了，繼續前進！',true);}ctx.save();}
       else if(result.effect.broken)ctx.toast('武器用壞了！可換上備用武器，或請鍛匠在營地修復。',2400,'武器壞了，找鍛匠修理吧');

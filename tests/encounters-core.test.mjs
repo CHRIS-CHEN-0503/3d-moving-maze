@@ -26,7 +26,8 @@ function completeSimple(run) {
 
 test('三位商人的裝備專業互不混淆，每層一或兩位，補給只由獨立雜貨商供應',()=>{
   const expected={tieLing:['helmet','bat'],jinHe:['armor','pan'],lanZhou:['shield','staff']},seen=new Set();
-  assert.equal(new Set(Object.values(E.MERCHANTS).flatMap(m=>m.supplies)).size,Object.keys(C.ITEMS).length-1);
+  assert.equal(new Set(Object.values(E.MERCHANTS).flatMap(m=>m.supplies)).size,Object.keys(C.ITEMS).filter(k=>k!=='coin'&&C.ITEMS[k].buyPrice!=null).length);
+  for(const dropOnly of ['forget','power_starlight','power_sunheart'])assert.ok(!Object.values(E.MERCHANTS).some(m=>m.supplies.includes(dropOnly)),dropOnly);
   for(const floor of [99,69,19])for(let seed=1;seed<=35;seed++){
     const shops=E.merchantOffers(floor,seed),professionals=shops.filter(m=>m.id!=='suHe');assert.ok(professionals.length>=1&&professionals.length<=2);if(floor===99)assert.equal(professionals.length,1);
     assert.deepEqual(shops,E.merchantOffers(floor,seed));

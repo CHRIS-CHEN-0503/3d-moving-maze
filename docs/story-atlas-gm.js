@@ -23,6 +23,12 @@
     return {id:'mana',title:'MP 上限與技能消耗',intro:'MP 上限＝（40＋每級 5）× 職業精神；每秒回復 1.2＋上限的 1.5%。每招消耗 4＋原冷卻的一半（一般最多 30、覺醒與進階最多 45）；冷卻已減為原本的一半。機器人沒有 MP。',
       columns:['職業','精神','1／10／15 級上限','最貴的一般招式'],rows:jobs.map(([job,v])=>{const own=Object.values(h.SKILLS).filter(s=>s.job===job&&!s.unique).sort((a,b)=>b.mp-a.mp)[0];return [h.JOBS[job].name,'× '+v,[1,10,15].map(l=>h.mpMax(job,l)).join('／'),own?own.name+' '+own.mp:'—'];})};
   }
+  function attributes(){
+    const h=H(),p=mod('tower-party-core.js','TowerPartyCore'),names=h.ATTRIBUTE_NAMES,list=k=>h.ATTRIBUTES.map(a=>k[a]||0).join('／'),step=h.ATTRIBUTE_STEP,pct=n=>Math.round(n*1000)/10+'%';
+    return {id:'attributes',title:'能力值與爆擊',intro:'能力值＝職業基礎＋每級自動 '+h.AUTO_POINTS_PER_LEVEL+' 點＋每級自由 '+h.FREE_POINTS_PER_LEVEL+' 點；自由點數每項最多 '+p.ATTRIBUTE_CAP+' 點，只有自由點數改變數值。順序：'+h.ATTRIBUTES.map(a=>names[a]).join('／')+'。',
+      columns:['職業','1 級基礎','每級自動','自動配點順序','基礎爆擊率'],rows:Object.keys(h.JOBS).map(job=>[h.JOBS[job].name,list(h.ATTRIBUTE_BASE[job]),Object.entries(h.ATTRIBUTE_GROWTH[job]).map(([a,v])=>names[a]+' +'+v).join('、'),h.ATTRIBUTE_PLAN[job].map(a=>names[a]).join('→'),(h.CRIT_BASE[job]??h.CRIT_DEFAULT)+'%']),
+      notes:['每 1 點自由點數：力量 物理攻擊 +'+pct(step.str)+'；智力 魔法攻擊 +'+pct(step.int)+'、MP 上限 +'+pct(step.intMp)+'、治療 +'+pct(step.intHeal)+'；體質 HP 上限 +'+pct(step.vit)+'；敏捷 攻擊間隔 −'+pct(step.agi)+'（0.35 秒下限不變）；幸運 爆擊率 +'+step.luk+' 個百分點。','爆擊造成 '+h.CRIT_MULTIPLIER+' 倍傷害，判定取自該次攻擊本身，讀檔不重擲。機器人不能分配智力。遺忘藥水退回全部自由點數，第 30 層之後的樓主 60% 掉落。']};
+  }
   function killXp(){
     const h=H(),b=B(),depth=h.SURFACE_XP_DEPTH,floors=[99,90,80,70,60,50,40,30,20,10,1];
     return {id:'kill-xp',title:'擊殺經驗公式',
@@ -53,6 +59,6 @@
       intro:'第 99 層與章末樓主樓層以外，每層依旅程種子 '+d.HUNT_CHANCE+'% 出現，種類三選一：'+kinds.map(([,k])=>k.title.replace('討伐裂隙・','')+'（'+k.objective.replace(/。$/,'')+'）').join('；')+'。完成另給療癒藥與乾糧 1；離開、逾時或倒下沒有獎勵，每層一次。',
       columns:['深度','樓層',...kinds.map(([,k])=>k.title.replace('討伐裂隙・','')),'療癒藥'],rows};
   }
-  function sections(){return [levels(),life(),mana(),killXp(),lords(),minis(),hunts()];}
+  function sections(){return [levels(),life(),mana(),attributes(),killXp(),lords(),minis(),hunts()];}
   return Object.freeze({sections});
 });

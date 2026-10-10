@@ -83,7 +83,7 @@ test('settings: 離開遊戲 sits right before 繼續遊戲 at the right end',()
 test('bosses leave several different piles: chapter lords 2-5, floor mini lords 1-2 (the healing draught counts as one); only boss slots may hold extra piles',()=>{
   const Lt=require('../story/tower-loot.js'),counts={lord:new Set(),mini:new Set()};
   for(let seed=1;seed<=80;seed++)for(const [floor,kind]of [[80,'lord'],[85,'mini'],[-20,'lord'],[-15,'mini']]){
-    const run=build(floor,'swordsman',floor<0?11:3,[],seed),spec=P.monsterSpecs(run).find(s=>kind==='lord'?s.lord:s.elite),drops=H.finishMonster(run,spec,{x:1,y:1});
+    const run=build(floor,'swordsman',floor<0?11:3,[],seed),spec=P.monsterSpecs(run).find(s=>kind==='lord'?s.lord:s.elite),drops=H.finishMonster(run,spec,{x:1,y:1}).filter(d=>!d.id.endsWith(':forget'));
     counts[kind].add(drops.length);assert.ok(kind==='lord'?drops.length>=2&&drops.length<=5:drops.length>=1&&drops.length<=2,kind+' '+floor+' '+seed);
     assert.equal(new Set(drops.map(d=>d.type+':'+d.key)).size,drops.length,'different kinds');if(kind==='mini')assert.ok(drops.some(d=>d.id.endsWith(':bonus')),'the draught is one of them');
     assert.ok(C.validateSave(JSON.stringify(run)),'saves');}

@@ -83,6 +83,7 @@
     heal_mid: Object.freeze({ id: 'heal_mid', name: '中級療癒藥', description: '恢復 70 點生命。第 60 層起出現。', buyPrice: 30, sellPrice: 13, color: '#ff5f78' }),
     heal_high: Object.freeze({ id: 'heal_high', name: '高級療癒藥', description: '恢復 150 點生命。地下第一層起出現。', buyPrice: 60, sellPrice: 26, color: '#ff4f9a' }),
     spirit: Object.freeze({ id: 'spirit', name: '精神藥水', description: '恢復 45 點 MP，讓技能能再次施放；機器人改用動力石。', buyPrice: 16, sellPrice: 7, color: '#6ab6ff' }),
+    forget: Object.freeze({ id: 'forget', name: '遺忘藥水', description: '退回一位隊員已分配的全部自由點數，可重新分配能力值。只會由第 30 層之後的樓主掉落，商店不販售。', buyPrice: null, sellPrice: null, color: '#8fe3d0' }),
     ration: Object.freeze({ id: 'ration', name: '乾糧', description: '恢復 45 點飽食度。', buyPrice: 8, sellPrice: 3, color: '#efc073' }),
     haste: Object.freeze({ id: 'haste', name: '加速藥水', description: '使用者的移動速度與普通攻擊速度提高 '+HASTE_PERCENT+'%，持續五分鐘。不能疊加或刷新，不縮短技能冷卻與準備時間。', buyPrice: 24, sellPrice: 10, color: '#f3bc57' }),
     haste_strong: Object.freeze({ id: 'haste_strong', name: '強力加速藥水', description: '使用者的移動速度與普通攻擊速度提高 '+HASTE_STRONG_PERCENT+'%，持續五分鐘；可取代仍在生效的一般加速藥水。地下第一層起出現。', buyPrice: 45, sellPrice: 20, color: '#ffd24a' }),
@@ -162,7 +163,7 @@
     const seed = Number.isInteger(opts.seed) && opts.seed > 0 && opts.seed <= 0xffffffff ? opts.seed : ((Date.now() >>> 0) || 1);
     return {
       stateVersion: STATE_VERSION, mode: 'tower', floor: 99, hp: MAX_HP, hunger: 100, coins: 24,
-      bag: { heal: 2, heal_mid: 0, heal_high: 0, spirit: 0, haste_strong: 0, arcane: 0, courage: 0, ration: 2, haste: 0, shield: 0, hourglass: 0, bell: 0, map: 1, feather: 0, arrow: 0, ...Object.fromEntries(Object.keys(ITEMS).filter(k=>ITEMS[k].fuel).map(k=>[k,0])) },
+      bag: { heal: 2, heal_mid: 0, heal_high: 0, spirit: 0, haste_strong: 0, arcane: 0, courage: 0, forget: 0, ration: 2, haste: 0, shield: 0, hourglass: 0, bell: 0, map: 1, feather: 0, arrow: 0, ...Object.fromEntries(Object.keys(ITEMS).filter(k=>ITEMS[k].fuel).map(k=>[k,0])) },
       effects: { shield: 0, freeze: 0, repel: 0, reveal: 0, haste: 0 },
       engine: { shovels: 1, kites: 0, whistles: 0, shovelCooldownMs: 0, skillCooldownMs: 0 },
       claimed: [], floorElapsed: 0, warrior: null, hiredWarriors: [], defeatedMonsters: [],
@@ -329,7 +330,7 @@
     for (const id of Object.keys(ITEMS).filter((key) => key !== 'coin')) {
       // Old journeys get their initial quiver once, without resetting other inventory.
       if (id === 'arrow' && !Object.hasOwn(run.bag,id)) { bag.arrow=run.party?.loadouts&&(run.party.profession==='archer'||run.party.members?.some(m=>m.profession==='archer'))?30:0; continue; }
-      if (['haste','heal_mid','heal_high','spirit','haste_strong','arcane','courage'].includes(id) && !Object.hasOwn(run.bag,id)) { bag[id]=0; continue; }
+      if (['haste','heal_mid','heal_high','spirit','haste_strong','arcane','courage','forget'].includes(id) && !Object.hasOwn(run.bag,id)) { bag[id]=0; continue; }
       if (ITEMS[id].fuel && !Object.hasOwn(run.bag,id)) { bag[id]=0; continue; }
       if (!Object.hasOwn(run.bag, id) || !validNumber(run.bag[id], 0, itemStorageLimit(id), true)) return null;
       bag[id] = run.bag[id];
@@ -632,7 +633,7 @@
       if (ITEMS[itemId]?.fuel) return {ok:false,message:'動力石只供職業旅程中的機器人使用。'};
       const maximum=next.party?.loadouts?heroRules().maxHp(next):MAX_HP;
       if (Object.hasOwn(HEAL_POTIONS,itemId) && next.hp >= maximum) return { ok: false, message: '生命已滿，先把療癒藥留著吧。' };
-      if (['spirit','haste_strong','arcane','courage'].includes(itemId)) return { ok: false, message: ITEMS[itemId].name+'只在職業旅程中使用。' };
+      if (['spirit','haste_strong','arcane','courage','forget'].includes(itemId)) return { ok: false, message: ITEMS[itemId].name+'只在職業旅程中使用。' };
       if (itemId === 'ration' && next.hunger >= 100) return { ok: false, message: '飽食度已滿，暫時不需要乾糧。' };
       const effect = { id: itemId };
       if (itemId === 'haste') {

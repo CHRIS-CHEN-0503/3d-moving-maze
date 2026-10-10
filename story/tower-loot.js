@@ -32,6 +32,9 @@
   // (its 50% gear piece counts as one), a floor mini lord 1-2 (its healing draught counts as one),
   // a hunt-rift champion 1-3.
   const BOSS_PILES=Object.freeze({lord:Object.freeze([2,5]),mini:Object.freeze([1,2]),champion:Object.freeze([1,3])});
+  // From 30F on (every underground chapter lord included) a chapter lord of a hero journey also has a 60%
+  // chance to leave a forgetting draught, rolled on its own so it never takes one of the 2-5 piles.
+  const FORGET_FLOOR=30,FORGET_CHANCE=60,lordSlot=floor=>floor<0?'monster-12':'monster-11';
   const pileCount=(run,prefix,[low,high])=>low+hash(run.seed,prefix+':count')%(high-low+1);
   function bossPicks(run,spec,prefix,count,taken=[]){
     const seen=new Set(taken.map(e=>e.type+':'+e.key)),out=[];if(count<=0)return out;
@@ -58,6 +61,7 @@
     if(spec.elite)entries.push({type:'item',key:'heal',rarity:'uncommon',quantity:1,id:prefix+':bonus',source:spec.id,cx,cy});
     if(spec.lord&&hash(run.seed,prefix+':gear')%100<50){const kinds=run.party.loadouts?H().gearPool(run.floor):['helmet','armor','shield','bat','pan','staff'],kind=kinds[hash(run.seed,prefix+':gear-kind')%kinds.length];entries.push({type:'gear',key:kind,rarity:'rare',quantity:1,id:prefix+':gear',source:spec.id,cx,cy,gear:C().createGear(kind,run.floor,run.seed,'lord-drop',true)});}
     if(boss)bossPicks(run,spec,prefix,pileCount(run,prefix,spec.lord?BOSS_PILES.lord:BOSS_PILES.mini)-entries.length,entries).forEach((p,i)=>entries.push({...p,id:prefix+':item'+(i?i+1:''),source:spec.id,cx,cy}));
+    if(spec.lord&&run.party.loadouts&&run.floor<=FORGET_FLOOR&&hash(run.seed,prefix+':forget')%100<FORGET_CHANCE)entries.push({type:'item',key:'forget',rarity:'legendary',quantity:1,id:prefix+':forget',source:spec.id,cx,cy});
     // Preserve every existing ground drop. Stop adding piles when the finite
     // floor storage is full; never let long-running reinforcement farming
     // invalidate the player's save or discard an uncollected rare item.
@@ -73,8 +77,8 @@
     // A forgotten receipt must not resurrect its saved reinforcement record.
     if(run.party.reinforcements)run.party.reinforcements.monsters=run.party.reinforcements.monsters.filter(m=>!expired.has(m.id));
   }
-  // A pile id is <floor>:<source>:item|gear|bonus; only the boss slot (chapter or mini lord) may add item2-item5.
-  function validSlot(e,floor){const head=floor+':'+e.source+':',slot=typeof e.id==='string'&&e.id.startsWith(head)?e.id.slice(head.length):null;if(e.type==='gear')return slot==='gear';if(bonusDrop(e,floor))return slot==='bonus';return slot==='item'||/^item[2-5]$/.test(slot||'')&&e.source===(floor<0?'monster-12':'monster-11');}
+  // A pile id is <floor>:<source>:item|gear|bonus|forget; only the boss slot (chapter or mini lord) may add item2-item5.
+  function validSlot(e,floor){const head=floor+':'+e.source+':',slot=typeof e.id==='string'&&e.id.startsWith(head)?e.id.slice(head.length):null;if(e.type==='gear')return slot==='gear';if(e.type==='item'&&e.key==='forget')return slot==='forget'&&e.quantity===1&&floor<=FORGET_FLOOR&&e.source===lordSlot(floor)&&!!Lords()?.allLords()[floor];if(bonusDrop(e,floor))return slot==='bonus';return slot==='item'||/^item[2-5]$/.test(slot||'')&&e.source===(floor<0?'monster-12':'monster-11');}
   function validate(value,floor,defeated){
     if(value===undefined)return fresh();if(!value||value.version!==1||!Array.isArray(value.rolled)||value.rolled.length>128||new Set(value.rolled).size!==value.rolled.length||!value.rolled.every(id=>C().validMonsterId(id,floor)&&defeated.includes(id))||!Array.isArray(value.entries)||value.entries.length>128||new Set(value.entries.map(e=>e?.id)).size!==value.entries.length)return null;
     const maxCell=C().floorConfig(floor).size-1,entries=[];for(const e of value.entries){if(!e||!value.rolled.includes(e.source)||!['item','ingredient','material','fuel','gear'].includes(e.type)||!Object.hasOwn(CHANCES,e.rarity)||!num(e.quantity,1,e.type==='item'&&e.key==='arrow'?ARROW_DROP_QUANTITY:20)||!num(e.cx,0,maxCell)||!num(e.cy,0,maxCell)||!validSlot(e,floor))return null;
@@ -93,5 +97,5 @@
     else{const stock=e.type==='ingredient'?n.party.ingredients:e.type==='material'?n.party.journey.materials:n.bag,limit=e.type==='item'?C().itemLimit(e.key,n):99,storedLimit=e.type==='item'?C().itemStorageLimit(e.key):99;if(!stock||!num(stock[e.key],0,storedLimit))return {ok:false,message:'材料資料尚未就緒，掉落物留在原地。'};if(stock[e.key]+e.quantity>limit)return {ok:false,message:e.key==='arrow'?'箭袋空間不足，整束箭矢留在原地。':'這種物品已滿，掉落物留在原地。'};stock[e.key]+=e.quantity;}
     state.entries=state.entries.filter(x=>x.id!==id);compact(n);return {ok:true,message:'獲得 '+label(e),effect:{pickup:e}};
   });}
-  return Object.freeze({BOSS_PILES,huntSpoils,CHANCES,COMMON_FOOD,COMMON_FOOD_BONUS,chance,MAX_GROUND,ARROW_DROP_QUANTITY,fresh,pool,recordKill,compact,validate,claim,label,hash});
+  return Object.freeze({BOSS_PILES,FORGET_FLOOR,FORGET_CHANCE,huntSpoils,CHANCES,COMMON_FOOD,COMMON_FOOD_BONUS,chance,MAX_GROUND,ARROW_DROP_QUANTITY,fresh,pool,recordKill,compact,validate,claim,label,hash});
 });

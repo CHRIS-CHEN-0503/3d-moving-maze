@@ -1011,7 +1011,7 @@ button:focus-visible,input:focus-visible{outline:3px solid #fff;outline-offset:3
    3D移動迷宮 — 給小朋友的變形迷宮冒險
    ===================================================== */
 const $=id=>document.getElementById(id);
-const GAME_VERSION='1.62.0';
+const GAME_VERSION='1.62.1';
 
 /* ---------- 設定（後台可調） ---------- */
 const DEFAULT_CFG={teamSize:2,shiftMin:3,itemCount:6,foodCount:4,hungerMin:3,stunSec:3,pingSec:3,smellCells:3,mazeSize:13,magicMap:0,duelMin:5,unpaidRate:100,musicOn:1,speechOn:1,speechVoice:'',apiUrl:'',roomMax:3,rounds:3,goodsCount:16,shopCollect:1,shopMin:2.5,cartFull:400,views:{fp:1,tp:1,top:1},broker:'wss://broker.emqx.io:8084/mqtt'};
@@ -1026,7 +1026,8 @@ function cameraDistance(value){const n=Number(value);return value!=null&&value!=
 try{CFG.cameraDistance=cameraDistance(JSON.parse(localStorage.getItem('maze3d_cfg')||'{}').cameraDistance);}catch(_){CFG.cameraDistance=5.8;}
 function zoomCamera(delta){
   if(G.view==='tp'){CFG.cameraDistance=cameraDistance(CFG.cameraDistance+delta*.12);}
-  else if(G.view==='top')G.topZoom=Math.max(10,Math.min(48,G.topZoom+delta));
+  // v1.62.1 · the overhead view starts much closer (13 instead of 22 units up) and may zoom in to 7; the far limit is unchanged.
+  else if(G.view==='top')G.topZoom=Math.max(7,Math.min(48,G.topZoom+delta));
 }
 // AbortSignal.timeout is missing before Safari 16; a top-level TypeError here
 // would abort this whole script block and leave every later global undefined.
@@ -1193,7 +1194,7 @@ const G={
  nextShiftAt:0, shifting:false, preWarned:false,
  items:[], foods:[], goods:[], effects:{}, shovels:0, starBonus:0,
  satiety:100, drainPerSec:100/180, hungerMul:1, hungerOn:true, hungerLethal:true, starvedNoted:false,
- kites:0, whistles:0, visionUntil:0, owlUntil:0, viewBefore:null, topZoom:22,
+ kites:0, whistles:0, visionUntil:0, owlUntil:0, viewBefore:null, topZoom:13,
  smellMarks:null, smellTarget:null, smellPath:null, smellPathAt:0,
  stunnedUntil:0, atkCoolUntil:0, spMode:'classic', coUntil:0, registers:[],
  visited:null, solutionPath:null, mapUntil:0, compassUntil:0, ghostUntil:0,

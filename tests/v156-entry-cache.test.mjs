@@ -109,8 +109,8 @@ function assertReleaseReferences(html,entry,expected){
 function assertGameVersion(html,manifest){
   const declarations=[...html.matchAll(/\bconst\s+GAME_VERSION\s*=\s*(["'])([^"']+)\1/g)];
   assert.equal(declarations.length,1,'one real game version declaration');
-  assert.equal(declarations[0][2],'1.62.0','GAME_VERSION');
-  assert.equal(manifest.version,'1.62.0','package.json version');
+  assert.equal(declarations[0][2],'1.62.1','GAME_VERSION');
+  assert.equal(manifest.version,'1.62.1','package.json version');
 }
 
 function assertCinematicOrder(html){
@@ -130,9 +130,9 @@ function sectionText(html,title){
   return section[1].replace(/<[^>]*>/g,' ').replace(/\s+/g,' ').trim();
 }
 
-test('actual v1.62.0 game and package versions are synchronized',()=>{
+test('actual v1.62.1 game and package versions are synchronized',()=>{
   assertGameVersion(game,packageInfo);
-  assert.match(atlas,/劇情模式\s*·\s*v1\.62\.0 圖鑑/);
+  assert.match(atlas,/劇情模式\s*·\s*v1\.62\.1 圖鑑/);
 });
 
 test('v1.58.0 region film stages and reviewed fixes update while unchanged assets retain their tags',()=>{
@@ -178,8 +178,8 @@ test('every changed game and atlas asset rejects stale, malformed, unversioned a
 });
 
 test('invalid source and manifest versions fail independently instead of matching each other',()=>{
-  for(const stale of ['1.55.0','1.57.3','1.57.4','1.57.5','1.57.6','1.57.7','1.57.8','1.57.9','1.58.0','1.58.1','1.58.2','1.58.3','1.58.4','1.58.5','1.58.6','1.58.7','1.59.0','1.61.0','1.61.1']){
-    const oldGame=game.replace(/(\bconst\s+GAME_VERSION\s*=\s*["'])1\.62\.0/,(_,prefix)=>prefix+stale);
+  for(const stale of ['1.55.0','1.57.3','1.57.4','1.57.5','1.57.6','1.57.7','1.57.8','1.57.9','1.58.0','1.58.1','1.58.2','1.58.3','1.58.4','1.58.5','1.58.6','1.58.7','1.59.0','1.61.0','1.61.1','1.62.0']){
+    const oldGame=game.replace(/(\bconst\s+GAME_VERSION\s*=\s*["'])1\.62\.1/,(_,prefix)=>prefix+stale);
     assert.notEqual(oldGame,game,'version mutation must take effect');
     assert.throws(()=>assertGameVersion(oldGame,packageInfo));
     assert.throws(()=>assertGameVersion(game,{...packageInfo,version:stale}));

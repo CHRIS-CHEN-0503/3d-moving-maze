@@ -246,9 +246,52 @@
       if(tier>1)box(big?.35:.25,.07,.2,dark,0,big?1.01:.7);if(tier>=3)for(const side of [-1,1])box(.04,.17,.055,look.accent,big?.195:.15,y,side*.09);
     }
     else if(kind==='cooking_pan'){g.userData.contact={kind:'pan-bottom',center:[0,.48,-.0225],normal:[0,0,-1],headCenter:[0,.48,0],axis:[0,1,0],grip:[0,0,0]};rod(.045,.42,wood,0,.08);const pan=rod(.23+(tier-1)*.015,.045,dark,0,.48);pan.rotation.x=Math.PI/2;mesh(new T.TorusGeometry(.21+(tier-1)*.015,.025,5,14),iron,0,.48,.026);if(tier>1){const grip=mesh(new T.TorusGeometry(.075,.02,4,10,Math.PI*1.4),gold,0,.77);grip.rotation.z=-.2;}if(tier>=3)mesh(new T.TorusGeometry(.14,.012,4,12),gold,0,.48,.026);}
-    else if(['buckler','round_shield','tower_shield'].includes(kind)){const big=kind==='tower_shield';if(big){box(.5,.75,.08,dark);box(.045,.72,.1,gold);box(.5,.045,.1,gold,0,.12);}else{const disk=rod(kind==='buckler'?.26:.31,.08,kind==='buckler'?wood:iron);disk.rotation.x=Math.PI/2;mesh(new T.TorusGeometry(kind==='buckler'?.24:.29,.025,4,12),gold,0,0,.055);mesh(new T.SphereGeometry(.075,8,6),iron,0,0,.08);}box(.16,.05,.11,wood,0,0,-.08);}
-    else if(kind==='heavy_helm'){const cap=mesh(new T.SphereGeometry(female?.285:.315,12,6,0,Math.PI*2,0,Math.PI/2),iron,0,female?1.75:1.68);cap.scale.set(1,female?.86:1,.9);for(const side of [-1,1])soft(female?.065:.09,female?.2:.27,.28,iron,side*(female?.25:.275),female?1.68:1.63,-.025);if(female){for(const side of [-1,1]){const wing=soft(.15,.045,.12,gold,side*.245,1.84,.14);wing.rotation.z=-side*.3;}}else box(.055,.14,.49,gold,0,1.91);}
-    else if(kind==='light_hood'){const cap=mesh(new T.SphereGeometry(female?.285:.325,12,6,0,Math.PI*2,0,Math.PI/2),female?look.cloak:wood,0,female?1.74:1.66);cap.scale.set(1,female?.75:1,.9);soft(female?.54:.63,.055,.23,female?look.accent:0xae875e,0,female?1.8:1.73,.23);if(female){const fold=soft(.15,.12,.28,look.cloak,.25,1.73,-.055);fold.rotation.z=-.25;soft(.07,.09,.04,gold,-.21,1.78,.2);}else for(const side of [-1,1])soft(.09,.27,.29,wood,side*.285,1.58,-.07);}
+    else if(['buckler','round_shield','tower_shield'].includes(kind)){const big=kind==='tower_shield',smith=job==='smith',chef=job==='chef',face=big?.052:.09;
+      if(big){box(.5,.75,.08,dark);box(.045,.72,.1,gold);box(.5,.045,.1,gold,0,.12);}else{const disk=rod(kind==='buckler'?.26:.31,.08,kind==='buckler'?wood:iron);disk.rotation.x=Math.PI/2;mesh(new T.TorusGeometry(kind==='buckler'?.24:.29,.025,4,12),gold,0,0,.055);if(!chef)mesh(new T.SphereGeometry(.075,8,6),iron,0,0,.08);}
+      box(.16,.05,.11,wood,0,0,-.08);
+      if(smith){
+        // 鍛匠：盾面鐵砧盾心與一圈鉚釘。
+        box(.17,.06,.05,dark,0,.01,face+.01).name='smith-anvil-boss';box(.07,.04,.05,dark,.11,.03,face+.01).name='smith-anvil-horn';
+        const rr=big?.19:kind==='buckler'?.19:.24;for(let i=0;i<6;i++){const a=i/6*Math.PI*2+Math.PI/6;rivet(Math.cos(a)*rr,Math.sin(a)*rr*(big?1.6:1),face+.02,.014);}
+      }else if(chef){
+        // 廚師：鍋蓋盾，中央提鈕與掛在邊緣的長柄杓。
+        mesh(new T.SphereGeometry(.06,8,6),wood,0,0,face+.03).name='chef-lid-knob';const stem=rod(.025,.07,gold,0,0,face);stem.rotation.x=Math.PI/2;
+        const ladle=rod(.012,.32,gold,-.17,.02,face+.01);ladle.rotation.z=.35;ladle.name='chef-ladle-hook';mesh(new T.SphereGeometry(.045,8,5),gold,-.23,-.12,face+.01).scale.set(1,.6,1);
+      }else{
+        // 劍士：盾面斜向色帶（家徽底色）。
+        const band=box(.08,big?.74:kind==='buckler'?.46:.56,.018,look.cloak,0,0,face);band.rotation.z=-.6;band.name='knight-shield-band';
+      }}
+    else if(kind==='heavy_helm'){const y=female?1.75:1.68,r=female?.285:.315,cap=mesh(new T.SphereGeometry(r,12,6,0,Math.PI*2,0,Math.PI/2),iron,0,y);cap.scale.set(1,female?.86:1,.9);
+      if(job==='smith'){
+        // 鍛匠：鉚釘圓盔配額前黃銅護目鏡、皮革護耳與頂環；沒有騎士的冠飾。
+        for(const side of [-1,1]){const flap=box(.085,.24,.2,look.leather,side*(r-.035),y-.11,-.02);flap.rotation.z=side*.08;flap.name='smith-ear-flap';}
+        box(r*2.02,.05,.04,look.leather,0,y+.07,r*.84).name='smith-goggle-strap';
+        for(const side of [-1,1]){mesh(new T.TorusGeometry(.062,.02,5,12),gold,side*.11,y+.07,r*.9).name='smith-goggle-lens';mesh(new T.CircleGeometry(.048,10),0x95c9ef,side*.11,y+.07,r*.9+.01,'gem').name='smith-goggle-glass';}
+        const ring=mesh(new T.TorusGeometry(r*.55,.02,4,14),gold,0,y+.24);ring.rotation.x=Math.PI/2;ring.scale.z=.9;ring.name='smith-crown-ring';
+      }else{
+        // 劍士：騎士盔的頰甲貼著盔緣、鼻樑護條，男性加冠飾、女性加側翼。
+        for(const side of [-1,1]){const cheek=box(.07,.27,.24,iron,side*(r-.02),y-.13,.02);cheek.rotation.z=side*.06;cheek.name='knight-cheek-plate';}
+        box(.045,.2,.04,iron,0,y-.03,r*.9).name='knight-nasal-bar';
+        if(female){for(const side of [-1,1]){const wing=soft(.15,.045,.12,gold,side*.245,y+.09,.14);wing.rotation.z=-side*.3;wing.name='valkyrie-side-wing';}}else box(.055,.14,.49,gold,0,y+.23).name='knight-crest-comb';
+      }}
+    else if(kind==='light_hood'){const y=female?1.74:1.66,r=female?.285:.325,chef=job==='chef',archer=job==='archer',capColor=chef?0xf2ede4:female?look.cloak:wood,cap=mesh(new T.SphereGeometry(r,12,6,0,Math.PI*2,0,Math.PI/2),capColor,0,y);cap.scale.set(1,female?.75:1,.9);
+      if(chef){
+        // 廚師：白色高帽（帽筒、褶邊、帽帶），不是獵裝兜帽。
+        mesh(new T.CylinderGeometry(r*.76,r*.62,.26,12),0xf2ede4,0,y+(female?.22:.3),-.02,'fabric').name='chef-toque-crown';
+        const pleat=mesh(new T.TorusGeometry(r*.72,.03,5,14),0xf2ede4,0,y+(female?.11:.18),-.02,'fabric');pleat.rotation.x=Math.PI/2;pleat.name='chef-toque-pleat';
+        const band=mesh(new T.TorusGeometry(r*.98,.028,4,16),look.accent,0,y+.03);band.rotation.x=Math.PI/2;band.scale.z=.9;band.name='chef-toque-band';
+      }else if(archer){
+        // 射手：獵帽的前短簷、皮革帽帶與側邊羽飾。
+        soft(.42,.05,.27,look.leather,0,y+.02,.29).name='archer-cap-peak';
+        const band=mesh(new T.TorusGeometry(r*.97,.024,4,16),look.leather,0,y+.05);band.rotation.x=Math.PI/2;band.scale.z=.9;band.name='archer-cap-band';
+        const quill=box(.026,.3,.012,look.accent,-.19,y+.14,-.07);quill.rotation.set(-.3,0,.9);quill.name='archer-cap-feather';const vane=soft(.07,.26,.02,look.accent,-.3,y+.22,-.15);vane.rotation.set(-.3,0,.9);vane.name='archer-cap-feather';
+      }else{
+        // 斥候：兜帽加後垂帽尾與下顎面巾。
+        soft(female?.54:.63,.055,.23,female?look.accent:0xae875e,0,y+(female?.06:.07),.23);
+        const tail=box(.26,.3,.06,capColor,0,y-.12,-.27);tail.rotation.x=.4;tail.name='scout-hood-tail';
+        const scarf=mesh(new T.TorusGeometry(.21,.055,5,14),look.cloak,0,y-.33,.03,'fabric');scarf.rotation.x=Math.PI/2;scarf.scale.z=.85;scarf.name='scout-face-scarf';
+        if(female){const fold=soft(.15,.12,.28,look.cloak,.25,y-.01,-.055);fold.rotation.z=-.25;soft(.07,.09,.04,gold,-.21,y+.04,.2);}else for(const side of [-1,1])soft(.09,.27,.29,wood,side*.285,y-.08,-.07);
+      }}
     else if(kind==='rune_crown'&&job==='cleric'){
       if(female){
         // Kanzashi hairpin above the right ear: a gold stem, a red blossom and two hanging beads.
@@ -270,15 +313,54 @@
       const mount=mesh(new T.TorusGeometry(.075,female?.012:.017,4,12),gold,0,1.77,.327);mount.scale.set(female?.85:1,female?1.3:1.15,1);
       const jewel=mesh(new T.SphereGeometry(.062,8,6),female?(job==='healer'?0xb8e4cf:0xc5ace7):0x91d8e4,0,1.77,.34);jewel.scale.set(female?.72:.85,female?1.2:1.1,.42);
       for(const side of [-1,1]){const scroll=mesh(new T.TorusGeometry(.09,.012,4,10,Math.PI),gold,side*.12,1.77,.31);scroll.rotation.z=side<0?0:Math.PI;}
+      if(job==='healer'){
+        // 療癒師：環冠後方的光環與兩片白色垂紗。
+        const halo=mesh(new T.TorusGeometry(.3,.014,4,20),gold,0,1.92,-.1);halo.rotation.x=Math.PI/2.6;halo.name='healer-halo-ring';
+        for(const side of [-1,1]){const veil=box(.12,.42,.02,0xf2ede4,side*.2,1.52,-.25);veil.rotation.z=side*.1;veil.name='healer-veil';}
+      }else{
+        // 法師：額前低矮的新月飾與小星石（環冠維持無尖刺、不超過髮頂的低輪廓）。
+        const crescent=mesh(new T.TorusGeometry(.05,.012,4,12,Math.PI*1.2),gold,0,1.815,.31);crescent.rotation.z=-Math.PI*.1;crescent.name='mage-crescent-spire';
+        mesh(new T.OctahedronGeometry(.032),master?.gem||0xbab2f2,0,1.855,.31,'gem').name='mage-star-finial';
+      }
     }
     else if(kind==='heavy_armor'){
-      const knight=!female&&job==='swordsman';
+      const knight=!female&&job==='swordsman',smith=job==='smith';
       if(knight&&root.CharacterSculpt?.knightTorso)mesh(root.CharacterSculpt.knightTorso(T,.74,.67,.43),iron,0,1.03).name='knight-fitted-cuirass';else body(female?.68:.76,female?.62:.59,.46,iron,1.03);
       for(const y of [female?.79:.76,.9,1.22]){const band=mesh(new T.TorusGeometry(female?.285:knight?.305:.34,.022,4,12),dark,0,y);band.rotation.x=Math.PI/2;band.scale.y=.67;}
-      for(const side of [-1,1]){const pad=soft(female?.22:knight?.26:.3,female?.16:knight?.19:.25,knight?.37:.42,iron,side*(female?.335:knight?.36:.39),knight?1.27:1.25);if(knight)pad.rotation.z=-side*.17;if(female){const plate=box(.23,.25,.09,iron,side*.22,.7,.14);plate.rotation.z=side*.16;plate.name='female-armored-fauld';}}
+      for(const side of [-1,1]){
+        // 鍛匠用鉚釘方肩甲，劍士用圓肩甲。
+        if(smith){const plate=box(female?.22:.27,.12,.3,iron,side*(female?.33:.38),1.27,0);plate.rotation.z=-side*.14;plate.name='smith-square-pauldron';rivet(side*(female?.33:.38),1.335,.12,.016);}
+        else{const pad=soft(female?.22:knight?.26:.3,female?.16:knight?.19:.25,knight?.37:.42,iron,side*(female?.335:knight?.36:.39),knight?1.27:1.25);if(knight)pad.rotation.z=-side*.17;pad.name='knight-round-pauldron';}
+        if(female){const plate=box(.23,.25,.09,iron,side*.22,.7,.14);plate.rotation.z=side*.16;plate.name='female-armored-fauld';}
+      }
       const crest=soft(female?.085:knight?.105:.12,.15,.035,gold,0,1.12,.25);crest.name=female?'female-leaf-crest':'male-shield-crest';coat(look.cloak,female?.58:.62);
+      if(smith){
+        // 鍛匠：胸甲外披皮革工匠圍裙，腰側掛工具袋與鎚環。
+        box(female?.32:.38,female?.46:.52,.045,look.leather,0,female?.77:.78,.245).name='smith-leather-apron';box(.2,.16,.04,look.leather,0,female?1.06:1.1,.255).name='smith-apron-bib';
+        for(const side of [-1,1]){const pouch=box(.12,.13,.09,look.leather,side*.27,.74,.16);pouch.rotation.y=side*.5;pouch.name='smith-tool-pouch';}
+        const loop=mesh(new T.TorusGeometry(.045,.011,4,10),gold,.22,.64,.21,'metal');loop.rotation.x=Math.PI/2;loop.name='smith-hammer-loop';
+      }
     }
-    else if(kind==='light_armor'){const leather=female?look.leather:0x89664a;body(female?.63:.7,female?.65:.63,.42,leather,1.0);for(const side of [-1,1]){const strap=box(.045,.57,.043,female?look.accent:0xc1a17b,side*(female?.1:.14),1,.215);strap.rotation.z=side*(female?.26:.16);}const belt=mesh(new T.TorusGeometry(female?.235:.31,.035,4,12),wood,0,.77);belt.rotation.x=Math.PI/2;belt.scale.y=.72;coat(female?look.cloak:leather,.6);if(female){neck(look.skin,1.26,.24);soft(.085,.07,.028,gold,0,1.1,.245);}else{const sash=box(.065,.61,.04,look.accent,0,1.0,.225);sash.rotation.z=-.6;}}
+    else if(kind==='light_armor'){const chef=job==='chef',scout=job==='scout',archer=job==='archer',leather=chef?0xf2ede4:female?look.leather:0x89664a;body(female?.63:.7,female?.65:.63,.42,leather,1.0);
+      if(chef){
+        // 廚師：白色雙排扣廚師服、紅色領巾與腰前圍裙，取代獵裝的交叉束帶。
+        for(const side of [-1,1])for(let i=0;i<3;i++)mesh(new T.SphereGeometry(.021,6,4),gold,side*.085,1.19-i*.12,.236,'metal').name='chef-breast-button';
+        box(.26,.07,.05,0xc03d3d,0,1.27,.2).name='chef-neckerchief';soft(.07,.06,.05,0xc03d3d,.03,1.21,.245).name='chef-neckerchief-knot';
+        box(female?.32:.38,.4,.035,look.leather,0,.64,.205).name='chef-waist-apron';
+      }else for(const side of [-1,1]){const strap=box(.045,.57,.043,female?look.accent:0xc1a17b,side*(female?.1:.14),1,.215);strap.rotation.z=side*(female?.26:.16);}
+      const belt=mesh(new T.TorusGeometry(female?.235:.31,.035,4,12),wood,0,.77);belt.rotation.x=Math.PI/2;belt.scale.y=.72;coat(chef||female?look.cloak:leather,.6);
+      if(female&&!chef){neck(look.skin,1.26,.24);soft(.085,.07,.028,gold,0,1.1,.245);}else if(!female&&!chef){const sash=box(.065,.61,.04,look.accent,0,1.0,.225);sash.rotation.z=-.6;}
+      if(scout){
+        // 斥候：單側短披肩、大腿刀鞘與腰後小袋。
+        const cape=box(.3,.44,.05,look.cloak,-.3,1.04,-.07);cape.rotation.set(0,.25,.22);cape.name='scout-side-cape';
+        const sheath=box(.06,.22,.05,look.leather,.25,.62,.15);sheath.rotation.z=.12;sheath.name='scout-thigh-sheath';
+        const pouch=box(.14,.1,.08,wood,-.19,.73,-.16);pouch.rotation.y=.4;pouch.name='scout-belt-pouch';
+      }else if(archer){
+        // 射手：背後箭袋與三支箭、胸前葉形護片。
+        const quiver=rod(.07,.5,look.leather,-.2,1.02,-.26);quiver.rotation.set(.12,0,.35);quiver.name='archer-quiver';
+        for(let i=0;i<3;i++){const shaft=rod(.008,.3,0xcfb38a,-.32+i*.035,1.3+i*.015,-.32);shaft.rotation.set(.12,0,.35);shaft.name='archer-quiver-arrow';const fletch=soft(.045,.09,.018,look.accent,-.36+i*.035,1.41+i*.015,-.34);fletch.rotation.set(.12,0,.35);fletch.name='archer-quiver-fletching';}
+        soft(.2,.26,.045,look.accent,-.11,1.09,.235).name='archer-leaf-guard';
+      }}
     else if(kind==='robe'&&job==='cleric'){
       // Kariginu (male) or kosode (female): a white top with wide hanging sleeves and a crossed collar. The hakama
       // belongs to the body, so the robe set ends at the waist with a red breast cord.
@@ -287,7 +369,18 @@
       const cord=mesh(new T.TorusGeometry(.03,.009,4,10),0xc03d3d,0,1.12,.25);cord.name='breast-cord';for(const side of [-1,1])box(.012,.16,.012,0xc03d3d,side*.03,1.0,.245);
       if(tier>1)for(const side of [-1,1])inlay([[side*.08,.78],[side*.2,.84],[side*.28,.78]],look.accent,0,0,.23,'kariginu-hem-pattern',.006);
     }
-    else if(kind==='robe'){const cloth=look.cloak;if(female){const back=mesh(new T.CylinderGeometry(.25,.35,.85,14,1,true,Math.PI/2,Math.PI),cloth,0,.59,-.04);back.scale.z=.74;back.name='continuous-robe-back';for(const side of [-1,1]){const panel=box(.22,.79,.07,cloth,side*.22,.61,.17);panel.rotation.z=side*.095;panel.name='female-slit-robe';}}else{const skirt=mesh(new T.CylinderGeometry(.27,.37,.74,14),cloth,0,.66);skirt.scale.z=.75;}body(female?.64:.7,female?.64:.58,.43,cloth,1.06);for(const side of [-1,1])box(.035,female?.64:.79,.03,gold,side*(female?.13:.18),female?1.02:.91,.225);const belt=mesh(new T.TorusGeometry(female?.23:.3,.025,4,12),gold,0,female?.85:.92);belt.rotation.x=Math.PI/2;belt.scale.y=.75;if(female)neck(look.skin,1.3,.24);else{for(const side of [-1,1]){const lapel=box(.12,.26,.05,look.accent,side*.09,1.23,.23);lapel.rotation.z=-side*.3;}}}
+    else if(kind==='robe'){const cloth=look.cloak;if(female){const back=mesh(new T.CylinderGeometry(.25,.35,.85,14,1,true,Math.PI/2,Math.PI),cloth,0,.59,-.04);back.scale.z=.74;back.name='continuous-robe-back';for(const side of [-1,1]){const panel=box(.22,.79,.07,cloth,side*.22,.61,.17);panel.rotation.z=side*.095;panel.name='female-slit-robe';}}else{const skirt=mesh(new T.CylinderGeometry(.27,.37,.74,14),cloth,0,.66);skirt.scale.z=.75;}body(female?.64:.7,female?.64:.58,.43,cloth,1.06);for(const side of [-1,1])box(.035,female?.64:.79,.03,gold,side*(female?.13:.18),female?1.02:.91,.225);const belt=mesh(new T.TorusGeometry(female?.23:.3,.025,4,12),gold,0,female?.85:.92);belt.rotation.x=Math.PI/2;belt.scale.y=.75;if(female)neck(look.skin,1.3,.24);else{for(const side of [-1,1]){const lapel=box(.12,.26,.05,look.accent,side*.09,1.23,.23);lapel.rotation.z=-side*.3;}}
+      if(job==='healer'){
+        // 療癒師：斜披肩帶、葉形胸針與腰側藥草袋。
+        const sash=box(.11,.8,.03,look.accent,0,1.0,.236);sash.rotation.z=.55;sash.name='healer-cross-sash';
+        soft(.08,.1,.03,0x8de8cf,.1,1.2,.25).name='healer-leaf-brooch';
+        const satchel=box(.16,.14,.08,look.leather,.26,.74,.1);satchel.rotation.y=-.4;satchel.name='healer-herb-satchel';
+      }else{
+        // 法師：披在肩上的短披風（前方開口）與胸前符文墜飾。
+        const cape=mesh(new T.CylinderGeometry(.36,.44,.46,12,1,true,Math.PI*.12,Math.PI*1.76),look.accent,0,1.1,-.02,'fabric');cape.scale.z=.8;cape.material.side=T.DoubleSide;cape.name='mage-shoulder-cape';
+        mesh(new T.OctahedronGeometry(.045),master?.gem||0xbab2f2,0,1.0,.26,'gem').name='mage-rune-pendant';
+      }
+    }
     // Readable construction details sit flush to the silhouette. Surface grain,
     // fine engraving and stitching live in the atlas; only larger seams/crests
     // use geometry and are merged below with their existing material family.
@@ -344,7 +437,8 @@
       if(tier>=3){if(body){for(const side of [-1,1])inlay([[side*.14,1.21],[side*.23,1.11],[side*.2,.95],[side*.12,.85]],gold,0,0,.224,'tier-crafted-fillet',.0045);}else if(shield){for(const side of [-1,1])inlay([[side*.07,-.16],[side*.13,0],[side*.07,.16]],gold,0,0,.096,'tier-shield-fillet',.004);}else if(!head&&kind!=='spellbook'){rod(.065,.09,gold,0,kind==='arcane_staff'?.62:.16);}}
     }
     if(tier>1&&definition.slot==='armor'){
-      const mantle=box(kind==='heavy_armor'?.75:.64,.12,.37,kind==='heavy_armor'?iron:look.accent,0,1.255,-.005);mantle.name='tiered-shoulder-mantle';
+      // Rounded layered pauldrons on each shoulder instead of one flat board across both.
+      for(const side of [-1,1]){const heavy=kind==='heavy_armor',pauldron=soft(heavy?.3:.22,heavy?.14:.1,heavy?.33:.27,heavy?iron:look.accent,side*(female?.31:.35),heavy?1.275:1.29,-.005);pauldron.rotation.z=-side*.28;pauldron.name='layered-pauldron';}
       if(root.CharacterSculpt?.cloth){const cape=mesh(root.CharacterSculpt.cloth(T,female?.61:.69,tier>=3?.69+(tier-3)*.04:.44,-.065),look.cloak,0,1.25,-.225,'fabric');cape.material.side=T.DoubleSide;cape.material.forceSinglePass=true;cape.name='folded-profession-cape';}
     }
     if(kind==='twin_daggers'){
@@ -598,11 +692,12 @@
     for(const child of [...head.children]){if(job==='archer'&&child.name==='human-ear'){head.remove(child);child.geometry.dispose();}else if(child.name==='hair-side')child.visible=false;}
     if(m.children.find(c=>c.name==='base-skirt'))m.children.find(c=>c.name==='base-skirt').visible=false;
     const mats=new Map(),add=(geo,color,x,y,z,parent=head)=>{if(!mats.has(color))mats.set(color,new T.MeshLambertMaterial({color}));const o=new T.Mesh(geo,mats.get(color));o.position.set(x,y,z);parent.add(o);return o;};
-    const soft=(w,h,d,color,x,y,z,parent=head)=>{const o=add(new T.SphereGeometry(1,10,6),color,x,y,z,parent);o.scale.set(w/2,h/2,d/2);return o;};
+    const soft=(w,h,d,color,x,y,z,parent=head,segments=10,rings=6)=>{const o=add(new T.SphereGeometry(1,segments,rings),color,x,y,z,parent);o.scale.set(w/2,h/2,d/2);return o;};
     if(female&&job==='chef'){const bun=soft(.25,.24,.24,s.hair,.17,-.045,-.23);bun.name='connected-hair-bun';}
     if(!female&&['mage','smith'].includes(job)){const beard=add(root.CharacterSculpt.capsule(T,job==='smith'?.26:.18,job==='smith'?.17:.12,.065),s.hair,0,-.2,.19);beard.name='profession-beard';if(job==='smith')smithLongBeard(T,beard);}
         const nose=head.children.find(c=>c.name==='sculpted-nose');if(nose)nose.scale.set(female?.82:job==='smith'?1.15:1,female?.9:1,job==='mage'?1.15:female?.85:1);
-    const bridge=soft(.048,.105,.044,s.skin,0,-.015,.244);bridge.name='nose-bridge';for(const side of [-1,1]){const nostril=soft(.013,.012,.01,0x8b6055,side*.024,-.074,.286);nostril.name='nostril';}
+    // Tiny features use fewer rings: the saved triangles pay for the rounded shoulder caps within the figure budget.
+    const bridge=soft(.048,.105,.044,s.skin,0,-.015,.244,head,8,5);bridge.name='nose-bridge';for(const side of [-1,1]){const nostril=soft(.013,.012,.01,0x8b6055,side*.024,-.074,.286,head,6,4);nostril.name='nostril';}
     const face=m.userData.face;if(face){const eyeMaterial=new T.MeshLambertMaterial({color:s.eyes});for(const eye of face.eyes){eye.material=eyeMaterial;eye.scale.x=female&&job==='smith'?.96:female?.88:.76;}for(const b of face.brows){b.scale.x=(job==='smith'?(female?.86:1.2):job==='healer'?.8:1)*(female?.9:1.1);b.scale.y=female?.7:1.2;}face.width=(job==='chef'?1.15:job==='archer'?.85:1)*(female?.9:1);for(const lip of face.lips||[])lip.material.color.setHex(female?0xb3747b:0xae8170);for(const cheek of face.cheeks)cheek.material.opacity=female?.34:.24;}
     root.CharacterFace?.refine(T,m,{job,sex,skin:s.skin,hair:s.hair,eyes:s.eyes});
     if(job==='archer')archerLook(T,m,s,female);
@@ -616,7 +711,9 @@
     if(job==='archer'&&female)for(const limb of [m.userData.armL,m.userData.armR,m.userData.legL,m.userData.legR]){limb.scale.x*=1.08;limb.scale.z*=1.08;}
     const badge=add(new T.SphereGeometry(.045,8,5),s.accent,.2,1.21,.23,m);badge.scale.z=.4;m.userData.baseClothing?.push(badge);
     if(female){for(const leg of [m.userData.legL,m.userData.legR]){leg.material=new T.MeshPhongMaterial({color:s.skin,specular:0x332521,shininess:13});const boot=leg.children.find(c=>c.geometry?.type==='ExtrudeGeometry');if(boot){boot.scale.y=1.8;boot.position.y=-.38;}}}
-    for(const arm of [m.userData.armL,m.userData.armR]){const sleeve=arm.children.find(c=>c.geometry?.type==='LatheGeometry');if(sleeve){sleeve.scale.set(1.12,female?.86:1.04,1.12);sleeve.name='connected-shoulder-sleeve';}const cuff=arm.children.find(c=>c.geometry?.type==='BoxGeometry');if(cuff){cuff.scale.set(1.06,1.1,1.06);cuff.name='tailored-wrist-cuff';}}
+    for(const arm of [m.userData.armL,m.userData.armR]){const sleeve=arm.children.find(c=>c.geometry?.type==='LatheGeometry');if(sleeve){sleeve.scale.set(1.12,female?.86:1.04,1.12);sleeve.name='connected-shoulder-sleeve';}const cuff=arm.children.find(c=>c.geometry?.type==='BoxGeometry');if(cuff){cuff.scale.set(1.06,1.1,1.06);cuff.name='tailored-wrist-cuff';}const cap=arm.children.find(c=>c.name==='rounded-shoulder-cap');
+      // The rounded cap is baked into the sleeve: one mesh per arm keeps every figure inside its draw budget.
+      if(sleeve&&cap){cap.scale.set(.137,female?.095:.105,.145);const merged=mergeParts(T,[placed(T,sleeve.geometry,sleeve.position.toArray(),[0,0,0],sleeve.scale.toArray()),placed(T,cap.geometry,cap.position.toArray(),[0,0,0],cap.scale.toArray())]);merged.userData.shoulderCap=true;sleeve.geometry=merged;sleeve.position.set(0,0,0);sleeve.scale.set(1,1,1);arm.remove(cap);}}
     if(job==='smith')smithDwarfBody(T,m);
     if(knight)knightBody(T,m,s);
     if(job==='archer'||job==='cleric'){const old=m.userData.armR.geometry;bowArmRig(T,m,s);old.dispose();}

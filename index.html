@@ -1011,7 +1011,7 @@ button:focus-visible,input:focus-visible{outline:3px solid #fff;outline-offset:3
    3D移動迷宮 — 給小朋友的變形迷宮冒險
    ===================================================== */
 const $=id=>document.getElementById(id);
-const GAME_VERSION='1.61.1';
+const GAME_VERSION='1.62.0';
 
 /* ---------- 設定（後台可調） ---------- */
 const DEFAULT_CFG={teamSize:2,shiftMin:3,itemCount:6,foodCount:4,hungerMin:3,stunSec:3,pingSec:3,smellCells:3,mazeSize:13,magicMap:0,duelMin:5,unpaidRate:100,musicOn:1,speechOn:1,speechVoice:'',apiUrl:'',roomMax:3,rounds:3,goodsCount:16,shopCollect:1,shopMin:2.5,cartFull:400,views:{fp:1,tp:1,top:1},broker:'wss://broker.emqx.io:8084/mqtt'};
@@ -1884,6 +1884,8 @@ function buildCharacter(cd){
     const sleeve=limb(.205,.25,.23,cd.shirt);sleeve.position.y=-.03;arm.add(sleeve);
     const cuff=box(.19,.04,.205,0xe5dfc9);cuff.position.y=-.15;arm.add(cuff);
     const thumb=soft(.06,.12,.08,cd.type==='robot'?0x90a4ae:cd.skin);thumb.position.set(arm===armR?.065:-.065,-.34,.075);arm.add(thumb);
+    // A rounded cap over the sleeve top hides the flat shoulder seam in every arm pose (added after the thumb: hand rigs find the thumb first).
+    const cap=new THREE.Mesh(new THREE.SphereGeometry(1,8,6),M(cd.shirt));cap.scale.set(.125,.1,.13);cap.position.y=.075;cap.name='rounded-shoulder-cap';arm.add(cap);
   }
   for(const leg of [legL,legR]){
     const boot=bevel(.24,.18,.34,0x354757);boot.position.set(0,-.45,.065);leg.add(boot);
@@ -5461,7 +5463,7 @@ window.addEventListener('pagehide',()=>{AudioEng.shiftSound?.stop();AudioEng.com
 <script src="story/tower-combat-motion.js?v=1.60.0"></script>
 <script src="story/tower-menu-voice.js?v=1.42.4"></script>
 <script src="assets/equipment-surfaces.js?v=1.58.0"></script>
-<script src="story/tower-heroes-visuals.js?v=1.61.1"></script>
+<script src="story/tower-heroes-visuals.js?v=1.62.0"></script>
 <script src="story/tower-skill-effects.js?v=1.60.0"></script>
 <script src="story/tower-growth-runtime.js?v=1.61.0"></script>
 <script src="story/tower-team-tactics.js?v=1.57.1"></script>
@@ -5498,7 +5500,7 @@ window.addEventListener('pagehide',()=>{AudioEng.shiftSound?.stop();AudioEng.com
 <script src="story/tower-lighting-runtime.js?v=1.58.2"></script>
 <script src="story/tower-encounter-alert.js?v=1.42.5"></script>
 <script src="story/tower-combat-readability.js?v=1.58.2"></script>
-<script src="story/tower-field-guide.js?v=1.60.0"></script>
+<script src="story/tower-field-guide.js?v=1.62.0"></script>
 <script src="story/tower-creature-art.js?v=1.58.0"></script>
 <script src="story/tower-cinematic-actors.js?v=1.58.0"></script>
 <script src="story/tower-cinematic-look.js?v=1.57.0"></script>

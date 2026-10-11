@@ -98,7 +98,10 @@
     const cache=new Map(),mats=new Map(),textures=[];
     const geometry=(key,build)=>{if(!cache.has(key)){const g=build();cache.set(key,g);owned.add(g);}return cache.get(key);};
     const texture=(kind,size=256)=>{
-      const pixels=new Uint8Array(size*size*4);
+      // v1.61.1 · the pixel maps are deterministic per region, so they are generated once per session
+      // instead of on every story page (24–56 ms of CPU work per open on a desktop, more on phones).
+      const cacheKey=kind+'|'+id+'|'+size;let pixels=SURFACE_PIXELS.get(cacheKey);
+      if(!pixels){pixels=new Uint8Array(size*size*4);
       for(let y=0;y<size;y++)for(let x=0;x<size;x++){
         const at=(y*size+x)*4,noise=((Math.sin(x*127.1+y*311.7)*43758.5453)%1+1)%1;
         let shade=.84+noise*.12,alpha=255;
@@ -124,6 +127,7 @@
         }
         const value=Math.max(0,Math.min(255,Math.round(shade*255)));pixels[at]=value;pixels[at+1]=value;pixels[at+2]=value;pixels[at+3]=alpha;
       }
+      SURFACE_PIXELS.set(cacheKey,pixels);}
       const tex=new T.DataTexture(pixels,size,size,T.RGBAFormat);tex.name='story-'+kind+'-surface';tex.needsUpdate=true;tex.magFilter=T.LinearFilter;tex.minFilter=T.LinearMipmapLinearFilter;tex.generateMipmaps=true;
       if(kind!=='soft'){tex.wrapS=tex.wrapT=T.RepeatWrapping;tex.repeat.set(kind==='floor'||kind==='ground'?3:2,kind==='floor'||kind==='ground'?3:2);tex.colorSpace=T.SRGBColorSpace;}else{tex.wrapS=tex.wrapT=T.ClampToEdgeWrapping;tex.generateMipmaps=false;tex.minFilter=T.LinearFilter;}
       textures.push(tex);owned.add(tex);return tex;
@@ -463,6 +467,8 @@
     for(const mat of originals)if(!used.has(mat))retired.add(mat);
     model.userData.storyIdentityPalette='lian-teal-silver';
   }
+  // Procedural surface pixels per (kind, region, size); the DataTextures built from them stay owned by each session.
+  const SURFACE_PIXELS=new Map();
   function create({THREE:T,hero,heroJob='swordsman',heroSex='male',heroName='旅人',buildActor,buildStoryActor,dispose,environment,floor=99,reduced=false}={}){
     if(!T?.Scene||!T?.Mesh)return null;
     const id=environmentId(environment,floor),palette=PALETTES[id],look=LOOKS[id],deep=Number(floor)<0,scene=new T.Scene(),owned=new Set(),motion=[];

@@ -29,6 +29,8 @@ export async function onRequestGet({ env }) {
 
 export async function onRequestPost({ request, env }) {
   if (!env.SCORES) return new Response('KV binding "SCORES" not set', { status: 500, headers: CORS });
+  // A record is a few hundred bytes; anything larger is never a real submission.
+  if (Number(request.headers?.get?.('content-length') || 0) > 4096) return new Response('record too large', { status: 413, headers: CORS });
   let r;
   try { r = await request.json(); }
   catch (e) { return new Response('bad json', { status: 400, headers: CORS }); }
@@ -43,6 +45,8 @@ export async function onRequestPost({ request, env }) {
   };
   // A finished maze always takes at least a second; a 0:00 entry is never real.
   if (!rec.name || !LEVEL_IDS.has(rec.level) || rec.timeSec < 1 || !/^\d{4}-\d{2}-\d{2}$/.test(rec.date)) return new Response('invalid record', { status: 400, headers: CORS });
+  // The game scores max(100, 6000 − 15 s) plus 100 per star; a score no run could reach is clamped to that ceiling.
+  rec.score = Math.min(rec.score, Math.max(100, 6000 - rec.timeSec * 15) + 3000);
   try {
     const arr = parseRecords(await env.SCORES.get('records'));
     arr.push(rec);

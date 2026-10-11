@@ -212,6 +212,8 @@
     overlay.addEventListener('input',event=>window.MazeAudioSettings?.input(event));
     window.addEventListener('keydown', event => {
       if (!active && overlay.hidden) return;
+      // v1.61.1 · a cutscene owns the keyboard: no bag, trade or journal panels over a lord's line.
+      if (cinema?.active) return;
       if (!overlay.hidden) {
         if (event.code === 'Escape' && active && run.status === 'playing' && floorStarted) closeDialog();
         if (event.code === 'Tab') {
@@ -737,9 +739,12 @@
     showToast(result.message||'記憶已經亮起。',3000);
     if(run.expedition.active.progress.length===3)showToast('副本目標完成！趕在時間內找到出口領取報酬。',3500);
   }
+  let dungeonClock=0;
   function tickDungeon(dt,now) {
-    const result=D.tick(run,dt);if(!result.ok)return;run=result.run;
-    if(result.effect?.expired){finishDungeon('expired');return;}
+    // The clock is committed four times a second: each commit is a full validated transaction, far too costly per frame.
+    dungeonClock+=dt;
+    if(dungeonClock>=.25){const seconds=dungeonClock;dungeonClock=0;const result=D.tick(run,seconds);if(!result.ok)return;run=result.run;
+      if(result.effect?.expired){finishDungeon('expired');return;}}
     nearbyEncounter=nearest=nearestWarrior=null;updateJourneyNearby();
     for(const item of dungeonObjects)if(item.rotate)item.icon.rotation.y+=dt*.35;
     if(run.effects.reveal>0)G.mapUntil=now+250;
@@ -751,6 +756,7 @@
     dialog('退出副本確認',huntActive()?'放棄這次討伐？':'放下這段未完成的記憶？','退出後回到原層，不會領取獎勵，也不能在同一層重開這個副本。','',action('繼續挑戰','close')+action('確認退出副本','dungeon-abandon'));
   }
   function finishDungeon(outcome) {
+    dungeonClock=0;
     if(!inDungeon())return;
     syncEngine();const offer=dungeonOffer(),title=offer.title,story=sideStory(offer.kind),result=D.finish(run,outcome,run.revision);
     if(!result.ok){dialog('副本尚未結算','請先整理背包',result.message,'',action('整理背包','bag')+action('放棄報酬並退出','dungeon-leave'));return;}
@@ -1056,6 +1062,8 @@
     return cinema.start({...spec,done:()=>{if(!active||run.floor!==floor)return;if(!momentSeen(spec.key)&&run.adventure.claimed.length<128)run.adventure.claimed.push('cinema:'+spec.key);save();spec.done?.();}});
   }
   function presentLord(m,event){
+    // The farewell close-up must not freeze a hit flash, a squash or a raised weapon on the fallen lord.
+    if(event==='defeat'&&m?.model){window.TowerCombatReadability?.update?.(THREE,m,{visible:false});restLord(m);if(m.model.userData.ring)m.model.userData.ring.visible=false;}
     if(!cinema)return lordVoice(m,event);
     // A companion may finish a lord behind a corner. Keep its farewell audio,
     // but never cut to a hidden actor or reveal a room through the fog.
@@ -1507,6 +1515,8 @@
     for(let i=1;i<=steps;i++)if(playerInWall(ax+(bx-ax)*i/steps,az+(bz-az)*i/steps,.1))return false;
     return true;
   }
+  // A lord that is stunned, held or guarded drops its wind-up pose instead of freezing mid-swing.
+  const restLord=m=>{if(m.lord&&m.model){m.strikeLeft=0;Lords?.pose?.(m.model,{});}};
   function updateMonster(m,dt,now) {
     if(!m.alive||paused||G.frozen||G.shifting||!G.running||run.status!=='playing')return;
     if(cinema&&m.lord&&!momentSeen('lord:'+m.id+':encounter')){checkLordEntrance();return;}
@@ -1514,13 +1524,13 @@
     m.alertLeft=Math.max(0,(m.alertLeft||0)-dt);
     const stunned=(run.monsterStuns[m.id]||0)>0;
     const questTarget=run.adventure?.quest?.status==='active'&&run.adventure.quest.target===m.id;
-    if(m.stunLabel!==stunned||m.questLabel!==questTarget){const old=m.model.userData.tag;if(old){m.model.remove(old);disposeSceneObject(old);const tag=strengthTag((questTarget?'委託目標・':'')+m.def.name+(stunned?'（暈）':''),C.effectiveMonsterStrength(run,m.id,m.strength));tag.position.y=m.lord?3:2.35;m.model.add(tag);m.model.userData.tag=tag;}
+    if(m.stunLabel!==stunned||m.questLabel!==questTarget){const old=m.model.userData.tag;if(old){m.model.remove(old);disposeSceneObject(old);const tag=strengthTag((questTarget?'委託目標・':'')+m.def.name+(m.lord?'・樓層主':'')+(stunned?'（暈）':''),C.effectiveMonsterStrength(run,m.id,m.strength));tag.position.y=m.lord?3:2.35;m.model.add(tag);m.model.userData.tag=tag;}
       if(m.stunLabel!==stunned&&!stunned&&isHeld(m)){const result=C.resolveHeldMonster(run,m.id,m.strength);if(result.ok&&result.effect.changed){run=result.run;save();updateHud();showToast('怪物恢復強度，護衛改為限時抵擋 '+result.effect.seconds+' 秒。');}}
       m.stunLabel=stunned;m.questLabel=questTarget;
     }
-    if(stunned){m.windup=0;m.path=[];m.cooldown=2;m.model.userData.ring.material.opacity=.25+.12*Math.sin(now*.01);return;}
-    if(isHeld(m)){m.windup=0;m.path=[];m.cooldown=2;m.model.userData.ring.material.opacity=.65;return;}
-    if(partyUI?.guard(m,dt))return;
+    if(stunned){m.windup=0;m.path=[];m.cooldown=2;m.model.userData.ring.material.opacity=.25+.12*Math.sin(now*.01);restLord(m);return;}
+    if(isHeld(m)){m.windup=0;m.path=[];m.cooldown=2;m.model.userData.ring.material.opacity=.65;restLord(m);return;}
+    if(partyUI?.guard(m,dt)){restLord(m);return;}
     const p=m.model.position, distance=Math.hypot(G.px-p.x,G.pz-p.z),status=modern()?Heroes.state(run).enemy[m.id]:null;
     const affixes=window.TowerAffixes,blocked=!!affixes?.attackBlocked(run,m.id,true);
     if(blocked){m.windup=0;m.aim=null;}
@@ -1539,7 +1549,9 @@
     m.cooldown=Math.max(0,m.cooldown-dt);m.pathLeft-=dt;
     m.model.userData.body.position.y=(m.kind==='clockmite' ? .6 : 1)+Math.sin(now*.004+m.phase)*.1;
     m.model.userData.ring.material.opacity=m.windup>0?.9:.35;
-    if(m.lord){const dome=m.model.getObjectByName('lord-guard-dome');if(dome?.visible)dome.material.opacity=.2+.1*Math.sin(now*.005);m.strikeLeft=Math.max(0,(m.strikeLeft||0)-dt);if(!cinema)Lords?.pose?.(m.model,{windup:m.windup,total:m.windupTotal,strike:m.strikeLeft});}
+    if(m.lord){const dome=m.model.getObjectByName('lord-guard-dome');if(dome?.visible)dome.material.opacity=.2+.1*Math.sin(now*.005);m.strikeLeft=Math.max(0,(m.strikeLeft||0)-dt);
+      // The director object always exists; cutscenes stop this tick themselves, so the attack pose runs whenever the lord does.
+      Lords?.pose?.(m.model,{windup:m.windup,total:m.windupTotal,strike:m.strikeLeft});}
     if(m.def.ranged&&!blocked){
       if(repelled){m.windup=0;m.aim=null;}
       else if(m.windup>0){

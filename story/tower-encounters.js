@@ -136,11 +136,17 @@
     const count=Math.ceil((size-5)/4);
     return Array.from({length:count},(_,i)=>({id:'arrows:'+run.floor+':'+i,kind:'arrow',quantity:10}));
   }
-  function merchantOffers(floor, seed, modern=false) {
-    const C = core(), random = randomFor(floor, seed, 0x24181), ids = Object.keys(MERCHANT_SERVICES);
+  // Which service merchants stand on a floor is decided here alone, so presence checks never build the full shop.
+  function merchantRoster(floor, seed) {
+    const random = randomFor(floor, seed, 0x24181), ids = Object.keys(MERCHANT_SERVICES);
     for (let i = ids.length - 1; i > 0; i--) { const j = Math.floor(random() * (i + 1)); [ids[i], ids[j]] = [ids[j], ids[i]]; }
     const count = floor < 70 && random() < .45 ? 2 : 1;
-    const shops = ids.slice(0, count).map(id => {
+    return ids.slice(0, count);
+  }
+  const hasServiceMerchant=(run,merchantId)=>!!run&&merchantRoster(run.floor,run.seed).includes(merchantId);
+  function merchantOffers(floor, seed, modern=false) {
+    const C = core();
+    const shops = merchantRoster(floor, seed).map(id => {
       const H=typeof module==='object'&&module.exports?require('./tower-heroes-core.js'):globalThis.TowerHeroes;
       const old=MERCHANTS[id],entry=modern?{...old,equipmentKinds:H.gearPool(floor).filter(kind=>merchantHandles(id,kind))}:old;
       return { ...entry, equipmentKinds: [...entry.equipmentKinds], supplies: [], gear: entry.equipmentKinds.map(kind => {
@@ -161,9 +167,9 @@
     if(definition.integrated||definition.core)return merchantId==='tieLing';
     return definition.slot===rules.slot||definition.slot==='weapon'&&(rules.weaponKinds.includes(definition.baseKind||kind)||rules.legacyWeapons.includes(kind));
   }
-  function serviceContext(run,merchantId){return run&&Object.hasOwn(MERCHANT_SERVICES,merchantId)&&merchant(run,merchantId)?{kind:'merchant',merchantId,floor:run.floor,seed:run.seed}:null;}
+  function serviceContext(run,merchantId){return run&&Object.hasOwn(MERCHANT_SERVICES,merchantId)&&hasServiceMerchant(run,merchantId)?{kind:'merchant',merchantId,floor:run.floor,seed:run.seed}:null;}
   function serviceAvailable(run,service,gear){
-    return !!(run&&service?.kind==='merchant'&&service.floor===run.floor&&service.seed===run.seed&&merchant(run,service.merchantId)&&merchantHandles(service.merchantId,gear));
+    return !!(run&&service?.kind==='merchant'&&service.floor===run.floor&&service.seed===run.seed&&hasServiceMerchant(run,service.merchantId)&&merchantHandles(service.merchantId,gear));
   }
   function failure(run, message) { return { ok: false, run, message }; }
   function transaction(run, expectedRevision, fn) {

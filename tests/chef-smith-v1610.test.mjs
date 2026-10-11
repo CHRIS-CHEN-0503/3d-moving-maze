@@ -9,7 +9,7 @@ test('a chef cooks special portions that heal and feed more; without a chef the 
   let run=legacy('chef');run.hp=20;let r=P.cook(run,'stew');assert.ok(r.ok,r.message);run=r.run;assert.equal(run.party.meals.stew,2);assert.equal(run.party.specials.stew,2);assert.match(r.message,/廚師特製/);assert.equal(r.effect.special,true);
   assert.equal(P.chefLevel(run),3);assert.equal(P.specialBonus(run),30);r=P.eat(run,'stew');assert.ok(r.ok);assert.equal(r.run.hp,20+Math.round(8*1.3));assert.match(r.message,/廚師特製 \+30%/);assert.equal(r.run.party.specials.stew,1);assert.equal(r.run.party.meals.stew,1);assert.ok(C.validateSave(JSON.stringify(r.run)));
   let plain=legacy('swordsman');plain.hp=20;r=P.cook(plain,'stew');assert.ok(r.ok);assert.equal(r.run.party.specials.stew,0);assert.equal(r.effect.special,false);r=P.eat(r.run,'stew');assert.equal(r.run.hp,28);assert.doesNotMatch(r.message,/特製/);
-  const broken=structuredClone(run);broken.party.specials.stew=9;assert.equal(C.validateSave(JSON.stringify(broken)),null,'specials can never exceed the dish count');
+  const broken=structuredClone(run);broken.party.specials.stew=9;const repaired=C.validateSave(JSON.stringify(broken));assert.ok(repaired,'v1.61.1: an overcounted special is clamped on load instead of rejecting the save');assert.equal(repaired.party.specials.stew,repaired.party.meals.stew,'specials never exceed the dish count');
   const old=structuredClone(run);delete old.party.specials;const migrated=C.validateSave(JSON.stringify(old));assert.ok(migrated);assert.deepEqual(migrated.party.specials,Object.fromEntries(Object.keys(P.RECIPES).map(id=>[id,0])));
 });
 test('the chef bonus follows the travelling chef level, at least ten percent and at most fifty',()=>{

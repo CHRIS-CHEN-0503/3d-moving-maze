@@ -177,7 +177,7 @@
     if (![1, 2, 3, 4].includes(version)) return null;
     const generated = rawOffer(run.floor, run.seed, version);
     if (!generated || run.expedition && (!Array.isArray(run.expedition.history) || run.expedition.history.some(entry => entry.id === generated.id))) return null;
-    if(run.party?.loadouts&&generated.reward.gear){const C=getCore(),kinds=Object.keys(C.GEAR).filter(k=>C.GEAR[k].tier<=(run.floor>=70?1:run.floor>=40?2:3)),kind=kinds[(run.seed+run.floor*7)%kinds.length];generated.reward.gear=C.createGear(kind,run.floor,run.seed,generated.id,true);}
+    if(run.party?.loadouts&&generated.reward.gear){const C=getCore(),kinds=Object.keys(C.GEAR).filter(k=>!C.GEAR[k].integrated&&!C.GEAR[k].craftOnly&&!C.GEAR[k].core&&C.GEAR[k].tier<=(run.floor>=70?1:run.floor>=40?2:3)),kind=kinds[(run.seed+run.floor*7)%kinds.length];generated.reward.gear=C.createGear(kind,run.floor,run.seed,generated.id,true);}
     return generated;
   }
   function discover(run) {

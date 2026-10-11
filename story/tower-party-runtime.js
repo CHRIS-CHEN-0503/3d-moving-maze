@@ -123,7 +123,7 @@
     const P=root.TowerPartyCore,X=root.TowerExpedition,T=ctx.THREE,V=root.TowerCharacters,H=root.TowerHeroes;
     // The follower list is built once per frame (and again after each state transaction), not once per monster and companion.
     const modern=()=>!!r()?.party?.loadouts,records=()=>{const run=r();if(!recordsOf||recordsOf.run!==run)recordsOf={run,list:modern()?H.followerRecords(run):run.party.members};return recordsOf.list;};
-    const heroes=root.TowerHeroesRuntime?.create({...ctx,actors:()=>actors,safeCamp,assemble,robotService:()=>{const service=root.TowerEncounters.serviceContext(r(),'tieLing');return service&&workshopSafe(service)?{service}:{safe:safeCamp()};},syncActors,hit:applyHit,portrait,walkClear:(a,b)=>walkClear(a,b)});
+    const heroes=root.TowerHeroesRuntime?.create({...ctx,actors:()=>actors,safeCamp,assemble,release:releaseAssembly,robotService:()=>{const service=root.TowerEncounters.serviceContext(r(),'tieLing');return service&&workshopSafe(service)?{service}:{safe:safeCamp()};},syncActors,hit:applyHit,portrait,walkClear:(a,b)=>walkClear(a,b)});
     let actors=[],queue=[],queueClock=0,stations=[],near=null,offer=null,group=null,pulse=0,uiClock=0,ailmentLeft=0,recordsOf=null,skillLeft=0,guardVoiceLeft=0,worldFloor=null,worldSeed=null,working=null,pendingForge=null,pendingDismantle=null,pendingRepair=null,pendingAffix=null,forgeSelected=null,forgeService,forgePage='list';
     const r=()=>ctx.run(), enabled=()=>!!r()?.party, live=()=>enabled()&&(modern()||!ctx.inDungeon())&&worldFloor===r().floor&&worldSeed===r().seed;
     const esc=ctx.text,act=ctx.action;
@@ -132,6 +132,8 @@
     const clear=p=>ctx.clear(ctx.G.px,ctx.G.pz,p.x,p.z);
     const QUEUE_GAP=1.8,BODY_GAP=1.15;
     const walkClear=(a,b)=>ctx.followClear?ctx.followClear(a,b):ctx.clear(a.x,a.z,b.x,b.z);
+    // A cancelled or fired gather hands the companions back to their own AI at once instead of holding formation for 8 s.
+    function releaseAssembly(ids){for(const a of actors)if(a.assembly&&(!ids||ids.includes(a.id)))a.assembly=null;}
     function assemble(ids,definition){if(!modern()||ctx.paused()||ctx.G.shifting)return false;const origin={x:ctx.G.px,z:ctx.G.pz},points=[origin];for(const [dx,dz]of [[0,1.5],[0,-1.5],[1.5,0],[-1.5,0],[0,3],[0,-3],[3,0],[-3,0]]){const p={x:origin.x+dx,z:origin.z+dz};if(walkClear(origin,p)&&points.every(other=>Math.hypot(p.x-other.x,p.z-other.z)>=BODY_GAP&&Math.hypot(p.x-other.x,p.z-other.z)<=definition.formation.distance))points.push(p);}const members=actors.filter(a=>ids.includes(a.id)&&H.hp(r(),a.id)>0);if(points.length<members.length+1){ctx.toast('這裡太窄，先走到較寬的通道再集合。',1800,false);return false;}const used=[origin];for(const a of members){const p=points.slice(1).filter(p=>!used.includes(p)).sort((p,q)=>Math.hypot(a.model.position.x-p.x,a.model.position.z-p.z)-Math.hypot(a.model.position.x-q.x,a.model.position.z-q.z))[0];used.push(p);a.assembly={...p,left:8,active:H.state(r()).active};a.path=[];a.pathLeft=0;}return true;}
     const part=(parent,geometry,color,x=0,y=0,z=0)=>{const m=new T.Mesh(geometry,new T.MeshLambertMaterial({color,flatShading:true}));m.position.set(x,y,z);parent.add(m);return m;};
     const ball=(p,s,c,x,y,z)=>part(p,new T.SphereGeometry(s,8,6),c,x,y,z);
@@ -308,7 +310,7 @@
       view.done=done;view.pending.visible=!done;view.resolved.visible=done;view.marker.material.color.setHex(done?0x79bba0:P.PROFESSIONS[view.job].color);view.marker.material.opacity=done?.35:1;
     }
     function refreshSiteVisuals(){if(!live())return;const done=!!r().party.journey.site.done;for(const s of stations)if(s.kind==='site')setSiteVisual(s.model,done);}
-    function reset(){heroes?.reset();actors=[];queue=[];queueClock=0;stations=[];near=null;offer=null;group=null;pulse=0;ailmentLeft=0;recordsOf=null;skillLeft=0;guardVoiceLeft=0;worldFloor=null;worldSeed=null;working=null;pendingForge=pendingDismantle=pendingRepair=pendingAffix=null;forgeService=undefined;forgePage='list';workHud();}
+    function reset(){heroes?.reset();actors=[];queue=[];queueClock=0;stations=[];near=null;offer=null;group=null;pulse=0;ailmentLeft=0;recordsOf=null;skillLeft=0;guardVoiceLeft=0;worldFloor=null;worldSeed=null;working=null;labPick={};pendingForge=pendingDismantle=pendingRepair=pendingAffix=null;forgeService=undefined;forgePage='list';workHud();}
     function recruitAvailable(candidate){
       const party=r()?.party;
       return !!candidate&&!!party&&(candidate.returning||!party.joined.includes(candidate.id))&&!party.members.some(m=>m.id===candidate.id||m.profession===candidate.profession);
@@ -329,7 +331,7 @@
       // visible copy. Do not remove merchants, explorers or other world objects.
       const stale=new Set(ctx.world()?.children.filter(o=>o.name==='tower-party-scene')||[]);if(group)stale.add(group);
       for(const old of stale)if(old.parent){old.parent.remove(old);ctx.dispose(old);}
-      reset();worldFloor=r()?.floor;worldSeed=r()?.seed;if(!live())return;group=new T.Group();group.name='tower-party-scene';ctx.world().add(group);if(ctx.inDungeon()){syncActors();return;}
+      reset();worldFloor=r()?.floor;worldSeed=r()?.seed;if(!live())return;group=new T.Group();group.name='tower-party-scene';ctx.world().add(group);if(ctx.inDungeon()){syncActors();if(ctx.inHunt?.())refreshMonsters();return;}
       const p=ctx.cell(0,0),camp={...p,kind:'camp',model:stationModel('camp')};camp.model.position.set(p.x,0,p.z);group.add(camp.model);stations.push(camp);
       // The recruit's cell stays reserved after they join, keeping later stations in place.
       offer=P.recruitOffer(r());const recruitPoint=offer?ctx.chooseCell(random,used):null;if(recruitAvailable(offer)){const p=recruitPoint,model=memberModel(offer.profession,offer.level,offer.id,offer.sex);if(modern())root.TowerHeroVisuals.dress(T,model,H.preview(r(),offer).equipment,ctx.dispose);model.position.set(p.x,0,p.z);label(model,P.person(offer.profession,offer.sex)+' · '+P.PROFESSIONS[offer.profession].name);group.add(model);stations.push({...p,kind:'recruit',offer,model});}
@@ -568,7 +570,7 @@
     // an AI swing that is certain to fail would retry (and toast) every frame.
     function strikeReady(id){return !modern()||!((H.job(r(),id)==='robot'&&!H.ROBOT?.powered(r(),id))||root.TowerAffixes?.attackBlocked(r(),id));}
     function shift(){
-      pruneRecruits();working=null;queueClock=0;if(modern()){const seconds=H.teamPassive(r(),'intuition');if(seconds)r().effects.reveal=Math.max(r().effects.reveal||0,seconds);}heroes?.reset();workHud();if(modern())root.TowerHeroGrowth.state(r()).route=null;const placed=[];
+      pruneRecruits();working=null;queueClock=0;if(modern()){const seconds=H.teamPassive(r(),'intuition');if(seconds)r().effects.reveal=Math.max(r().effects.reveal||0,seconds);}heroes?.reset({keepUpgrades:true});workHud();if(modern())root.TowerHeroGrowth.state(r()).route=null;const placed=[];
       for(const a of actors){
         const c=ctx.worldToCell(a.model.position.x,a.model.position.z),centre=ctx.cell(c.x,c.y),p=companionSpawn(centre,placed,placed.length);
         a.model.position.set(p.x,0,p.z);a.path=[];a.pathLeft=0;a.safeTurn=false;a.queueLeader=null;a.assembly=null;a.retreating=false;placed.push(a);

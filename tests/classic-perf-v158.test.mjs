@@ -37,7 +37,8 @@ test('fixed pickup captions share one texture, story loot names stay per marker,
   assert.notEqual(tag(loot1).material.map,tag(loot2).material.map,'unbounded loot names are not cached');assert.notEqual(tag(loot1).material.map.userData.sharedResource,true);
   const checkout=fn('updateCheckoutBtn'),smell=fn('updateSmell'),satiety=fn('updateSatietyBar');
   assert.match(checkout,/if\(\$\('coCnt'\)\.textContent!==String\(left\)\)/);assert.match(checkout,/if\(\$\('coCnt'\)\.textContent!==cart\)/);
-  assert.match(smell,/if\(\$\('smellTxt'\)\.textContent!==smell\)/);assert.match(smell,/if\(updateSmell\.turn!==turn\)/);
+  // v1.61.1: compared with the last written value, because the phone text filter strips the emoji from the DOM node.
+  assert.match(smell,/if\(updateSmell\.last!==smell\)\{\$\('smellTxt'\)\.textContent=smell;updateSmell\.last=smell;\}/);assert.match(smell,/if\(updateSmell\.turn!==turn\)/);
   assert.match(satiety,/if\(updateSatietyBar\.label!==label\)\{\$\('satietyWrap'\)\.setAttribute/);
   assert.match(html,/roomClock=MP\.on&&MP\.started&&\(MP\.mode==='tag'\|\|\['shop','treasure'\]\.includes\(MP\.mode\)&&!MP\.ended\|\|MP\.mode==='ctf'&&Number\.isFinite\(window\.CaptureFlag\?\.view\?\.\(\)\?\.deadline\)\);if\(!roomClock&&/,'timed rooms own their countdown clock');
   const frame=fn('mpFrame');assert.doesNotMatch(frame,/\$\('hudTime'\)\.textContent=/,'room countdowns compare before writing');assert.equal((frame.match(/setHudClock\(/g)||[]).length,3);

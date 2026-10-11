@@ -58,7 +58,9 @@
     const story=offer.returning?P().person(offer.profession,offer.sex)+'還記得上次的旅程，願意再次同行；這回希望準備更充足的補給。原有等級與技能保留，'+(offer.profession==='robot'?'機殼與拳臂保留原有階級與耐久。':'裝備請從背包重新分配。'):terms.story;
     return {offer,costs,list,affordable:!reason,reason,story,returning:!!offer.returning,recruitCount:offer.recruitCount};
   }
-  function pay(run,q){for(const c of q.list){if(c.type==='coins')run.coins-=c.count;else if(c.type==='scrap')run.party.journey.scrap-=c.count;else if(c.type==='materials')run.party.journey.materials[c.id]-=c.count;else if(c.type==='bag')run.bag[c.id]-=c.count;else run.party[c.type][c.id]-=c.count;}}
+  function pay(run,q){for(const c of q.list){if(c.type==='coins')run.coins-=c.count;else if(c.type==='scrap')run.party.journey.scrap-=c.count;else if(c.type==='materials')run.party.journey.materials[c.id]-=c.count;else if(c.type==='bag')run.bag[c.id]-=c.count;else{run.party[c.type][c.id]-=c.count;
+      // v1.61.1 · a chef's special portions can never outnumber the meals they belong to.
+      if(c.type==='meals'&&run.party.specials)run.party.specials[c.id]=Math.min(run.party.specials[c.id]||0,run.party.meals[c.id]);}}}
   function remember(run,member){
     const p=run.party,key=identity(member.profession,member.sex),before=archive(run).find(t=>t.identity===key);
     const record={identity:key,id:member.id,profession:member.profession,sex:member.sex,level:member.level,xp:member.xp??G().XP[member.level-1],departedFloor:run.floor,departures:Math.min(149,(before?.departures||0)+1),legacy:!p.loadouts,loadout:p.loadouts?H().recruitSnapshot(run,member.id):null};
@@ -70,7 +72,7 @@
   }
   function validate(value,party,floor){
     if(value===undefined)return [];
-    if(!Array.isArray(value)||value.length>16||new Set(value.map(t=>t?.identity)).size!==value.length||new Set(value.map(t=>t?.id)).size!==value.length)return null;
+    if(!Array.isArray(value)||value.length>Object.keys(TERMS).length||new Set(value.map(t=>t?.identity)).size!==value.length||new Set(value.map(t=>t?.id)).size!==value.length)return null;
     const result=[];for(const t of value){
       if(!t||typeof t!=='object'||Array.isArray(t)||t.identity!==identity(t.profession,t.sex)||!Object.hasOwn(TERMS,t.identity)||typeof t.id!=='string'||!t.id||t.id==='hero'||t.id.length>80||!party.joined.includes(t.id)||!C().isFloor(t.departedFloor)||t.departedFloor<floor||!Number.isInteger(t.departures)||t.departures<1||t.departures>149||!Number.isInteger(t.level)||t.level<1||t.level>(t.departedFloor<0&&party.loadouts?10:5)||!Number.isInteger(t.xp))return null;
       const xp=G().migrateXp(t.xp,t.level,party.loadouts?.xpCurve);if(xp<G().XP[t.level-1]||xp>G().XP[9])return null;

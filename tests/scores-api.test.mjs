@@ -13,7 +13,8 @@ test('scores accept only plausible records for real levels and store them normal
   for(const bad of [{level:'moon'},{timeSec:0},{timeSec:-30},{date:'yesterday'},{name:''},{name:'\u0000\u0001'}])assert.equal((await post(env,record(bad))).status,400,JSON.stringify(bad));
   assert.equal((await post(env,null)).status,400);
   await post(env,record({char:'<b>x</b>',score:1e9,timeSec:12.6}));
-  const stored=env.SCORES.read();assert.equal(stored.length,2);assert.equal(stored[0].char,'bx/b');assert.equal(stored[0].score,20000);assert.equal(stored[0].timeSec,13);
+  // v1.61.1: a score above what the game can award in 13 s (6000 − 15 s plus stars) is clamped to that ceiling.
+  const stored=env.SCORES.read();assert.equal(stored.length,2);assert.equal(stored[0].char,'bx/b');assert.equal(stored[0].score,Math.max(100,6000-13*15)+3000);assert.equal(stored[0].timeSec,13);
 });
 
 test('each level keeps its own top list, so fast levels cannot evict slower ones',async()=>{

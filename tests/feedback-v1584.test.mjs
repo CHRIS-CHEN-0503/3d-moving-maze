@@ -86,6 +86,6 @@ test('the runtime pulses a prompt after a stronger pickup or chest, opens a comp
   assert.match(runtime,/act\('立刻換上','hero-upgrade-equip',u\.actorId\+'\|'\+u\.gearId\)\+act\('暫不更換','hero-upgrade-skip',u\.gearId\)/);
   assert.match(runtime,/\(u\.tradeoff\?'。注意：'\+\(u\.offense<0\?'攻擊':'防禦'\)\+'會下降'\+\(u\.shieldOff\?'，雙手武器會卸下盾牌（放回行囊）':''\):''\)/,'a trade-off names what drops');assert.match(runtime,/rises=\(u\.offense>1e-6\?'攻擊↑':''\)\+\(u\.armor>1e-6\?'防禦↑':''\)/,'the prompt says what rises');
   assert.match(runtime,/if\(key==='hero-upgrade-equip'\)\{[^\n]*commit\(H\.equip\(r\(\),who,item,r\(\)\.revision\)\)/,'one tap uses the normal equip transaction');
-  assert.match(runtime,/function hud\(force=false\)\{if\(force\)upgradeAlert\(\);/,'a stale prompt clears after any change');assert.match(runtime,/function reset\(\)\{upgrades=\[\];upgradeAlert\(\);/);
+  assert.match(runtime,/function hud\(force=false\)\{if\(force\)upgradeAlert\(\);/,'a stale prompt clears after any change');assert.match(runtime,/function reset\(options\)\{if\(!options\?\.keepUpgrades\)\{upgrades=\[\];upgradeAlert\(\);\}/,'v1.61.1: a maze shift keeps the prompt, every other reset clears it');
   assert.match(css,/#heroUpgradeAlert\{[^}]*animation:hero-upgrade-pulse/);assert.match(css,/prefers-reduced-motion:reduce\)\{#heroUpgradeAlert\{animation:none/);assert.match(css,/#heroUpgradeAlert\{[^}]*min-height:44px/);
 });

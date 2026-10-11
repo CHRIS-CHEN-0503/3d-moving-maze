@@ -195,7 +195,9 @@
     $('roomCountdown').hidden=true;$('mpReady').disabled=false;window.ShopChaos?.stop();baseLeave();
   };
   const connect=mpConnect;
-  mpConnect=async function(cb){await connect(cb);ensureTimer();};
+  // v1.61.1 · forward every argument: the retry counter must survive this wrapper, or a broker
+  // outage reconnects every second forever instead of backing off and stopping.
+  mpConnect=async function(...args){await connect(...args);ensureTimer();};
   window.addEventListener('visibilitychange',()=>{if(!document.hidden)tick();});
   window.RoomLifecycle={tick,sendLocal,hostSeenAt:()=>lastHost};
 })();

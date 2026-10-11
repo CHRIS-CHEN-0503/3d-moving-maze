@@ -704,8 +704,9 @@
       const bar=new T.Mesh(new T.BoxGeometry(.2,.018,.018),wood);bar.position.y=.46;bar.name='prayer-wand-crossbar';wand.add(bar);
       for(let i=0;i<6;i++){const strip=new T.Mesh(new T.BoxGeometry(.045,.085,.004),paper);strip.position.set(-.08+(i%2)*.16,.42-Math.floor(i/2)*.075,(i%2?-1:1)*.012);strip.rotation.z=(i%2?-1:1)*.3;strip.name='prayer-wand-shide';wand.add(strip);}
       wand.position.set(0,-.02,.05);wand.rotation.set(-.35,0,0);wand.visible=false;hand.add(wand);model.userData.prayerWand=wand;}
-    model.userData.prayerUntil=(root.performance?.now?.()??Date.now())+Math.max(.2,seconds)*1000;return wand;}
-  function pose(model,remaining,interval,fp=false,dt=0){const right=model.userData.armR,left=model.userData.armL,praying=model.userData.prayerUntil>(root.performance?.now?.()??Date.now()),kind=praying?'prayer_wand':model.userData.heroWeapon;if(!right||!left)return;if(model.userData.prayerWand)model.userData.prayerWand.visible=praying;
+    // Game seconds, not wall-clock: a dialog or cutscene mid-prayer pauses the wand with the gesture.
+    model.userData.prayerLeft=Math.max(.2,seconds);return wand;}
+  function pose(model,remaining,interval,fp=false,dt=0){const right=model.userData.armR,left=model.userData.armL,praying=(model.userData.prayerLeft=Math.max(0,(model.userData.prayerLeft||0)-Math.max(0,Number(dt)||0)))>0,kind=praying?'prayer_wand':model.userData.heroWeapon;if(!right||!left)return;if(model.userData.prayerWand)model.userData.prayerWand.visible=praying;
     if(root.TowerCombatMotion){
       const p=root.TowerCombatMotion.update(model,dt),T=root.THREE,q=model.userData.heroWrist||(model.userData.heroWrist=new T.Quaternion()),e=model.userData.heroWristEuler||(model.userData.heroWristEuler=new T.Euler()),offset=model.userData.heroWristOffset||(model.userData.heroWristOffset=new T.Vector3());
       right.rotation.set(p.rx,p.ry,p.rz);left.rotation.set(p.lx,p.ly,p.lz);

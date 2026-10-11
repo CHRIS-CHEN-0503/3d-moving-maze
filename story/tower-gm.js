@@ -113,7 +113,7 @@
   /* ---------------- 面板（僅瀏覽器、僅 #逃生梯） ---------------- */
   const OPTIONS='maze3d_tower_gm_options';
   const esc=value=>String(value).replace(/[&<>"']/g,ch=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'})[ch]);
-  const JOB_ORDER=['swordsman','mage','scout','chef','healer','smith','archer','robot'];
+  const JOB_ORDER=['swordsman','mage','scout','chef','healer','smith','archer','robot','cleric'];
   let panel=null;
   function remembered(){try{return JSON.parse(root.localStorage.getItem(OPTIONS)||'null')||{};}catch(_){return {};}}
   function css(){

@@ -570,7 +570,7 @@
     for(const e of Object.values(s.enemy))for(const key of ['slow','root','blind','mark','tauntLeft','relay','relayCooldown','relayWeak'])if(e[key])e[key]=Math.max(0,e[key]-dt);F()?.tick(run,dt);pruneTaunts(run);sync(run);
   }
   function advance(run,{reward=true}={}){if(!enabled(run))return;state(run).enemy={};if(F()?.state(run))F().state(run).enemies={};state(run).removedTraps=[];for(const a of Object.values(state(run).actors)){a.shot=null;a.pending=null;if(a.robot){a.robot.stationary=0;a.robot.calibrationReady=false;a.robot.energyLeft=0;}}G.state(run).route=null;G.state(run).nearby={};if(reward)gainXp(run,C().isUnderworld(run)?360:8);}
-  const BUFFS=['guard','barrier','ward','rally','speed','polish','fortify','stealth','smoke','stomach','regen','daylight','slow','intercept','path_eye','oath_power','fortress','sanctuary','escape','haste','robot_guard','robot_speed','meal_burn','meal_poison','meal_shock','arcane','courage'];
+  const BUFFS=['guard','barrier','ward','rally','speed','polish','fortify','stealth','smoke','stomach','regen','daylight','slow','intercept','path_eye','oath_power','fortress','sanctuary','escape','haste','robot_guard','robot_speed','meal_burn','meal_poison','meal_shock','meal_slow','meal_curse','meal_root','arcane','courage'];
   function validTalents(a,profession,actorLevel,progress,id,floor){
     if(!a||!Array.isArray(a.skills)||a.skills.length<3||a.skills.length>(id==='hero'?8:7)||new Set(a.skills).size!==a.skills.length||!a.skills.every(s=>own(SKILLS,s)&&SKILLS[s].job===profession)||!a.skills.some(s=>SKILLS[s].attack)||profession!=='mage'&&!a.skills.some(s=>!SKILLS[s].attack))return false;
     if(profession==='healer'&&!a.skills.some(s=>['herbal_heal','revive'].includes(s)))return false;

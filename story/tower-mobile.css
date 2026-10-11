@@ -113,3 +113,37 @@
 /* Settings: 離開遊戲 sits immediately left of 繼續遊戲, both at the right end of the row. */
 #towerDialog>.tower-actions .tower-btn.is-leave{margin-left:auto}
 #towerDialog>.tower-actions .tower-btn.is-leave+.tower-btn.is-exit{margin-left:0}
+
+/* v1.61.1 · Phone item views: supplies, meals and worn gear become short rows instead of tall cards,
+   so several items fit on one screen; the "何時使用？" guide stays folded under its row. */
+@media(max-width:1000px),(max-height:600px){
+  #towerDialog .tower-grid>.supply-card{display:grid;grid-template-columns:34px minmax(0,1fr) auto;grid-template-areas:"icon title button" "icon text button" "guide guide guide";align-items:center;gap:1px 9px;padding:7px 9px;border-radius:10px}
+  #towerDialog .tower-grid>.supply-card>.hero-icon{grid-area:icon;width:34px;height:34px;align-self:center}
+  #towerDialog .tower-grid>.supply-card>h3{grid-area:title;font-size:15px;line-height:1.3;margin:0}
+  #towerDialog .tower-grid>.supply-card>p{grid-area:text;font-size:13px;line-height:1.4;margin:0;color:#b9cddc;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+  #towerDialog .tower-grid>.supply-card>button{grid-area:button;width:auto;min-width:60px;min-height:38px;padding:6px 10px;font-size:14px;white-space:nowrap;align-self:center}
+  #towerDialog .tower-grid>.supply-card>.supply-guide{grid-area:guide;margin:0}
+  #towerDialog .tower-grid>.supply-card>.supply-guide>summary{min-height:26px;font-size:13px;padding:2px 0}
+  #towerDialog .tower-grid>.supply-card>.supply-guide p{font-size:13px;line-height:1.45;margin:2px 0}
+  #towerDialog .tower-grid>.supply-card>.supply-guide small{font-size:12px}
+  #towerDialog .tower-grid>.supply-light.is-compact{flex-direction:row;align-items:center;gap:8px;padding:7px 9px!important}
+  #towerDialog .tower-grid>.supply-light.is-compact h3{font-size:15px}
+  #towerDialog .tower-grid>.supply-light.is-compact p{font-size:12px;margin:2px 0 0}
+  #towerDialog .tower-grid>.supply-light.is-compact button{width:auto;min-height:38px;padding:6px 10px;font-size:14px;white-space:nowrap}
+  #towerDialog .tower-grid>.party-recipe,#towerDialog .tower-grid>.party-prepared-meal{padding:7px 9px;gap:4px}
+  #towerDialog .party-recipe .grocery-heading,#towerDialog .party-prepared-meal .grocery-heading{gap:8px;margin:0}
+  #towerDialog .party-recipe .grocery-heading svg,#towerDialog .party-prepared-meal .grocery-heading svg{width:38px;height:30px;flex-basis:38px}
+  #towerDialog .party-recipe h3,#towerDialog .party-prepared-meal h3{font-size:15px}
+  #towerDialog .party-recipe .grocery-heading small,#towerDialog .party-prepared-meal .grocery-heading small{font-size:12px}
+  #towerDialog .party-recipe p,#towerDialog .party-prepared-meal p{font-size:13px;line-height:1.4;margin:0}
+  #towerDialog .party-recipe .party-cost{font-size:12px;padding:3px 5px}#towerDialog .party-recipe .party-cost svg{width:22px;height:20px}
+  #towerDialog .party-recipe .trade-card-actions button,#towerDialog .party-prepared-meal .trade-card-actions button{min-height:36px;padding:5px 8px;font-size:14px}
+  #towerDialog .hero-equipped{display:grid;grid-template-columns:40px minmax(0,1fr);grid-auto-flow:dense;align-items:center;gap:2px 9px;padding:7px 9px}
+  #towerDialog .hero-equipped>*{grid-column:2;min-width:0}
+  #towerDialog .hero-equipped>small:first-child{grid-column:1/-1;font-size:12px;color:#b6c9d6}
+  #towerDialog .hero-equipped>.hero-icon{grid-column:1;grid-row:span 2;width:40px;height:40px;align-self:center}
+  #towerDialog .hero-equipped>b{font-size:15px;line-height:1.3}
+  #towerDialog .hero-equipped>p,#towerDialog .hero-equipped>small{font-size:13px;line-height:1.4;margin:0}
+  #towerDialog .hero-equipped>button{justify-self:start;width:auto;min-height:36px;padding:5px 10px;font-size:14px}
+  #towerDialog .hero-bag-item .hero-icon{width:36px;height:38px}#towerDialog .hero-bag-item small{font-size:13px;line-height:1.4}#towerDialog .hero-bag-item button{min-height:36px;padding:5px 10px;font-size:14px}
+}

@@ -11,7 +11,7 @@
     // Locking the combo: when the tap lands a moment after the line broke, the AI members
     // walk back into formation and the combo starts by itself within eight seconds.
     function beginGather(id){if(gather||!ctx.assemble)return false;const hint=C.hints(r(),space()).find(h=>h.definition.id===id);if(!hint||ctx.assemble(hint.members,hint.definition)===false)return false;gather={id,left:8,members:hint.members,active:H.state(r()).active};ctx.toast('隊友正在就位，陣形成立後自動發動 '+ctx.text(hint.definition.name)+'。',2400,false);last='';hud();return true;}
-    function stopGather(notify=false){if(!gather)return;gather=null;last='';if(notify)ctx.toast('時限內沒有排好陣形，合作未發動。',1800,false);}
+    function stopGather(notify=false){if(!gather)return;const members=gather.members;gather=null;last='';ctx.release?.(members);if(notify)ctx.toast('時限內沒有排好陣形，合作未發動。',1800,false);}
     function start(id){if(channel||!ctx.ready()||ctx.beforeAction?.()===false)return false;const plan=C.evaluate(r(),id,space());if(!plan.ok){if(beginGather(id))return false;ctx.toast(plan.message,1500,false);hud();return false;}stopGather();ctx.cancelTarget();const d=plan.definition;
       channel={id,left:d.preparation,active:H.state(r()).active,floor:r().floor,expedition:r().expedition.active?.id||'',plan,presentations:[]};
       d.participants.forEach((part,i)=>{const who=plan.members[i],at=ctx.pos(who),skill=H.SKILLS[part.skill];ctx.motion(who,'charge',d.preparation,skill);channel.presentations.push({id:who,glow:ctx.glow(part.skill,at,{stage:'charge',duration:d.preparation}),stop:ctx.sound(skill,who,'charge',d.preparation)});});last='';hud();return true;

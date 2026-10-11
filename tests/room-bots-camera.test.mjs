@@ -25,9 +25,10 @@ for(const mode of ['race','tag','treasure','shop','ctf'])test(mode+'：補位開
   h.c.MP.fillBots=false;assert.equal(h.c.mpLobbyPlan().ready,true);
 });
 test('房主補位設定同步到訪客，訪客只讀且看不到開始鍵；下一輪不重複加電腦',()=>{
-  const h=peer(),guest=peer(false);h.c.MP.fillBots=true;h.c.mpBroadcastLobby();guest.c.mpHandle(h.sent.at(-1));
+  // v1.61.1: a guest only follows a lobby that lists it, as the real host does after the guest's hello.
+  const h=peer(),guest=peer(false);h.c.MP.roster.push({id:'guest',charIdx:1,name:'客人',ready:true});h.c.MP.fillBots=true;h.c.mpBroadcastLobby();guest.c.mpHandle(h.sent.at(-1));
   assert.equal(guest.c.MP.fillBots,true);assert.equal(guest.nodes.get('mpBotOptions').hidden,true);assert.equal(guest.nodes.get('mpStart').style.display,'none');
-  assert.match(guest.nodes.get('mpBotSummary').textContent,/加入 4 位電腦/);
+  assert.match(guest.nodes.get('mpBotSummary').textContent,/2 位真人，開始時加入 3 位電腦/);
   h.c.MP.roster=h.c.mpRoundPlayers();assert.equal(h.c.mpRoundPlayers().length,5);
   h.c.sendMpRoundStart(h.c.mpRoundPlayers(),2);assert.equal(h.sent.at(-1).fillBots,true);assert.equal(h.sent.at(-1).seriesRound,2);
   h.c.MP.fillBots=false;h.c.mpBroadcastLobby();guest.c.mpHandle(h.sent.at(-1));assert.equal(guest.c.MP.fillBots,false);

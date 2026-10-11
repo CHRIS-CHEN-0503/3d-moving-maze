@@ -79,7 +79,9 @@
     return Object.fromEntries(Object.keys(INGREDIENTS).map(k=>[k,value[k]??0]));
   }
   // Chef-made portions (特製) are tracked per dish; older saves simply have none.
-  function specialStock(value,meals){if(value===undefined)return emptyStock(RECIPES);if(!value||typeof value!=='object'||Array.isArray(value)||Object.keys(value).some(id=>!own(RECIPES,id))||Object.entries(value).some(([id,v])=>!num(v,0,99,true)||v>meals[id]))return null;return Object.fromEntries(Object.keys(RECIPES).map(id=>[id,value[id]??0]));}
+  // v1.61.1 · specials are clamped to the meals they belong to instead of rejecting the save: a v1.61.0
+  // recruitment that paid with a special meal left more specials than meals behind.
+  function specialStock(value,meals){if(value===undefined)return emptyStock(RECIPES);if(!value||typeof value!=='object'||Array.isArray(value)||Object.keys(value).some(id=>!own(RECIPES,id))||Object.values(value).some(v=>!num(v,0,99,true)))return null;return Object.fromEntries(Object.keys(RECIPES).map(id=>[id,Math.min(value[id]??0,meals[id]??0)]));}
   const SPECIAL_BONUS_PER_LEVEL=10,SPECIAL_BONUS_CAP=50,SPECIAL_BONUS_MIN=10;
   const chefLevel=run=>!run?.party?0:run.party.loadouts?Math.max(0,...H().ids(run).filter(id=>H().job(run,id)==='chef'&&H().hp(run,id)>0).map(id=>H().level(run,id))):run.party.profession==='chef'&&run.hp>0?3:Math.max(0,...run.party.members.filter(m=>m.profession==='chef'&&m.hp>0).map(m=>m.level));
   // A chef-made portion is always at least a little better; a travelling chef raises it with her level.
@@ -203,6 +205,8 @@
     if(picks.length<2||picks.length>4||picks.reduce((s,[,v])=>s+v,0)>8)return {ok:false,message:'請選 2～4 種食材，總量最多 8 份。'};
     if(picks.some(([k,v])=>(p.ingredients[k]||0)<v))return {ok:false,message:'食材不夠，先去採集或向商人補貨。'};
     const cost=Object.fromEntries(picks),hit=Lab().match(cost);p.discoveries=p.discoveries||[];p.specials=p.specials||emptyStock(RECIPES);
+    // v1.61.1 · a full meal box refuses before any ingredient is spent, the same way cook() does.
+    if(hit&&p.discoveries.includes(hit.id)&&p.meals[hit.id]>=99)return {ok:false,message:'料理盒裡的「'+hit.name+'」已滿，先享用一些再研發。'};
     for(const [k,v] of picks)p.ingredients[k]-=v;
     if(hit){const fresh=!p.discoveries.includes(hit.id);if(fresh)p.discoveries.push(hit.id);const amount=Math.min(portions(n,p),99-p.meals[hit.id]);p.meals[hit.id]+=amount;p.specials[hit.id]=Math.min(p.meals[hit.id],(p.specials[hit.id]||0)+amount);return {ok:true,message:fresh?'研發成功！新食譜「'+hit.name+'」已記入食譜，做好 '+amount+' 份。':'做出已知的「'+hit.name+'」'+amount+' 份。',effect:{discovered:fresh?hit.id:null,recipe:hit.id,amount}};}
     const closest=Lab().hint(cost,p.discoveries),medley=hash(n.seed,'research:'+n.revision)%2===0;
@@ -213,7 +217,9 @@
     if(p.loadouts&&H().job(n)==='robot')return {ok:false,message:'機器人不能享用料理，請使用動力核心或零件回補修復。'};
     if(!recipeUnlocked(n,id)||!p.meals[id])return {ok:false,message:'料理盒裡沒有可享用的這道料理。'};const r=RECIPES[id];
     const special=(p.specials?.[id]||0)>0,bonus=special?specialBonus(n):0,q=1+bonus/100,hpGain=Math.round(r.hp*q),teamGain=Math.round((r.team||0)*q);if(p.loadouts)H().heal(n,p.loadouts.active,hpGain);else n.hp=Math.min(C().MAX_HP,n.hp+hpGain);n.hunger=Math.min(100,n.hunger+r.hunger*q*(p.loadouts?1+H().teamPassive(n,'gourmet')/100:1));if(r.team){if(p.loadouts)H().ids(n).filter(k=>k!==p.loadouts.active&&H().hp(n,k)>0).forEach(k=>H().heal(n,k,teamGain));else p.members.forEach(m=>m.hp=Math.min(memberMax(m),m.hp+teamGain));}if(p.loadouts){H().food(n);G().recipe(n,id);}
-    if(r.buff){p.buffs=p.buffs.filter(b=>b.id!==r.buff);p.buffs.push({id:r.buff,floors:3});if(p.buffs.length>2)p.buffs.shift();}
+    if(r.buff){p.buffs=p.buffs.filter(b=>b.id!==r.buff);p.buffs.push({id:r.buff,floors:3});if(p.buffs.length>2)p.buffs.shift();
+      // v1.61.1 · when a third meal pushes 強身 out, nobody may keep more HP than the lower cap allows.
+      if(!p.buffs.some(b=>b.id==='vigor')){if(p.loadouts){for(const k of H().ids(n))if(H().hp(n,k)>H().maxHp(n,k))H().setHp(n,k,H().maxHp(n,k));}else p.members.forEach(m=>{m.hp=Math.min(m.hp,memberMax(m));});}}
     if(r.ward&&p.loadouts)H().setBuff(n,p.loadouts.active,'meal_'+r.ward,300,1);
     p.meals[id]--;if(special)p.specials[id]--;return {ok:true,message:`享用${r.name}${special?'（廚師特製 +'+bonus+'%）':''}。`,effect:{special,bonus}};
   });}

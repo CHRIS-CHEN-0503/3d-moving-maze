@@ -623,7 +623,7 @@ button:focus-visible,input:focus-visible{outline:3px solid #fff;outline-offset:3
 <link rel="stylesheet" href="story/tower-cinematics.css?v=1.58.0">
 <link rel="stylesheet" href="story/tower-cooperation.css?v=1.47.0">
 <link rel="stylesheet" href="story/tower-heroes.css?v=1.59.0">
-<link rel="stylesheet" href="story/tower-mobile.css?v=1.58.7">
+<link rel="stylesheet" href="story/tower-mobile.css?v=1.61.1">
 <link rel="stylesheet" href="story/tower-growth.css?v=1.42.0">
 <link rel="stylesheet" href="assets/battle-dock.css?v=1.43.3">
 <link rel="stylesheet" href="assets/adventure-polish.css?v=1.46.0">
@@ -1011,14 +1011,17 @@ button:focus-visible,input:focus-visible{outline:3px solid #fff;outline-offset:3
    3D移動迷宮 — 給小朋友的變形迷宮冒險
    ===================================================== */
 const $=id=>document.getElementById(id);
-const GAME_VERSION='1.61.0';
+const GAME_VERSION='1.61.1';
 
 /* ---------- 設定（後台可調） ---------- */
 const DEFAULT_CFG={teamSize:2,shiftMin:3,itemCount:6,foodCount:4,hungerMin:3,stunSec:3,pingSec:3,smellCells:3,mazeSize:13,magicMap:0,duelMin:5,unpaidRate:100,musicOn:1,speechOn:1,speechVoice:'',apiUrl:'',roomMax:3,rounds:3,goodsCount:16,shopCollect:1,shopMin:2.5,cartFull:400,views:{fp:1,tp:1,top:1},broker:'wss://broker.emqx.io:8084/mqtt'};
 let CFG={...DEFAULT_CFG};
 try{const s=JSON.parse(localStorage.getItem('maze3d_cfg')||'{}');CFG={...DEFAULT_CFG,...GameRules.normalize(s),musicOn:s.musicOn===0?0:1,speechOn:s.speechOn===0?0:1,speechVoice:typeof s.speechVoice==='string'?s.speechVoice.slice(0,300):'',rounds:Math.max(1,Math.min(10,Number(s.rounds)||3))};}catch(e){}
 window.GameVoice?.configure({enabled:!!CFG.speechOn,voice:CFG.speechVoice});
-function saveCfg(){const {broker,apiUrl,...preferences}=CFG;localStorage.setItem('maze3d_cfg',JSON.stringify(preferences));}
+// Browsers that block site data throw on every localStorage call; the game must still start and play.
+function storageGet(key){try{return localStorage.getItem(key);}catch(_){return null;}}
+function storageSet(key,value){try{localStorage.setItem(key,value);}catch(_){}}
+function saveCfg(){const {broker,apiUrl,...preferences}=CFG;storageSet('maze3d_cfg',JSON.stringify(preferences));}
 function cameraDistance(value){const n=Number(value);return value!=null&&value!==''&&Number.isFinite(n)?Math.max(3,Math.min(7,n)):5.8;}
 try{CFG.cameraDistance=cameraDistance(JSON.parse(localStorage.getItem('maze3d_cfg')||'{}').cameraDistance);}catch(_){CFG.cameraDistance=5.8;}
 function zoomCamera(delta){
@@ -1357,7 +1360,7 @@ const AudioEng={
  stopMusic(){ this.shiftSound?.stop(); this.combatSound?.stop(); this.playing=false; this.musicRequest=(this.musicRequest||0)+1; if(this.seqTimer){clearInterval(this.seqTimer);this.seqTimer=null;} if(window.ClassicAudio)ClassicAudio.stop(); },
  /* --- 道具「使用中」的循環音樂 --- */
  startItemLoop(){
-   if(this.itemLoopTimer) return;
+   if(this.itemLoopTimer||G.muted) return;
    let i=0; const notes=[523.3,659.3,784,1046.5,784,659.3];
    this.itemLoopTimer=setInterval(()=>{
      this.tone(notes[i%6],0.12,'triangle',this.itemGain,0.3); i++;
@@ -2284,7 +2287,8 @@ function updateSatietyBar(){
   const width=(Math.round(v*5)/5)+'%',color=v<=25?'#ef5350':(v<=50?'#ffa726':energy?'#8de0ff':'#8bc34a'),caption=(energy?'能源 ':'')+Math.ceil(v)+'%'+(!energy&&v<=50?' 🐢':'');
   if(updateSatietyBar.width!==width){$('satietyFill').style.width=width;updateSatietyBar.width=width;}
   if(updateSatietyBar.color!==color){$('satietyFill').style.background=color;updateSatietyBar.color=color;}
-  if($('satietyPct').textContent!==caption)$('satietyPct').textContent=caption;
+  // Compare with what we last wrote: the phone text filter strips the emoji from the node, so the DOM never matches.
+  if(updateSatietyBar.caption!==caption){$('satietyPct').textContent=caption;updateSatietyBar.caption=caption;}
   const foodIcon=$('satietyPct').parentElement.querySelector('.inline-ui-icon');
   if(foodIcon&&foodIcon.dataset.energy!==String(!!energy)){foodIcon.dataset.energy=String(!!energy);foodIcon.classList.toggle('icon-food',!energy);foodIcon.innerHTML=energy?(window.TowerHeroIcons?.svg('power_glimmer')||''):'';}
   const label=(energy?'機器人能源':'飽足感')+' '+Math.ceil(v)+'%';if(updateSatietyBar.label!==label){$('satietyWrap').setAttribute('aria-label',label);updateSatietyBar.label=label;}
@@ -2317,14 +2321,15 @@ function addEffect(id,label,dur){
   AudioEng.startItemLoop(); renderChips();
 }
 function renderChips(){
-  const wrap=$('effectChips'); wrap.innerHTML='';
-  const now=performance.now();
+  const now=performance.now(),labels=[];
   for(const k in G.effects){
     const e=G.effects[k], left=Math.ceil((e.until-now)/1000);
     if(left<=0){delete G.effects[k];continue;}
-    const d=document.createElement('div'); d.className='chip'; d.textContent=`${e.label} ${left}s`;
-    wrap.appendChild(d);
+    labels.push(`${e.label} ${left}s`);
   }
+  // The chips are rebuilt only when their text changes, not on every half-second poll.
+  const signature=labels.join('|');
+  if(renderChips.signature!==signature){renderChips.signature=signature;const wrap=$('effectChips');wrap.innerHTML='';for(const text of labels){const d=document.createElement('div');d.className='chip';d.textContent=text;wrap.appendChild(d);}}
   if(!Object.keys(G.effects).length) AudioEng.stopItemLoop();
 }
 function applyItem(it){
@@ -3490,7 +3495,7 @@ function updateSmell(now){
   // HUD：方向箭頭 + 距離幾格
   const hud=$('smellHud'); if(hud.style.display!=='block')hud.style.display='block';
   const dist=Math.sqrt(bd), cells=Math.max(1,Math.round(dist/G.cell)),smell='👃 聞到味道！約 '+cells+' 格';
-  if($('smellTxt').textContent!==smell)$('smellTxt').textContent=smell;
+  if(updateSmell.last!==smell){$('smellTxt').textContent=smell;updateSmell.last=smell;}
   const worldAng=Math.atan2(bpos.x-G.px,bpos.z-G.pz);
   const camF=(G.view==='top')?Math.PI:G.camYaw+Math.PI;
   const turn='rotate('+(-(worldAng-camF)*180/Math.PI).toFixed(1)+'deg)';if(updateSmell.turn!==turn){$('smellArrow').style.transform=turn;updateSmell.turn=turn;}
@@ -3674,7 +3679,7 @@ function winGame(){
   recordSeriesRound([{id:'solo',name:getPlayerName(),charIdx:G.charIdx,win:true,points:score}]);
   renderSingleSeriesResult(true);
   const rec={name:getPlayerName(),char:CHARS[G.charIdx].emoji,level:LEVELS[G.lvlIdx].id,
-    timeSec:Math.round(timeSec),score,date:new Date().toISOString().slice(0,10)};
+    timeSec:Math.max(1,Math.round(timeSec)),score,date:new Date().toISOString().slice(0,10)};
   // Clear the previous round's rank now; a slow or late reply from an older
   // round must not overwrite this one.
   const rankToken=winGame.rankToken=(winGame.rankToken||0)+1,levelName=LEVELS[G.lvlIdx].name;
@@ -3712,7 +3717,7 @@ async function saveRecord(rec){
   await runtimeConfigReady;
   const local=loadLocalRecords(); local.push(rec);
   local.sort((a,b)=>a.timeSec-b.timeSec);
-  localStorage.setItem('maze3d_lb',JSON.stringify(local.slice(0,200)));
+  storageSet('maze3d_lb',JSON.stringify(local.slice(0,200)));
   try{
     await fetch(scoreApiUrl(),{method:'POST',headers:{'Content-Type':'text/plain'},body:JSON.stringify(rec),signal:timeoutSignal(8000)});
   }catch(e){/* 沒有雲端 API 或離線也沒關係，本機有存 */}
@@ -3800,7 +3805,7 @@ function continueToSetup(){
     return;
   }
   $('profileError').textContent='';
-  localStorage.setItem('maze3d_name',name);
+  storageSet('maze3d_name',name);
   if(entryMode==='story'){TowerMode.beginNew();return;}
   $('setupTitle').textContent=entryMode==='multi'?'準備多人遊戲':'準備單人冒險';
   document.querySelector('#spModeRow [data-m="classic"] .mode-copy').textContent=entryMode==='multi'?'比賽搶終點':'經典闖關';
@@ -3841,8 +3846,8 @@ function buildTitleUI(){
   document.querySelectorAll('#spModeRow .view-btn').forEach(b=>{
     b.onclick=()=>{G.spMode=b.dataset.m;document.querySelectorAll('#spModeRow .view-btn').forEach(x=>x.classList.toggle('sel',x===b));};
   });
-  $('playerName').value=localStorage.getItem('maze3d_name')||'';
-  $('playerName').addEventListener('input',()=>localStorage.setItem('maze3d_name',$('playerName').value));
+  $('playerName').value=storageGet('maze3d_name')||'';
+  $('playerName').addEventListener('input',()=>storageSet('maze3d_name',$('playerName').value));
   $('roundCount').value=String(Math.max(1,Math.min(10,CFG.rounds||3)));
 }
 /* 角色 3D 預覽（旋轉展示台） */
@@ -4494,11 +4499,16 @@ function mpHandle(m){
       if(m.to!==MP.id||MP.host||MP.started)break;
       clearInterval(MP.helloTimer); MP.helloTimer=null;
       if(m.reason==='version'){mpVersionMismatch('房主是 v'+String(m.ver||'?').slice(0,16)+'，你的是 v'+GAME_VERSION+'。');break;}
+      // v1.61.1 · leave for real: a connection kept open here would later follow the host's lobby and start packets as an unlisted player.
+      if(MP.net){MP.net.close();MP.net=null;}
+      MP.on=false;MP.roster=[];$('mpJoin').disabled=false;$('mpLobby').style.display='none';$('mpSetup').style.display='block';
       $('mpStatus').textContent='😅 這個房間人數已經滿了';
       break;
     case 'lobby':
       if(MP.host||m.f===MP.id)break;
       if(m.ver!==GAME_VERSION){if(!MP.started)mpVersionMismatch('房主的遊戲版本與你不同。');break;}
+      // A device the host never listed (a late arrival to a full room) must not follow this lobby.
+      if(!Array.isArray(m.players)||!m.players.some(p=>p?.id===MP.id))break;
       MP.roster=safeRoster(m.players,MP.roster); MP.mode=m.mode; MP.maxPlayers=m.max||MP.maxPlayers;
       MP.fillBots=m.fillBots===true;
       MP.plannedRounds=Math.max(1,Math.min(10,parseInt(m.rounds)||1));
@@ -4511,6 +4521,8 @@ function mpHandle(m){
       break;
     case 'start':
       if(MP.started)break;
+      // Guests join a round only when the host's order names them; an unlisted device would become an invisible player.
+      if(!MP.host&&!(Array.isArray(m.order)&&m.order.includes(MP.id)))break;
       {
         const kind=m.seriesKind||(MP.net?'multi':'single');
         const total=Math.max(1,Math.min(10,parseInt(m.seriesTotal)||1));
@@ -4574,7 +4586,8 @@ function mpHandle(m){
     case 'pos':{
       if(m.f===MP.id)break;
       const p=MP.players[m.f];
-      if(p){p.tx=m.x;p.tz=m.z;p.th=m.h;p.lastSeen=now;if(p.mesh)p.mesh.visible=true;}
+      // Broker data is unverified: a non-finite or out-of-maze pose is dropped (the same bounds as bot poses).
+      if(p&&[m.x,m.z,m.h].every(Number.isFinite)&&Math.abs(m.x)<=G.mazeW*G.cell/2&&Math.abs(m.z)<=G.mazeH*G.cell/2){p.tx=m.x;p.tz=m.z;p.th=m.h;p.lastSeen=now;if(p.mesh)p.mesh.visible=true;}
       // 只有房主能替電腦報位置（與 ctfpos 相同的檢查）。
       if(Array.isArray(m.bots)&&m.bots.length<=10&&m.f===MP.order[0])for(const pose of m.bots){
         const r=MP.roster.find(r=>r.id===pose?.id),q=MP.players[pose?.id];
@@ -4603,7 +4616,7 @@ function mpHandle(m){
       MP.round=m.round; setSeed(m.seed); doShift();
       break;
     case 'reach':
-      if(!MP.started||MP.mode!=='race'||MP.ended)break;
+      if(!MP.started||MP.mode!=='race'||MP.ended||!MP.roster.some(r=>r.id===m.f))break;
       if(!MP.finishers.find(x=>x.id===m.f)){
         MP.finishers.push({id:m.f,tm:m.tm});
         showToast('🏁 '+mpName(m.f)+' 抵達終點！');
@@ -4612,7 +4625,7 @@ function mpHandle(m){
       }
       break;
     case 'out':
-      if(MP.outs[m.f])break;
+      if(MP.outs[m.f]||!MP.roster.some(r=>r.id===m.f))break;
       MP.outs[m.f]=1;
       if(m.f!==MP.id)showToast('😵 '+mpName(m.f)+' 餓昏了');
       if(MP.mode==='race'&&MP.started&&!MP.ended&&
@@ -4704,8 +4717,9 @@ function mpHandle(m){
       }
       break;}
     case 'prank':
-      if(!MP.started||MP.ended)break;
-      applyPrank(m.list||[],m.f);
+      if(!MP.started||MP.ended||!MP.roster.some(r=>r.id===m.f))break;
+      // Only finite spots inside the maze may move anyone.
+      applyPrank((Array.isArray(m.list)?m.list:[]).filter(e=>e&&Number.isFinite(e.x)&&Number.isFinite(e.z)&&Math.abs(e.x)<=G.mazeW*G.cell/2&&Math.abs(e.z)<=G.mazeH*G.cell/2).slice(0,16),m.f);
       break;
     case 'rob':{
       if(!MP.started||MP.mode!=='shop'||MP.ended)break;
@@ -4782,7 +4796,7 @@ function mpHandle(m){
       if(m.f!==MP.id)showToast('📣 '+mpName(m.f)+' 撿到集合口哨了！小心被叫過去',2600);
       break;
     case 'gather':
-      if(!MP.started||MP.ended)break;
+      if(!MP.started||MP.ended||!MP.roster.some(r=>r.id===m.f)||!Number.isFinite(m.x)||!Number.isFinite(m.z)||Math.abs(m.x)>G.mazeW*G.cell/2||Math.abs(m.z)>G.mazeH*G.cell/2)break;
       MP.whistleHolder=null; // 用掉了，下次變形才會再出現
       applyGather(m.x,m.z,m.f);
       break;
@@ -4876,7 +4890,7 @@ function mpAfterStart(){
 }
 
 /* ---- 每一幀：移動其他玩家、鬼抓人判定、比賽收尾 ---- */
-function setHudClock(text){const clock=$('hudTime');if(clock.textContent!==text)clock.textContent=text;}
+function setHudClock(text){if(setHudClock.last===text)return;setHudClock.last=text;$('hudTime').textContent=text;}
 function mpFrame(dt){
   const now=performance.now();
   if(MP.host&&MP.started&&!MP.ended&&MP.mode==='treasure'&&MP.treasure?.holder&&MP.treasure.holder!==MP.id){const holder=MP.treasure.holder,p=MP.players[holder];if(p&&!p.bot&&now-p.lastSeen>12000)dropTreasure(holder);}
@@ -4888,8 +4902,8 @@ function mpFrame(dt){
     const k=Math.min(1,dt*9);
     const dx=p.tx-p.mesh.position.x, dz=p.tz-p.mesh.position.z;
     p.mesh.position.x+=dx*k; p.mesh.position.z+=dz*k;
-    let dh=p.th-p.mesh.rotation.y;
-    while(dh>Math.PI)dh-=Math.PI*2; while(dh<-Math.PI)dh+=Math.PI*2;
+    // Wrapped in one step: a huge heading from a bad packet must never spin a while loop for the whole frame.
+    const dh=Math.atan2(Math.sin(p.th-p.mesh.rotation.y),Math.cos(p.th-p.mesh.rotation.y));
     p.mesh.rotation.y+=dh*k;
     const moving=Math.hypot(dx,dz)>0.06&&now>(p.stunnedUntil||0), u=p.mesh.userData;
     if(window.CharacterMotion)CharacterMotion.update(p.mesh,dt,now/1000,moving?1:0);
@@ -5309,7 +5323,8 @@ function mpLeave(){
   clearInterval(MP.posTimer); clearInterval(MP.helloTimer);
   MP.posTimer=MP.helloTimer=null;
   if(MP.net){MP.net.close();MP.net=null;}
-  for(const id in MP.players){const p=MP.players[id];if(p.mesh)scene.remove(p.mesh);}
+  // Remote and computer characters are disposed here: a new round rebuilds them, and the world sweep cannot see them once removed.
+  for(const id in MP.players){const p=MP.players[id];if(p.mesh){scene.remove(p.mesh);disposeSceneObject(p.mesh);}}
   MP.players={}; MP.roster=[]; MP.on=false; MP.started=false; MP.ended=false; MP.endSent=false;
   MP.taggedId=null; MP.finishers=[]; MP.outs={}; MP.meFinished=false; MP.meOut=false; MP.raceEndAt=0;
   MP.treasure=null; MP.bots=null; MP.twinSent=false;
@@ -5425,6 +5440,8 @@ document.addEventListener('visibilitychange',()=>{if(document.hidden){AudioEng.s
     const duration=performance.now()-hiddenAt;G.startTime+=duration;
     for(const key of SOLO_DEADLINES)if(G[key]>hiddenAt)G[key]+=duration;
     Object.values(G.effects).forEach(effect=>{if(effect.until>hiddenAt)effect.until+=duration;});
+    // A shift warning that ran out in the background is re-armed, so the postponed shift still announces itself.
+    if(preWarnTimer){clearInterval(preWarnTimer);preWarnTimer=0;$('preWarn').style.display='none';G.preWarned=false;}
   }
   if(G.running&&Object.keys(G.effects).length)AudioEng.startItemLoop();
 });
@@ -5438,27 +5455,27 @@ window.addEventListener('pagehide',()=>{AudioEng.shiftSound?.stop();AudioEng.com
 <script src="story/tower-robot-core.js?v=1.58.0"></script>
 <script src="story/tower-ascension-catalog.js?v=1.61.0"></script>
 <script src="story/tower-gear-tiers.js?v=1.54.0"></script>
-<script src="story/tower-hero-growth.js?v=1.60.0"></script>
-<script src="story/tower-heroes-core.js?v=1.61.0"></script>
+<script src="story/tower-hero-growth.js?v=1.61.1"></script>
+<script src="story/tower-heroes-core.js?v=1.61.1"></script>
 <script src="story/tower-heroes-icons.js?v=1.60.0"></script>
 <script src="story/tower-combat-motion.js?v=1.60.0"></script>
 <script src="story/tower-menu-voice.js?v=1.42.4"></script>
 <script src="assets/equipment-surfaces.js?v=1.58.0"></script>
-<script src="story/tower-heroes-visuals.js?v=1.60.0"></script>
+<script src="story/tower-heroes-visuals.js?v=1.61.1"></script>
 <script src="story/tower-skill-effects.js?v=1.60.0"></script>
 <script src="story/tower-growth-runtime.js?v=1.61.0"></script>
 <script src="story/tower-team-tactics.js?v=1.57.1"></script>
 <script src="story/tower-combat-intent.js?v=1.43.3"></script>
 <script src="story/tower-equipment-compare.js?v=1.44.0"></script>
-<script src="story/tower-heroes-runtime.js?v=1.61.0"></script>
+<script src="story/tower-heroes-runtime.js?v=1.61.1"></script>
 <script src="story/tower-cooperation-core.js?v=1.61.0"></script>
-<script src="story/tower-cooperation-runtime.js?v=1.61.0"></script>
-<script src="story/story-core.js?v=1.60.0"></script>
+<script src="story/tower-cooperation-runtime.js?v=1.61.1"></script>
+<script src="story/story-core.js?v=1.61.1"></script>
 <script src="story/tower-narrative.js?v=1.45.0"></script>
 <script src="story/tower-side-stories.js?v=1.45.0"></script>
-<script src="story/tower-dungeons.js?v=1.58.7"></script>
+<script src="story/tower-dungeons.js?v=1.61.1"></script>
 <script src="story/tower-hazards.js?v=1.49.0"></script>
-<script src="story/tower-encounters.js?v=1.61.0"></script>
+<script src="story/tower-encounters.js?v=1.61.1"></script>
 <script src="story/tower-characters.js?v=1.61.0"></script>
 <script src="story/tower-audio.js?v=1.58.0"></script>
 <script src="story/tower-materials.js?v=1.61.0"></script>
@@ -5470,14 +5487,14 @@ window.addEventListener('pagehide',()=>{AudioEng.shiftSound?.stop();AudioEng.com
 <script src="story/tower-stairs.js?v=1.57.0"></script>
 <script src="story/tower-monster-sense.js?v=1.44.0"></script>
 <script src="story/tower-recipe-lab.js?v=1.61.0"></script>
-<script src="story/tower-party-core.js?v=1.61.0"></script>
+<script src="story/tower-party-core.js?v=1.61.1"></script>
 <script src="story/tower-alchemy.js?v=1.61.0"></script>
 <script src="story/tower-commission-cooking.js?v=1.54.0"></script>
-<script src="story/tower-recruitment.js?v=1.61.0"></script>
+<script src="story/tower-recruitment.js?v=1.61.1"></script>
 <script src="story/tower-resource-icons.js?v=1.48.0"></script>
 <script src="story/tower-forge-icons.js?v=1.47.0"></script>
 <script src="story/tower-compact-help.js?v=1.54.0"></script>
-<script src="story/tower-party-runtime.js?v=1.61.0"></script>
+<script src="story/tower-party-runtime.js?v=1.61.1"></script>
 <script src="story/tower-lighting-runtime.js?v=1.58.2"></script>
 <script src="story/tower-encounter-alert.js?v=1.42.5"></script>
 <script src="story/tower-combat-readability.js?v=1.58.2"></script>
@@ -5486,7 +5503,7 @@ window.addEventListener('pagehide',()=>{AudioEng.shiftSound?.stop();AudioEng.com
 <script src="story/tower-cinematic-actors.js?v=1.58.0"></script>
 <script src="story/tower-cinematic-look.js?v=1.57.0"></script>
 <script src="story/tower-story-direction.js?v=1.58.0"></script>
-<script src="story/tower-story-theater.js?v=1.60.0"></script>
+<script src="story/tower-story-theater.js?v=1.61.1"></script>
 <script src="story/tower-cinematics.js?v=1.58.0"></script>
 <script src="story/tower-affixes.js?v=1.61.0"></script>
 <script src="story/tower-landmarks.js?v=1.55.0"></script>
@@ -5494,9 +5511,9 @@ window.addEventListener('pagehide',()=>{AudioEng.shiftSound?.stop();AudioEng.com
 <script src="story/tower-story-insights.js?v=1.57.0"></script>
 <script src="story/tower-environment-life.js?v=1.58.0"></script>
 <!-- 逃生梯（GM）：只在網址為 #逃生梯 時建立面板，必須早於劇情模組載入以選用獨立存檔。 -->
-<script src="story/tower-gm.js?v=1.58.2"></script>
-<script src="story/tower-mode.js?v=1.61.0"></script>
-<script src="assets/room-lifecycle.js?v=1.58.0"></script>
+<script src="story/tower-gm.js?v=1.61.1"></script>
+<script src="story/tower-mode.js?v=1.61.1"></script>
+<script src="assets/room-lifecycle.js?v=1.61.1"></script>
 <script src="assets/shop-collection-core.js?v=1.55.0"></script>
 <script src="assets/shop-collection.js?v=1.58.0"></script>
 <script src="assets/shop-chaos.js?v=1.34.0"></script>

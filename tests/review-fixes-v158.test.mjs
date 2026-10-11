@@ -153,15 +153,17 @@ test('a hidden tab pauses a solo classic round and silences item music, while ro
   const block=html.slice(html.indexOf('const SOLO_DEADLINES='),html.indexOf('\n});',html.indexOf('let soloHiddenAt=0;'))+4);
   const run=({mp=false}={})=>{
     let now=10000,listener;const audio={loops:0,stops:0,startItemLoop(){this.loops++;},stopItemLoop(){this.stops++;},shiftSound:null,combatSound:null};
-    const G={running:true,startTime:4000,nextShiftAt:70000,ghostUntil:12000,shovelRechargeAt:0,radarNextAt:9000,effects:{speed:{until:15000,label:'加速'}}};
-    const document={hidden:false,addEventListener:(type,fn)=>{if(type==='visibilitychange')listener=fn;}};
-    vm.runInNewContext(block,{document,G,MP:{on:mp},AudioEng:audio,performance:{now:()=>now},window:{}});
-    document.hidden=true;listener();now+=300000;document.hidden=false;listener();return {G,audio};
+    const G={running:true,startTime:4000,nextShiftAt:70000,ghostUntil:12000,shovelRechargeAt:0,radarNextAt:9000,preWarned:true,effects:{speed:{until:15000,label:'加速'}}};
+    const document={hidden:false,addEventListener:(type,fn)=>{if(type==='visibilitychange')listener=fn;}},ui={preWarn:{style:{display:'block'}}};let cleared=0;
+    vm.runInNewContext(block,{document,G,MP:{on:mp},AudioEng:audio,performance:{now:()=>now},window:{},preWarnTimer:7,clearInterval(){cleared++;},$:id=>ui[id]});
+    document.hidden=true;listener();now+=300000;document.hidden=false;listener();return {G,audio,ui,cleared};
   };
   const solo=run();assert.equal(solo.G.startTime,304000);assert.equal(solo.G.nextShiftAt,370000);assert.equal(solo.G.ghostUntil,312000);assert.equal(solo.G.effects.speed.until,315000);
+  // v1.61.1: a shift warning that ran out in the background is re-armed for the postponed shift.
+  assert.equal(solo.G.preWarned,false);assert.equal(solo.ui.preWarn.style.display,'none');assert.equal(solo.cleared,1);
   assert.equal(solo.G.shovelRechargeAt,0,'unset timers stay unset');assert.equal(solo.G.radarNextAt,9000,'already-expired deadlines are not revived');
   assert.equal(solo.audio.stops,1);assert.equal(solo.audio.loops,1,'item music resumes for still-active effects');
-  const room=run({mp:true});assert.equal(room.G.startTime,4000);assert.equal(room.G.nextShiftAt,70000);assert.equal(room.audio.stops,1);
+  const room=run({mp:true});assert.equal(room.G.startTime,4000);assert.equal(room.G.nextShiftAt,70000);assert.equal(room.audio.stops,1);assert.equal(room.G.preWarned,true,'rooms keep the host clock and their warning');
 });
 
 test('touch controls keep the joystick thumb out of second-finger steals and pinch zoom; rank replies cannot go stale',()=>{

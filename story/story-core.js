@@ -400,6 +400,8 @@
     for (const value of rawBag) {
       const gear = validateGear(value);
       if (!gear || gearIds.has(gear.id)) return null;
+      // v1.61.1 · built-in robot parts never belong in the bag (v1.61.0 rift rewards could hand one out); drop them instead of rejecting the save.
+      if (GEAR[gear.kind]?.integrated) continue;
       gearIds.add(gear.id); gearBag.push(gear);
     }
     const rawStuns = run.monsterStuns === undefined ? {} : run.monsterStuns;
